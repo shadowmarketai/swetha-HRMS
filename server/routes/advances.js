@@ -1,0 +1,92 @@
+const router = require('express').Router();
+const pool = require('../config/db');
+const { verifyToken, requireRole } = require('../middleware/auth');
+const { body, validationResult } = require('express-validator');
+const { auditLog } = require('../middleware/audit');
+
+// GET /api/advances — list advances
+router.get('/', verifyToken, async (req, res) => {
+  try {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+    const offset = (page - 1) * limit;
+    if (!['MD', 'HR'].includes(req.user.role)) {
+      const [[{ total }]] = await pool.query('SELECT COUNT(*) as total FROM advance_requests WHERE emp_code = ?', [req.user.empCode]);
+      const [rows] = await pool.query('SELECT * FROM advance_requests WHERE emp_code = ? ORDER BY applied_date DESC LIMIT ? OFFSET ?', [req.user.empCode, limit, offset]);
+      return res.json({ data: rows, total, page, limit });
+    }
+    const [[{ total }]] = await pool.query('SELECT COUNT(*) as total FROM advance_requests');
+    const [rows] = await pool.query('SELECT * FROM advance_requests ORDER BY applied_date DESC LIMIT ? OFFSET ?', [limit, offset]);
+    res.json({ data: rows, total, page, limit });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/advances — create advance request
+router.post('/', verifyToken, [
+  body('type').trim().isIn(['site', 'salary', 'travel']).withMessage('Invalid advance type'),
+  body('amount').isNumeric().withMessage('Amount must be a number')
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
+  try {
+    const { type, amount, reason, details, project, category, travelFrom, travelTo, vehicle, travelKm, emiAmount, emiMonths, urgency } = req.body;
+    if (!type || !amount) return res.status(400).json({ error: 'Type and amount required' });
+
+    // Get employee info
+    const [emp] = await pool.query('SELECT name, dept FROM employees WHERE code = ?', [req.user.empCode]);
+    const empName = emp.length ? emp[0].name : '';
+    const dept = emp.length ? emp[0].dept : '';
+
+    const [result] = await pool.query(
+      `INSERT INTO advance_requests (type, emp_code, emp_name, dept, amount, reason, details, project, category,
+       travel_from, travel_to, vehicle, travel_km, emi_amount, emi_months, urgency, applied_date)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURDATE())`,
+      [type, req.user.empCode, empName, dept, amount, reason || '', details || '', project || '', category || '',
+       travelFrom || '', travelTo || '', vehicle || '', travelKm || 0, emiAmount || 0, emiMonths || 0, urgency || 'medium']
+    );
+    res.status(201).json({ message: 'Advance request submitted', id: result.insertId });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PATCH /api/advances/:id/approve
+router.patch('/:id/approve', verifyToken, requireRole('MD', 'HR'), auditLog('approve', 'advance'), async (req, res) => {
+  try {
+    const [existing] = await pool.query('SELECT status FROM advance_requests WHERE id = ?', [req.params.id]);
+    if (existing.length === 0) return res.status(404).json({ error: 'Advance request not found' });
+    if (existing[0].status !== 'Pending') return res.status(400).json({ error: `Cannot approve: status is ${existing[0].status}` });
+    await pool.query(
+      'UPDATE advance_requests SET status = "Approved", reviewed_by = ?, review_date = CURDATE() WHERE id = ?',
+      [req.user.empCode, req.params.id]
+    );
+    res.json({ message: 'Advance approved' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PATCH /api/advances/:id/reject
+router.patch('/:id/reject', verifyToken, requireRole('MD', 'HR'), auditLog('reject', 'advance'), async (req, res) => {
+  try {
+    const [existing] = await pool.query('SELECT status FROM advance_requests WHERE id = ?', [req.params.id]);
+    if (existing.length === 0) return res.status(404).json({ error: 'Advance request not found' });
+    if (existing[0].status !== 'Pending') return res.status(400).json({ error: `Cannot reject: status is ${existing[0].status}` });
+    const { reason } = req.body;
+    await pool.query(
+      'UPDATE advance_requests SET status = "Rejected", reviewed_by = ?, review_date = CURDATE(), reject_reason = ? WHERE id = ?',
+      [req.user.empCode, reason || '', req.params.id]
+    );
+    res.json({ message: 'Advance rejected' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+module.exports = router;

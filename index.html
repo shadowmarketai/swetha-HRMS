@@ -1,0 +1,1076 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+<meta name="theme-color" content="#E85D04">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="HRMS">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icons/icon-192.svg">
+<title>Swetha Structures — HRMS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<meta name="google-client-id" content="245239484935-upileff5mt7bahinfmm62a4tpfakpg9i.apps.googleusercontent.com">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="phone-frame" id="app">
+  <!-- LOGIN SCREEN -->
+  <div class="login-screen" id="loginScreen">
+    <div class="login-left">
+      <div class="login-logo"><img src="swetha_symbol.png" alt="Swetha Structures" style="width:90px;height:auto;object-fit:contain"></div>
+      <div class="login-title">SWETHA STRUCTURES</div>
+      <div class="login-tagline">Steel Building Specialist</div>
+      <div class="login-subtitle">Employee Management System</div>
+    </div>
+    <div class="login-right">
+      <div class="login-form">
+        <div class="login-field"><label>Employee Code / Phone</label><input type="text" id="loginId" placeholder="e.g. MD001, SSC006, SSC011" maxlength="50" autocomplete="username"></div>
+        <div class="login-field"><label>Password</label><input type="password" id="loginPass" placeholder="Enter password" maxlength="128" autocomplete="current-password"></div>
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <input type="checkbox" id="rememberMe" style="accent-color:white;width:16px;height:16px">
+          <label for="rememberMe" style="font-size:.72rem;opacity:.8;cursor:pointer">Remember me</label>
+        </div>
+        <button class="login-btn" id="signInBtn">Sign In</button>
+        <button class="login-btn" id="biometricBtn" style="margin-top:8px;background:transparent;color:white;border:1px solid rgba(255,255,255,.3)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><path d="M12 11c0-1.1.9-2 2-2s2 .9 2 2-2 4-2 4"/><path d="M8 11a4 4 0 0 1 8 0c0 2.5-2 5-4 6.5"/><path d="M6 11a6 6 0 0 1 12 0c0 4-3 7-6 9"/></svg>Biometric Login</button>
+        <div class="login-divider"><span>or</span></div>
+        <button class="google-signin-btn" id="googleSignInBtn"><svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59a14.5 14.5 0 0 1 0-9.18l-7.98-6.19a24.01 24.01 0 0 0 0 21.56l7.98-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg><span>Sign in with Google</span></button>
+        <div class="login-error" id="loginError"></div>
+      </div>
+      <div class="login-demo">
+        <p>Quick Demo Access</p>
+        <div class="demo-btns">
+          <button class="demo-btn" data-demo="MD">MD — Selvam</button>
+          <button class="demo-btn" data-demo="HR">HR — Priyanka</button>
+          <button class="demo-btn" data-demo="EMP">Employee — Vishnu</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <header class="app-header" id="appHeader" style="display:none">
+    <div class="header-logo">
+      <img src="swetha_symbol.png" alt="SS" style="width:30px;height:30px;object-fit:contain">
+      <span>Swetha Structures</span>
+    </div>
+    <div class="header-actions">
+      <span class="role-badge" id="roleBadge"></span>
+      <button class="header-btn md-only" id="locationBtn" onclick="showOverlay('location')" style="display:none"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></button>
+      <button class="header-btn" onclick="showOverlay('notifications')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><span class="badge"></span></button>
+      <button class="header-btn" id="adminBtn" onclick="showOverlay('admin')" style="display:none"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+      <button class="header-btn" id="settingsBtn" onclick="showOverlay('settings')"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.73 12.73 1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg></button>
+      <div class="avatar-sm" id="headerAvatar" onclick="showOverlay('profile')">VK</div>
+    </div>
+  </header>
+
+  <div class="app-content" id="appContent" role="main" style="display:none">
+    <!-- HOME -->
+    <div class="screen active" id="screen-home">
+      <div class="greeting fade-in">
+        <div class="time-label" id="timeLabel">Good Morning</div>
+        <h1 id="greetingName">Welcome <span class="wave">&#128075;</span></h1>
+      </div>
+      <div class="checkin-card fade-in">
+        <div class="checkin-status"><span class="dot"></span> Checked In</div>
+        <div class="checkin-time" id="currentTime">09:12 AM</div>
+        <div class="checkin-date" id="currentDate">Friday, 07 March 2026</div>
+        <div class="checkin-actions">
+          <button class="btn btn-solid-white" id="gpsCheckinBtn" onclick="gpsCheckIn()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Check In</button>
+          <button class="btn btn-white" onclick="gpsCheckOut()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Check Out</button>
+        </div>
+      </div>
+      <div class="section-title">Quick Actions</div>
+      <div class="quick-links fade-in">
+        <button class="quick-link" onclick="switchTab('site',document.querySelector('[data-tab=site]'))"><div class="ql-icon ql-site"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 20h20"/><path d="M5 20V8l7-5 7 5v12"/><rect x="9" y="12" width="6" height="8"/></svg></div><span>Site Advance</span></button>
+        <button class="quick-link" onclick="switchTab('advance',document.querySelector('[data-tab=advance]'))"><div class="ql-icon ql-advance"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div><span>Salary Advance</span></button>
+        <button class="quick-link" onclick="switchTab('ta',document.querySelector('[data-tab=ta]'))"><div class="ql-icon ql-ta"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div><span>TA &amp; Travel</span></button>
+        <button class="quick-link md-only hidden" onclick="showOverlay('location')"><div class="ql-icon ql-location"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div><span>Live Location</span></button>
+        <button class="quick-link md-hr-only hidden" onclick="showOverlay('onboarding')"><div class="ql-icon ql-onboard"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg></div><span>Add Employee</span></button>
+        <button class="quick-link" onclick="showOverlay('self-service')"><div class="ql-icon" style="background:linear-gradient(135deg,#DBEAFE,#BFDBFE);color:#2563EB"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><span>Self Service</span></button>
+      </div>
+      <div class="quick-links fade-in" style="margin-top:0">
+        <button class="quick-link" onclick="switchTab('progress',document.querySelector('[data-tab=progress]'))"><div class="ql-icon ql-progress"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div><span>Progress</span></button>
+        <button class="quick-link" onclick="switchTab('salary',document.querySelector('[data-tab=salary]'))"><div class="ql-icon ql-salary"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div><span>Salary Slip</span></button>
+        <button class="quick-link" onclick="switchTab('attendance',document.querySelector('[data-tab=attendance]'))"><div class="ql-icon ql-attendance"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg></div><span>Attendance</span></button>
+        <button class="quick-link" onclick="switchTab('leaves',document.querySelector('[data-tab=leaves]'))"><div class="ql-icon ql-leave"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/></svg></div><span>Apply Leave</span></button>
+      </div>
+      <div class="quick-links fade-in" style="margin-top:0">
+        <button class="quick-link" onclick="showOverlay('hr-kpi')"><div class="ql-icon" style="background:linear-gradient(135deg,#FFF7ED,#FFEDD5);color:#E85D04"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div><span>My KPI</span></button>
+        <button class="quick-link" onclick="showOverlay('hr-tasks')"><div class="ql-icon" style="background:linear-gradient(135deg,#FFEDD5,#FED7AA);color:#C2410C"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div><span>Tasks</span></button>
+        <button class="quick-link" onclick="showOverlay('hr-events')"><div class="ql-icon" style="background:linear-gradient(135deg,#FEF3C7,#FDE68A);color:#D97706"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><span>Events</span></button>
+        <button class="quick-link" onclick="switchTab('hr',document.querySelector('[data-tab=hr]'))"><div class="ql-icon" style="background:linear-gradient(135deg,#DBEAFE,#BFDBFE);color:#2563EB"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><span>HR Hub</span></button>
+      </div>
+      <div id="dashboardCelebrations"></div>
+      <div id="dashboardAnnouncements"></div>
+      <div class="section-title">Recent Activity</div>
+      <div class="card fade-in">
+        <div class="request-item">
+          <div class="req-icon" style="background:var(--orange-light);color:var(--orange-dark)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 20h20"/><path d="M5 20V8l7-5 7 5v12"/></svg></div>
+          <div class="req-info"><h4>Site Advance — Porur Project</h4><p>Material purchase &middot; &#8377;25,000</p></div>
+          <div class="req-meta"><div class="date">Today</div><span class="badge-status badge-pending">Pending</span></div>
+        </div>
+        <div class="request-item">
+          <div class="req-icon" style="background:var(--teal-light);color:var(--teal-dark)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+          <div class="req-info"><h4>Salary Advance — Balasubramaninam</h4><p>EMI: &#8377;15,000/month &middot; Balance: &#8377;1,05,000</p></div>
+          <div class="req-meta"><div class="date">02 Jan</div><span class="badge-status badge-approved">Active</span></div>
+        </div>
+        <div class="request-item">
+          <div class="req-icon" style="background:#FCE7F3;color:#BE185D"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div>
+          <div class="req-info"><h4>TA — Bike to Tambaram Site</h4><p>Krishna Gowri Sankar &middot; &#8377;539</p></div>
+          <div class="req-meta"><div class="date">Dec 25</div><span class="badge-status badge-approved">Approved</span></div>
+        </div>
+        <div class="request-item">
+          <div class="req-icon" style="background:var(--primary-50);color:var(--primary)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></div>
+          <div class="req-info"><h4>Dec 2025 Salary — Office Staff</h4><p>Total: &#8377;5,15,774 &middot; 17 staff</p></div>
+          <div class="req-meta"><div class="date">31 Dec</div><span class="badge-status badge-paid">Paid</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SITE ADVANCE & EXPENSES -->
+    <div class="screen" id="screen-site">
+      <button class="adv-pending-banner md-hr-only hidden" id="sitePendingBanner" onclick="showOverlay('advance-requests')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span id="sitePendingText">Pending Requests</span>
+        <span class="count-badge" id="sitePendingCount">0</span>
+      </button>
+      <div class="section-title" style="margin-top:4px">Site Advance &amp; Expenses</div>
+      <div class="location-bar fade-in">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        <div class="loc-text"><p>Location: Porur, Chennai</p><small>GPS tracking active &middot; 13.0382&#176;N, 80.1582&#176;E</small></div>
+        <div class="loc-live"></div>
+      </div>
+      <div class="summary-grid fade-in">
+        <div class="summary-card total"><div class="amount">&#8377;1.25L</div><div class="label">Total Advance</div></div>
+        <div class="summary-card approved"><div class="amount">&#8377;85K</div><div class="label">Settled</div></div>
+        <div class="summary-card pending"><div class="amount">&#8377;40K</div><div class="label">Pending</div></div>
+      </div>
+      <div class="section-title">Recent Site Expenses</div>
+      <div class="expense-item fade-in">
+        <div class="expense-icon" style="background:var(--orange-light);color:var(--orange-dark)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 20h20"/><path d="M5 20V8l7-5 7 5v12"/></svg></div>
+        <div class="expense-info"><h4>Cement &amp; Steel — Porur Site</h4><p>Material &middot; Bill attached</p></div>
+        <div class="expense-amount"><div class="value">&#8377;45,000</div><div class="date">05 Mar</div></div>
+      </div>
+      <div class="expense-item fade-in">
+        <div class="expense-icon" style="background:#DBEAFE;color:#2563EB"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="6" width="22" height="12" rx="2"/><path d="M1 10h22"/></svg></div>
+        <div class="expense-info"><h4>Labour Payment — Daily Wages</h4><p>Site Labour &middot; 8 workers</p></div>
+        <div class="expense-amount"><div class="value">&#8377;18,400</div><div class="date">04 Mar</div></div>
+      </div>
+      <div class="expense-item fade-in">
+        <div class="expense-icon" style="background:var(--success-light);color:var(--success-dark)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></div>
+        <div class="expense-info"><h4>Equipment Rental — JCB</h4><p>Machinery &middot; 2 days</p></div>
+        <div class="expense-amount"><div class="value">&#8377;12,000</div><div class="date">02 Mar</div></div>
+      </div>
+      <div class="section-title">Attach Bill</div>
+      <div class="camera-zone fade-in" onclick="document.getElementById('cameraInput').click()">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        <p>Tap to capture bill photo</p>
+        <small>Camera will open to scan receipt</small>
+        <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none" onchange="handleBillCapture(this)">
+      </div>
+      <div id="billPreview" style="display:none;margin-top:10px;text-align:center">
+        <img id="billImg" style="max-width:100%;border-radius:var(--radius);box-shadow:var(--shadow)">
+        <p style="font-size:.72rem;color:var(--success);font-weight:600;margin-top:8px">Bill captured successfully</p>
+      </div>
+      <div style="margin-top:12px">
+        <button class="btn btn-primary w-full" style="border-radius:var(--radius)" onclick="openAdvanceApplyForm('site')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New Site Expense</button>
+      </div>
+      <div class="my-requests-section" id="mySiteRequests"></div>
+    </div>
+
+    <!-- SALARY ADVANCE -->
+    <div class="screen" id="screen-advance">
+      <button class="adv-pending-banner md-hr-only hidden" id="advPendingBanner" onclick="showOverlay('advance-requests')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span id="advPendingText">Pending Requests</span>
+        <span class="count-badge" id="advPendingCount">0</span>
+      </button>
+      <div class="section-title" style="margin-top:4px">Salary Advance Tracker</div>
+      <div class="adv-tracker fade-in">
+        <div class="adv-tracker-header"><h4>Balasubramaninam</h4><div class="total">&#8377;1,05,000</div></div>
+        <div style="font-size:.7rem;color:var(--gray-400);margin-bottom:8px">Total Advance: &#8377;1,07,000 &middot; Deducted: &#8377;2,000 &middot; Bal: &#8377;1,05,000</div>
+        <div style="font-size:.72rem;color:var(--primary);font-weight:600;margin-bottom:8px">EMI: &#8377;15,000/month for 7 months</div>
+        <div class="adv-row"><span class="month">Feb 2026</span><span class="amt due">&#8377;15,000</span></div>
+        <div class="adv-row"><span class="month">Mar 2026</span><span class="amt due">&#8377;15,000</span></div>
+        <div class="adv-row"><span class="month">Apr 2026</span><span class="amt due">&#8377;15,000</span></div>
+        <div class="adv-row"><span class="month">May 2026</span><span class="amt due">&#8377;15,000</span></div>
+        <div class="adv-row"><span class="month">Jun 2026</span><span class="amt due">&#8377;15,000</span></div>
+        <div class="adv-row"><span class="month">Jul 2026</span><span class="amt due">&#8377;15,000</span></div>
+        <div class="adv-row"><span class="month">Aug 2026</span><span class="amt due">&#8377;15,000</span></div>
+      </div>
+      <div class="adv-tracker fade-in">
+        <div class="adv-tracker-header"><h4>Yuvaraja</h4><div class="total">&#8377;7,500</div></div>
+        <div style="font-size:.7rem;color:var(--gray-400);margin-bottom:8px">Total Advance: &#8377;7,500 &middot; Deducted: &#8377;5,000 (Dec) &middot; Bal: &#8377;0</div>
+        <div class="adv-row"><span class="month">Dec 2025 (Deducted)</span><span class="amt paid">&#8377;5,000</span></div>
+        <div class="adv-row"><span class="month">Remaining</span><span class="amt" style="color:var(--gray-500)">&#8377;0</span></div>
+      </div>
+      <div class="adv-tracker fade-in">
+        <div class="adv-tracker-header"><h4>Sankavai</h4><div class="total">&#8377;15,000</div></div>
+        <div style="font-size:.7rem;color:var(--gray-400);margin-bottom:8px">Loan amount: &#8377;15,000 &middot; Feb 26 – Jul 26</div>
+        <div class="adv-row"><span class="month">Feb 2026</span><span class="amt due">&#8377;2,500</span></div>
+        <div class="adv-row"><span class="month">Mar – Jul 2026</span><span class="amt due">&#8377;2,500/mo</span></div>
+      </div>
+      <div class="adv-tracker fade-in">
+        <div class="adv-tracker-header"><h4>Praveen</h4><div class="total">&#8377;15,000</div></div>
+        <div style="font-size:.7rem;color:var(--gray-400);margin-bottom:8px">Cash Advance: &#8377;15,000 &middot; Deducted from Dec salary</div>
+        <div class="adv-row"><span class="month">Dec 2025 (Adjusted)</span><span class="amt paid">-&#8377;15,000</span></div>
+        <div class="adv-row"><span class="month">Net Salary</span><span class="amt" style="color:var(--gray-800)">&#8377;32,581</span></div>
+      </div>
+      <div class="adv-tracker fade-in">
+        <div class="adv-tracker-header"><h4>Manikandan (PEB)</h4><div class="total">&#8377;5,000</div></div>
+        <div style="font-size:.7rem;color:var(--gray-400);margin-bottom:8px">Cash Advance: &#8377;5,000 &middot; Deducted from Dec salary</div>
+        <div class="adv-row"><span class="month">Dec 2025 (Adjusted)</span><span class="amt paid">-&#8377;5,000</span></div>
+        <div class="adv-row"><span class="month">Net Salary</span><span class="amt" style="color:var(--gray-800)">&#8377;15,323</span></div>
+      </div>
+      <div style="margin-top:12px">
+        <button class="btn btn-primary w-full" style="border-radius:var(--radius)" onclick="openAdvanceApplyForm('salary')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New Salary Advance</button>
+      </div>
+      <div class="my-requests-section" id="myAdvanceRequests"></div>
+    </div>
+
+    <!-- TA - BIKE, CAR & OTHER -->
+    <div class="screen" id="screen-ta">
+      <button class="adv-pending-banner md-hr-only hidden" id="taPendingBanner" onclick="showOverlay('advance-requests')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span id="taPendingText">Pending Requests</span>
+        <span class="count-badge" id="taPendingCount">0</span>
+      </button>
+      <div class="section-title" style="margin-top:4px">Travel Allowance — Dec 2025</div>
+      <div class="location-bar fade-in">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        <div class="loc-text"><p>Live Tracking Enabled</p><small>Auto-calculates distance for TA claims</small></div>
+        <div class="loc-live"></div>
+      </div>
+      <div class="summary-grid fade-in">
+        <div class="summary-card total"><div class="amount">&#8377;3,550</div><div class="label">Total TA</div></div>
+        <div class="summary-card approved"><div class="amount">8</div><div class="label">Staff Claims</div></div>
+        <div class="summary-card pending"><div class="amount">&#8377;539</div><div class="label">Highest</div></div>
+      </div>
+      <div class="section-title">TA by Employee (Factory)</div>
+      <div class="ta-type-card fade-in">
+        <div class="ta-icon" style="background:#FEF3C7;color:#D97706">&#128661;</div>
+        <div class="ta-info"><h4>Krishna Gowri Sankar.S</h4><p>Bike &middot; Tambaram to Factory</p></div>
+        <div class="ta-amount" style="color:var(--success-dark)">&#8377;539</div>
+      </div>
+      <div class="ta-type-card fade-in">
+        <div class="ta-icon" style="background:#DBEAFE;color:#2563EB">&#128661;</div>
+        <div class="ta-info"><h4>Shanmugam.G</h4><p>Bike &middot; Daily commute</p></div>
+        <div class="ta-amount" style="color:var(--success-dark)">&#8377;461</div>
+      </div>
+      <div class="ta-type-card fade-in">
+        <div class="ta-icon" style="background:#FFF7ED;color:#E85D04">&#128661;</div>
+        <div class="ta-info"><h4>Karthikeyan</h4><p>Bike &middot; Site visit travel</p></div>
+        <div class="ta-amount" style="color:var(--success-dark)">&#8377;390</div>
+      </div>
+      <div class="ta-type-card fade-in">
+        <div class="ta-icon" style="background:var(--danger-light);color:var(--danger)">&#128661;</div>
+        <div class="ta-info"><h4>Vijaya Kumar</h4><p>Bike &middot; Multi-site travel</p></div>
+        <div class="ta-amount" style="color:var(--success-dark)">&#8377;585</div>
+      </div>
+      <div class="ta-type-card fade-in">
+        <div class="ta-icon" style="background:var(--success-light);color:var(--success-dark)">&#128661;</div>
+        <div class="ta-info"><h4>Govarthanan</h4><p>Bike &middot; Factory commute</p></div>
+        <div class="ta-amount" style="color:var(--success-dark)">&#8377;1,014</div>
+      </div>
+      <div class="ta-type-card fade-in">
+        <div class="ta-icon" style="background:var(--orange-light);color:var(--orange-dark)">&#128661;</div>
+        <div class="ta-info"><h4>Lingeswaran</h4><p>Bike &middot; Daily</p></div>
+        <div class="ta-amount" style="color:var(--success-dark)">&#8377;396</div>
+      </div>
+      <div class="ta-type-card fade-in">
+        <div class="ta-icon" style="background:var(--teal-light);color:var(--teal-dark)">&#128661;</div>
+        <div class="ta-info"><h4>Udhaya Shankar</h4><p>Bike &middot; Factory travel</p></div>
+        <div class="ta-amount" style="color:var(--success-dark)">&#8377;165</div>
+      </div>
+      <div class="section-title">Attach Bill / Receipt</div>
+      <div class="camera-zone fade-in" onclick="document.getElementById('taCameraInput').click()">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        <p>Capture fuel bill / toll receipt</p>
+        <small>Photo will be attached to TA claim</small>
+        <input type="file" id="taCameraInput" accept="image/*" capture="environment" style="display:none" onchange="handleBillCapture(this)">
+      </div>
+      <div style="margin-top:12px">
+        <button class="btn btn-primary w-full" style="border-radius:var(--radius)" onclick="openAdvanceApplyForm('travel')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New TA Claim</button>
+      </div>
+      <div class="my-requests-section" id="myTravelRequests"></div>
+    </div>
+
+    <!-- PROGRESS REPORT -->
+    <div class="screen" id="screen-progress">
+      <div class="section-title" style="margin-top:4px">Project Progress — March 2026</div>
+      <div class="progress-card fade-in">
+        <div class="progress-header"><h4>Porur Villa Project</h4><span class="badge-status badge-open">In Progress</span></div>
+        <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:72%;background:linear-gradient(90deg,var(--primary),var(--primary-light))"></div></div>
+        <div class="progress-meta"><span>72% Complete</span><span>Target: Apr 2026</span></div>
+      </div>
+      <div class="progress-card fade-in">
+        <div class="progress-header"><h4>Tambaram Warehouse</h4><span class="badge-status badge-pending">Delayed</span></div>
+        <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:45%;background:linear-gradient(90deg,var(--warning),#FBBF24)"></div></div>
+        <div class="progress-meta"><span>45% Complete</span><span>Target: Jun 2026</span></div>
+      </div>
+      <div class="progress-card fade-in">
+        <div class="progress-header"><h4>PEB Factory Extension</h4><span class="badge-status badge-approved">On Track</span></div>
+        <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:88%;background:linear-gradient(90deg,var(--success),#4ADE80)"></div></div>
+        <div class="progress-meta"><span>88% Complete</span><span>Target: Mar 2026</span></div>
+      </div>
+      <div class="progress-card fade-in">
+        <div class="progress-header"><h4>Guduvanchery Residence</h4><span class="badge-status badge-open">In Progress</span></div>
+        <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:30%;background:linear-gradient(90deg,var(--primary),var(--primary-light))"></div></div>
+        <div class="progress-meta"><span>30% Complete</span><span>Target: Aug 2026</span></div>
+      </div>
+      <div class="section-title">Staff Deployment</div>
+      <div class="dept-grid fade-in">
+        <div class="dept-card office"><div class="dept-name">Office Staff</div><div class="dept-amount">17</div><div class="dept-count">Active employees</div></div>
+        <div class="dept-card site"><div class="dept-name">Site Staff</div><div class="dept-amount">15</div><div class="dept-count">Active employees</div></div>
+        <div class="dept-card factory"><div class="dept-name">Factory Staff</div><div class="dept-amount">14</div><div class="dept-count">Incl. PEB company</div></div>
+        <div class="dept-card garden"><div class="dept-name">Garden Labour</div><div class="dept-amount">5</div><div class="dept-count">Security + Gardener</div></div>
+      </div>
+    </div>
+
+    <!-- ATTENDANCE -->
+    <div class="screen" id="screen-attendance">
+      <div class="section-title" style="margin-top:4px">March 2026</div>
+      <div class="card calendar-card fade-in" id="calendarCard">
+        <div class="cal-header"><h3>Attendance Calendar</h3><div class="cal-nav"><button><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button><button><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg></button></div></div>
+        <div class="cal-days" id="calDays"></div>
+        <div class="cal-legend">
+          <div class="cal-legend-item"><span class="dot" style="background:var(--success)"></span>Present</div>
+          <div class="cal-legend-item"><span class="dot" style="background:var(--danger)"></span>Absent</div>
+          <div class="cal-legend-item"><span class="dot" style="background:var(--warning)"></span>Half Day</div>
+          <div class="cal-legend-item"><span class="dot" style="background:var(--primary-light)"></span>Leave</div>
+          <div class="cal-legend-item"><span class="dot" style="background:var(--gray-400)"></span>Holiday</div>
+        </div>
+      </div>
+      <div class="section-title">Shifts</div>
+      <div class="shift-card fade-in"><div class="shift-icon" style="background:#FFF7ED;color:#E85D04">&#127749;</div><div class="shift-info"><h4>General Shift</h4><p>Today &middot; Swetha Structures</p></div><div class="shift-time">09:00 — 18:00</div></div>
+      <div class="shift-card fade-in"><div class="shift-icon" style="background:#FEF3C7;color:#D97706">&#127780;</div><div class="shift-info"><h4>General Shift</h4><p>Tomorrow &middot; Swetha Structures</p></div><div class="shift-time">09:00 — 18:00</div></div>
+      <div class="md-hr-only"><button class="payroll-report-btn" onclick="downloadAttendanceReport()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download Attendance Report (PDF)</button></div>
+    </div>
+
+    <!-- LEAVES -->
+    <div class="screen" id="screen-leaves">
+      <div id="leaveBalanceGrid"></div>
+      <div class="tab-pills" id="leaveTabPills"><button class="tab-pill active" data-ltab="my" onclick="switchLeaveTab('my',this)">My Leaves</button><button class="tab-pill" data-ltab="team" onclick="switchLeaveTab('team',this)">Team Leaves</button><button class="tab-pill" data-ltab="holidays" onclick="switchLeaveTab('holidays',this)">Holidays</button></div>
+      <div id="myLeavesTab" class="card fade-in"></div>
+      <div id="teamLeavesTab" class="card fade-in" style="display:none"></div>
+      <div id="holidaysTab" style="display:none"><div class="card fade-in">
+        <div class="holiday-item"><div class="holiday-date-box"><span class="day">14</span><span class="month">Mar</span></div><div class="holiday-info"><h4>Holi</h4><p>Saturday &middot; Gazetted Holiday</p></div></div>
+        <div class="holiday-item"><div class="holiday-date-box"><span class="day">30</span><span class="month">Mar</span></div><div class="holiday-info"><h4>Id-ul-Fitr</h4><p>Monday &middot; Gazetted Holiday</p></div></div>
+        <div class="holiday-item"><div class="holiday-date-box"><span class="day">14</span><span class="month">Apr</span></div><div class="holiday-info"><h4>Dr. Ambedkar Jayanti</h4><p>Tuesday &middot; Gazetted Holiday</p></div></div>
+      </div></div>
+      <div style="margin-top:12px"><button class="btn btn-primary w-full" style="border-radius:var(--radius)" onclick="openLeaveForm()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Apply for Leave</button></div>
+    </div>
+
+    <!-- EXPENSES -->
+    <div class="screen" id="screen-expenses">
+      <div class="section-title" style="margin-top:4px">December 2025 — Overall</div>
+      <div class="summary-grid fade-in">
+        <div class="summary-card total"><div class="amount">&#8377;12.52L</div><div class="label">Total Salary</div></div>
+        <div class="summary-card approved"><div class="amount">&#8377;9.07L</div><div class="label">NEFT</div></div>
+        <div class="summary-card pending"><div class="amount">&#8377;3.41L</div><div class="label">Other A/c</div></div>
+      </div>
+      <div class="advance-card fade-in" style="margin-bottom:8px"><div><h4>Cash Payment</h4><p>Garden labour — Cash component</p></div><div class="advance-amount">&#8377;4,000</div></div>
+      <div class="section-title">Department Breakdown</div>
+      <div class="dept-grid fade-in">
+        <div class="dept-card office"><div class="dept-name">Office</div><div class="dept-amount">&#8377;5,15,774</div><div class="dept-count">17 staff &middot; NEFT</div></div>
+        <div class="dept-card site"><div class="dept-name">Site</div><div class="dept-amount">&#8377;3,47,323</div><div class="dept-count">15 staff &middot; NEFT</div></div>
+        <div class="dept-card factory"><div class="dept-name">Factory</div><div class="dept-amount">&#8377;3,55,098</div><div class="dept-count">14 staff &middot; NEFT</div></div>
+        <div class="dept-card garden"><div class="dept-name">Garden</div><div class="dept-amount">&#8377;34,250</div><div class="dept-count">5 labour &middot; NEFT+Cash</div></div>
+      </div>
+      <div class="md-hr-only"><button class="payroll-report-btn" onclick="downloadPayrollReport()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download Payroll Report (PDF)</button></div>
+      <div class="md-hr-only" style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+        <button class="payroll-report-btn" style="background:linear-gradient(135deg,#14B8A6,#0F766E)" onclick="downloadBankNEFTFile()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>Download Bank NEFT File (CSV)</button>
+        <button class="payroll-report-btn" style="background:linear-gradient(135deg,#3B82F6,#1D4ED8)" onclick="downloadPFECRFile()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Download PF ECR File</button>
+        <button class="payroll-report-btn" style="background:linear-gradient(135deg,#8B5CF6,#6D28D9)" onclick="downloadESIReturnFile()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Download ESI Return (CSV)</button>
+      </div>
+    </div>
+
+    <!-- SALARY -->
+    <div class="screen" id="screen-salary">
+      <div id="salaryContent"></div>
+    </div>
+
+    <!-- HR HUB -->
+    <div class="screen" id="screen-hr">
+      <div class="section-title" style="margin-top:4px">HR Hub</div>
+      <div class="hr-hub-grid">
+        <button class="hr-hub-card" onclick="showOverlay('hr-kpi')">
+          <div class="hc-icon" style="background:linear-gradient(135deg,#FFF7ED,#FFEDD5);color:#E85D04">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          </div>
+          <span>KPI &amp; Performance</span>
+        </button>
+        <button class="hr-hub-card md-hr-only" onclick="showOverlay('hr-recruit')">
+          <div class="hc-icon" style="background:linear-gradient(135deg,#DBEAFE,#BFDBFE);color:#2563EB">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+          </div>
+          <span>Recruitment</span>
+        </button>
+        <button class="hr-hub-card" onclick="showOverlay('hr-documents')">
+          <div class="hc-icon" style="background:linear-gradient(135deg,#D1FAE5,#A7F3D0);color:#059669">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          </div>
+          <span>Legal Docs</span>
+        </button>
+        <button class="hr-hub-card" onclick="showOverlay('hr-career')">
+          <div class="hc-icon" style="background:linear-gradient(135deg,#FEF3C7,#FDE68A);color:#D97706">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+          </div>
+          <span>Career Ladder</span>
+        </button>
+        <button class="hr-hub-card md-hr-only" onclick="showOverlay('hr-incentive')">
+          <div class="hc-icon" style="background:linear-gradient(135deg,#CCFBF1,#99F6E4);color:#0F766E">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><path d="M12 22V7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>
+          </div>
+          <span>Incentive &amp; Pay</span>
+        </button>
+        <button class="hr-hub-card" onclick="showOverlay('hr-temperament')">
+          <div class="hc-icon" style="background:linear-gradient(135deg,#FCE7F3,#FBCFE8);color:#BE185D">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          </div>
+          <span>Temperament</span>
+        </button>
+        <button class="hr-hub-card" onclick="showOverlay('hr-tasks')">
+          <div class="hc-icon" style="background:linear-gradient(135deg,#FFEDD5,#FED7AA);color:#C2410C">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          </div>
+          <span>Tasks &amp; To-Do</span>
+        </button>
+        <button class="hr-hub-card" onclick="showOverlay('hr-skills')">
+          <div class="hc-icon" style="background:linear-gradient(135deg,#FED7AA,#FDBA74);color:#C2410C">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+          </div>
+          <span>Skills Matrix</span>
+        </button>
+        <button class="hr-hub-card md-hr-only" onclick="showOverlay('hr-hotseat')">
+          <div class="hc-icon" style="background:linear-gradient(135deg,#FEE2E2,#FECACA);color:#DC2626">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2c0 0-4 4-4 9a4 4 0 0 0 8 0c0-5-4-9-4-9z"/><path d="M12 11c0 0-2 2-2 4.5a2 2 0 0 0 4 0C14 13 12 11 12 11z"/></svg>
+          </div>
+          <span>HOT Seat</span>
+        </button>
+        <button class="hr-hub-card" onclick="showOverlay('hr-vision')">
+          <div class="hc-icon" style="background:linear-gradient(135deg,#CCFBF1,#99F6E4);color:#0F766E">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </div>
+          <span>Vision</span>
+        </button>
+        <button class="hr-hub-card" onclick="showOverlay('hr-events')">
+          <div class="hc-icon" style="background:linear-gradient(135deg,#FEF3C7,#FDE68A);color:#D97706">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          </div>
+          <span>Events &amp; Awards</span>
+        </button>
+        <button class="hr-hub-card md-hr-only" onclick="showOverlay('hr-analytics')">
+          <div class="hc-icon" style="background:linear-gradient(135deg,#FFF7ED,#FFEDD5);color:#E85D04">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          </div>
+          <span>HR Analytics</span>
+        </button>
+        <button class="hr-hub-card md-hr-only" onclick="showOverlay('hr-shifts')">
+          <div class="hc-icon" style="background:linear-gradient(135deg,#EDE9FE,#DDD6FE);color:#7C3AED">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+          </div>
+          <span>Shifts</span>
+        </button>
+        <button class="hr-hub-card" onclick="showOverlay('hr-expenses')">
+          <div class="hc-icon" style="background:linear-gradient(135deg,#CCFBF1,#99F6E4);color:#0F766E">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+          </div>
+          <span>Expenses</span>
+        </button>
+        <button class="hr-hub-card" onclick="showOverlay('hr-tax')">
+          <div class="hc-icon" style="background:linear-gradient(135deg,#DBEAFE,#BFDBFE);color:#2563EB">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+          </div>
+          <span>Form 16 &amp; Tax</span>
+        </button>
+        <button class="hr-hub-card md-hr-only" onclick="showOverlay('hr-compliance')">
+          <div class="hc-icon" style="background:linear-gradient(135deg,#FEE2E2,#FECACA);color:#DC2626">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <span>Compliance</span>
+        </button>
+        <button class="hr-hub-card md-hr-only" onclick="showOverlay('hr-assets')">
+          <div class="hc-icon" style="background:linear-gradient(135deg,#FEF3C7,#FDE68A);color:#D97706">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a4 4 0 0 0-8 0v2"/></svg>
+          </div>
+          <span>Assets</span>
+        </button>
+        <button class="hr-hub-card md-hr-only" onclick="showOverlay('hr-exit')">
+          <div class="hc-icon" style="background:linear-gradient(135deg,#FCE7F3,#FBCFE8);color:#BE185D">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          </div>
+          <span>Exit &amp; F&amp;F</span>
+        </button>
+        <button class="hr-hub-card" onclick="showOverlay('hr-orgchart')">
+          <div class="hc-icon" style="background:linear-gradient(135deg,#D1FAE5,#A7F3D0);color:#059669">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="4" rx="1"/><rect x="2" y="18" width="6" height="4" rx="1"/><rect x="16" y="18" width="6" height="4" rx="1"/><line x1="12" y1="6" x2="12" y2="14"/><line x1="5" y1="14" x2="19" y2="14"/><line x1="5" y1="14" x2="5" y2="18"/><line x1="19" y1="14" x2="19" y2="18"/></svg>
+          </div>
+          <span>Org Chart</span>
+        </button>
+        <button class="hr-hub-card" onclick="showOverlay('hr-announcements')">
+          <div class="hc-icon" style="background:linear-gradient(135deg,#FFEDD5,#FED7AA);color:#C2410C">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 17H2a3 3 0 0 0 3-3V9a7 7 0 0 1 14 0v5a3 3 0 0 0 3 3zm-8.27 4a2 2 0 0 1-3.46 0"/></svg>
+          </div>
+          <span>Announcements</span>
+        </button>
+        <button class="hr-hub-card" onclick="showOverlay('hr-celebrations')">
+          <div class="hc-icon" style="background:linear-gradient(135deg,#FFF7ED,#FFEDD5);color:#E85D04">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </div>
+          <span>Celebrations</span>
+        </button>
+      </div>
+      <div class="section-title">Quick Links</div>
+      <div class="quick-links fade-in">
+        <button class="quick-link" onclick="showOverlay('hr-kpi')"><div class="ql-icon" style="background:linear-gradient(135deg,#FFF7ED,#FFEDD5);color:#E85D04"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div><span>My KPI</span></button>
+        <button class="quick-link" onclick="showOverlay('hr-tasks')"><div class="ql-icon" style="background:linear-gradient(135deg,#FFEDD5,#FED7AA);color:#C2410C"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div><span>Tasks</span></button>
+        <button class="quick-link" onclick="showOverlay('hr-events')"><div class="ql-icon" style="background:linear-gradient(135deg,#FEF3C7,#FDE68A);color:#D97706"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><span>Events</span></button>
+        <button class="quick-link md-hr-only" onclick="showOverlay('hr-analytics')"><div class="ql-icon" style="background:linear-gradient(135deg,#DBEAFE,#BFDBFE);color:#2563EB"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><span>Analytics</span></button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- OVERLAYS -->
+  <div class="overlay-screen" id="overlay-profile" role="dialog" aria-modal="true" aria-label="Profile">
+    <div class="overlay-header"><button class="back-btn" aria-label="Go back" onclick="hideOverlay('profile')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button><h2>My Profile</h2></div>
+    <div class="card profile-card" style="margin:16px;border-radius:var(--radius)">
+      <div class="profile-avatar">VK</div>
+      <h2>Vishnu Kumar</h2>
+      <div class="designation">Office Staff</div>
+      <div class="emp-id">SSC011</div>
+    </div>
+    <div class="card profile-section" style="margin:0 16px 12px;border-radius:var(--radius)">
+      <div style="font-family:var(--font-display);font-weight:600;font-size:.82rem;margin-bottom:8px;color:var(--gray-500)">Salary Details (Dec 2025)</div>
+      <div class="profile-row"><span class="label">Monthly Salary</span><span class="value">&#8377;1,00,000</span></div>
+      <div class="profile-row"><span class="label">Per Day Salary</span><span class="value">&#8377;3,225.81</span></div>
+      <div class="profile-row"><span class="label">Working Days</span><span class="value">31</span></div>
+      <div class="profile-row"><span class="label">Leave Days</span><span class="value">1 (CL: 1)</span></div>
+      <div class="profile-row"><span class="label">Worked Days</span><span class="value">31</span></div>
+      <div class="profile-row"><span class="label">Net Salary</span><span class="value" style="color:var(--success-dark)">&#8377;1,00,000</span></div>
+    </div>
+    <div class="card profile-section" style="margin:0 16px 12px;border-radius:var(--radius)">
+      <div style="font-family:var(--font-display);font-weight:600;font-size:.82rem;margin-bottom:8px;color:var(--gray-500)">Company Details</div>
+      <div class="profile-row"><span class="label">Company</span><span class="value">Swetha Structures Pvt Ltd</span></div>
+      <div class="profile-row"><span class="label">Department</span><span class="value">Office</span></div>
+      <div class="profile-row"><span class="label">Bank Account</span><span class="value">UOB — 2524***2932</span></div>
+      <div class="profile-row"><span class="label">Employee Code</span><span class="value">SSC011</span></div>
+      <div class="profile-row"><span class="label">Payment Mode</span><span class="value">NEFT</span></div>
+    </div>
+    <div style="padding:0 16px 8px"><button class="payroll-report-btn" onclick="downloadIDCard()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>Download ID Card (PDF)</button></div>
+    <div style="padding:0 16px 24px"><button class="btn btn-outline w-full" style="border-radius:var(--radius);color:var(--danger);border-color:var(--danger-light)" onclick="doLogout()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Log Out</button></div>
+  </div>
+
+  <div class="overlay-screen" id="overlay-notifications" role="dialog" aria-modal="true" aria-label="Notifications">
+    <div class="overlay-header"><button class="back-btn" aria-label="Go back" onclick="hideOverlay('notifications')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button><h2>Notifications</h2><div style="margin-left:auto;font-size:.72rem;color:var(--primary);font-weight:600;cursor:pointer" onclick="markAllNotifRead()">Mark all read</div></div>
+    <div id="notifListContainer"></div>
+  </div>
+
+  <!-- LEAVE FORM BOTTOM SHEET -->
+  <div class="leave-form-overlay" id="leaveFormOverlay" onclick="if(event.target===this)closeLeaveForm()">
+    <div class="leave-form-sheet">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <h3 style="font-family:var(--font-display);font-size:1rem;font-weight:700">Apply for Leave</h3>
+        <button style="background:none;border:none;cursor:pointer;font-size:1.2rem;color:var(--gray-400)" onclick="closeLeaveForm()">&times;</button>
+      </div>
+      <div class="leave-type-pills" id="leaveTypePills">
+        <div class="lt-pill active" onclick="selectLeaveType('casual',this)">Casual</div>
+        <div class="lt-pill" onclick="selectLeaveType('earned',this)">Earned</div>
+        <div class="lt-pill" onclick="selectLeaveType('sick',this)">Sick</div>
+        <div class="lt-pill" onclick="selectLeaveType('comp',this)">Comp Off</div>
+      </div>
+      <div class="form-row"><label>From Date</label><input type="date" id="leaveFromDate" onclick="this.showPicker&&this.showPicker()"></div>
+      <div class="form-row"><label>To Date</label><input type="date" id="leaveToDate" onclick="this.showPicker&&this.showPicker()"></div>
+      <div class="form-row"><label>Reason</label><textarea id="leaveReason" placeholder="Enter reason for leave..." rows="3"></textarea></div>
+      <button class="btn btn-primary w-full" style="border-radius:var(--radius-sm);margin-top:8px" onclick="submitLeave()">Submit Leave Application</button>
+    </div>
+  </div>
+
+  <div class="overlay-screen" id="overlay-settings" role="dialog" aria-modal="true" aria-label="Settings">
+    <div class="overlay-header"><button class="back-btn" aria-label="Go back" onclick="hideOverlay('settings')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button><h2>Settings</h2></div>
+    <div style="padding:16px">
+      <div class="section-title" style="margin-top:4px">Preferences</div>
+      <div class="setting-row"><div class="setting-info"><h4>Dark Mode</h4><p>Switch to dark color scheme</p></div><button class="toggle" id="darkModeToggle" onclick="toggleDarkMode()"></button></div>
+      <div class="setting-row"><div class="setting-info"><h4>Push Notifications</h4><p>Alerts for approvals, salary, advances</p></div><button class="toggle on" onclick="this.classList.toggle('on');requestNotificationPermission()"></button></div>
+      <div class="setting-row"><div class="setting-info"><h4>Location Tracking</h4><p>GPS tracking for site expenses &amp; TA</p></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
+      <div class="setting-row"><div class="setting-info"><h4>Camera Auto-attach</h4><p>Auto-prompt camera for bill capture</p></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
+      <div class="setting-row"><div class="setting-info"><h4>Biometric Login</h4><p>Use fingerprint or face ID</p></div><button class="toggle" id="biometricToggle" onclick="this.classList.toggle('on');if(this.classList.contains('on'))registerBiometric()"></button></div>
+
+      <div class="section-title">Notification Preferences</div>
+      <div class="setting-row"><div class="setting-info"><h4>Salary Slip Alerts</h4><p>Notify on salary slip download</p></div><button class="toggle on" id="notifPrefSalary" onclick="toggleNotifPref('salary',this)"></button></div>
+      <div class="setting-row"><div class="setting-info"><h4>Leave Alerts</h4><p>Notify on leave submit/approve</p></div><button class="toggle on" id="notifPrefLeave" onclick="toggleNotifPref('leave',this)"></button></div>
+      <div class="setting-row"><div class="setting-info"><h4>Advance Alerts</h4><p>Notify on advance approve/reject</p></div><button class="toggle on" id="notifPrefAdvance" onclick="toggleNotifPref('advance',this)"></button></div>
+      <div class="setting-row"><div class="setting-info"><h4>Payroll Alerts</h4><p>Notify on payroll report generation</p></div><button class="toggle on" id="notifPrefPayroll" onclick="toggleNotifPref('payroll',this)"></button></div>
+
+      <div class="section-title">Change Password</div>
+      <div class="card fade-in" style="padding:14px;margin-bottom:12px">
+        <div class="form-row"><label>Current Password</label><input type="password" id="chgOldPass" placeholder="Enter current password"></div>
+        <div class="form-row"><label>New Password</label><input type="password" id="chgNewPass" placeholder="Enter new password"></div>
+        <div class="form-row"><label>Confirm New Password</label><input type="password" id="chgConfirmPass" placeholder="Confirm new password"></div>
+        <button class="btn btn-primary w-full" style="border-radius:var(--radius-sm);margin-top:8px" onclick="changePassword()">Update Password</button>
+      </div>
+
+      <div class="section-title">Export Data</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+        <button class="btn btn-sm btn-outline" onclick="exportEmployeeList()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Employees</button>
+        <button class="btn btn-sm btn-outline" onclick="exportKPIReport()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> KPI Scores</button>
+        <button class="btn btn-sm btn-outline" onclick="exportSalaryReport()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Salary</button>
+        <button class="btn btn-sm btn-outline" onclick="exportAttendanceReport()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Attendance</button>
+        <button class="btn btn-sm btn-outline" onclick="exportTaskReport()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Tasks</button>
+        <button class="btn btn-sm btn-outline" onclick="exportAdvanceReport()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Advances</button>
+        <button class="btn btn-sm btn-outline" onclick="exportAnalyticsReport()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Analytics</button>
+        <button class="btn btn-sm btn-outline" onclick="exportIncentiveReport()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Incentives</button>
+      </div>
+
+      <div class="section-title">Data Management</div>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <button class="btn" style="flex:1;background:var(--primary-50);color:var(--primary);border-radius:var(--radius-sm)" onclick="exportAllData()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Export Data</button>
+        <button class="btn" style="flex:1;background:var(--success-light);color:var(--success-dark);border-radius:var(--radius-sm)" onclick="importAllData()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Import Data</button>
+      </div>
+      <button class="btn w-full" style="background:var(--danger-light);color:var(--danger-dark);border-radius:var(--radius-sm);margin-bottom:8px" onclick="clearAllData()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Reset All Data to Defaults</button>
+
+      <div style="margin-top:24px;text-align:center"><div style="font-size:.72rem;color:var(--gray-400)">Swetha Structures HRMS v3.0</div><div style="font-size:.65rem;color:var(--gray-300);margin-top:2px">Swetha Structures Private Limited</div></div>
+    </div>
+  </div>
+
+  <!-- ONBOARDING WIZARD OVERLAY -->
+  <div class="overlay-screen" id="overlay-onboarding" role="dialog" aria-modal="true" aria-label="Onboarding">
+    <div class="overlay-header"><button class="back-btn" aria-label="Go back" onclick="hideOverlay('onboarding')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button><h2>Add New Employee</h2></div>
+    <div class="wizard-steps" id="wizardSteps">
+      <div class="wizard-step active" data-step="1"><div class="step-dot">1</div><div class="step-label">Personal</div></div>
+      <div class="wizard-step" data-step="2"><div class="step-dot">2</div><div class="step-label">Company</div></div>
+      <div class="wizard-step" data-step="3"><div class="step-dot">3</div><div class="step-label">Salary</div></div>
+      <div class="wizard-step" data-step="4"><div class="step-dot">4</div><div class="step-label">Emergency</div></div>
+      <div class="wizard-step" data-step="5"><div class="step-dot">5</div><div class="step-label">Documents</div></div>
+    </div>
+    <div id="wizardContent">
+      <!-- Step 1: Personal -->
+      <div class="wizard-body" id="wizStep1">
+        <div class="section-label">Personal Information</div>
+        <div class="photo-upload" onclick="document.getElementById('empPhotoInput').click()"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg><span>Photo</span></div>
+        <input type="file" id="empPhotoInput" accept="image/*" style="display:none">
+        <div class="form-row"><label>Full Name *</label><input type="text" id="obName" placeholder="Enter full name"></div>
+        <div class="form-grid">
+          <div class="form-row"><label>Phone *</label><input type="tel" id="obPhone" placeholder="Mobile number"></div>
+          <div class="form-row"><label>Email</label><input type="email" id="obEmail" placeholder="Email address"></div>
+        </div>
+        <div class="form-grid">
+          <div class="form-row"><label>Date of Birth</label><input type="date" id="obDob"></div>
+          <div class="form-row"><label>Gender</label><select id="obGender"><option value="">Select</option><option>Male</option><option>Female</option><option>Other</option></select></div>
+        </div>
+        <div class="form-row"><label>Address</label><textarea id="obAddress" placeholder="Full address"></textarea></div>
+        <div class="form-grid">
+          <div class="form-row"><label>Aadhaar No.</label><input type="text" id="obAadhaar" placeholder="12 digit Aadhaar" maxlength="12"></div>
+          <div class="form-row"><label>PAN No.</label><input type="text" id="obPan" placeholder="e.g. ABCDE1234F" maxlength="10"></div>
+        </div>
+      </div>
+      <!-- Step 2: Company -->
+      <div class="wizard-body hidden" id="wizStep2">
+        <div class="section-label">Company Details</div>
+        <div class="form-grid">
+          <div class="form-row"><label>Employee Code *</label><input type="text" id="obCode" placeholder="Auto: SSC/SSM"></div>
+          <div class="form-row"><label>Department *</label><select id="obDept"><option value="">Select Dept</option><option>Office</option><option>Site</option><option>Factory</option><option>Garden</option><option>PEB</option></select></div>
+        </div>
+        <div class="form-grid">
+          <div class="form-row"><label>Designation *</label><input type="text" id="obDesignation" placeholder="e.g. Site Engineer"></div>
+          <div class="form-row"><label>Sub-department</label><input type="text" id="obSubDept" placeholder="Optional"></div>
+        </div>
+        <div class="form-grid">
+          <div class="form-row"><label>Date of Joining *</label><input type="date" id="obDoj"></div>
+          <div class="form-row"><label>Reporting Manager</label><select id="obManager"><option value="">Select Manager</option><option>Selvam (MD)</option><option>N.Hari Haran</option><option>Priyanka (HR)</option><option>Sankar Guru.P</option></select></div>
+        </div>
+      </div>
+      <!-- Step 3: Salary & Bank -->
+      <div class="wizard-body hidden" id="wizStep3">
+        <div class="section-label">Salary &amp; Bank Details</div>
+        <div class="form-row"><label>Monthly Salary (CTC) *</label><input type="number" id="obSalary" placeholder="e.g. 25000"></div>
+        <div class="form-grid">
+          <div class="form-row"><label>Bank Name *</label><input type="text" id="obBank" placeholder="e.g. UOB, SBI"></div>
+          <div class="form-row"><label>Account Number *</label><input type="text" id="obAccNo" placeholder="Account number"></div>
+        </div>
+        <div class="form-grid">
+          <div class="form-row"><label>IFSC Code</label><input type="text" id="obIfsc" placeholder="e.g. UBIN0123456"></div>
+          <div class="form-row"><label>Payment Mode</label><select id="obPayMode"><option>NEFT</option><option>Cash</option><option>UPI</option></select></div>
+        </div>
+      </div>
+      <!-- Step 4: Emergency -->
+      <div class="wizard-body hidden" id="wizStep4">
+        <div class="section-label">Emergency Contact</div>
+        <div class="form-row"><label>Contact Name *</label><input type="text" id="obEmgName" placeholder="Emergency contact person"></div>
+        <div class="form-grid">
+          <div class="form-row"><label>Relation</label><select id="obEmgRelation"><option>Father</option><option>Mother</option><option>Spouse</option><option>Sibling</option><option>Other</option></select></div>
+          <div class="form-row"><label>Phone Number *</label><input type="tel" id="obEmgPhone" placeholder="Contact phone"></div>
+        </div>
+      </div>
+      <!-- Step 5: Documents -->
+      <div class="wizard-body hidden" id="wizStep5">
+        <div class="section-label">Upload Documents</div>
+        <div class="doc-upload-zone" onclick="this.querySelector('input').click()"><div class="doc-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></div><div class="doc-info"><h4>Aadhaar Card</h4><p>Upload front &amp; back</p></div><span class="doc-status"></span><input type="file" accept="image/*,.pdf" style="display:none" onchange="this.parentNode.querySelector('.doc-status').textContent='Uploaded'"></div>
+        <div class="doc-upload-zone" onclick="this.querySelector('input').click()"><div class="doc-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></div><div class="doc-info"><h4>PAN Card</h4><p>Upload clear copy</p></div><span class="doc-status"></span><input type="file" accept="image/*,.pdf" style="display:none" onchange="this.parentNode.querySelector('.doc-status').textContent='Uploaded'"></div>
+        <div class="doc-upload-zone" onclick="this.querySelector('input').click()"><div class="doc-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></div><div class="doc-info"><h4>Photo ID</h4><p>Passport / Driving Licence</p></div><span class="doc-status"></span><input type="file" accept="image/*,.pdf" style="display:none" onchange="this.parentNode.querySelector('.doc-status').textContent='Uploaded'"></div>
+        <div class="doc-upload-zone" onclick="this.querySelector('input').click()"><div class="doc-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></div><div class="doc-info"><h4>Other Documents</h4><p>Certificates, offer letter, etc.</p></div><span class="doc-status"></span><input type="file" accept="image/*,.pdf" style="display:none" onchange="this.parentNode.querySelector('.doc-status').textContent='Uploaded'" multiple></div>
+      </div>
+    </div>
+    <div class="wizard-nav">
+      <button class="btn btn-outline" id="wizPrevBtn" onclick="wizardNav(-1)" disabled>Previous</button>
+      <button class="btn btn-primary" id="wizNextBtn" onclick="wizardNav(1)">Next Step</button>
+    </div>
+  </div>
+
+  <!-- ADMIN PANEL OVERLAY (MD Only) -->
+  <div class="overlay-screen" id="overlay-admin" role="dialog" aria-modal="true" aria-label="Admin Panel">
+    <div class="overlay-header"><button class="back-btn" aria-label="Go back" onclick="hideOverlay('admin')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button><h2>Admin Panel</h2><span class="role-badge md" style="margin-left:auto">MD</span></div>
+    <div class="admin-tabs">
+      <button class="admin-tab active" onclick="switchAdminTab('roles',this)">Manage Roles</button>
+      <button class="admin-tab" onclick="switchAdminTab('depts',this)">Departments</button>
+      <button class="admin-tab" onclick="switchAdminTab('emplist',this)">All Employees</button>
+    </div>
+    <div class="admin-section" id="adminRoles">
+      <div class="section-title">Assign Employee Roles</div>
+      <div id="rolesList"></div>
+    </div>
+    <div class="admin-section hidden" id="adminDepts">
+      <div class="section-title">Manage Departments</div>
+      <div id="deptsList"></div>
+      <div class="section-title">Add New Department</div>
+      <div class="add-dept-row"><input type="text" id="newDeptName" placeholder="Department name"><button onclick="addDepartment()">Add</button></div>
+    </div>
+    <div class="admin-section hidden" id="adminEmpList">
+      <div class="section-title">All Employees (by Department)</div>
+      <div id="allEmpList"></div>
+    </div>
+  </div>
+
+  <!-- LIVE LOCATION OVERLAY (MD Only) -->
+  <div class="overlay-screen" id="overlay-location" role="dialog" aria-modal="true" aria-label="Location">
+    <div class="overlay-header">
+      <button class="back-btn" aria-label="Go back" onclick="closeLocationTracker()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2>Live Location</h2>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+        <span id="locLastUpdated" style="font-size:.62rem;color:var(--gray-400)">Just now</span>
+        <button class="back-btn" aria-label="Go back" onclick="refreshLocations()" title="Refresh"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
+      </div>
+    </div>
+    <div class="location-tracker">
+      <div class="loc-map-area" id="locMapArea">
+        <div class="map-bg"><div class="map-grid"></div></div>
+        <div class="map-label">Chennai Metro Area</div>
+      </div>
+      <div class="loc-summary-bar" id="locSummary"></div>
+      <button class="btn-view-all-map" onclick="viewAllOnGoogleMaps()" style="display:flex;align-items:center;justify-content:center;gap:6px;width:calc(100% - 24px);margin:8px 12px;padding:10px;background:var(--primary);color:white;border:none;border-radius:var(--radius-sm);font-weight:600;font-size:.75rem;cursor:pointer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>View All on Google Maps</button>
+      <div class="loc-filter-bar" id="locFilters"></div>
+      <div class="loc-refresh-info"><span id="locEmpCount"></span><span style="font-size:.6rem;color:var(--gray-400);margin-left:6px">Tap employee to open on Google Maps</span></div>
+      <div id="locEmpList"></div>
+    </div>
+  </div>
+
+  <!-- UNIFIED ADVANCE APPLY OVERLAY -->
+  <div class="overlay-screen" id="overlay-advance-apply" role="dialog" aria-modal="true" aria-label="Apply for Advance">
+    <div class="overlay-header"><button class="back-btn" aria-label="Go back" onclick="hideOverlay('advance-apply')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button><h2 id="advApplyTitle">New Advance Request</h2></div>
+    <div style="padding:16px">
+      <!-- Type Selector -->
+      <div class="adv-type-selector">
+        <button class="adv-type-option active" onclick="setAdvType('site')"><div class="type-icon">&#127959;</div>Site Advance</button>
+        <button class="adv-type-option" onclick="setAdvType('salary')"><div class="type-icon">&#128176;</div>Salary Advance</button>
+        <button class="adv-type-option" onclick="setAdvType('travel')"><div class="type-icon">&#128661;</div>Travel Advance</button>
+      </div>
+      <!-- Common: Amount -->
+      <div class="form-row"><label>Amount (&#8377;) *</label><input type="number" id="advAmount" placeholder="e.g. 25000" oninput="updateEmiCalc()"></div>
+      <!-- Site fields -->
+      <div id="advFieldsSite">
+        <div class="form-row"><label>Project / Site *</label><select id="advSiteProject"><option value="">Select project</option><option>Porur Villa Project</option><option>Tambaram Warehouse</option><option>PEB Factory Extension</option><option>Guduvanchery Residence</option><option>Other</option></select></div>
+        <div class="form-row"><label>Category *</label><select id="advSiteCategory"><option value="">Select category</option><option>Material</option><option>Labour</option><option>Equipment</option><option>Transport</option><option>Other</option></select></div>
+      </div>
+      <!-- Salary fields -->
+      <div id="advFieldsSalary" style="display:none">
+        <div class="form-row"><label>Reason *</label><select id="advReason"><option value="">Select reason</option><option>Medical</option><option>Education</option><option>Marriage</option><option>Housing</option><option>Emergency</option><option>Personal</option><option>Other</option></select></div>
+        <div class="form-row"><label>Preferred EMI / month (&#8377;) *</label><input type="number" id="advEmi" placeholder="e.g. 5000" oninput="updateEmiCalc()"></div>
+        <div id="advEmiCalc" style="font-size:.75rem;color:var(--primary);font-weight:600;margin:-4px 0 12px;min-height:18px"></div>
+      </div>
+      <!-- Travel fields -->
+      <div id="advFieldsTravel" style="display:none">
+        <div class="form-grid">
+          <div class="form-row"><label>From *</label><input type="text" id="advTravelFrom" placeholder="e.g. Porur"></div>
+          <div class="form-row"><label>To *</label><input type="text" id="advTravelTo" placeholder="e.g. Tambaram"></div>
+        </div>
+        <div class="form-grid">
+          <div class="form-row"><label>Vehicle *</label><select id="advTravelVehicle"><option value="">Select</option><option>Bike</option><option>Car</option><option>Auto</option><option>Bus</option><option>Train</option><option>Other</option></select></div>
+          <div class="form-row"><label>Distance (km)</label><input type="number" id="advTravelKm" placeholder="e.g. 25"></div>
+        </div>
+      </div>
+      <!-- Common: Details & Urgency -->
+      <div class="form-row"><label>Details (optional)</label><textarea id="advDetails" placeholder="Brief explanation..." rows="2"></textarea></div>
+      <div class="form-row"><label>Urgency</label>
+        <div style="display:flex;gap:8px;margin-top:4px">
+          <button type="button" class="tab-pill active" id="advUrgNormal" onclick="setAdvUrgency('normal')">Normal</button>
+          <button type="button" class="tab-pill" id="advUrgUrgent" onclick="setAdvUrgency('urgent')">Urgent</button>
+        </div>
+      </div>
+      <button class="btn btn-primary w-full" style="border-radius:var(--radius);margin-top:16px" onclick="submitAdvanceRequest()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Submit Request</button>
+    </div>
+  </div>
+
+  <!-- ADVANCE REQUESTS REVIEW OVERLAY (MD/HR) -->
+  <div class="overlay-screen" id="overlay-advance-requests" role="dialog" aria-modal="true" aria-label="Advance Requests">
+    <div class="overlay-header"><button class="back-btn" aria-label="Go back" onclick="hideOverlay('advance-requests')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button><h2>Advance Requests</h2></div>
+    <div style="padding:16px">
+      <div class="tab-pills" id="advReqTabs">
+        <button class="tab-pill active" onclick="switchAdvReqTab('pending',this)">Pending</button>
+        <button class="tab-pill" onclick="switchAdvReqTab('approved',this)">Approved</button>
+        <button class="tab-pill" onclick="switchAdvReqTab('rejected',this)">Rejected</button>
+        <button class="tab-pill" onclick="switchAdvReqTab('all',this)">All</button>
+      </div>
+      <div style="display:flex;gap:6px;margin-bottom:12px" id="advReqTypeFilter">
+        <button class="loc-filter-chip active" onclick="filterAdvReqByType('all',this)">All Types</button>
+        <button class="loc-filter-chip" onclick="filterAdvReqByType('site',this)">Site</button>
+        <button class="loc-filter-chip" onclick="filterAdvReqByType('salary',this)">Salary</button>
+        <button class="loc-filter-chip" onclick="filterAdvReqByType('travel',this)">Travel</button>
+      </div>
+      <div id="advReqList"></div>
+    </div>
+  </div>
+
+  <!-- HR KPI & PERFORMANCE OVERLAY -->
+  <div class="overlay-screen" id="overlay-hr-kpi" role="dialog" aria-modal="true" aria-label="KPI Dashboard">
+    <div class="overlay-header">
+      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('hr-kpi')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2>KPI &amp; Performance</h2>
+    </div>
+    <div class="hr-overlay-body" id="hrKpiContent"></div>
+  </div>
+
+  <!-- HR RECRUITMENT OVERLAY -->
+  <div class="overlay-screen" id="overlay-hr-recruit" role="dialog" aria-modal="true" aria-label="Recruitment">
+    <div class="overlay-header">
+      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('hr-recruit')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2>Recruitment</h2>
+    </div>
+    <div class="hr-overlay-body" id="hrRecruitContent"></div>
+  </div>
+
+  <!-- HR LEGAL DOCUMENTS OVERLAY -->
+  <div class="overlay-screen" id="overlay-hr-documents" role="dialog" aria-modal="true" aria-label="Documents">
+    <div class="overlay-header">
+      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('hr-documents')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2>Legal Documents</h2>
+    </div>
+    <div class="hr-overlay-body" id="hrDocumentsContent"></div>
+  </div>
+
+  <!-- HR CAREER LADDER OVERLAY -->
+  <div class="overlay-screen" id="overlay-hr-career" role="dialog" aria-modal="true" aria-label="Career Path">
+    <div class="overlay-header">
+      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('hr-career')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2>Career Ladder</h2>
+    </div>
+    <div class="hr-overlay-body" id="hrCareerContent"></div>
+  </div>
+
+  <!-- HR INCENTIVE & PAY OVERLAY -->
+  <div class="overlay-screen" id="overlay-hr-incentive" role="dialog" aria-modal="true" aria-label="Incentive Report">
+    <div class="overlay-header">
+      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('hr-incentive')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2>Incentive &amp; Pay</h2>
+    </div>
+    <div class="hr-overlay-body" id="hrIncentiveContent"></div>
+  </div>
+
+  <!-- HR TEMPERAMENT OVERLAY -->
+  <div class="overlay-screen" id="overlay-hr-temperament" role="dialog" aria-modal="true" aria-label="Temperament Test">
+    <div class="overlay-header">
+      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('hr-temperament')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2>Temperament Profile</h2>
+    </div>
+    <div class="hr-overlay-body" id="hrTemperamentContent"></div>
+  </div>
+
+  <!-- HR TASKS OVERLAY -->
+  <div class="overlay-screen" id="overlay-hr-tasks" role="dialog" aria-modal="true" aria-label="Tasks">
+    <div class="overlay-header">
+      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('hr-tasks')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2>Tasks &amp; To-Do</h2>
+    </div>
+    <div class="hr-overlay-body" id="hrTasksContent"></div>
+  </div>
+
+  <!-- HR SKILLS MATRIX OVERLAY -->
+  <div class="overlay-screen" id="overlay-hr-skills" role="dialog" aria-modal="true" aria-label="Skills Matrix">
+    <div class="overlay-header">
+      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('hr-skills')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2>Skills Matrix</h2>
+    </div>
+    <div class="hr-overlay-body" id="hrSkillsContent"></div>
+  </div>
+
+  <!-- HR HOT SEAT OVERLAY -->
+  <div class="overlay-screen" id="overlay-hr-hotseat" role="dialog" aria-modal="true" aria-label="Hot Seat Sessions">
+    <div class="overlay-header">
+      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('hr-hotseat')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2>HOT Seat Sessions</h2>
+    </div>
+    <div class="hr-overlay-body" id="hrHotseatContent"></div>
+  </div>
+
+  <!-- HR VISION OVERLAY -->
+  <div class="overlay-screen" id="overlay-hr-vision" role="dialog" aria-modal="true" aria-label="Personal Vision">
+    <div class="overlay-header">
+      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('hr-vision')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2>Vision &amp; Purpose</h2>
+    </div>
+    <div class="hr-overlay-body" id="hrVisionContent"></div>
+  </div>
+
+  <!-- HR EVENTS & AWARDS OVERLAY -->
+  <div class="overlay-screen" id="overlay-hr-events" role="dialog" aria-modal="true" aria-label="Events">
+    <div class="overlay-header">
+      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('hr-events')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2>Events &amp; Awards</h2>
+    </div>
+    <div class="hr-overlay-body" id="hrEventsContent"></div>
+  </div>
+
+  <!-- HR ANALYTICS OVERLAY -->
+  <div class="overlay-screen" id="overlay-hr-analytics" role="dialog" aria-modal="true" aria-label="Analytics">
+    <div class="overlay-header">
+      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('hr-analytics')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2>HR Analytics</h2>
+    </div>
+    <div class="hr-overlay-body" id="hrAnalyticsContent"></div>
+  </div>
+
+  <!-- F1: SHIFT MANAGEMENT OVERLAY -->
+  <div class="overlay-screen" id="overlay-hr-shifts" role="dialog" aria-modal="true" aria-label="Shift Management">
+    <div class="overlay-header">
+      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('hr-shifts')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2>Shift Management</h2>
+    </div>
+    <div class="new-feature-body" id="shiftsContent"></div>
+  </div>
+
+  <!-- F2: EXPENSE REIMBURSEMENT OVERLAY -->
+  <div class="overlay-screen" id="overlay-hr-expenses" role="dialog" aria-modal="true" aria-label="Expense Reimbursement">
+    <div class="overlay-header">
+      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('hr-expenses')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2>Expense Reimbursement</h2>
+    </div>
+    <div class="new-feature-body" id="expensesContent"></div>
+  </div>
+
+  <!-- F3: SELF SERVICE OVERLAY -->
+  <div class="overlay-screen" id="overlay-self-service" role="dialog" aria-modal="true" aria-label="Employee Self Service">
+    <div class="overlay-header">
+      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('self-service')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2>Self Service Portal</h2>
+    </div>
+    <div class="ss-tabs" id="ssTabs">
+      <button class="ss-tab active" onclick="switchSsTab('details')">My Details</button>
+      <button class="ss-tab" onclick="switchSsTab('documents')">Documents</button>
+      <button class="ss-tab" onclick="switchSsTab('downloads')">Downloads</button>
+    </div>
+    <div class="new-feature-body" id="selfServiceContent"></div>
+  </div>
+
+  <!-- F4: ATTENDANCE LOG OVERLAY -->
+  <div class="overlay-screen" id="overlay-attendance-log" role="dialog" aria-modal="true" aria-label="Attendance Log">
+    <div class="overlay-header">
+      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('attendance-log')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2>Attendance Log</h2>
+    </div>
+    <div class="new-feature-body" id="attendanceLogContent"></div>
+  </div>
+
+  <!-- F5: FORM 16 / TAX OVERLAY -->
+  <div class="overlay-screen" id="overlay-hr-tax" role="dialog" aria-modal="true" aria-label="Tax Declaration">
+    <div class="overlay-header">
+      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('hr-tax')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2>Form 16 &amp; Tax</h2>
+    </div>
+    <div class="tax-tabs" id="taxTabs">
+      <button class="tax-tab active" onclick="switchTaxTab('declaration')">Declaration</button>
+      <button class="tax-tab" onclick="switchTaxTab('summary')">Tax Summary</button>
+      <button class="tax-tab" onclick="switchTaxTab('form16')">Form 16</button>
+    </div>
+    <div class="new-feature-body" id="taxContent"></div>
+  </div>
+
+  <!-- F6: COMPLIANCE OVERLAY -->
+  <div class="overlay-screen" id="overlay-hr-compliance" role="dialog" aria-modal="true" aria-label="Labour Compliance">
+    <div class="overlay-header">
+      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('hr-compliance')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2>Compliance Dashboard</h2>
+    </div>
+    <div class="compliance-tabs" id="complianceTabs">
+      <button class="compliance-tab active" onclick="switchComplianceTab('filing')">Filings</button>
+      <button class="compliance-tab" onclick="switchComplianceTab('calendar')">Calendar</button>
+      <button class="compliance-tab" onclick="switchComplianceTab('wages')">Min Wage</button>
+      <button class="compliance-tab" onclick="switchComplianceTab('clra')">CLRA</button>
+    </div>
+    <div class="new-feature-body" id="complianceContent"></div>
+  </div>
+
+  <!-- F7: ASSET MANAGEMENT OVERLAY -->
+  <div class="overlay-screen" id="overlay-hr-assets" role="dialog" aria-modal="true" aria-label="Asset Management">
+    <div class="overlay-header">
+      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('hr-assets')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2>Asset Management</h2>
+    </div>
+    <div class="new-feature-body" id="assetsContent"></div>
+  </div>
+
+  <!-- F8: EXIT & F&F OVERLAY -->
+  <div class="overlay-screen" id="overlay-hr-exit" role="dialog" aria-modal="true" aria-label="Employee Exit">
+    <div class="overlay-header">
+      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('hr-exit')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2>Exit &amp; Full &amp; Final</h2>
+    </div>
+    <div class="new-feature-body" id="exitContent"></div>
+  </div>
+
+  <!-- F9: ORG CHART OVERLAY -->
+  <div class="overlay-screen" id="overlay-hr-orgchart" role="dialog" aria-modal="true" aria-label="Organization Chart">
+    <div class="overlay-header">
+      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('hr-orgchart')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2>Organization Chart</h2>
+    </div>
+    <div class="new-feature-body" id="orgchartContent" style="overflow-x:auto"></div>
+  </div>
+
+  <!-- F10: ANNOUNCEMENTS OVERLAY -->
+  <div class="overlay-screen" id="overlay-hr-announcements" role="dialog" aria-modal="true" aria-label="Announcements">
+    <div class="overlay-header">
+      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('hr-announcements')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2>Announcements</h2>
+    </div>
+    <div class="new-feature-body" id="announcementsContent"></div>
+  </div>
+
+  <!-- F11: CELEBRATIONS OVERLAY -->
+  <div class="overlay-screen" id="overlay-hr-celebrations" role="dialog" aria-modal="true" aria-label="Celebrations">
+    <div class="overlay-header">
+      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('hr-celebrations')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2>Celebrations</h2>
+    </div>
+    <div class="new-feature-body" id="celebrationsContent"></div>
+  </div>
+
+  <!-- Bottom Tabs -->
+  <nav class="bottom-tabs" id="bottomTabs" role="navigation" aria-label="Main navigation" style="display:none">
+    <button class="tab-item active" data-tab="home" onclick="switchTab('home',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg><span>Home</span></button>
+    <button class="tab-item" data-tab="site" onclick="switchTab('site',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 20h20"/><path d="M5 20V8l7-5 7 5v12"/><rect x="9" y="12" width="6" height="8"/></svg><span>Site</span></button>
+    <button class="tab-item" data-tab="advance" onclick="switchTab('advance',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg><span>Advance</span></button>
+    <button class="tab-item" data-tab="ta" onclick="switchTab('ta',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg><span>TA</span></button>
+    <button class="tab-item" data-tab="progress" onclick="switchTab('progress',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg><span>Progress</span></button>
+    <button class="tab-item" data-tab="hr" onclick="switchTab('hr',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span>HR</span></button>
+    <button class="tab-item md-hr-only" data-tab="expenses" onclick="switchTab('expenses',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg><span>Payroll</span></button>
+    <button class="tab-item" data-tab="salary" onclick="switchTab('salary',this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span>Salary</span></button>
+  </nav>
+</div>
+
+
+<script src="app.js"></script>
+</body>
+</html>

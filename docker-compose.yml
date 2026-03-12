@@ -1,0 +1,15 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: hrms-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-hrms2026}
+      MYSQL_DATABASE: hrms
+    ports:
+      - "127.0.0.1:3307:3306"
+    volumes:
+      - hrms_data:/var/lib/mysql
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
+volumes:
+  hrms_data:
