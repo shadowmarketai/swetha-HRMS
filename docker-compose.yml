@@ -19,6 +19,7 @@ services:
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - AI_MODEL=${AI_MODEL:-claude-haiku-4-5-20251001}
+      - STATIC_DIR=/app/public
     depends_on:
       mysql:
         condition: service_healthy

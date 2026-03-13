@@ -78,7 +78,9 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // Serve static files (frontend)
-app.use(express.static(path.join(__dirname, '..')));
+const STATIC_DIR = process.env.STATIC_DIR || path.join(__dirname, '..');
+console.log('Serving static files from:', STATIC_DIR);
+app.use(express.static(STATIC_DIR));
 
 // Serve uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -113,7 +115,7 @@ app.get('/api/health', (req, res) => {
 
 // Fallback to frontend
 app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'index.html'));
+  res.sendFile(path.join(STATIC_DIR, 'index.html'));
 });
 
 app.listen(PORT, () => {

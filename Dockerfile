@@ -6,12 +6,18 @@ WORKDIR /app
 COPY server/package.json server/package-lock.json* ./server/
 RUN cd server && npm install --production
 
-# Copy all app files
-COPY index.html styles.css app.js sw.js manifest.json ./
-COPY swetha_logo.png swetha_symbol.png swetha_name.png swetha_tagline.png ./
-COPY icons/ ./icons/
+# Copy frontend static files to /app/public
+RUN mkdir -p /app/public
+COPY index.html styles.css app.js sw.js manifest.json /app/public/
+COPY swetha_logo.png swetha_symbol.png swetha_name.png swetha_tagline.png /app/public/
+COPY icons/ /app/public/icons/
+
+# Copy server and database
 COPY server/ ./server/
 COPY database/ ./database/
+
+# Set static dir explicitly
+ENV STATIC_DIR=/app/public
 
 # Expose port
 EXPOSE 3000
