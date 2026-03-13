@@ -33,6 +33,6 @@ Thumbs.db
 *.pyc
 __pycache__/
 
-# Package manager
-package-lock.json
-yarn.lock
+# Package manager (root only)
+/package-lock.json
+/yarn.lock
