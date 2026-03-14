@@ -1,12 +1,13 @@
-const CACHE_NAME = 'hrms-v20';
+const CACHE_NAME = 'hrms-v21';
 const PRECACHE_URLS = [
   './',
   './index.html',
   './styles.css',
   './app.js',
   './manifest.json',
-  './icons/icon-192.svg',
-  './icons/icon-512.svg',
+  './icons/icon-192.png',
+  './icons/icon-512.png',
+  './icons/apple-touch-icon.png',
   'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
   'https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js'
 ];
@@ -78,8 +79,8 @@ self.addEventListener('push', event => {
   event.waitUntil(
     self.registration.showNotification(data.title, {
       body: data.body,
-      icon: './icons/icon-192.svg',
-      badge: './icons/icon-192.svg',
+      icon: './icons/icon-192.png',
+      badge: './icons/icon-192.png',
       vibrate: [200, 100, 200]
     })
   );

@@ -3943,17 +3943,23 @@ async function registerBiometric() {
 
     const challenge = new Uint8Array(32);
     crypto.getRandomValues(challenge);
+    const userId = new TextEncoder().encode(currentUser.code);
     const credential = await navigator.credentials.create({
       publicKey: {
         challenge: challenge,
         rp: { name: 'Swetha Structures HRMS', id: location.hostname || 'localhost' },
         user: {
-          id: new TextEncoder().encode(currentUser.code),
+          id: userId,
           name: currentUser.code,
           displayName: currentUser.name
         },
-        pubKeyCredParams: [{ alg: -7, type: 'public-key' }],
-        authenticatorSelection: { authenticatorAttachment: 'platform', userVerification: 'required' },
+        pubKeyCredParams: [{ alg: -7, type: 'public-key' }, { alg: -257, type: 'public-key' }],
+        authenticatorSelection: {
+          authenticatorAttachment: 'platform',
+          userVerification: 'required',
+          residentKey: 'preferred',
+          requireResidentKey: false
+        },
         timeout: 60000
       }
     });
@@ -3971,26 +3977,53 @@ async function registerBiometric() {
 }
 
 async function biometricLogin() {
-  if (!window.PublicKeyCredential) return false;
+  if (!window.PublicKeyCredential) { showToast('Biometric login not supported on this browser'); return false; }
   try {
     // Find any registered biometric credential
     const keys = Object.keys(localStorage).filter(k => k.startsWith('hrms_biometric_'));
-    if (keys.length === 0) return false;
+    if (keys.length === 0) { showToast('No biometric registered. Login first and enable in Settings.'); return false; }
+
+    // Build allowCredentials from stored registrations
+    const allowCredentials = [];
+    for (const key of keys) {
+      try {
+        const stored = JSON.parse(safeStorage.get(key) || '{}');
+        if (stored.credentialId) {
+          const rawId = Uint8Array.from(atob(stored.credentialId), c => c.charCodeAt(0));
+          allowCredentials.push({ type: 'public-key', id: rawId, transports: ['internal'] });
+        }
+      } catch (_) {}
+    }
 
     const challenge = new Uint8Array(32);
     crypto.getRandomValues(challenge);
-    const assertion = await navigator.credentials.get({
+    const opts = {
       publicKey: {
         challenge: challenge,
         rpId: location.hostname || 'localhost',
         userVerification: 'required',
         timeout: 60000
       }
-    });
+    };
+    if (allowCredentials.length > 0) opts.publicKey.allowCredentials = allowCredentials;
+
+    const assertion = await navigator.credentials.get(opts);
     if (assertion) {
-      // Find matching user
-      const empCode = keys[0].replace('hrms_biometric_', '');
-      const cred = CREDENTIAL_HASHES[empCode];
+      // Match assertion to registered credential
+      const assertionId = btoa(String.fromCharCode(...new Uint8Array(assertion.rawId)));
+      let matchedCode = null;
+      for (const key of keys) {
+        try {
+          const stored = JSON.parse(safeStorage.get(key) || '{}');
+          if (stored.credentialId === assertionId) {
+            matchedCode = key.replace('hrms_biometric_', '');
+            break;
+          }
+        } catch (_) {}
+      }
+      if (!matchedCode) matchedCode = keys[0].replace('hrms_biometric_', '');
+
+      const cred = CREDENTIAL_HASHES[matchedCode];
       if (cred) {
         const session = {
           empIndex: cred.idx,
@@ -4005,7 +4038,8 @@ async function biometricLogin() {
       }
     }
   } catch (e) {
-    // User cancelled or not available
+    if (e.name === 'NotAllowedError') showToast('Biometric authentication was cancelled');
+    else showToast('Biometric login failed: ' + e.message);
   }
   return false;
 }
@@ -4064,52 +4098,52 @@ async function _handleGoogleCredential(idToken) {
     return;
   }
   const gEmail = payload.email.toLowerCase();
-  const empIdx = EMPLOYEES.findIndex(e => e.email && e.email.toLowerCase() === gEmail);
-  if (empIdx >= 0) {
-    const session = {
-      empIndex: empIdx,
-      token: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36),
-      expiry: Date.now() + 24 * 60 * 60 * 1000,
-      rememberMe: false
+  let empIdx = EMPLOYEES.findIndex(e => e.email && e.email.toLowerCase() === gEmail);
+
+  // Auto-register new Google user if not found
+  if (empIdx < 0) {
+    const nextNum = EMPLOYEES.length + 1;
+    const newCode = 'SSC' + String(nextNum).padStart(3, '0');
+    const displayName = payload.name || payload.email.split('@')[0];
+    const newEmp = {
+      code: newCode, name: displayName, dept: 'Office', designation: 'New Employee',
+      salary: 0, bank: 'TBD', accNo: 'TBD', role: 'Employee',
+      phone: '', doj: new Date().toISOString().split('T')[0],
+      email: payload.email, picture: payload.picture || ''
     };
-    safeStorage.set(STORAGE_KEYS.session, JSON.stringify(session));
-    loginAs(empIdx);
-    showToast('Signed in with Google');
-  } else {
-    err.textContent = 'No employee account linked to ' + escapeHTML(payload.email) + '. Contact HR.';
+    EMPLOYEES.push(newEmp);
+    CREDENTIAL_HASHES[newCode] = { hash: DEFAULT_HASH, idx: EMPLOYEES.length - 1 };
+    empIdx = EMPLOYEES.length - 1;
+    saveAllData();
+
+    // Try to register on backend too
+    try { await apiCall('POST', '/employees', newEmp); } catch (_) {}
+    showToast('Welcome ' + escapeHTML(displayName) + '! Account created. Contact MD/HR for role assignment.');
   }
-  _resetGoogleBtn();
+
+  const session = {
+    empIndex: empIdx,
+    token: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36),
+    expiry: Date.now() + 24 * 60 * 60 * 1000,
+    rememberMe: false
+  };
+  safeStorage.set(STORAGE_KEYS.session, JSON.stringify(session));
+  loginAs(empIdx);
+  if (empIdx >= 0) showToast('Signed in with Google');
 }
 
-async function googleSignIn() {
-  const err = document.getElementById('loginError');
-  const btn = document.getElementById('googleSignInBtn');
-
-  // Check GIS library loaded
-  if (typeof google === 'undefined' || !google.accounts) {
-    err.textContent = 'Google Sign-In library not loaded. Check your internet connection.';
-    return;
-  }
-
-  // Check Client ID configured
-  if (!GOOGLE_CLIENT_ID) {
-    err.textContent = 'Google Sign-In is not configured. Contact your administrator.';
-    return;
-  }
-
-  if (btn) { btn.disabled = true; btn.querySelector('span').textContent = 'Signing in...'; }
-  err.textContent = '';
-
-  // Strategy: Try One Tap first, fall back to popup sign-in
-  let oneTapHandled = false;
+let _gsiInitialized = false;
+function initGoogleSignIn() {
+  if (_gsiInitialized) return;
+  if (typeof google === 'undefined' || !google.accounts) return;
+  if (!GOOGLE_CLIENT_ID) return;
 
   google.accounts.id.initialize({
     client_id: GOOGLE_CLIENT_ID,
     callback: async (response) => {
-      oneTapHandled = true;
       if (!response.credential) {
-        err.textContent = 'Google Sign-In was cancelled.';
-        _resetGoogleBtn();
+        const err = document.getElementById('loginError');
+        if (err) err.textContent = 'Google Sign-In was cancelled.';
         return;
       }
       await _handleGoogleCredential(response.credential);
@@ -4119,47 +4153,25 @@ async function googleSignIn() {
     ux_mode: 'popup'
   });
 
-  google.accounts.id.prompt((notification) => {
-    if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-      // One Tap not available — use popup sign-in button
-      if (!oneTapHandled) _launchGooglePopup();
-    }
-  });
+  _gsiInitialized = true;
+
+  // Render the real Google button in the container
+  const container = document.getElementById('googleBtnContainer');
+  if (container) {
+    google.accounts.id.renderButton(container, {
+      type: 'standard',
+      theme: 'outline',
+      size: 'large',
+      width: 280,
+      text: 'signin_with',
+      shape: 'pill'
+    });
+  }
 }
 
-function _launchGooglePopup() {
-  const err = document.getElementById('loginError');
-  // Use a hidden container to render Google's own button, then auto-click it
-  let container = document.getElementById('_gsi_container');
-  if (!container) {
-    container = document.createElement('div');
-    container.id = '_gsi_container';
-    container.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0;pointer-events:none;';
-    document.body.appendChild(container);
-  }
-  container.innerHTML = '';
-
-  google.accounts.id.renderButton(container, {
-    type: 'standard',
-    theme: 'outline',
-    size: 'large',
-    click_listener: () => {}
-  });
-
-  // Auto-click the rendered Google button after a small delay
-  setTimeout(() => {
-    const gBtn = container.querySelector('[role="button"]') || container.querySelector('div[style]') || container.querySelector('iframe');
-    if (gBtn) {
-      gBtn.click();
-    } else {
-      // If renderButton didn't produce a clickable element, show message
-      err.textContent = 'Please sign into Google in this browser first, then try again.';
-      _resetGoogleBtn();
-    }
-  }, 300);
-
-  // Reset button after timeout if nothing happened
-  setTimeout(() => { _resetGoogleBtn(); }, 5000);
+async function googleSignIn() {
+  // Legacy — if custom button still exists, delegate to initGoogleSignIn
+  initGoogleSignIn();
 }
 
 // =====================================================
@@ -4183,7 +4195,7 @@ if ('serviceWorker' in navigator) {
 // =====================================================
 // API CLIENT — BACKEND INTEGRATION
 // =====================================================
-const API_BASE = (window.HRMS_API_BASE || (location.port === '3000' ? '' : 'http://localhost:3000')) + '/api';
+const API_BASE = (window.HRMS_API_BASE || '') + '/api';
 let JWT_TOKEN = safeStorage.get('hrms_jwt') || null;
 const GOOGLE_CLIENT_ID = (document.querySelector('meta[name="google-client-id"]') || {}).content || window.HRMS_GOOGLE_CLIENT_ID || '';
 let isOnline = navigator.onLine;
@@ -6075,8 +6087,12 @@ function renderCelebrationsOverlay() {
   if (signInBtn) signInBtn.addEventListener('click', function() { doLogin(); });
   var biometricBtn = document.getElementById('biometricBtn');
   if (biometricBtn) biometricBtn.addEventListener('click', function() { biometricLogin(); });
-  var googleBtn = document.getElementById('googleSignInBtn');
-  if (googleBtn) googleBtn.addEventListener('click', function() { googleSignIn(); });
+  // Initialize Google Sign-In — render real Google button (retries until GIS loads)
+  function _tryInitGoogle() {
+    if (typeof google !== 'undefined' && google.accounts) { initGoogleSignIn(); }
+    else { setTimeout(_tryInitGoogle, 500); }
+  }
+  _tryInitGoogle();
   var loginPass = document.getElementById('loginPass');
   if (loginPass) loginPass.addEventListener('keydown', function(e) { if (e.key === 'Enter') doLogin(); });
   // Demo buttons
