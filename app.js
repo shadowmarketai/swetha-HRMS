@@ -4059,64 +4059,47 @@ function _resetGoogleBtn() {
   if (btn) { btn.disabled = false; btn.querySelector('span').textContent = 'Sign in with Google'; }
 }
 
-async function _handleGoogleCredential(idToken) {
+async function _handleGoogleUserInfo(userInfo) {
   const err = document.getElementById('loginError');
+  if (!userInfo || !userInfo.email) {
+    if (err) err.textContent = 'Could not read Google account info.';
+    return;
+  }
 
-  // Backend-first: verify server-side
+  // Try backend first
   try {
-    const res = await fetch(API_BASE + '/auth/google', {
+    const res = await fetch(API_BASE + '/auth/google-token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idToken })
+      body: JSON.stringify({ email: userInfo.email, name: userInfo.name, picture: userInfo.picture })
     });
     const data = await res.json();
     if (res.ok && data.token) {
       JWT_TOKEN = data.token;
       safeStorage.set('hrms_jwt', data.token);
       const empIdx = EMPLOYEES.findIndex(e => e.code === data.user.empCode);
-      if (empIdx >= 0) {
-        loginAs(empIdx);
-        showToast('Signed in with Google');
-        _resetGoogleBtn();
-        return;
-      }
+      if (empIdx >= 0) { loginAs(empIdx); showToast('Signed in with Google'); return; }
     }
-    if (data.error) {
-      err.textContent = data.error;
-      _resetGoogleBtn();
-      return;
-    }
-  } catch (e) {
-    // Backend unavailable — fall through to local matching
-  }
+  } catch (_) {}
 
-  // Local fallback: decode JWT and match email
-  const payload = _decodeJwtPayload(idToken);
-  if (!payload || !payload.email) {
-    err.textContent = 'Could not read Google account info.';
-    _resetGoogleBtn();
-    return;
-  }
-  const gEmail = payload.email.toLowerCase();
+  // Local fallback: match email or auto-register
+  const gEmail = userInfo.email.toLowerCase();
   let empIdx = EMPLOYEES.findIndex(e => e.email && e.email.toLowerCase() === gEmail);
 
-  // Auto-register new Google user if not found
   if (empIdx < 0) {
     const nextNum = EMPLOYEES.length + 1;
     const newCode = 'SSC' + String(nextNum).padStart(3, '0');
-    const displayName = payload.name || payload.email.split('@')[0];
+    const displayName = userInfo.name || userInfo.email.split('@')[0];
     const newEmp = {
       code: newCode, name: displayName, dept: 'Office', designation: 'New Employee',
       salary: 0, bank: 'TBD', accNo: 'TBD', role: 'Employee',
       phone: '', doj: new Date().toISOString().split('T')[0],
-      email: payload.email, picture: payload.picture || ''
+      email: userInfo.email, picture: userInfo.picture || ''
     };
     EMPLOYEES.push(newEmp);
     CREDENTIAL_HASHES[newCode] = { hash: DEFAULT_HASH, idx: EMPLOYEES.length - 1 };
     empIdx = EMPLOYEES.length - 1;
     saveAllData();
-
-    // Try to register on backend too
     try { await apiCall('POST', '/employees', newEmp); } catch (_) {}
     showToast('Welcome ' + escapeHTML(displayName) + '! Account created. Contact MD/HR for role assignment.');
   }
@@ -4129,49 +4112,56 @@ async function _handleGoogleCredential(idToken) {
   };
   safeStorage.set(STORAGE_KEYS.session, JSON.stringify(session));
   loginAs(empIdx);
-  if (empIdx >= 0) showToast('Signed in with Google');
+  showToast('Signed in with Google');
 }
 
-let _gsiInitialized = false;
+let _googleTokenClient = null;
 function initGoogleSignIn() {
-  if (_gsiInitialized) return;
-  if (typeof google === 'undefined' || !google.accounts) return;
+  if (_googleTokenClient) return;
+  if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) return;
   if (!GOOGLE_CLIENT_ID) return;
 
-  google.accounts.id.initialize({
+  _googleTokenClient = google.accounts.oauth2.initTokenClient({
     client_id: GOOGLE_CLIENT_ID,
-    callback: async (response) => {
-      if (!response.credential) {
-        const err = document.getElementById('loginError');
-        if (err) err.textContent = 'Google Sign-In was cancelled.';
+    scope: 'email profile',
+    callback: async (tokenResponse) => {
+      const err = document.getElementById('loginError');
+      if (tokenResponse.error) {
+        if (err) err.textContent = 'Google Sign-In failed: ' + tokenResponse.error;
         return;
       }
-      await _handleGoogleCredential(response.credential);
-    },
-    auto_select: false,
-    cancel_on_tap_outside: true,
-    ux_mode: 'popup'
+      try {
+        const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { 'Authorization': 'Bearer ' + tokenResponse.access_token }
+        });
+        const userInfo = await res.json();
+        await _handleGoogleUserInfo(userInfo);
+      } catch (e) {
+        if (err) err.textContent = 'Failed to get Google profile: ' + e.message;
+      }
+    }
   });
-
-  _gsiInitialized = true;
-
-  // Render the real Google button in the container
-  const container = document.getElementById('googleBtnContainer');
-  if (container) {
-    google.accounts.id.renderButton(container, {
-      type: 'standard',
-      theme: 'outline',
-      size: 'large',
-      width: 280,
-      text: 'signin_with',
-      shape: 'pill'
-    });
-  }
 }
 
 async function googleSignIn() {
-  // Legacy — if custom button still exists, delegate to initGoogleSignIn
+  const err = document.getElementById('loginError');
+  if (err) err.textContent = '';
+
+  if (typeof google === 'undefined' || !google.accounts) {
+    if (err) err.textContent = 'Google Sign-In library not loaded. Check your internet connection.';
+    return;
+  }
+  if (!GOOGLE_CLIENT_ID) {
+    if (err) err.textContent = 'Google Sign-In is not configured. Contact your administrator.';
+    return;
+  }
+
   initGoogleSignIn();
+  if (_googleTokenClient) {
+    _googleTokenClient.requestAccessToken();
+  } else {
+    if (err) err.textContent = 'Google Sign-In could not initialize. Try refreshing the page.';
+  }
 }
 
 // =====================================================
@@ -6087,12 +6077,9 @@ function renderCelebrationsOverlay() {
   if (signInBtn) signInBtn.addEventListener('click', function() { doLogin(); });
   var biometricBtn = document.getElementById('biometricBtn');
   if (biometricBtn) biometricBtn.addEventListener('click', function() { biometricLogin(); });
-  // Initialize Google Sign-In — render real Google button (retries until GIS loads)
-  function _tryInitGoogle() {
-    if (typeof google !== 'undefined' && google.accounts) { initGoogleSignIn(); }
-    else { setTimeout(_tryInitGoogle, 500); }
-  }
-  _tryInitGoogle();
+  // Google Sign-In button
+  var googleBtn = document.getElementById('googleSignInBtn');
+  if (googleBtn) googleBtn.addEventListener('click', function() { googleSignIn(); });
   var loginPass = document.getElementById('loginPass');
   if (loginPass) loginPass.addEventListener('keydown', function(e) { if (e.key === 'Enter') doLogin(); });
   // Demo buttons
