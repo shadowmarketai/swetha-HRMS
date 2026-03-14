@@ -1,10 +1,9 @@
 services:
   app:
     build: .
-    container_name: hrms-app-testing
     restart: unless-stopped
-    ports:
-      - "3001:3000"
+    expose:
+      - "3000"
     environment:
       - PORT=3000
       - DB_HOST=mysql
@@ -14,7 +13,7 @@ services:
       - DB_NAME=hrms
       - JWT_SECRET=${JWT_SECRET:-change-this-in-production}
       - JWT_EXPIRY=24h
-      - CORS_ORIGINS=${CORS_ORIGINS:-https://hrms.shadowmarket.ai,http://localhost:3001}
+      - CORS_ORIGINS=${CORS_ORIGINS:-https://hrms.shadowmarket.ai}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
@@ -23,12 +22,15 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
-    networks:
-      - hrms-testing-net
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
   mysql:
     image: mysql:8.0
-    container_name: hrms-mysql-testing
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-hrms2026}
@@ -42,12 +44,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
-    networks:
-      - hrms-testing-net
 
 volumes:
   hrms_testing_data:
-
-networks:
-  hrms-testing-net:
-    driver: bridge
