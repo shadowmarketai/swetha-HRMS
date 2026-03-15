@@ -856,16 +856,18 @@ a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.demo-btn:f
   .section-title { font-size: .88rem; margin: 24px 0 12px; }
   .btn { padding: 11px 20px; font-size: .85rem; }
   .card { padding: 18px; border-radius: 15px; }
-  /* Overlays — full content area, stacked on top */
+  /* Overlays — full-screen fixed, escape the grid entirely */
   .overlay-screen {
-    grid-column: 2; grid-row: 2;
-    position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-    width: 100% !important; max-width: 100% !important; height: 100% !important;
+    position: fixed !important; top: 0 !important; left: 0 !important;
+    width: 100vw !important; height: 100vh !important;
+    max-width: none !important; max-height: none !important;
     transform: none !important; transition: none !important;
-    display: none !important; overflow-x: hidden !important;
-    z-index: var(--z-overlay) !important;
+    display: none !important;
+    overflow-y: auto !important; overflow-x: hidden !important;
+    z-index: 9000 !important;
+    background: var(--bg) !important;
   }
-  .overlay-screen.active { display: block !important; transform: none !important; transition: none !important; }
+  .overlay-screen.active { display: block !important; }
   .overlay-header { height: 60px; padding: 0 20px; }
   .overlay-header h2 { font-size: 1.15rem; }
   .hr-overlay-body { padding: 20px 20px 32px; }
@@ -1169,24 +1171,20 @@ a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.demo-btn:f
   .login-field input { font-size: 1rem; padding: 14px 16px; }
   .login-btn { font-size: 1rem; padding: 15px; }
 
-  /* ── Step 9: Overlays — hide with display:none, kill transitions ── */
+  /* ── Step 9: Overlays — full-screen fixed, escape the grid entirely ── */
   .overlay-screen {
-    grid-column: 2; grid-row: 2;
-    position: absolute;
-    top: 0; left: 0; right: 0; bottom: 0;
-    width: 100% !important;
-    max-width: 100% !important;
-    height: 100% !important;
+    position: fixed !important; top: 0 !important; left: 0 !important;
+    width: 100vw !important; height: 100vh !important;
+    max-width: none !important; max-height: none !important;
     transform: none !important;
     transition: none !important;
     display: none !important;
-    overflow-x: hidden !important;
-    z-index: var(--z-overlay) !important;
+    overflow-y: auto !important; overflow-x: hidden !important;
+    z-index: 9000 !important;
+    background: var(--bg) !important;
   }
   .overlay-screen.active {
     display: block !important;
-    transform: none !important;
-    transition: none !important;
   }
   .hr-overlay-body { padding: 24px 24px 40px; }
 }

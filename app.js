@@ -344,6 +344,8 @@ function loginAs(empIndex) {
   updateGreeting();
   buildCalendar();
   initLeaveTabs();
+  // Set initial history state so back button has a baseline
+  history.replaceState({ tab: 'home' }, '');
 }
 function doLogout() {
   currentUser = null;
@@ -360,9 +362,13 @@ function doLogout() {
   document.getElementById('loginId').value = '';
   document.getElementById('loginPass').value = '';
   document.getElementById('loginError').textContent = '';
-  hideOverlay('profile');
-  // Reset to home tab
-  switchTab('home', document.querySelector('[data-tab=home]'));
+  // Close overlays without touching history (we'll reset history below)
+  document.querySelectorAll('.overlay-screen.active').forEach(function(o) { o.classList.remove('active'); });
+  _overlayPreviousFocus = [];
+  // Reset to home tab without pushing history
+  switchTab('home', document.querySelector('[data-tab=home]'), true);
+  // Clear all navigation history
+  history.replaceState(null, '');
 }
 
 // =====================================================
@@ -713,8 +719,9 @@ function updateSalaryScreen() {
 // =====================================================
 // CORE UI FUNCTIONS
 // =====================================================
-function switchTab(id, el) {
-  // Close all open overlays first
+function switchTab(id, el, _fromPopstate) {
+  // Close all open overlays first — track if any were open
+  var hadOverlays = document.querySelectorAll('.overlay-screen.active').length > 0;
   document.querySelectorAll('.overlay-screen.active').forEach(o => o.classList.remove('active'));
   document.querySelectorAll('.leave-form-overlay.active').forEach(o => o.classList.remove('active'));
 
@@ -735,6 +742,14 @@ function switchTab(id, el) {
     next.classList.add('active');
     if(el) el.classList.add('active');
     document.querySelector('.app-content').scrollTop = 0;
+  }
+  if (!_fromPopstate) {
+    if (hadOverlays) {
+      // Replace the orphaned overlay history entry instead of pushing on top of it
+      history.replaceState({ tab: id }, '');
+    } else {
+      history.pushState({ tab: id }, '');
+    }
   }
   if (id === 'advance' || id === 'site' || id === 'ta') { renderAllMyRequests(); renderAllPendingBanners(); }
   if (id === 'leaves') renderLeaveScreen();
@@ -757,15 +772,22 @@ function showOverlay(id) {
   _overlayPreviousFocus.push(document.activeElement);
   const el = document.getElementById('overlay-' + id);
   el.classList.add('active');
+  history.pushState({ overlay: id }, '');
   // Focus first focusable element
   const focusable = el.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
   if (focusable.length) focusable[0].focus();
 }
-function hideOverlay(id) {
+let _skipPopstate = false;
+function hideOverlay(id, _fromPopstate) {
   const el = document.getElementById('overlay-' + id);
   if (el) el.classList.remove('active');
   const prev = _overlayPreviousFocus.pop();
   if (prev && prev.focus) prev.focus();
+  // If called from UI back button (not popstate), go back in history to consume the pushState entry
+  if (!_fromPopstate) {
+    _skipPopstate = true;
+    history.back();
+  }
   // If no overlays remain active, ensure the current screen is visible
   const anyActive = document.querySelector('.overlay-screen.active');
   if (!anyActive) {
@@ -796,6 +818,33 @@ document.addEventListener('keydown', (e) => {
         else if (!e.shiftKey && document.activeElement === last) { first.focus(); e.preventDefault(); }
       }
     }
+  }
+});
+
+// Browser back button support — close overlays or navigate tabs
+window.addEventListener('popstate', function(e) {
+  if (_skipPopstate) { _skipPopstate = false; return; }
+  // Don't handle navigation when logged out
+  if (!currentUser) return;
+  // If an overlay is open, close the topmost one
+  var overlays = document.querySelectorAll('.overlay-screen.active');
+  if (overlays.length > 0) {
+    var topOverlay = overlays[overlays.length - 1];
+    var oid = topOverlay.id.replace('overlay-', '');
+    hideOverlay(oid, true);
+    return;
+  }
+  // If state has a tab, switch to it
+  if (e.state && e.state.tab) {
+    switchTab(e.state.tab, document.querySelector('[data-tab="' + e.state.tab + '"]'), true);
+    return;
+  }
+  // No state or orphaned overlay state — navigate to home or let browser exit
+  var activeScreen = document.querySelector('.screen.active');
+  if (activeScreen && activeScreen.id !== 'screen-home') {
+    switchTab('home', document.querySelector('[data-tab="home"]'), true);
+    // Re-establish home as the base state so next back exits cleanly
+    history.replaceState({ tab: 'home' }, '');
   }
 });
 
