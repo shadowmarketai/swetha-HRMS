@@ -3293,6 +3293,7 @@ function loadAllData() {
 }
 
 function clearAllData() {
+  if (currentUser && currentUser.role === 'Employee') { showToast('Access denied. Management only.'); return; }
   if (!confirm('This will reset ALL data to defaults. Are you sure?')) return;
   Object.values(STORAGE_KEYS).forEach(k => safeStorage.remove(k));
   showToast('All data cleared. Refreshing...');
@@ -3303,6 +3304,7 @@ function clearAllData() {
 // DATA EXPORT / IMPORT
 // =====================================================
 function exportAllData() {
+  if (currentUser && currentUser.role === 'Employee') { showToast('Access denied. Management only.'); return; }
   const data = {};
   Object.entries(STORAGE_KEYS).forEach(([key, storageKey]) => {
     const val = safeStorage.get(storageKey);
@@ -3321,6 +3323,7 @@ function exportAllData() {
 }
 
 function importAllData() {
+  if (currentUser && currentUser.role === 'Employee') { showToast('Access denied. Management only.'); return; }
   const input = document.createElement('input');
   input.type = 'file';
   input.accept = '.json';
@@ -3499,6 +3502,7 @@ function exportToCSV(data, filename, columns) {
 }
 
 function exportEmployeeList() {
+  if (currentUser && currentUser.role === 'Employee') { showToast('Access denied. Management only.'); return; }
   exportToCSV(EMPLOYEES, 'employees.csv', [
     {label:'Name', key:'name'},
     {label:'Code', key:'code'},
@@ -3513,6 +3517,7 @@ function exportEmployeeList() {
 }
 
 function exportKPIReport() {
+  if (currentUser && currentUser.role === 'Employee') { showToast('Access denied. Management only.'); return; }
   const data = EMPLOYEES.map(e => ({
     name: e.name, code: e.code, dept: e.dept,
     score: getKpiScore(e.code),
@@ -3527,6 +3532,7 @@ function exportKPIReport() {
 }
 
 function exportSalaryReport() {
+  if (currentUser && currentUser.role === 'Employee') { showToast('Access denied. Management only.'); return; }
   exportToCSV(EMPLOYEES, 'salary_dec2025.csv', [
     {label:'Name', key:'name'}, {label:'Code', key:'code'},
     {label:'Department', key:'dept'}, {label:'Designation', key:'designation'},
@@ -3537,6 +3543,7 @@ function exportSalaryReport() {
 }
 
 function exportAttendanceReport() {
+  if (currentUser && currentUser.role === 'Employee') { showToast('Access denied. Management only.'); return; }
   const data = EMPLOYEES.map(e => ({
     name: e.name, code: e.code, dept: e.dept,
     present: Math.floor(Math.random() * 5) + 22,
@@ -3553,6 +3560,7 @@ function exportAttendanceReport() {
 }
 
 function exportTaskReport() {
+  if (currentUser && currentUser.role === 'Employee') { showToast('Access denied. Management only.'); return; }
   exportToCSV(TASK_DATA, 'tasks.csv', [
     {label:'Title', key:'title'}, {label:'Type', key:'type'},
     {label:'Assigned To', key:'assignedTo'}, {label:'Due Date', key:'dueDate'},
@@ -3563,6 +3571,7 @@ function exportTaskReport() {
 }
 
 function exportAdvanceReport() {
+  if (currentUser && currentUser.role === 'Employee') { showToast('Access denied. Management only.'); return; }
   exportToCSV(advanceRequests, 'advances.csv', [
     {label:'Employee', key:'empName'}, {label:'Code', key:'empCode'},
     {label:'Type', key:'type'}, {label:'Amount', key:'amount'},
@@ -3574,6 +3583,7 @@ function exportAdvanceReport() {
 }
 
 function exportAnalyticsReport() {
+  if (currentUser && currentUser.role === 'Employee') { showToast('Access denied. Management only.'); return; }
   const m = getHRMetrics();
   const data = EMPLOYEES.map(e => {
     const inc = calculateIncentive(e.code);
@@ -3592,6 +3602,7 @@ function exportAnalyticsReport() {
 }
 
 function exportIncentiveReport() {
+  if (currentUser && currentUser.role === 'Employee') { showToast('Access denied. Management only.'); return; }
   const data = EMPLOYEES.map(e => {
     const inc = calculateIncentive(e.code);
     return {

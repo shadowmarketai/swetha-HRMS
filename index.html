@@ -147,6 +147,7 @@
         <div class="loc-text"><p>Location: Porur, Chennai</p><small>GPS tracking active &middot; 13.0382&#176;N, 80.1582&#176;E</small></div>
         <div class="loc-live"></div>
       </div>
+      <div class="md-hr-only">
       <div class="summary-grid fade-in">
         <div class="summary-card total"><div class="amount">&#8377;1.25L</div><div class="label">Total Advance</div></div>
         <div class="summary-card approved"><div class="amount">&#8377;85K</div><div class="label">Settled</div></div>
@@ -167,6 +168,7 @@
         <div class="expense-icon" style="background:var(--success-light);color:var(--success-dark)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></div>
         <div class="expense-info"><h4>Equipment Rental — JCB</h4><p>Machinery &middot; 2 days</p></div>
         <div class="expense-amount"><div class="value">&#8377;12,000</div><div class="date">02 Mar</div></div>
+      </div>
       </div>
       <div class="section-title">Attach Bill</div>
       <div class="camera-zone fade-in" onclick="document.getElementById('cameraInput').click()">
@@ -192,6 +194,7 @@
         <span id="advPendingText">Pending Requests</span>
         <span class="count-badge" id="advPendingCount">0</span>
       </button>
+      <div class="md-hr-only">
       <div class="section-title" style="margin-top:4px">Salary Advance Tracker</div>
       <div class="adv-tracker fade-in">
         <div class="adv-tracker-header"><h4>Balasubramaninam</h4><div class="total">&#8377;1,05,000</div></div>
@@ -229,6 +232,7 @@
         <div class="adv-row"><span class="month">Dec 2025 (Adjusted)</span><span class="amt paid">-&#8377;5,000</span></div>
         <div class="adv-row"><span class="month">Net Salary</span><span class="amt" style="color:var(--gray-800)">&#8377;15,323</span></div>
       </div>
+      </div>
       <div style="margin-top:12px">
         <button class="btn btn-primary w-full" style="border-radius:var(--radius)" onclick="openAdvanceApplyForm('salary')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New Salary Advance</button>
       </div>
@@ -248,6 +252,7 @@
         <div class="loc-text"><p>Live Tracking Enabled</p><small>Auto-calculates distance for TA claims</small></div>
         <div class="loc-live"></div>
       </div>
+      <div class="md-hr-only">
       <div class="summary-grid fade-in">
         <div class="summary-card total"><div class="amount">&#8377;3,550</div><div class="label">Total TA</div></div>
         <div class="summary-card approved"><div class="amount">8</div><div class="label">Staff Claims</div></div>
@@ -288,6 +293,7 @@
         <div class="ta-icon" style="background:var(--teal-light);color:var(--teal-dark)">&#128661;</div>
         <div class="ta-info"><h4>Udhaya Shankar</h4><p>Bike &middot; Factory travel</p></div>
         <div class="ta-amount" style="color:var(--success-dark)">&#8377;165</div>
+      </div>
       </div>
       <div class="section-title">Attach Bill / Receipt</div>
       <div class="camera-zone fade-in" onclick="document.getElementById('taCameraInput').click()">
@@ -618,6 +624,7 @@
         <button class="btn btn-primary w-full" style="border-radius:var(--radius-sm);margin-top:8px" onclick="changePassword()">Update Password</button>
       </div>
 
+      <div class="md-hr-only">
       <div class="section-title">Export Data</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
         <button class="btn btn-sm btn-outline" onclick="exportEmployeeList()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Employees</button>
@@ -636,6 +643,7 @@
         <button class="btn" style="flex:1;background:var(--success-light);color:var(--success-dark);border-radius:var(--radius-sm)" onclick="importAllData()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Import Data</button>
       </div>
       <button class="btn w-full" style="background:var(--danger-light);color:var(--danger-dark);border-radius:var(--radius-sm);margin-bottom:8px" onclick="clearAllData()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Reset All Data to Defaults</button>
+      </div>
 
       <div style="margin-top:24px;text-align:center"><div style="font-size:.72rem;color:var(--gray-400)">Swetha Structures HRMS v3.0</div><div style="font-size:.65rem;color:var(--gray-300);margin-top:2px">Swetha Structures Private Limited</div></div>
     </div>
