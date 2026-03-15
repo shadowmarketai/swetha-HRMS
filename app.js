@@ -3945,51 +3945,74 @@ let attendanceLogs; try { attendanceLogs = JSON.parse(safeStorage.get(STORAGE_KE
 
 function gpsCheckIn() {
   if (!navigator.geolocation) { showToast('Geolocation not supported'); return; }
-  const btn = document.getElementById('gpsCheckinBtn');
+  var btn = document.getElementById('gpsCheckinBtn');
   if (btn) btn.textContent = 'Getting location...';
 
-  navigator.geolocation.getCurrentPosition(
-    (pos) => {
-      const log = {
-        empCode: currentUser.code,
-        type: 'checkin',
-        lat: pos.coords.latitude,
-        lng: pos.coords.longitude,
-        accuracy: pos.coords.accuracy,
-        timestamp: new Date().toISOString()
-      };
-      attendanceLogs.push(log);
-      safeStorage.set(STORAGE_KEYS.attendanceLogs, JSON.stringify(attendanceLogs));
-      saveAllData();
-      showToast(`Checked in at ${pos.coords.latitude.toFixed(4)}°N, ${pos.coords.longitude.toFixed(4)}°E`);
-      sendNotification('Check-In Recorded', `Location: ${pos.coords.latitude.toFixed(4)}°N, ${pos.coords.longitude.toFixed(4)}°E`, 'checkin');
-      if (btn) btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/></svg>Checked In';
-      updateCheckinCard(pos.coords);
+  function onSuccess(pos) {
+    var log = {
+      empCode: currentUser.code,
+      type: 'checkin',
+      lat: pos.coords.latitude,
+      lng: pos.coords.longitude,
+      accuracy: pos.coords.accuracy,
+      timestamp: new Date().toISOString()
+    };
+    attendanceLogs.push(log);
+    safeStorage.set(STORAGE_KEYS.attendanceLogs, JSON.stringify(attendanceLogs));
+    saveAllData();
+    showToast('Checked in at ' + pos.coords.latitude.toFixed(4) + '\u00B0N, ' + pos.coords.longitude.toFixed(4) + '\u00B0E');
+    sendNotification('Check-In Recorded', 'Location: ' + pos.coords.latitude.toFixed(4) + '\u00B0N, ' + pos.coords.longitude.toFixed(4) + '\u00B0E', 'checkin');
+    if (btn) btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/></svg>Checked In';
+    updateCheckinCard(pos.coords);
+  }
+
+  // Try high-accuracy GPS first, fallback to network location on timeout
+  navigator.geolocation.getCurrentPosition(onSuccess,
+    function(err) {
+      if (err.code === 3) {
+        // Timeout — retry with network location (faster, less accurate)
+        if (btn) btn.textContent = 'Retrying...';
+        navigator.geolocation.getCurrentPosition(onSuccess,
+          function(err2) {
+            showToast('Location error: ' + err2.message);
+            if (btn) btn.textContent = 'Check In';
+          },
+          { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
+        );
+      } else {
+        showToast('Location error: ' + err.message);
+        if (btn) btn.textContent = 'Check In';
+      }
     },
-    (err) => {
-      showToast('Location error: ' + err.message);
-      if (btn) btn.textContent = 'Check In';
-    },
-    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 }
   );
 }
 
 function gpsCheckOut() {
   if (!navigator.geolocation) { showToast('Geolocation not supported'); return; }
-  navigator.geolocation.getCurrentPosition(
-    (pos) => {
-      const log = {
-        empCode: currentUser.code, type: 'checkout',
-        lat: pos.coords.latitude, lng: pos.coords.longitude,
-        accuracy: pos.coords.accuracy, timestamp: new Date().toISOString()
-      };
-      attendanceLogs.push(log);
-      safeStorage.set(STORAGE_KEYS.attendanceLogs, JSON.stringify(attendanceLogs));
-      showToast('Checked out successfully');
-      sendNotification('Check-Out Recorded', `Time: ${new Date().toLocaleTimeString()}`, 'checkout');
+  function onSuccess(pos) {
+    var log = {
+      empCode: currentUser.code, type: 'checkout',
+      lat: pos.coords.latitude, lng: pos.coords.longitude,
+      accuracy: pos.coords.accuracy, timestamp: new Date().toISOString()
+    };
+    attendanceLogs.push(log);
+    safeStorage.set(STORAGE_KEYS.attendanceLogs, JSON.stringify(attendanceLogs));
+    showToast('Checked out successfully');
+    sendNotification('Check-Out Recorded', 'Time: ' + new Date().toLocaleTimeString(), 'checkout');
+  }
+  navigator.geolocation.getCurrentPosition(onSuccess,
+    function(err) {
+      if (err.code === 3) {
+        navigator.geolocation.getCurrentPosition(onSuccess,
+          function(err2) { showToast('Location error: ' + err2.message); },
+          { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
+        );
+      } else {
+        showToast('Location error: ' + err.message);
+      }
     },
-    (err) => showToast('Location error: ' + err.message),
-    { enableHighAccuracy: true, timeout: 10000 }
+    { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 }
   );
 }
 
