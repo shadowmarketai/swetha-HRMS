@@ -750,6 +750,10 @@ function showOverlay(id) {
   if (id === 'notifications') renderNotifications();
   if (id === 'location') openLocationTracker();
   if (id === 'advance-requests') { advReqActiveTab = 'pending'; advReqTypeFilter = 'all'; renderAdvanceRequests('pending'); document.querySelectorAll('#advReqTabs .tab-pill').forEach((p,i) => p.classList.toggle('active', i===0)); document.querySelectorAll('#advReqTypeFilter .loc-filter-chip').forEach((c,i) => c.classList.toggle('active', i===0)); }
+  // Close any currently active overlays to prevent split-screen stacking
+  document.querySelectorAll('.overlay-screen.active').forEach(function(o) {
+    o.classList.remove('active');
+  });
   _overlayPreviousFocus.push(document.activeElement);
   const el = document.getElementById('overlay-' + id);
   el.classList.add('active');
@@ -758,9 +762,16 @@ function showOverlay(id) {
   if (focusable.length) focusable[0].focus();
 }
 function hideOverlay(id) {
-  document.getElementById('overlay-' + id).classList.remove('active');
+  const el = document.getElementById('overlay-' + id);
+  if (el) el.classList.remove('active');
   const prev = _overlayPreviousFocus.pop();
   if (prev && prev.focus) prev.focus();
+  // If no overlays remain active, ensure the current screen is visible
+  const anyActive = document.querySelector('.overlay-screen.active');
+  if (!anyActive) {
+    const activeScreen = document.querySelector('.screen.active');
+    if (activeScreen) activeScreen.scrollTop = 0;
+  }
 }
 
 // Keyboard navigation — Escape closes topmost overlay, Tab traps focus

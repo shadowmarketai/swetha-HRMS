@@ -41,7 +41,7 @@ body{font-family:var(--font-body);color:var(--text);background:#E8EAF0;display:f
 .screen{display:none;padding:16px 16px 24px;animation:fadeUp .35s ease}
 .screen.active{display:block}
 @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
-.overlay-screen{position:absolute;top:0;left:0;right:0;bottom:0;z-index:var(--z-overlay);background:var(--bg);transform:translateX(100%);transition:transform .35s cubic-bezier(.4,0,.2,1);overflow-y:auto}
+.overlay-screen{position:absolute;top:0;left:0;right:0;bottom:0;width:100%;height:100%;z-index:var(--z-overlay);background:var(--bg);transform:translateX(100%);transition:transform .35s cubic-bezier(.4,0,.2,1);overflow-y:auto}
 .overlay-screen.active{transform:translateX(0)}
 .overlay-header{position:sticky;top:0;height:var(--header-h);display:flex;align-items:center;gap:12px;padding:0 16px;background:rgba(255,255,255,.88);backdrop-filter:blur(16px) saturate(180%);-webkit-backdrop-filter:blur(16px) saturate(180%);border-bottom:1px solid rgba(0,0,0,.06);z-index:10}
 .overlay-header h2{font-family:var(--font-display);font-size:1.1rem;font-weight:600}
@@ -856,13 +856,14 @@ a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.demo-btn:f
   .section-title { font-size: .88rem; margin: 24px 0 12px; }
   .btn { padding: 11px 20px; font-size: .85rem; }
   .card { padding: 18px; border-radius: 15px; }
-  /* Overlays */
+  /* Overlays — full content area, stacked on top */
   .overlay-screen {
     grid-column: 2; grid-row: 2;
     position: absolute; top: 0; left: 0; right: 0; bottom: 0;
-    width: 100% !important; max-width: 100% !important;
+    width: 100% !important; max-width: 100% !important; height: 100% !important;
     transform: none !important; transition: none !important;
     display: none !important; overflow-x: hidden !important;
+    z-index: var(--z-overlay) !important;
   }
   .overlay-screen.active { display: block !important; transform: none !important; transition: none !important; }
   .overlay-header { height: 60px; padding: 0 20px; }
@@ -1175,10 +1176,12 @@ a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.demo-btn:f
     top: 0; left: 0; right: 0; bottom: 0;
     width: 100% !important;
     max-width: 100% !important;
+    height: 100% !important;
     transform: none !important;
     transition: none !important;
     display: none !important;
     overflow-x: hidden !important;
+    z-index: var(--z-overlay) !important;
   }
   .overlay-screen.active {
     display: block !important;
