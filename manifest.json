@@ -22,21 +22,6 @@
       "purpose": "any maskable"
     }
   ],
-  "screenshots": [
-    {
-      "src": "screen_home_final.png",
-      "sizes": "430x932",
-      "type": "image/png",
-      "form_factor": "narrow",
-      "label": "HRMS Home Screen"
-    },
-    {
-      "src": "desktop-final.png",
-      "sizes": "1440x900",
-      "type": "image/png",
-      "form_factor": "wide",
-      "label": "HRMS Desktop Dashboard"
-    }
-  ],
+  "screenshots": [],
   "prefer_related_applications": false
 }
