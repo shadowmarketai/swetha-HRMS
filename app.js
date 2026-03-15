@@ -174,6 +174,8 @@ const SITE_LOCATIONS = [
   {name:'Site - Porur', lat:11.0320, lng:76.9800, radius:250},
   {name:'PEB Unit - Kinathukadavu', lat:10.8100, lng:76.9700, radius:250}
 ];
+let siteLocations; try { siteLocations = JSON.parse(safeStorage.get('hrms_site_locations')); } catch { siteLocations = null; }
+if (!siteLocations || !Array.isArray(siteLocations)) siteLocations = SITE_LOCATIONS.map(s => ({...s}));
 
 // F5: Tax / Form 16
 let taxDeclarations = {};
@@ -413,6 +415,9 @@ function applyRole() {
 
   // Salary screen — role-based content
   updateSalaryScreen();
+
+  // Recent Activity (role-filtered)
+  renderRecentActivity();
 
   // Advance requests
   renderAdvancePendingBanner();
@@ -901,6 +906,7 @@ function buildCalendar() {
     const dot = st ? '<span class="cal-dot '+st+'"></span>' : '';
     c.innerHTML += '<div class="cal-day'+(isToday?' today':'')+'">'+d+dot+'</div>';
   }
+  renderAttendanceLogList();
 }
 
 function initLeaveTabs() {
@@ -1009,6 +1015,8 @@ function switchAdminTab(tab, btn) {
   document.getElementById('adminRoles').classList.toggle('hidden', tab !== 'roles');
   document.getElementById('adminDepts').classList.toggle('hidden', tab !== 'depts');
   document.getElementById('adminEmpList').classList.toggle('hidden', tab !== 'emplist');
+  document.getElementById('adminGeofence').classList.toggle('hidden', tab !== 'geofence');
+  if (tab === 'geofence') renderGeofenceSites();
 }
 
 function renderAdminPanel() {
@@ -3196,7 +3204,8 @@ const STORAGE_KEYS = {
   exitNextId: 'hrms_exit_next_id',
   announcements: 'hrms_announcements',
   announcementNextId: 'hrms_announcement_next_id',
-  announcementReadStatus: 'hrms_announcement_read_status'
+  announcementReadStatus: 'hrms_announcement_read_status',
+  siteLocations: 'hrms_site_locations'
 };
 
 function saveAllData() {
@@ -3237,6 +3246,7 @@ function saveAllData() {
     safeStorage.set(STORAGE_KEYS.announcements, JSON.stringify(announcements));
     safeStorage.set(STORAGE_KEYS.announcementNextId, JSON.stringify(announcementNextId));
     safeStorage.set(STORAGE_KEYS.announcementReadStatus, JSON.stringify(announcementReadStatus));
+    safeStorage.set(STORAGE_KEYS.siteLocations, JSON.stringify(siteLocations));
   } catch (e) {
     // Failed to save data
   }
@@ -3287,6 +3297,7 @@ function loadAllData() {
     d = load(STORAGE_KEYS.announcements); if (d) { announcements.length = 0; d.forEach(e => announcements.push(e)); }
     d = load(STORAGE_KEYS.announcementNextId); if (d !== null) announcementNextId = d;
     d = load(STORAGE_KEYS.announcementReadStatus); if (d) { Object.keys(announcementReadStatus).forEach(k => delete announcementReadStatus[k]); Object.assign(announcementReadStatus, d); }
+    d = load(STORAGE_KEYS.siteLocations); if (d && Array.isArray(d)) { siteLocations.length = 0; d.forEach(e => siteLocations.push(e)); }
   } catch (e) {
     // Failed to load data
   }
@@ -3960,21 +3971,24 @@ function gpsCheckIn() {
   if (btn) btn.textContent = 'Getting location...';
 
   function onSuccess(pos) {
+    var geoResult = checkGeofence(pos.coords.latitude, pos.coords.longitude);
     var log = {
       empCode: currentUser.code,
       type: 'checkin',
       lat: pos.coords.latitude,
       lng: pos.coords.longitude,
       accuracy: pos.coords.accuracy,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      location: geoResult.inside ? geoResult.location : 'Outside geofence'
     };
     attendanceLogs.push(log);
     safeStorage.set(STORAGE_KEYS.attendanceLogs, JSON.stringify(attendanceLogs));
     saveAllData();
-    showToast('Checked in at ' + pos.coords.latitude.toFixed(4) + '\u00B0N, ' + pos.coords.longitude.toFixed(4) + '\u00B0E');
-    sendNotification('Check-In Recorded', 'Location: ' + pos.coords.latitude.toFixed(4) + '\u00B0N, ' + pos.coords.longitude.toFixed(4) + '\u00B0E', 'checkin');
+    showToast('Checked in at ' + (geoResult.inside ? geoResult.location : pos.coords.latitude.toFixed(4) + '\u00B0N, ' + pos.coords.longitude.toFixed(4) + '\u00B0E'));
+    sendNotification('Check-In Recorded', 'Location: ' + (geoResult.inside ? geoResult.location : pos.coords.latitude.toFixed(4) + '\u00B0N'), 'checkin');
     if (btn) btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/></svg>Checked In';
     updateCheckinCard(pos.coords);
+    renderAttendanceLogList();
   }
 
   // Try high-accuracy GPS first, fallback to network location on timeout
@@ -4002,15 +4016,18 @@ function gpsCheckIn() {
 function gpsCheckOut() {
   if (!navigator.geolocation) { showToast('Geolocation not supported'); return; }
   function onSuccess(pos) {
+    var geoResult = checkGeofence(pos.coords.latitude, pos.coords.longitude);
     var log = {
       empCode: currentUser.code, type: 'checkout',
       lat: pos.coords.latitude, lng: pos.coords.longitude,
-      accuracy: pos.coords.accuracy, timestamp: new Date().toISOString()
+      accuracy: pos.coords.accuracy, timestamp: new Date().toISOString(),
+      location: geoResult.inside ? geoResult.location : 'Outside geofence'
     };
     attendanceLogs.push(log);
     safeStorage.set(STORAGE_KEYS.attendanceLogs, JSON.stringify(attendanceLogs));
     showToast('Checked out successfully');
     sendNotification('Check-Out Recorded', 'Time: ' + new Date().toLocaleTimeString(), 'checkout');
+    renderAttendanceLogList();
   }
   navigator.geolocation.getCurrentPosition(onSuccess,
     function(err) {
@@ -5405,7 +5422,8 @@ function haversineDistance(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 function checkGeofence(lat, lng) {
-  for (const loc of SITE_LOCATIONS) {
+  const sites = (typeof siteLocations !== 'undefined' && Array.isArray(siteLocations)) ? siteLocations : SITE_LOCATIONS;
+  for (const loc of sites) {
     const dist = haversineDistance(lat, lng, loc.lat, loc.lng);
     if (dist <= loc.radius) return { inside: true, location: loc.name, distance: Math.round(dist) };
   }
@@ -5445,6 +5463,250 @@ function renderAttendanceLogOverlay() {
   }
   html += '</div>';
   c.innerHTML = html;
+}
+
+// =====================================================
+// ATTENDANCE LOG LIST (below calendar)
+// =====================================================
+function renderAttendanceLogList() {
+  var c = document.getElementById('attendanceLogList');
+  if (!c || !currentUser) return;
+  var myLogs = (typeof attendanceLogs !== 'undefined' ? attendanceLogs : []).filter(function(l) { return l.empCode === currentUser.code; });
+  if (myLogs.length === 0) {
+    c.innerHTML = '<div style="padding:16px;text-align:center;color:var(--gray-400);font-size:.8rem">No attendance records yet. Use GPS Check-In to start logging.</div>';
+    return;
+  }
+  // Group by date
+  var byDate = {};
+  myLogs.forEach(function(log) {
+    var d = log.timestamp ? log.timestamp.split('T')[0] : 'unknown';
+    if (!byDate[d]) byDate[d] = { checkin: null, checkout: null };
+    if (log.type === 'checkin' && !byDate[d].checkin) byDate[d].checkin = log;
+    if (log.type === 'checkout') byDate[d].checkout = log;
+  });
+  var dates = Object.keys(byDate).sort().reverse().slice(0, 30);
+  var html = '<div style="padding:12px">';
+  dates.forEach(function(dt) {
+    var pair = byDate[dt];
+    var ciTime = pair.checkin ? new Date(pair.checkin.timestamp).toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'}) : '--:--';
+    var coTime = pair.checkout ? new Date(pair.checkout.timestamp).toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'}) : '--:--';
+    var loc = (pair.checkin && pair.checkin.location) ? pair.checkin.location : 'Unknown';
+    var duration = '';
+    if (pair.checkin && pair.checkout) {
+      var diff = (new Date(pair.checkout.timestamp) - new Date(pair.checkin.timestamp)) / 60000;
+      var hrs = Math.floor(diff / 60), mins = Math.round(diff % 60);
+      duration = hrs + 'h ' + mins + 'm';
+    }
+    var statusHtml = '';
+    if (pair.checkin) {
+      var ciDate = new Date(pair.checkin.timestamp);
+      var totalMin = ciDate.getHours() * 60 + ciDate.getMinutes();
+      if (totalMin > 9 * 60 + 15) statusHtml = '<span style="font-size:.65rem;color:var(--danger);font-weight:600">Late</span>';
+      else statusHtml = '<span style="font-size:.65rem;color:var(--success);font-weight:600">On-time</span>';
+    }
+    var dateLabel = new Date(dt + 'T00:00:00').toLocaleDateString('en-IN', {day:'2-digit',month:'short',year:'numeric',weekday:'short'});
+    html += '<div class="attendance-log-row" style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--gray-100)">';
+    html += '<div style="min-width:80px"><div style="font-weight:600;font-size:.78rem">' + escapeHTML(dateLabel.split(',')[1] || dateLabel) + '</div><div style="font-size:.65rem;color:var(--gray-400)">' + escapeHTML(dateLabel.split(',')[0] || '') + '</div></div>';
+    html += '<div style="flex:1;display:flex;flex-direction:column;gap:2px">';
+    html += '<div style="font-size:.75rem"><span style="color:var(--success)">In:</span> ' + escapeHTML(ciTime) + ' <span style="color:var(--danger);margin-left:6px">Out:</span> ' + escapeHTML(coTime) + '</div>';
+    html += '<div style="font-size:.68rem;color:var(--gray-500)">' + escapeHTML(loc) + '</div>';
+    html += '</div>';
+    html += '<div style="text-align:right;min-width:50px">' + (duration ? '<div style="font-size:.72rem;font-weight:600">' + escapeHTML(duration) + '</div>' : '<span class="badge-status badge-pending" style="font-size:.6rem">Active</span>') + statusHtml + '</div>';
+    html += '</div>';
+  });
+  html += '</div>';
+  c.innerHTML = html;
+}
+
+// =====================================================
+// RECENT ACTIVITY (role-filtered)
+// =====================================================
+function renderRecentActivity() {
+  var c = document.getElementById('recentActivityList');
+  if (!c || !currentUser) return;
+  var isMDorHR = currentUser.role === 'MD' || currentUser.role === 'HR';
+  var items = [];
+
+  // Advance requests
+  var advReqs = (typeof advanceRequests !== 'undefined' ? advanceRequests : []);
+  var filteredAdv = isMDorHR ? advReqs : advReqs.filter(function(r) { return r.empCode === currentUser.code; });
+  filteredAdv.slice(-5).reverse().forEach(function(r) {
+    items.push({
+      icon: '<div class="req-icon" style="background:var(--teal-light);color:var(--teal-dark)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>',
+      title: escapeHTML((r.type || 'Salary') + ' Advance' + (isMDorHR && r.empName ? ' — ' + r.empName : '')),
+      sub: '&#8377;' + (r.amount || 0).toLocaleString('en-IN'),
+      date: r.date || '',
+      status: r.status || 'Pending',
+      sortDate: r.date || ''
+    });
+  });
+
+  // Leave applications
+  var leaves = (typeof leaveApplications !== 'undefined' ? leaveApplications : []);
+  var filteredLeaves = isMDorHR ? leaves : leaves.filter(function(l) { return l.empCode === currentUser.code; });
+  filteredLeaves.slice(-5).reverse().forEach(function(l) {
+    items.push({
+      icon: '<div class="req-icon" style="background:#DBEAFE;color:#2563EB"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/></svg></div>',
+      title: escapeHTML((l.leaveType || 'Leave') + (isMDorHR && l.empName ? ' — ' + l.empName : '')),
+      sub: escapeHTML((l.startDate || '') + ' to ' + (l.endDate || '')),
+      date: l.appliedDate || l.startDate || '',
+      status: l.status || 'Pending',
+      sortDate: l.appliedDate || l.startDate || ''
+    });
+  });
+
+  // Expense reimbursements
+  var expenses = (typeof expenseReimbursements !== 'undefined' ? expenseReimbursements : []);
+  var filteredExp = isMDorHR ? expenses : expenses.filter(function(e) { return e.empCode === currentUser.code; });
+  filteredExp.slice(-3).reverse().forEach(function(e) {
+    items.push({
+      icon: '<div class="req-icon" style="background:#FCE7F3;color:#BE185D"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></div>',
+      title: escapeHTML((e.category || 'Expense') + (isMDorHR && e.empName ? ' — ' + e.empName : '')),
+      sub: '&#8377;' + (e.amount || 0).toLocaleString('en-IN'),
+      date: e.date || '',
+      status: e.status || 'Pending',
+      sortDate: e.date || ''
+    });
+  });
+
+  // Today's attendance logs
+  var todayStr = new Date().toISOString().split('T')[0];
+  var todayLogs = (typeof attendanceLogs !== 'undefined' ? attendanceLogs : []).filter(function(l) {
+    return l.empCode === currentUser.code && l.timestamp && l.timestamp.startsWith(todayStr);
+  });
+  todayLogs.forEach(function(l) {
+    var time = new Date(l.timestamp).toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'});
+    items.push({
+      icon: '<div class="req-icon" style="background:var(--success-light);color:var(--success-dark)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>',
+      title: escapeHTML(l.type === 'checkin' ? 'GPS Check-In' : 'GPS Check-Out'),
+      sub: escapeHTML(time + (l.location ? ' · ' + l.location : '')),
+      date: 'Today',
+      status: l.type === 'checkin' ? 'Checked In' : 'Checked Out',
+      sortDate: l.timestamp || ''
+    });
+  });
+
+  // Sort by date desc, limit to 5
+  items.sort(function(a, b) { return (b.sortDate || '').localeCompare(a.sortDate || ''); });
+  items = items.slice(0, 5);
+
+  if (items.length === 0) {
+    c.innerHTML = '<div style="padding:16px;text-align:center;color:var(--gray-400);font-size:.8rem">No recent activity</div>';
+    return;
+  }
+
+  var badgeClass = function(st) {
+    var s = (st || '').toLowerCase();
+    if (s === 'approved' || s === 'checked in' || s === 'checked out') return 'badge-approved';
+    if (s === 'rejected') return 'badge-danger';
+    if (s === 'paid' || s === 'active') return 'badge-paid';
+    return 'badge-pending';
+  };
+
+  var html = '';
+  items.forEach(function(it) {
+    var shortDate = it.date;
+    if (shortDate && shortDate.length > 6) {
+      try { shortDate = new Date(shortDate + 'T00:00:00').toLocaleDateString('en-IN', {day:'2-digit',month:'short'}); } catch(e) {}
+    }
+    html += '<div class="request-item">' + it.icon;
+    html += '<div class="req-info"><h4>' + it.title + '</h4><p>' + it.sub + '</p></div>';
+    html += '<div class="req-meta"><div class="date">' + escapeHTML(shortDate) + '</div><span class="badge-status ' + badgeClass(it.status) + '">' + escapeHTML(it.status) + '</span></div>';
+    html += '</div>';
+  });
+  c.innerHTML = html;
+}
+
+// =====================================================
+// GEOFENCE SITE MANAGEMENT (Admin Panel)
+// =====================================================
+function renderGeofenceSites() {
+  var c = document.getElementById('geofenceSiteList');
+  if (!c) return;
+  if (!siteLocations || siteLocations.length === 0) {
+    c.innerHTML = '<div style="padding:12px;text-align:center;color:var(--gray-400);font-size:.8rem">No sites configured</div>';
+    return;
+  }
+  var html = '';
+  siteLocations.forEach(function(site, idx) {
+    html += '<div class="dept-manage-item" style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--gray-100)">';
+    html += '<div class="dept-color" style="background:var(--primary);width:6px;height:40px;border-radius:3px"></div>';
+    html += '<div style="flex:1"><h4 style="font-size:.82rem;font-weight:600;margin:0">' + escapeHTML(site.name) + '</h4>';
+    html += '<p style="font-size:.68rem;color:var(--gray-500);margin:2px 0 0">Lat: ' + site.lat + ', Lng: ' + site.lng + ' · Radius: ' + site.radius + 'm</p></div>';
+    html += '<button style="background:none;border:none;color:var(--primary);cursor:pointer;padding:6px;font-size:.72rem;font-weight:600" onclick="editGeofenceSite(' + idx + ')">Edit</button>';
+    html += '<button style="background:none;border:none;color:var(--danger);cursor:pointer;padding:6px;font-size:.72rem;font-weight:600" onclick="deleteGeofenceSite(' + idx + ')">Delete</button>';
+    html += '</div>';
+  });
+  c.innerHTML = html;
+}
+
+function addGeofenceSiteFromForm() {
+  var name = (document.getElementById('geoSiteName').value || '').trim();
+  var lat = parseFloat(document.getElementById('geoSiteLat').value);
+  var lng = parseFloat(document.getElementById('geoSiteLng').value);
+  var radius = parseInt(document.getElementById('geoSiteRadius').value, 10);
+  if (!name) { showToast('Please enter a site name'); return; }
+  if (isNaN(lat) || lat < -90 || lat > 90) { showToast('Invalid latitude (-90 to 90)'); return; }
+  if (isNaN(lng) || lng < -180 || lng > 180) { showToast('Invalid longitude (-180 to 180)'); return; }
+  if (isNaN(radius) || radius < 50 || radius > 5000) { showToast('Radius must be 50–5000 meters'); return; }
+  siteLocations.push({ name: name, lat: lat, lng: lng, radius: radius });
+  safeStorage.set(STORAGE_KEYS.siteLocations, JSON.stringify(siteLocations));
+  saveAllData();
+  showToast('Site "' + name + '" added');
+  document.getElementById('geoSiteName').value = '';
+  document.getElementById('geoSiteLat').value = '';
+  document.getElementById('geoSiteLng').value = '';
+  document.getElementById('geoSiteRadius').value = '200';
+  renderGeofenceSites();
+}
+
+function editGeofenceSite(idx) {
+  var site = siteLocations[idx];
+  if (!site) return;
+  var newName = prompt('Site name:', site.name);
+  if (newName === null) return;
+  newName = newName.trim();
+  if (!newName) { showToast('Name cannot be empty'); return; }
+  var newLat = prompt('Latitude:', site.lat);
+  if (newLat === null) return;
+  newLat = parseFloat(newLat);
+  if (isNaN(newLat) || newLat < -90 || newLat > 90) { showToast('Invalid latitude'); return; }
+  var newLng = prompt('Longitude:', site.lng);
+  if (newLng === null) return;
+  newLng = parseFloat(newLng);
+  if (isNaN(newLng) || newLng < -180 || newLng > 180) { showToast('Invalid longitude'); return; }
+  var newRadius = prompt('Radius (meters):', site.radius);
+  if (newRadius === null) return;
+  newRadius = parseInt(newRadius, 10);
+  if (isNaN(newRadius) || newRadius < 50 || newRadius > 5000) { showToast('Radius must be 50–5000 meters'); return; }
+  siteLocations[idx] = { name: newName, lat: newLat, lng: newLng, radius: newRadius };
+  safeStorage.set(STORAGE_KEYS.siteLocations, JSON.stringify(siteLocations));
+  saveAllData();
+  showToast('Site updated');
+  renderGeofenceSites();
+}
+
+function deleteGeofenceSite(idx) {
+  var site = siteLocations[idx];
+  if (!site) return;
+  if (!confirm('Delete site "' + site.name + '"?')) return;
+  siteLocations.splice(idx, 1);
+  safeStorage.set(STORAGE_KEYS.siteLocations, JSON.stringify(siteLocations));
+  saveAllData();
+  showToast('Site deleted');
+  renderGeofenceSites();
+}
+
+function useCurrentLocationForGeo() {
+  if (!navigator.geolocation) { showToast('Geolocation not supported'); return; }
+  showToast('Getting location...');
+  navigator.geolocation.getCurrentPosition(function(pos) {
+    document.getElementById('geoSiteLat').value = pos.coords.latitude.toFixed(6);
+    document.getElementById('geoSiteLng').value = pos.coords.longitude.toFixed(6);
+    showToast('GPS coordinates filled');
+  }, function(err) {
+    showToast('Location error: ' + err.message);
+  }, { enableHighAccuracy: true, timeout: 15000 });
 }
 
 // =====================================================

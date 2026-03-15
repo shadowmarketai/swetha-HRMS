@@ -110,28 +110,7 @@
       <div id="dashboardCelebrations"></div>
       <div id="dashboardAnnouncements"></div>
       <div class="section-title">Recent Activity</div>
-      <div class="card fade-in">
-        <div class="request-item">
-          <div class="req-icon" style="background:var(--orange-light);color:var(--orange-dark)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 20h20"/><path d="M5 20V8l7-5 7 5v12"/></svg></div>
-          <div class="req-info"><h4>Site Advance — Porur Project</h4><p>Material purchase &middot; &#8377;25,000</p></div>
-          <div class="req-meta"><div class="date">Today</div><span class="badge-status badge-pending">Pending</span></div>
-        </div>
-        <div class="request-item">
-          <div class="req-icon" style="background:var(--teal-light);color:var(--teal-dark)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
-          <div class="req-info"><h4>Salary Advance — Balasubramaninam</h4><p>EMI: &#8377;15,000/month &middot; Balance: &#8377;1,05,000</p></div>
-          <div class="req-meta"><div class="date">02 Jan</div><span class="badge-status badge-approved">Active</span></div>
-        </div>
-        <div class="request-item">
-          <div class="req-icon" style="background:#FCE7F3;color:#BE185D"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div>
-          <div class="req-info"><h4>TA — Bike to Tambaram Site</h4><p>Krishna Gowri Sankar &middot; &#8377;539</p></div>
-          <div class="req-meta"><div class="date">Dec 25</div><span class="badge-status badge-approved">Approved</span></div>
-        </div>
-        <div class="request-item">
-          <div class="req-icon" style="background:var(--primary-50);color:var(--primary)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></div>
-          <div class="req-info"><h4>Dec 2025 Salary — Office Staff</h4><p>Total: &#8377;5,15,774 &middot; 17 staff</p></div>
-          <div class="req-meta"><div class="date">31 Dec</div><span class="badge-status badge-paid">Paid</span></div>
-        </div>
-      </div>
+      <div id="recentActivityList" class="card fade-in"></div>
     </div>
 
     <!-- SITE ADVANCE & EXPENSES -->
@@ -358,6 +337,8 @@
       <div class="shift-card fade-in"><div class="shift-icon" style="background:#FFF7ED;color:#E85D04">&#127749;</div><div class="shift-info"><h4>General Shift</h4><p>Today &middot; Swetha Structures</p></div><div class="shift-time">09:00 — 18:00</div></div>
       <div class="shift-card fade-in"><div class="shift-icon" style="background:#FEF3C7;color:#D97706">&#127780;</div><div class="shift-info"><h4>General Shift</h4><p>Tomorrow &middot; Swetha Structures</p></div><div class="shift-time">09:00 — 18:00</div></div>
       <div class="md-hr-only"><button class="payroll-report-btn" onclick="downloadAttendanceReport()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download Attendance Report (PDF)</button></div>
+      <div class="section-title">My Attendance Log</div>
+      <div id="attendanceLogList" class="card fade-in"></div>
     </div>
 
     <!-- LEAVES -->
@@ -740,6 +721,7 @@
       <button class="admin-tab active" onclick="switchAdminTab('roles',this)">Manage Roles</button>
       <button class="admin-tab" onclick="switchAdminTab('depts',this)">Departments</button>
       <button class="admin-tab" onclick="switchAdminTab('emplist',this)">All Employees</button>
+      <button class="admin-tab" onclick="switchAdminTab('geofence',this)">Geofence Sites</button>
     </div>
     <div class="admin-section" id="adminRoles">
       <div class="section-title">Assign Employee Roles</div>
@@ -754,6 +736,18 @@
     <div class="admin-section hidden" id="adminEmpList">
       <div class="section-title">All Employees (by Department)</div>
       <div id="allEmpList"></div>
+    </div>
+    <div class="admin-section hidden" id="adminGeofence">
+      <div class="section-title">Geofence Site Locations</div>
+      <div id="geofenceSiteList"></div>
+      <div class="section-title" style="margin-top:16px">Add New Site</div>
+      <div class="card" style="padding:12px;display:flex;flex-direction:column;gap:8px">
+        <div class="form-row"><label>Site Name *</label><input type="text" id="geoSiteName" placeholder="e.g. New Office - Gandhipuram"></div>
+        <div style="display:flex;gap:8px"><div class="form-row" style="flex:1"><label>Latitude *</label><input type="number" step="any" id="geoSiteLat" placeholder="e.g. 11.0168"></div><div class="form-row" style="flex:1"><label>Longitude *</label><input type="number" step="any" id="geoSiteLng" placeholder="e.g. 76.9558"></div></div>
+        <div class="form-row"><label>Radius (meters) *</label><input type="number" id="geoSiteRadius" placeholder="e.g. 200" value="200"></div>
+        <button class="btn btn-primary" style="border-radius:var(--radius);margin-top:4px" onclick="addGeofenceSiteFromForm()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add Site</button>
+        <button class="btn" style="border-radius:var(--radius);background:var(--gray-100);color:var(--gray-700);font-size:.75rem" onclick="useCurrentLocationForGeo()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> Use Current GPS Location</button>
+      </div>
     </div>
   </div>
 
