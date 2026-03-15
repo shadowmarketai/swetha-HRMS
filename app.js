@@ -4045,122 +4045,115 @@ async function biometricLogin() {
 }
 
 // =====================================================
-// GOOGLE SIGN-IN
+// GOOGLE SIGN-IN — Redirect-based OAuth2 (works on mobile)
 // =====================================================
-function _decodeJwtPayload(token) {
-  try {
-    const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-    return JSON.parse(atob(base64));
-  } catch { return null; }
-}
-
-function _resetGoogleBtn() {
-  const btn = document.getElementById('googleSignInBtn');
-  if (btn) { btn.disabled = false; btn.querySelector('span').textContent = 'Sign in with Google'; }
-}
-
-async function _handleGoogleUserInfo(userInfo) {
-  const err = document.getElementById('loginError');
-  if (!userInfo || !userInfo.email) {
-    if (err) err.textContent = 'Could not read Google account info.';
-    return;
-  }
-
-  // Try backend first
-  try {
-    const res = await fetch(API_BASE + '/auth/google-token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: userInfo.email, name: userInfo.name, picture: userInfo.picture })
-    });
-    const data = await res.json();
-    if (res.ok && data.token) {
-      JWT_TOKEN = data.token;
-      safeStorage.set('hrms_jwt', data.token);
-      const empIdx = EMPLOYEES.findIndex(e => e.code === data.user.empCode);
-      if (empIdx >= 0) { loginAs(empIdx); showToast('Signed in with Google'); return; }
-    }
-  } catch (_) {}
-
-  // Local fallback: match email or auto-register
-  const gEmail = userInfo.email.toLowerCase();
-  let empIdx = EMPLOYEES.findIndex(e => e.email && e.email.toLowerCase() === gEmail);
-
-  if (empIdx < 0) {
-    const nextNum = EMPLOYEES.length + 1;
-    const newCode = 'SSC' + String(nextNum).padStart(3, '0');
-    const displayName = userInfo.name || userInfo.email.split('@')[0];
-    const newEmp = {
-      code: newCode, name: displayName, dept: 'Office', designation: 'New Employee',
-      salary: 0, bank: 'TBD', accNo: 'TBD', role: 'Employee',
-      phone: '', doj: new Date().toISOString().split('T')[0],
-      email: userInfo.email, picture: userInfo.picture || ''
-    };
-    EMPLOYEES.push(newEmp);
-    CREDENTIAL_HASHES[newCode] = { hash: DEFAULT_HASH, idx: EMPLOYEES.length - 1 };
-    empIdx = EMPLOYEES.length - 1;
-    saveAllData();
-    try { await apiCall('POST', '/employees', newEmp); } catch (_) {}
-    showToast('Welcome ' + escapeHTML(displayName) + '! Account created. Contact MD/HR for role assignment.');
-  }
-
-  const session = {
-    empIndex: empIdx,
-    token: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36),
-    expiry: Date.now() + 24 * 60 * 60 * 1000,
-    rememberMe: false
-  };
-  safeStorage.set(STORAGE_KEYS.session, JSON.stringify(session));
-  loginAs(empIdx);
-  showToast('Signed in with Google');
-}
-
-let _googleTokenClient = null;
-function initGoogleSignIn() {
-  if (_googleTokenClient) return;
-  if (typeof google === 'undefined' || !google.accounts || !google.accounts.oauth2) return;
-  if (!GOOGLE_CLIENT_ID) return;
-
-  _googleTokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: GOOGLE_CLIENT_ID,
-    scope: 'email profile',
-    callback: async (tokenResponse) => {
-      const err = document.getElementById('loginError');
-      if (tokenResponse.error) {
-        if (err) err.textContent = 'Google Sign-In failed: ' + tokenResponse.error;
-        return;
-      }
-      try {
-        const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-          headers: { 'Authorization': 'Bearer ' + tokenResponse.access_token }
-        });
-        const userInfo = await res.json();
-        await _handleGoogleUserInfo(userInfo);
-      } catch (e) {
-        if (err) err.textContent = 'Failed to get Google profile: ' + e.message;
-      }
-    }
-  });
-}
-
-async function googleSignIn() {
-  const err = document.getElementById('loginError');
-  if (err) err.textContent = '';
-
-  if (typeof google === 'undefined' || !google.accounts) {
-    if (err) err.textContent = 'Google Sign-In library not loaded. Check your internet connection.';
-    return;
-  }
+function googleSignIn() {
   if (!GOOGLE_CLIENT_ID) {
+    const err = document.getElementById('loginError');
     if (err) err.textContent = 'Google Sign-In is not configured. Contact your administrator.';
     return;
   }
 
-  initGoogleSignIn();
-  if (_googleTokenClient) {
-    _googleTokenClient.requestAccessToken();
-  } else {
-    if (err) err.textContent = 'Google Sign-In could not initialize. Try refreshing the page.';
+  // Save state for CSRF protection
+  const state = Date.now().toString(36) + Math.random().toString(36).slice(2);
+  sessionStorage.setItem('hrms_google_state', state);
+
+  // Redirect to Google OAuth2
+  const redirectUri = location.origin + location.pathname;
+  const params = new URLSearchParams({
+    client_id: GOOGLE_CLIENT_ID,
+    redirect_uri: redirectUri,
+    response_type: 'token',
+    scope: 'email profile',
+    state: state,
+    prompt: 'select_account'
+  });
+  location.href = 'https://accounts.google.com/o/oauth2/v2/auth?' + params.toString();
+}
+
+// Handle OAuth2 redirect — called on page load
+async function _handleGoogleRedirect() {
+  const hash = location.hash;
+  if (!hash || !hash.includes('access_token')) return false;
+
+  // Parse token from URL hash
+  const params = new URLSearchParams(hash.substring(1));
+  const accessToken = params.get('access_token');
+  const state = params.get('state');
+
+  // Clear hash from URL
+  history.replaceState(null, '', location.pathname + location.search);
+
+  if (!accessToken) return false;
+
+  // Verify state
+  const savedState = sessionStorage.getItem('hrms_google_state');
+  sessionStorage.removeItem('hrms_google_state');
+  if (state && savedState && state !== savedState) {
+    showToast('Google Sign-In failed: invalid state');
+    return false;
+  }
+
+  // Fetch user info from Google
+  try {
+    const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { 'Authorization': 'Bearer ' + accessToken }
+    });
+    if (!res.ok) { showToast('Failed to get Google profile'); return false; }
+    const userInfo = await res.json();
+    if (!userInfo.email) { showToast('Could not read Google account info'); return false; }
+
+    // Try backend first
+    try {
+      const backendRes = await fetch(API_BASE + '/auth/google-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: userInfo.email, name: userInfo.name, picture: userInfo.picture })
+      });
+      const data = await backendRes.json();
+      if (backendRes.ok && data.token) {
+        JWT_TOKEN = data.token;
+        safeStorage.set('hrms_jwt', data.token);
+        const empIdx = EMPLOYEES.findIndex(e => e.code === data.user.empCode);
+        if (empIdx >= 0) { loginAs(empIdx); showToast('Signed in with Google'); return true; }
+      }
+    } catch (_) {}
+
+    // Local fallback: match email or auto-register
+    const gEmail = userInfo.email.toLowerCase();
+    let empIdx = EMPLOYEES.findIndex(e => e.email && e.email.toLowerCase() === gEmail);
+
+    if (empIdx < 0) {
+      const nextNum = EMPLOYEES.length + 1;
+      const newCode = 'SSC' + String(nextNum).padStart(3, '0');
+      const displayName = userInfo.name || userInfo.email.split('@')[0];
+      const newEmp = {
+        code: newCode, name: displayName, dept: 'Office', designation: 'New Employee',
+        salary: 0, bank: 'TBD', accNo: 'TBD', role: 'Employee',
+        phone: '', doj: new Date().toISOString().split('T')[0],
+        email: userInfo.email, picture: userInfo.picture || ''
+      };
+      EMPLOYEES.push(newEmp);
+      CREDENTIAL_HASHES[newCode] = { hash: DEFAULT_HASH, idx: EMPLOYEES.length - 1 };
+      empIdx = EMPLOYEES.length - 1;
+      saveAllData();
+      try { await apiCall('POST', '/employees', newEmp); } catch (_) {}
+      showToast('Welcome ' + escapeHTML(displayName) + '! Account created. Contact MD/HR for role assignment.');
+    }
+
+    const session = {
+      empIndex: empIdx,
+      token: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36),
+      expiry: Date.now() + 24 * 60 * 60 * 1000,
+      rememberMe: false
+    };
+    safeStorage.set(STORAGE_KEYS.session, JSON.stringify(session));
+    loginAs(empIdx);
+    showToast('Signed in with Google');
+    return true;
+  } catch (e) {
+    showToast('Google Sign-In failed: ' + e.message);
+    return false;
   }
 }
 
@@ -6057,19 +6050,21 @@ function renderCelebrationsOverlay() {
   MOCK_BACKEND.init();
   // Restore JWT if available
   JWT_TOKEN = safeStorage.get('hrms_jwt') || null;
-  // Credentials are pre-computed SHA-256 hashes
-  {
-    if (!tryAutoLogin()) {
-      // Show login screen (default state)
-    } else {
-      resetIdleTimer();
-      restoreNotifPrefToggles();
-      renderNotifications();
-      updateNotifBadge();
-      // Try to seed backend data if online
-      setTimeout(seedBackendData, 2000);
-      syncOfflineQueue();
-    }
+
+  // Check for Google OAuth2 redirect (access_token in URL hash)
+  const _googleRedirectPending = location.hash && location.hash.includes('access_token');
+  if (_googleRedirectPending) {
+    _handleGoogleRedirect();
+  } else if (!tryAutoLogin()) {
+    // Show login screen (default state)
+  } else {
+    resetIdleTimer();
+    restoreNotifPrefToggles();
+    renderNotifications();
+    updateNotifBadge();
+    // Try to seed backend data if online
+    setTimeout(seedBackendData, 2000);
+    syncOfflineQueue();
   }
 
   // Login button event listeners (no inline onclick — CSP safe)
