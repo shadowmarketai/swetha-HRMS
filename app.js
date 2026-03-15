@@ -4076,21 +4076,25 @@ async function _handleGoogleRedirect() {
   const hash = location.hash;
   if (!hash || !hash.includes('access_token')) return false;
 
+  const errEl = document.getElementById('loginError');
+
   // Parse token from URL hash
   const params = new URLSearchParams(hash.substring(1));
   const accessToken = params.get('access_token');
   const state = params.get('state');
 
-  // Clear hash from URL
-  history.replaceState(null, '', location.pathname + location.search);
-
-  if (!accessToken) return false;
+  if (!accessToken) {
+    if (errEl) errEl.textContent = 'Google Sign-In failed: no token received.';
+    history.replaceState(null, '', location.pathname + location.search);
+    return false;
+  }
 
   // Verify state
   const savedState = sessionStorage.getItem('hrms_google_state');
   sessionStorage.removeItem('hrms_google_state');
   if (state && savedState && state !== savedState) {
-    showToast('Google Sign-In failed: invalid state');
+    if (errEl) errEl.textContent = 'Google Sign-In failed: security check failed. Try again.';
+    history.replaceState(null, '', location.pathname + location.search);
     return false;
   }
 
@@ -4099,9 +4103,17 @@ async function _handleGoogleRedirect() {
     const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
       headers: { 'Authorization': 'Bearer ' + accessToken }
     });
-    if (!res.ok) { showToast('Failed to get Google profile'); return false; }
+    if (!res.ok) {
+      if (errEl) errEl.textContent = 'Failed to get Google profile (error ' + res.status + '). Try again.';
+      history.replaceState(null, '', location.pathname + location.search);
+      return false;
+    }
     const userInfo = await res.json();
-    if (!userInfo.email) { showToast('Could not read Google account info'); return false; }
+    if (!userInfo.email) {
+      if (errEl) errEl.textContent = 'Could not read Google account email. Try again.';
+      history.replaceState(null, '', location.pathname + location.search);
+      return false;
+    }
 
     // Try backend first
     try {
@@ -4148,11 +4160,15 @@ async function _handleGoogleRedirect() {
       rememberMe: false
     };
     safeStorage.set(STORAGE_KEYS.session, JSON.stringify(session));
+    // Clear hash only after successful login
+    history.replaceState(null, '', location.pathname + location.search);
     loginAs(empIdx);
     showToast('Signed in with Google');
     return true;
   } catch (e) {
-    showToast('Google Sign-In failed: ' + e.message);
+    const errEl2 = document.getElementById('loginError');
+    if (errEl2) errEl2.textContent = 'Google Sign-In failed: ' + e.message;
+    history.replaceState(null, '', location.pathname + location.search);
     return false;
   }
 }
@@ -6044,7 +6060,7 @@ function renderCelebrationsOverlay() {
 // =====================================================
 // INITIALIZATION — LOAD DATA & AUTO-LOGIN
 // =====================================================
-(function initApp() {
+(async function initApp() {
   initDarkMode();
   loadAllData();
   MOCK_BACKEND.init();
@@ -6052,9 +6068,18 @@ function renderCelebrationsOverlay() {
   JWT_TOKEN = safeStorage.get('hrms_jwt') || null;
 
   // Check for Google OAuth2 redirect (access_token in URL hash)
-  const _googleRedirectPending = location.hash && location.hash.includes('access_token');
-  if (_googleRedirectPending) {
-    _handleGoogleRedirect();
+  if (location.hash && location.hash.includes('access_token')) {
+    // Show loading state while processing Google login
+    const errEl = document.getElementById('loginError');
+    if (errEl) errEl.textContent = 'Signing in with Google...';
+    const btn = document.getElementById('googleSignInBtn');
+    if (btn) { btn.disabled = true; btn.querySelector('span').textContent = 'Signing in...'; }
+    try {
+      await _handleGoogleRedirect();
+    } catch (e) {
+      if (errEl) errEl.textContent = 'Google Sign-In failed. Please try again.';
+      if (btn) { btn.disabled = false; btn.querySelector('span').textContent = 'Sign in with Google'; }
+    }
   } else if (!tryAutoLogin()) {
     // Show login screen (default state)
   } else {

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hrms-v21';
+const CACHE_NAME = 'hrms-v22';
 const PRECACHE_URLS = [
   './',
   './index.html',
@@ -34,8 +34,8 @@ self.addEventListener('activate', event => {
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
-  // Never cache Google auth requests — always go to network
-  if (url.hostname === 'accounts.google.com' || url.hostname === 'apis.google.com') {
+  // Never cache Google/external API requests — always go to network
+  if (url.hostname.includes('google') || url.hostname.includes('googleapis')) {
     event.respondWith(fetch(event.request));
     return;
   }
