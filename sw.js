@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hrms-v22';
+const CACHE_NAME = 'hrms-v23';
 const PRECACHE_URLS = [
   './',
   './index.html',
@@ -40,21 +40,29 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Network-first for HTML pages and API calls — always get latest
-  if (event.request.destination === 'document' || url.pathname.startsWith('/api/')) {
+  // Network-first for ALL same-origin requests (HTML, JS, CSS, API)
+  // This ensures code updates are always picked up immediately
+  if (url.origin === self.location.origin) {
     event.respondWith(
       fetch(event.request)
         .then(response => {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+          if (response.ok && event.request.method === 'GET') {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then(cache => cache.put(event.request, clone));
+          }
           return response;
         })
-        .catch(() => caches.match(event.request))
+        .catch(() => {
+          return caches.match(event.request).then(cached => {
+            if (cached) return cached;
+            if (event.request.destination === 'document') return caches.match('./index.html');
+          });
+        })
     );
     return;
   }
 
-  // Cache-first for static assets (icons, manifest, fonts, etc.)
+  // Cache-first for external CDN assets (fonts, jsPDF, Chart.js)
   event.respondWith(
     caches.match(event.request).then(cached => {
       if (cached) return cached;
@@ -65,10 +73,6 @@ self.addEventListener('fetch', event => {
         }
         return response;
       });
-    }).catch(() => {
-      if (event.request.destination === 'document') {
-        return caches.match('./index.html');
-      }
     })
   );
 });

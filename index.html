@@ -14,6 +14,10 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <meta name="google-client-id" content="245239484935-upileff5mt7bahinfmm62a4tpfakpg9i.apps.googleusercontent.com">
+<script>
+// Capture Google OAuth2 redirect token IMMEDIATELY before SW/cached JS can lose it
+(function(){var h=location.hash;if(h&&h.indexOf('access_token')>-1){sessionStorage.setItem('hrms_google_token',h.substring(1));history.replaceState(null,'',location.pathname+location.search)}})();
+</script>
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>

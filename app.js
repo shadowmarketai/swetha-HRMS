@@ -4073,13 +4073,20 @@ function googleSignIn() {
 
 // Handle OAuth2 redirect — called on page load
 async function _handleGoogleRedirect() {
-  const hash = location.hash;
-  if (!hash || !hash.includes('access_token')) return false;
+  // Read token from sessionStorage (captured by inline script in index.html head)
+  // Falls back to location.hash if sessionStorage empty
+  let hashStr = sessionStorage.getItem('hrms_google_token') || '';
+  if (!hashStr) {
+    const h = location.hash;
+    if (h && h.includes('access_token')) hashStr = h.substring(1);
+  }
+  if (!hashStr) return false;
+  sessionStorage.removeItem('hrms_google_token');
 
   const errEl = document.getElementById('loginError');
 
-  // Parse token from URL hash
-  const params = new URLSearchParams(hash.substring(1));
+  // Parse token
+  const params = new URLSearchParams(hashStr);
   const accessToken = params.get('access_token');
   const state = params.get('state');
 
@@ -6067,8 +6074,9 @@ function renderCelebrationsOverlay() {
   // Restore JWT if available
   JWT_TOKEN = safeStorage.get('hrms_jwt') || null;
 
-  // Check for Google OAuth2 redirect (access_token in URL hash)
-  if (location.hash && location.hash.includes('access_token')) {
+  // Check for Google OAuth2 redirect (token in sessionStorage or URL hash)
+  const _hasGoogleToken = sessionStorage.getItem('hrms_google_token') || (location.hash && location.hash.includes('access_token'));
+  if (_hasGoogleToken) {
     // Show loading state while processing Google login
     const errEl = document.getElementById('loginError');
     if (errEl) errEl.textContent = 'Signing in with Google...';
