@@ -363,7 +363,7 @@ function doLogout() {
   document.getElementById('loginPass').value = '';
   document.getElementById('loginError').textContent = '';
   // Close overlays without touching history (we'll reset history below)
-  document.querySelectorAll('.overlay-screen.active').forEach(function(o) { o.classList.remove('active'); });
+  document.querySelectorAll('.overlay-screen.active').forEach(function(o) { o.classList.remove('active'); o.removeAttribute('style'); });
   _overlayPreviousFocus = [];
   // Reset to home tab without pushing history
   switchTab('home', document.querySelector('[data-tab=home]'), true);
@@ -722,7 +722,7 @@ function updateSalaryScreen() {
 function switchTab(id, el, _fromPopstate) {
   // Close all open overlays first — track if any were open
   var hadOverlays = document.querySelectorAll('.overlay-screen.active').length > 0;
-  document.querySelectorAll('.overlay-screen.active').forEach(o => o.classList.remove('active'));
+  document.querySelectorAll('.overlay-screen.active').forEach(o => { o.classList.remove('active'); o.removeAttribute('style'); });
   document.querySelectorAll('.leave-form-overlay.active').forEach(o => o.classList.remove('active'));
 
   const current = document.querySelector('.screen.active');
@@ -768,19 +768,41 @@ function showOverlay(id) {
   // Close any currently active overlays to prevent split-screen stacking
   document.querySelectorAll('.overlay-screen.active').forEach(function(o) {
     o.classList.remove('active');
+    o.removeAttribute('style');
   });
   _overlayPreviousFocus.push(document.activeElement);
   const el = document.getElementById('overlay-' + id);
   el.classList.add('active');
+  // Force full-screen inline styles — prevents split-screen on all devices
+  _forceOverlayFullScreen(el);
   history.pushState({ overlay: id }, '');
   // Focus first focusable element
   const focusable = el.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
   if (focusable.length) focusable[0].focus();
 }
+// Force overlay to cover entire viewport via inline styles (beats all CSS)
+function _forceOverlayFullScreen(el) {
+  var s = el.style;
+  s.setProperty('position', 'fixed', 'important');
+  s.setProperty('top', '0', 'important');
+  s.setProperty('left', '0', 'important');
+  s.setProperty('width', '100vw', 'important');
+  s.setProperty('height', '100vh', 'important');
+  s.setProperty('max-width', 'none', 'important');
+  s.setProperty('max-height', 'none', 'important');
+  s.setProperty('z-index', '99999', 'important');
+  s.setProperty('display', 'block', 'important');
+  s.setProperty('transform', 'none', 'important');
+  s.setProperty('overflow-y', 'auto', 'important');
+  s.setProperty('overflow-x', 'hidden', 'important');
+}
 let _skipPopstate = false;
 function hideOverlay(id, _fromPopstate) {
   const el = document.getElementById('overlay-' + id);
-  if (el) el.classList.remove('active');
+  if (el) {
+    el.classList.remove('active');
+    el.removeAttribute('style');
+  }
   const prev = _overlayPreviousFocus.pop();
   if (prev && prev.focus) prev.focus();
   // If called from UI back button (not popstate), go back in history to consume the pushState entry
