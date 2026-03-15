@@ -329,13 +329,7 @@ async function doLogin() {
   if (cred.hash !== inputHash) { err.textContent = 'Invalid credentials. Try demo buttons below.'; return; }
   loginAs(cred.idx);
 }
-function demoLogin(type) {
-  const demoPasswords = {MD:'admin123', HR:'hr123', EMP:'emp123'};
-  const demoCodes = {MD:'MD001', HR:'SSC006', EMP:'SSC011'};
-  document.getElementById('loginId').value = demoCodes[type] || 'SSC011';
-  document.getElementById('loginPass').value = demoPasswords[type] || 'emp123';
-  doLogin();
-}
+// demoLogin removed — production mode, no demo access
 function loginAs(empIndex) {
   currentUser = {...EMPLOYEES[empIndex]};
   document.getElementById('loginScreen').classList.add('hidden');
@@ -6501,8 +6495,4 @@ function renderCelebrationsOverlay() {
   if (googleBtn) googleBtn.addEventListener('click', function() { googleSignIn(); });
   var loginPass = document.getElementById('loginPass');
   if (loginPass) loginPass.addEventListener('keydown', function(e) { if (e.key === 'Enter') doLogin(); });
-  // Demo buttons
-  document.querySelectorAll('.demo-btn[data-demo]').forEach(function(btn) {
-    btn.addEventListener('click', function() { demoLogin(btn.getAttribute('data-demo')); });
-  });
 })();

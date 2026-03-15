@@ -395,11 +395,6 @@ body{font-family:var(--font-body);color:var(--text);background:#E8EAF0;display:f
 .login-btn{width:100%;padding:13px;border-radius:var(--radius-sm);border:none;background:white;color:var(--primary-dark);font-family:var(--font-body);font-size:.88rem;font-weight:700;cursor:pointer;transition:all .2s;margin-top:4px}
 .login-btn:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(0,0,0,.2)}
 .login-error{font-size:.72rem;color:#FCA5A5;margin-top:8px;text-align:center;min-height:18px}
-.login-demo{margin-top:16px;text-align:center;padding-bottom:8px}
-.login-demo p{font-size:.68rem;opacity:.5;margin-bottom:10px;text-transform:uppercase;letter-spacing:.06em}
-.demo-btns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
-.demo-btn{padding:8px 16px;border-radius:20px;border:1px solid rgba(255,255,255,.25);background:rgba(255,255,255,.08);color:white;font-size:.72rem;font-weight:600;cursor:pointer;transition:all .2s;backdrop-filter:blur(10px)}
-.demo-btn:hover{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.4)}
 /* Role Badge */
 .role-badge{padding:3px 10px;border-radius:20px;font-size:.6rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
 .role-badge.md{background:linear-gradient(135deg,var(--amber-light),var(--warning));color:#92400E}
@@ -643,7 +638,7 @@ body{font-family:var(--font-body);color:var(--text);background:#E8EAF0;display:f
 .login-field input:focus-visible{outline:2px solid rgba(255,255,255,.6);outline-offset:2px}
 .form-row input:focus-visible,.form-row select:focus-visible,.form-row textarea:focus-visible{outline:2px solid var(--primary);outline-offset:0;border-color:var(--primary)}
 .card:focus-visible,.expense-item:focus-visible,.salary-item:focus-visible,.ta-type-card:focus-visible,.hr-hub-card:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
-a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.demo-btn:focus-visible,.cal-nav button:focus-visible,.download-btn:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.cal-nav button:focus-visible,.download-btn:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
 
 /* =====================================================
    DISABLED STATES
