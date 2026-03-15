@@ -760,24 +760,28 @@ function showOverlay(id) {
   if (id === 'location' && currentUser.role !== 'MD') return;
   if (id === 'onboarding' && currentUser.role !== 'MD' && currentUser.role !== 'HR') return;
   if (id === 'advance-requests' && currentUser.role !== 'MD' && currentUser.role !== 'HR') return;
-  if (id === 'admin') renderAdminPanel();
-  if (id === 'onboarding') resetWizard();
-  if (id === 'notifications') renderNotifications();
-  if (id === 'location') openLocationTracker();
-  if (id === 'advance-requests') { advReqActiveTab = 'pending'; advReqTypeFilter = 'all'; renderAdvanceRequests('pending'); document.querySelectorAll('#advReqTabs .tab-pill').forEach((p,i) => p.classList.toggle('active', i===0)); document.querySelectorAll('#advReqTypeFilter .loc-filter-chip').forEach((c,i) => c.classList.toggle('active', i===0)); }
+  // Render content (wrapped in try-catch so errors don't block overlay display)
+  try {
+    if (id === 'admin') renderAdminPanel();
+    if (id === 'onboarding') resetWizard();
+    if (id === 'notifications') renderNotifications();
+    if (id === 'location') openLocationTracker();
+    if (id === 'advance-requests') { advReqActiveTab = 'pending'; advReqTypeFilter = 'all'; renderAdvanceRequests('pending'); document.querySelectorAll('#advReqTabs .tab-pill').forEach((p,i) => p.classList.toggle('active', i===0)); document.querySelectorAll('#advReqTypeFilter .loc-filter-chip').forEach((c,i) => c.classList.toggle('active', i===0)); }
+  } catch(e) { /* don't block overlay */ }
   // Close any currently active overlays to prevent split-screen stacking
   document.querySelectorAll('.overlay-screen.active').forEach(function(o) {
     o.classList.remove('active');
     o.removeAttribute('style');
   });
   _overlayPreviousFocus.push(document.activeElement);
-  const el = document.getElementById('overlay-' + id);
+  var el = document.getElementById('overlay-' + id);
+  if (!el) return;
   el.classList.add('active');
   // Force full-screen inline styles — prevents split-screen on all devices
   _forceOverlayFullScreen(el);
-  history.pushState({ overlay: id }, '');
+  try { history.pushState({ overlay: id }, ''); } catch(e) { /* ignore */ }
   // Focus first focusable element
-  const focusable = el.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+  var focusable = el.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
   if (focusable.length) focusable[0].focus();
 }
 // Force overlay to cover entire viewport via inline styles (beats all CSS)
@@ -786,15 +790,24 @@ function _forceOverlayFullScreen(el) {
   s.setProperty('position', 'fixed', 'important');
   s.setProperty('top', '0', 'important');
   s.setProperty('left', '0', 'important');
+  s.setProperty('right', '0', 'important');
+  s.setProperty('bottom', '0', 'important');
   s.setProperty('width', '100vw', 'important');
   s.setProperty('height', '100vh', 'important');
   s.setProperty('max-width', 'none', 'important');
   s.setProperty('max-height', 'none', 'important');
+  s.setProperty('margin', '0', 'important');
   s.setProperty('z-index', '99999', 'important');
   s.setProperty('display', 'block', 'important');
   s.setProperty('transform', 'none', 'important');
+  s.setProperty('transition', 'none', 'important');
   s.setProperty('overflow-y', 'auto', 'important');
   s.setProperty('overflow-x', 'hidden', 'important');
+  s.setProperty('background', '#F5F6FA', 'important');
+  // Dark mode support
+  if (document.documentElement.getAttribute('data-theme') === 'dark') {
+    s.setProperty('background', '#0F1117', 'important');
+  }
 }
 let _skipPopstate = false;
 function hideOverlay(id, _fromPopstate) {
