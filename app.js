@@ -1106,11 +1106,45 @@ function renderDeptsList() {
   container.innerHTML = departments.map(d => {
     const count = EMPLOYEES.filter(e => e.dept === d).length;
     const color = deptColors[d] || '#9CA3AF';
-    return `<div class="dept-manage-item">
+    const safeId = d.replace(/[^a-zA-Z0-9]/g, '_');
+    return `<div class="dept-manage-item" onclick="toggleDeptEmployees('${escapeHTML(d)}')" style="cursor:pointer">
       <div class="dept-color" style="background:${color}"></div>
-      <div class="dept-info"><h4>${d}</h4><p>${count} employees</p></div>
-    </div>`;
+      <div class="dept-info"><h4>${escapeHTML(d)}</h4><p>${count} employees</p></div>
+      <svg class="dept-chevron" id="chevron-${safeId}" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+    </div>
+    <div class="dept-emp-list" id="deptEmps-${safeId}" style="display:none"></div>`;
   }).join('');
+}
+
+function toggleDeptEmployees(dept) {
+  const safeId = dept.replace(/[^a-zA-Z0-9]/g, '_');
+  const container = document.getElementById('deptEmps-' + safeId);
+  const chevron = document.getElementById('chevron-' + safeId);
+  const item = chevron ? chevron.closest('.dept-manage-item') : null;
+  if (!container) return;
+  const isOpen = container.style.display !== 'none';
+  container.style.display = isOpen ? 'none' : 'block';
+  if (item) item.classList.toggle('expanded', !isOpen);
+  if (!isOpen && !container.dataset.loaded) {
+    const deptColors = {'Office':'#E85D04','Site':'#D62828','Factory':'#14B8A6','Garden':'#22C55E','PEB':'#EC4899'};
+    const color = deptColors[dept] || '#9CA3AF';
+    const emps = EMPLOYEES.filter(e => e.dept === dept);
+    if (emps.length === 0) { container.innerHTML = '<p style="padding:8px 12px;font-size:.7rem;color:var(--gray-400)">No employees</p>'; }
+    else {
+      container.innerHTML = emps.map(e => {
+        const init = e.name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
+        const isInactive = e.status === 'Inactive';
+        const statusBadge = isInactive
+          ? '<span style="display:inline-block;font-size:.58rem;padding:1px 5px;border-radius:6px;background:#EF4444;color:#fff;margin-left:4px">Inactive</span>'
+          : '<span style="display:inline-block;font-size:.58rem;padding:1px 5px;border-radius:6px;background:#22C55E;color:#fff;margin-left:4px">Active</span>';
+        return `<div class="emp-list-item" style="${isInactive ? 'opacity:.6' : ''}">
+          <div class="emp-avatar" style="background:${color}">${init}</div>
+          <div class="emp-details"><h4>${escapeHTML(e.name)}${statusBadge}</h4><p>${e.code} &middot; ${escapeHTML(e.designation)} &middot; &#8377;${e.salary.toLocaleString('en-IN')}</p></div>
+        </div>`;
+      }).join('');
+    }
+    container.dataset.loaded = '1';
+  }
 }
 
 function addDepartment() {

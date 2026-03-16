@@ -449,6 +449,9 @@ body{font-family:var(--font-body);color:var(--text);background:#E8EAF0;display:f
 .dept-manage-item .dept-info{flex:1}
 .dept-manage-item .dept-info h4{font-size:.78rem;font-weight:600}
 .dept-manage-item .dept-info p{font-size:.62rem;color:var(--gray-400)}
+.dept-manage-item .dept-chevron{transition:transform .2s ease;color:var(--gray-400);flex-shrink:0}
+.dept-manage-item.expanded .dept-chevron{transform:rotate(90deg)}
+.dept-emp-list{padding:0 0 8px 38px}
 .add-dept-row{display:flex;gap:8px;margin-top:8px}
 .add-dept-row input{flex:1;padding:8px 12px;border-radius:var(--radius-xs);border:1.5px solid var(--gray-200);font-size:.78rem;font-family:var(--font-body)}
 .add-dept-row button{padding:8px 14px;border-radius:var(--radius-xs);border:none;background:var(--primary);color:white;font-size:.75rem;font-weight:600;cursor:pointer}
