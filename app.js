@@ -1677,14 +1677,19 @@ function getRAGColor(score) {
 
 function submitSelfRating(empCode) {
   var inputs = document.querySelectorAll('#kpiSelfRatingForm input[type=range]');
+  if (!inputs || inputs.length === 0) { showToast('No rating inputs found'); return; }
+  if (!KPI_DATA[empCode]) { showToast('KPI data not found'); return; }
   var total = 0;
   var ratings = [];
-  inputs.forEach(function(inp) {
-    total += parseInt(inp.value, 10);
-    ratings.push({ category: inp.dataset.cat || inp.name || 'General', rating: parseFloat(inp.value) / 20, comments: '' });
+  var categories = ['Punctuality','Quality Output','Teamwork','Task Completion','Initiative'];
+  inputs.forEach(function(inp, idx) {
+    var val = parseInt(inp.value, 10);
+    total += val;
+    ratings.push({ category: categories[idx] || 'General', rating: val / 20, comments: '' });
   });
   var avg = Math.round(total / inputs.length);
   KPI_DATA[empCode].selfRating = avg;
+  saveAllData();
   apiCall('POST', '/kpi/self-rate', { period: new Date().getFullYear() + '-Q' + Math.ceil((new Date().getMonth() + 1) / 3), ratings: ratings });
   showToast('Self-rating submitted: ' + avg + '/100');
   renderKpiOverlay();
@@ -2563,7 +2568,7 @@ function renderSkillsOverlay() {
       '<span style="color:var(--gray-500)">Gap</span>' +
     '</div>' +
     gapRows +
-    '<button class="btn btn-primary w-full" style="margin-top:16px;border-radius:var(--radius-sm)" onclick="showToast(\'Skill ratings saved!\')">Save Self-Assessment</button>';
+    '<button class="btn btn-primary w-full" style="margin-top:16px;border-radius:var(--radius-sm)" onclick="saveSkillAssessment()">Save Self-Assessment</button>';
 }
 
 function updateSkillVal(input, empCode, key, ratingType) {
@@ -2572,6 +2577,14 @@ function updateSkillVal(input, empCode, key, ratingType) {
   ratings[key][ratingType] = val;
   var el = document.getElementById('sv_' + key);
   if (el) el.textContent = val;
+}
+
+function saveSkillAssessment() {
+  if (!currentUser) return;
+  safeStorage.set(STORAGE_KEYS.skillRatings, JSON.stringify(SKILL_RATINGS));
+  saveAllData();
+  showToast('Skill self-assessment saved!');
+  renderSkillsOverlay();
 }
 
 // =====================================================
@@ -2723,9 +2736,15 @@ function renderVisionOverlay() {
 }
 
 function savePersonalVision() {
-  var vision = document.getElementById('personalVisionText').value.trim();
-  var goals = document.getElementById('personalGoalsText').value.trim();
+  if (!currentUser) return;
+  var visionEl = document.getElementById('personalVisionText');
+  var goalsEl = document.getElementById('personalGoalsText');
+  if (!visionEl || !goalsEl) { showToast('Form not found'); return; }
+  var vision = visionEl.value.trim();
+  var goals = goalsEl.value.trim();
+  if (!vision && !goals) { showToast('Please enter your vision or goals'); return; }
   PERSONAL_VISIONS[currentUser.code] = {vision: vision, goals: goals};
+  saveAllData();
   showToast('Personal vision saved!');
 }
 
@@ -3373,7 +3392,7 @@ function importAllData() {
     'submitSelfRating', 'moveCandidateStagePrompt', 'aiScreenCandidate', 'aiScreenAllCandidates', 'generateDocument',
     'calculateTemperament', 'retakeTemperament',
     'toggleTaskStatus', 'assignTask',
-    'updateSkillVal', 'addPeerFeedback', 'scheduleHotSeat',
+    'updateSkillVal', 'saveSkillAssessment', 'addPeerFeedback', 'scheduleHotSeat',
     'savePersonalVision', 'addEvent',
     'submitLeave', 'approveLeave', 'rejectLeave',
     'assignShift', 'submitExpenseReimbursement', 'approveExpense', 'rejectExpense',
