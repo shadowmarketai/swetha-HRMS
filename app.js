@@ -151,10 +151,10 @@ EMPLOYEES.forEach(e => { if (EMP_DOB_MAP[e.code]) e.dob = EMP_DOB_MAP[e.code]; }
 // =====================================================
 
 // F1: Shift Management
-const SHIFT_TYPES = [
-  {code:'GEN', name:'General Shift', time:'09:00 - 18:00', color:'#2563EB'},
-  {code:'2ND', name:'Second Shift', time:'14:00 - 22:00', color:'#D97706'},
-  {code:'3RD', name:'Third Shift (Night)', time:'22:00 - 06:00', color:'#7C3AED'}
+let SHIFT_TYPES = [
+  {code:'GEN', name:'General Shift', start:'09:00', end:'18:00', color:'#2563EB'},
+  {code:'2ND', name:'Second Shift', start:'14:00', end:'22:00', color:'#D97706'},
+  {code:'3RD', name:'Third Shift (Night)', start:'22:00', end:'06:00', color:'#7C3AED'}
 ];
 let shiftAssignments = {};
 const SHIFT_ELIGIBLE_DEPTS = ['Factory'];
@@ -3416,6 +3416,7 @@ const STORAGE_KEYS = {
   announcementNextId: 'hrms_announcement_next_id',
   announcementReadStatus: 'hrms_announcement_read_status',
   siteLocations: 'hrms_site_locations',
+  shiftTypes: 'hrms_shift_types',
   projects: 'hrms_projects',
   projectNextId: 'hrms_project_next_id',
   projectTaskNextIds: 'hrms_project_task_next_ids'
@@ -3444,6 +3445,7 @@ function saveAllData() {
     safeStorage.set(STORAGE_KEYS.notifHistory, JSON.stringify(NOTIF_HISTORY));
     safeStorage.set(STORAGE_KEYS.notifPrefs, JSON.stringify(notifPrefs));
     safeStorage.set(STORAGE_KEYS.shiftAssignments, JSON.stringify(shiftAssignments));
+    safeStorage.set(STORAGE_KEYS.shiftTypes, JSON.stringify(SHIFT_TYPES));
     safeStorage.set(STORAGE_KEYS.expenseReimbursements, JSON.stringify(expenseReimbursements));
     safeStorage.set(STORAGE_KEYS.expReimbNextId, JSON.stringify(expReimbNextId));
     safeStorage.set(STORAGE_KEYS.employeeSelfData, JSON.stringify(employeeSelfData));
@@ -3498,6 +3500,7 @@ function loadAllData() {
     d = load(STORAGE_KEYS.notifHistory); if (d) { NOTIF_HISTORY.length = 0; d.forEach(e => NOTIF_HISTORY.push(e)); }
     d = load(STORAGE_KEYS.notifPrefs); if (d) { Object.assign(notifPrefs, d); }
     d = load(STORAGE_KEYS.shiftAssignments); if (d) { Object.keys(shiftAssignments).forEach(k => delete shiftAssignments[k]); Object.assign(shiftAssignments, d); }
+    d = load(STORAGE_KEYS.shiftTypes); if (d && Array.isArray(d)) { SHIFT_TYPES.length = 0; d.forEach(e => SHIFT_TYPES.push(e)); }
     d = load(STORAGE_KEYS.expenseReimbursements); if (d) { expenseReimbursements.length = 0; d.forEach(e => expenseReimbursements.push(e)); }
     d = load(STORAGE_KEYS.expReimbNextId); if (d !== null) expReimbNextId = d;
     d = load(STORAGE_KEYS.employeeSelfData); if (d) { Object.keys(employeeSelfData).forEach(k => delete employeeSelfData[k]); Object.assign(employeeSelfData, d); }
@@ -5443,6 +5446,10 @@ function savePdfSafe(doc, filename) {
 // =====================================================
 // F1: SHIFT MANAGEMENT FUNCTIONS
 // =====================================================
+function getShiftTime(s) {
+  if (s.time) return s.time;
+  return (s.start || '00:00') + ' - ' + (s.end || '00:00');
+}
 function getEmployeeShift(empCode) {
   return shiftAssignments[empCode] || null;
 }
@@ -5470,34 +5477,45 @@ function renderMyShiftCard() {
   if (!currentUser || !isShiftEligible(currentUser)) return '';
   const assignment = getEmployeeShift(currentUser.code);
   const shift = assignment && assignment.shiftCode ? SHIFT_TYPES.find(s => s.code === assignment.shiftCode) : SHIFT_TYPES[0];
-  return `<div class="my-shift-card"><h4>My Shift: ${shift.name}</h4><p>${shift.time}</p></div>`;
+  return `<div class="my-shift-card"><h4>My Shift: ${shift.name}</h4><p>${getShiftTime(shift)}</p></div>`;
 }
 function renderShiftsOverlay() {
   const c = document.getElementById('shiftsContent');
   if (!c) return;
   const isMdHr = currentUser && (currentUser.role === 'MD' || currentUser.role === 'HR');
   const eligible = EMPLOYEES.filter(e => isShiftEligible(e));
-  let html = '<div class="nf-section"><div class="nf-section-title">Shift Types</div>';
-  SHIFT_TYPES.forEach(s => {
-    html += `<div class="shift-card"><div class="shift-badge" style="background:${s.color}20;color:${s.color}">${s.code}</div><div style="flex:1"><div style="font-weight:600;font-size:.82rem">${s.name}</div><div style="font-size:.72rem;color:var(--gray-500)">${s.time}</div></div></div>`;
+
+  let html = '<div class="nf-section"><div style="display:flex;align-items:center;justify-content:space-between"><div class="nf-section-title">Shift Types</div>';
+  if (isMdHr) {
+    html += '<button class="nf-btn nf-btn-primary nf-btn-sm" onclick="openShiftTypeForm()">+ New Shift</button>';
+  }
+  html += '</div><div id="shiftTypeFormArea"></div>';
+  SHIFT_TYPES.forEach(function(s) {
+    var time = getShiftTime(s);
+    html += '<div class="shift-card"><div class="shift-badge" style="background:' + s.color + '20;color:' + s.color + '">' + escapeHTML(s.code) + '</div><div style="flex:1"><div style="font-weight:600;font-size:.82rem">' + escapeHTML(s.name) + '</div><div style="font-size:.72rem;color:var(--gray-500)">' + escapeHTML(time) + '</div></div>';
+    if (isMdHr) {
+      html += '<button style="background:none;border:none;cursor:pointer;padding:4px" onclick="editShiftType(\'' + escapeAttr(s.code) + '\')" title="Edit shift" aria-label="Edit ' + escapeAttr(s.name) + '"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>';
+      html += '<button style="background:none;border:none;cursor:pointer;padding:4px" onclick="deleteShiftType(\'' + escapeAttr(s.code) + '\')" title="Delete shift" aria-label="Delete ' + escapeAttr(s.name) + '"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>';
+    }
+    html += '</div>';
   });
   html += '</div><div class="nf-section"><div class="nf-section-title">Factory Employees (' + eligible.length + ')</div>';
-  eligible.forEach(emp => {
+  eligible.forEach(function(emp) {
     const a = shiftAssignments[emp.code] || {};
     const disabled = a.disabled;
     const shift = a.shiftCode ? SHIFT_TYPES.find(s => s.code === a.shiftCode) : SHIFT_TYPES[0];
-    html += `<div class="shift-card"><div style="flex:1"><div style="font-weight:600;font-size:.82rem">${emp.name}</div><div style="font-size:.72rem;color:var(--gray-500)">${emp.designation}</div></div>`;
+    html += '<div class="shift-card"><div style="flex:1"><div style="font-weight:600;font-size:.82rem">' + escapeHTML(emp.name) + '</div><div style="font-size:.72rem;color:var(--gray-500)">' + escapeHTML(emp.designation || '') + '</div></div>';
     if (disabled) {
-      html += `<span style="font-size:.7rem;color:var(--gray-400)">Disabled</span>`;
+      html += '<span style="font-size:.7rem;color:var(--gray-400)">Disabled</span>';
     } else {
-      html += `<div class="shift-badge" style="background:${shift.color}20;color:${shift.color}">${shift.name}</div>`;
+      html += '<div class="shift-badge" style="background:' + shift.color + '20;color:' + shift.color + '">' + escapeHTML(shift.name) + '</div>';
     }
     if (isMdHr) {
-      html += `<button class="shift-toggle ${disabled?'':'on'}" onclick="toggleShiftEligibility('${escapeAttr(emp.code)}')" title="Toggle eligibility" aria-label="Toggle shift eligibility for ${escapeAttr(emp.name)}"></button>`;
+      html += '<button class="shift-toggle ' + (disabled?'':'on') + '" onclick="toggleShiftEligibility(\'' + escapeAttr(emp.code) + '\')" title="Toggle eligibility" aria-label="Toggle shift eligibility for ' + escapeAttr(emp.name) + '"></button>';
       if (!disabled) {
-        html += `<select class="nf-select" style="width:auto;min-width:80px;font-size:.7rem;padding:4px 6px" onchange="assignShift('${escapeAttr(emp.code)}',this.value)" aria-label="Assign shift for ${escapeAttr(emp.name)}">`;
-        SHIFT_TYPES.forEach(s => {
-          html += `<option value="${s.code}" ${a.shiftCode===s.code?'selected':''}>${s.code}</option>`;
+        html += '<select class="nf-select" style="width:auto;min-width:80px;font-size:.7rem;padding:4px 6px" onchange="assignShift(\'' + escapeAttr(emp.code) + '\',this.value)" aria-label="Assign shift for ' + escapeAttr(emp.name) + '">';
+        SHIFT_TYPES.forEach(function(s) {
+          html += '<option value="' + s.code + '" ' + (a.shiftCode===s.code?'selected':'') + '>' + escapeHTML(s.code) + '</option>';
         });
         html += '</select>';
       }
@@ -5506,6 +5524,81 @@ function renderShiftsOverlay() {
   });
   html += '</div>';
   c.innerHTML = html;
+}
+
+function openShiftTypeForm(editCode) {
+  var existing = editCode ? SHIFT_TYPES.find(function(s){return s.code===editCode;}) : null;
+  var area = document.getElementById('shiftTypeFormArea');
+  if (!area) return;
+  var colors = ['#2563EB','#D97706','#7C3AED','#059669','#DC2626','#EC4899','#0891B2','#4F46E5'];
+  var colorOpts = colors.map(function(cl) {
+    return '<option value="' + cl + '"' + (existing && existing.color===cl ? ' selected' : '') + ' style="color:' + cl + '">' + cl + '</option>';
+  }).join('');
+
+  area.innerHTML = '<div class="card" style="padding:12px;border-left:4px solid var(--primary);margin:8px 0">' +
+    '<div class="nf-section-title" style="margin-bottom:8px">' + (existing ? 'Edit Shift' : 'New Shift') + '</div>' +
+    '<div style="display:flex;gap:8px">' +
+    '<div class="form-group" style="flex:1"><label class="form-label">Code *</label><input class="form-control" id="shiftCode" maxlength="5" value="' + (existing ? escapeHTML(existing.code) : '') + '"' + (existing ? ' readonly style="opacity:.6"' : '') + '></div>' +
+    '<div class="form-group" style="flex:2"><label class="form-label">Name *</label><input class="form-control" id="shiftName" value="' + (existing ? escapeHTML(existing.name) : '') + '"></div>' +
+    '</div>' +
+    '<div style="display:flex;gap:8px">' +
+    '<div class="form-group" style="flex:1"><label class="form-label">Start Time *</label><input class="form-control" type="time" id="shiftStart" value="' + (existing ? (existing.start || '') : '') + '"></div>' +
+    '<div class="form-group" style="flex:1"><label class="form-label">End Time *</label><input class="form-control" type="time" id="shiftEnd" value="' + (existing ? (existing.end || '') : '') + '"></div>' +
+    '</div>' +
+    '<div class="form-group"><label class="form-label">Color</label><select class="form-control" id="shiftColor">' + colorOpts + '</select></div>' +
+    '<div style="display:flex;gap:8px;margin-top:8px">' +
+    '<button class="nf-btn nf-btn-primary" onclick="saveShiftType(\'' + (editCode || '') + '\')">' + (existing ? 'Update' : 'Create') + '</button>' +
+    '<button class="nf-btn nf-btn-secondary" onclick="renderShiftsOverlay()">Cancel</button>' +
+    '</div></div>';
+}
+
+function saveShiftType(editCode) {
+  var code = document.getElementById('shiftCode').value.trim().toUpperCase();
+  var name = document.getElementById('shiftName').value.trim();
+  var start = document.getElementById('shiftStart').value;
+  var end = document.getElementById('shiftEnd').value;
+  var color = document.getElementById('shiftColor').value;
+
+  if (!code || !name || !start || !end) { showToast('Please fill all required fields'); return; }
+
+  if (editCode) {
+    var shift = SHIFT_TYPES.find(function(s){return s.code===editCode;});
+    if (shift) {
+      shift.name = name;
+      shift.start = start;
+      shift.end = end;
+      shift.color = color;
+      delete shift.time;
+      showToast('Shift updated');
+    }
+  } else {
+    if (SHIFT_TYPES.find(function(s){return s.code===code;})) { showToast('Shift code already exists'); return; }
+    SHIFT_TYPES.push({code:code, name:name, start:start, end:end, color:color});
+    showToast('Shift created');
+  }
+  saveAllData();
+  renderShiftsOverlay();
+}
+
+function editShiftType(code) {
+  openShiftTypeForm(code);
+}
+
+function deleteShiftType(code) {
+  if (SHIFT_TYPES.length <= 1) { showToast('Cannot delete the last shift type'); return; }
+  var shift = SHIFT_TYPES.find(function(s){return s.code===code;});
+  if (!shift) return;
+  if (!confirm('Delete shift "' + shift.name + '"? Employees on this shift will be reassigned to the first available shift.')) return;
+  SHIFT_TYPES = SHIFT_TYPES.filter(function(s){return s.code!==code;});
+  var fallback = SHIFT_TYPES[0].code;
+  Object.keys(shiftAssignments).forEach(function(empCode) {
+    if (shiftAssignments[empCode].shiftCode === code) {
+      shiftAssignments[empCode].shiftCode = fallback;
+    }
+  });
+  saveAllData();
+  showToast('Shift deleted');
+  renderShiftsOverlay();
 }
 
 // =====================================================
