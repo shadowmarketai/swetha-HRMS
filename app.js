@@ -2010,12 +2010,15 @@ var CANDIDATES = [
   {id:8, name:'Anbu Selvan', role:'Accounts Executive', jobId:3, stage:'Screening', rating:3, phone:'9876543217', exp:'4 yrs'}
 ];
 
+var jobNextId = 5;
+var candidateNextId = 9;
 var PIPELINE_STAGES = ['Applied','Screening','Interview','Offer','Hired','Rejected'];
 
 function renderRecruitmentOverlay() {
   var el = document.getElementById('hrRecruitContent');
   if (!el) return;
   var activeTab = el.dataset.rtab || 'postings';
+  var isMdHr = currentUser && (currentUser.role === 'MD' || currentUser.role === 'HR');
 
   var pills = ['postings','pipeline'].map(function(t) {
     return '<button class="tab-pill' + (activeTab === t ? ' active' : '') + '" onclick="recruitTab(\'' + t + '\')">' + (t === 'postings' ? 'Open Positions' : 'Candidate Pipeline') + '</button>';
@@ -2023,22 +2026,38 @@ function renderRecruitmentOverlay() {
 
   var content = '';
   if (activeTab === 'postings') {
-    content = JOB_POSTINGS.map(function(j) {
+    if (isMdHr) {
+      content += '<div style="margin-bottom:10px"><button class="nf-btn nf-btn-primary nf-btn-sm" onclick="openJobPostingForm()">+ New Opening</button></div>';
+    }
+    content += '<div id="jobPostingFormArea"></div>';
+    content += JOB_POSTINGS.map(function(j) {
       var candCount = CANDIDATES.filter(function(c) { return c.jobId === j.id; }).length;
+      var actionsHtml = '';
+      if (isMdHr) {
+        actionsHtml += '<button style="background:none;border:none;cursor:pointer;padding:2px 4px" onclick="event.stopPropagation();openJobPostingForm(' + j.id + ')" title="Edit"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>';
+        if (j.status === 'open') {
+          actionsHtml += '<button style="background:none;border:none;cursor:pointer;padding:2px 4px" onclick="event.stopPropagation();closeJobPosting(' + j.id + ')" title="Close opening"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg></button>';
+        } else {
+          actionsHtml += '<button style="background:none;border:none;cursor:pointer;padding:2px 4px" onclick="event.stopPropagation();reopenJobPosting(' + j.id + ')" title="Reopen"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>';
+        }
+        actionsHtml += '<button style="background:none;border:none;cursor:pointer;padding:2px 4px" onclick="event.stopPropagation();deleteJobPosting(' + j.id + ')" title="Delete"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--danger)" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>';
+      }
       return '<div class="job-card fade-in">' +
-        '<h4>' + j.title + '</h4>' +
+        '<div style="display:flex;align-items:flex-start;justify-content:space-between"><h4>' + escapeHTML(j.title) + '</h4><div style="display:flex;gap:2px;align-items:center">' + actionsHtml + '</div></div>' +
         '<div class="job-meta">' +
-          '<span>' + j.dept + '</span>' +
+          '<span>' + escapeHTML(j.dept) + '</span>' +
           '<span>' + j.openings + ' opening' + (j.openings > 1 ? 's' : '') + '</span>' +
           '<span>' + candCount + ' candidates</span>' +
           '<span>Posted ' + formatAdvDate(j.posted) + '</span>' +
         '</div>' +
-        '<div style="font-size:.72rem;color:var(--gray-500);margin-bottom:10px;line-height:1.5">' + j.jd + '</div>' +
+        '<div style="font-size:.72rem;color:var(--gray-500);margin-bottom:10px;line-height:1.5">' + escapeHTML(j.jd || '') + '</div>' +
         '<div class="job-actions">' +
           '<span class="badge-status badge-' + (j.status === 'open' ? 'open' : 'pending') + '">' + j.status.charAt(0).toUpperCase() + j.status.slice(1) + '</span>' +
           (candCount > 0 ? '<button class="ai-screen-btn" style="margin-left:8px" onclick="aiScreenAllCandidates(' + j.id + ',this)">&#10024; Screen All</button>' : '') +
+          (isMdHr ? '<button class="btn btn-sm btn-outline" style="margin-left:4px" onclick="event.stopPropagation();openCandidateForm(' + j.id + ')">+ Candidate</button>' : '') +
           (j.status === 'open' ? '<button class="btn btn-sm btn-outline" style="margin-left:auto" onclick="showToast(\'Sharing job link...\')">Share</button>' : '') +
         '</div>' +
+        '<div id="candidateFormArea_' + j.id + '"></div>' +
       '</div>';
     }).join('');
   } else {
@@ -2098,6 +2117,124 @@ function moveCandidateStagePrompt(candidateId) {
   var nextStage = PIPELINE_STAGES[nextIdx];
   cand.stage = nextStage;
   showToast(cand.name + ' moved to ' + nextStage);
+  renderRecruitmentOverlay();
+}
+
+function openJobPostingForm(editId) {
+  var existing = editId ? JOB_POSTINGS.find(function(j){return j.id===editId;}) : null;
+  var area = document.getElementById('jobPostingFormArea');
+  if (!area) return;
+  var deptOpts = ['Office','Site','Factory','PEB','Garden'].map(function(d) {
+    return '<option value="' + d + '"' + (existing && existing.dept===d ? ' selected' : '') + '>' + d + '</option>';
+  }).join('');
+
+  area.innerHTML = '<div class="card" style="padding:12px;border-left:4px solid var(--primary);margin-bottom:10px">' +
+    '<div class="nf-section-title" style="margin-bottom:8px">' + (existing ? 'Edit Opening' : 'New Job Opening') + '</div>' +
+    '<div class="form-group"><label class="form-label">Job Title *</label><input class="form-control" id="jobTitle" value="' + (existing ? escapeHTML(existing.title) : '') + '"></div>' +
+    '<div style="display:flex;gap:8px">' +
+    '<div class="form-group" style="flex:1"><label class="form-label">Department *</label><select class="form-control" id="jobDept">' + deptOpts + '</select></div>' +
+    '<div class="form-group" style="flex:1"><label class="form-label">Openings *</label><input class="form-control" type="number" min="1" id="jobOpenings" value="' + (existing ? existing.openings : '1') + '"></div>' +
+    '</div>' +
+    '<div class="form-group"><label class="form-label">Job Description</label><textarea class="form-control" id="jobJD" rows="3" style="resize:vertical">' + (existing ? escapeHTML(existing.jd || '') : '') + '</textarea></div>' +
+    '<div style="display:flex;gap:8px;margin-top:8px">' +
+    '<button class="nf-btn nf-btn-primary" onclick="saveJobPosting(' + (editId || 0) + ')">' + (existing ? 'Update' : 'Create') + '</button>' +
+    '<button class="nf-btn nf-btn-secondary" onclick="renderRecruitmentOverlay()">Cancel</button>' +
+    '</div></div>';
+}
+
+function saveJobPosting(editId) {
+  var title = document.getElementById('jobTitle').value.trim();
+  var dept = document.getElementById('jobDept').value;
+  var openings = parseInt(document.getElementById('jobOpenings').value, 10) || 1;
+  var jd = document.getElementById('jobJD').value.trim();
+  if (!title) { showToast('Job title is required'); return; }
+
+  if (editId) {
+    var job = JOB_POSTINGS.find(function(j){return j.id===editId;});
+    if (job) {
+      job.title = title; job.dept = dept; job.openings = openings; job.jd = jd;
+      showToast('Opening updated');
+    }
+  } else {
+    JOB_POSTINGS.push({id:jobNextId, title:title, dept:dept, openings:openings, posted:new Date().toISOString().split('T')[0], status:'open', jd:jd});
+    jobNextId++;
+    showToast('Opening created');
+  }
+  apiCall('POST', '/recruitment/jobs', {title:title,dept:dept,openings:openings,jd:jd}).catch(function(){});
+  saveAllData();
+  renderRecruitmentOverlay();
+}
+
+function closeJobPosting(id) {
+  var job = JOB_POSTINGS.find(function(j){return j.id===id;});
+  if (!job) return;
+  if (!confirm('Close "' + job.title + '"? This will mark it as closed.')) return;
+  job.status = 'closed';
+  saveAllData();
+  showToast('Opening closed');
+  renderRecruitmentOverlay();
+}
+
+function reopenJobPosting(id) {
+  var job = JOB_POSTINGS.find(function(j){return j.id===id;});
+  if (!job) return;
+  job.status = 'open';
+  saveAllData();
+  showToast('Opening reopened');
+  renderRecruitmentOverlay();
+}
+
+function deleteJobPosting(id) {
+  var job = JOB_POSTINGS.find(function(j){return j.id===id;});
+  if (!job) return;
+  var candCount = CANDIDATES.filter(function(c){return c.jobId===id;}).length;
+  if (!confirm('Delete "' + job.title + '"?' + (candCount > 0 ? ' This will also remove ' + candCount + ' candidate(s).' : ''))) return;
+  for (var i = JOB_POSTINGS.length - 1; i >= 0; i--) { if (JOB_POSTINGS[i].id === id) JOB_POSTINGS.splice(i, 1); }
+  for (var i = CANDIDATES.length - 1; i >= 0; i--) { if (CANDIDATES[i].jobId === id) CANDIDATES.splice(i, 1); }
+  saveAllData();
+  showToast('Opening deleted');
+  renderRecruitmentOverlay();
+}
+
+function openCandidateForm(jobId) {
+  var area = document.getElementById('candidateFormArea_' + jobId);
+  if (!area) return;
+  var job = JOB_POSTINGS.find(function(j){return j.id===jobId;});
+  if (!job) return;
+
+  area.innerHTML = '<div style="padding:10px 0;border-top:1px solid var(--gray-100);margin-top:10px">' +
+    '<div style="font-weight:600;font-size:.78rem;margin-bottom:8px">Add Candidate</div>' +
+    '<div class="form-group"><label class="form-label">Name *</label><input class="form-control" id="candName_' + jobId + '"></div>' +
+    '<div style="display:flex;gap:8px">' +
+    '<div class="form-group" style="flex:1"><label class="form-label">Phone</label><input class="form-control" id="candPhone_' + jobId + '"></div>' +
+    '<div class="form-group" style="flex:1"><label class="form-label">Experience</label><input class="form-control" id="candExp_' + jobId + '" placeholder="e.g. 3 yrs"></div>' +
+    '</div>' +
+    '<div class="form-group"><label class="form-label">Rating (1-5)</label><input class="form-control" type="number" min="1" max="5" id="candRating_' + jobId + '" value="3"></div>' +
+    '<div style="display:flex;gap:8px;margin-top:6px">' +
+    '<button class="nf-btn nf-btn-primary nf-btn-sm" onclick="saveCandidate(' + jobId + ')">Add</button>' +
+    '<button class="nf-btn nf-btn-secondary nf-btn-sm" onclick="document.getElementById(\'candidateFormArea_' + jobId + '\').innerHTML=\'\'">Cancel</button>' +
+    '</div></div>';
+}
+
+function saveCandidate(jobId) {
+  var name = document.getElementById('candName_' + jobId).value.trim();
+  if (!name) { showToast('Candidate name is required'); return; }
+  var job = JOB_POSTINGS.find(function(j){return j.id===jobId;});
+  if (!job) return;
+
+  CANDIDATES.push({
+    id: candidateNextId,
+    name: name,
+    role: job.title,
+    jobId: jobId,
+    stage: 'Applied',
+    rating: parseInt(document.getElementById('candRating_' + jobId).value, 10) || 3,
+    phone: document.getElementById('candPhone_' + jobId).value.trim(),
+    exp: document.getElementById('candExp_' + jobId).value.trim()
+  });
+  candidateNextId++;
+  saveAllData();
+  showToast('Candidate added');
   renderRecruitmentOverlay();
 }
 
@@ -3416,6 +3553,8 @@ const STORAGE_KEYS = {
   announcementNextId: 'hrms_announcement_next_id',
   announcementReadStatus: 'hrms_announcement_read_status',
   siteLocations: 'hrms_site_locations',
+  jobNextId: 'hrms_job_next_id',
+  candidateNextId: 'hrms_candidate_next_id',
   shiftTypes: 'hrms_shift_types',
   projects: 'hrms_projects',
   projectNextId: 'hrms_project_next_id',
@@ -3432,6 +3571,8 @@ function saveAllData() {
     safeStorage.set(STORAGE_KEYS.kpiData, JSON.stringify(KPI_DATA));
     safeStorage.set(STORAGE_KEYS.jobPostings, JSON.stringify(JOB_POSTINGS));
     safeStorage.set(STORAGE_KEYS.candidates, JSON.stringify(CANDIDATES));
+    safeStorage.set(STORAGE_KEYS.jobNextId, JSON.stringify(jobNextId));
+    safeStorage.set(STORAGE_KEYS.candidateNextId, JSON.stringify(candidateNextId));
     safeStorage.set(STORAGE_KEYS.employeeDocuments, JSON.stringify(EMPLOYEE_DOCUMENTS));
     safeStorage.set(STORAGE_KEYS.temperamentResults, JSON.stringify(TEMPERAMENT_RESULTS));
     safeStorage.set(STORAGE_KEYS.taskData, JSON.stringify(TASK_DATA));
@@ -3487,6 +3628,8 @@ function loadAllData() {
     d = load(STORAGE_KEYS.kpiData); if (d) { Object.keys(KPI_DATA).forEach(k => delete KPI_DATA[k]); Object.assign(KPI_DATA, d); }
     d = load(STORAGE_KEYS.jobPostings); if (d) { JOB_POSTINGS.length = 0; d.forEach(e => JOB_POSTINGS.push(e)); }
     d = load(STORAGE_KEYS.candidates); if (d) { CANDIDATES.length = 0; d.forEach(e => CANDIDATES.push(e)); }
+    d = load(STORAGE_KEYS.jobNextId); if (d !== null) jobNextId = d;
+    d = load(STORAGE_KEYS.candidateNextId); if (d !== null) candidateNextId = d;
     d = load(STORAGE_KEYS.employeeDocuments); if (d) { EMPLOYEE_DOCUMENTS.length = 0; d.forEach(e => EMPLOYEE_DOCUMENTS.push(e)); }
     d = load(STORAGE_KEYS.temperamentResults); if (d) { Object.keys(TEMPERAMENT_RESULTS).forEach(k => delete TEMPERAMENT_RESULTS[k]); Object.assign(TEMPERAMENT_RESULTS, d); }
     d = load(STORAGE_KEYS.taskData); if (d) { TASK_DATA.length = 0; d.forEach(e => TASK_DATA.push(e)); }
