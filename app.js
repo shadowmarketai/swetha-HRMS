@@ -5314,7 +5314,7 @@ function addNotification(title, body, category) {
 
 function updateNotifBadge() {
   const badge = document.querySelector('.header-btn .badge');
-  const unread = NOTIF_HISTORY.filter(n => !n.read).length;
+  const unread = NOTIF_HISTORY.filter(n => !n.read && (!n.empCode || (currentUser && n.empCode === currentUser.code))).length;
   if (badge) badge.style.display = unread > 0 ? '' : 'none';
 }
 
@@ -5329,10 +5329,16 @@ function renderNotifications() {
     salary: {bg:'var(--success-light)',color:'var(--success-dark)',svg:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>'},
     leave: {bg:'#FFF7ED',color:'#E85D04',svg:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/></svg>'},
     advance: {bg:'var(--teal-light)',color:'var(--teal-dark)',svg:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>'},
-    payroll: {bg:'var(--primary-50)',color:'var(--primary)',svg:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>'}
+    payroll: {bg:'var(--primary-50)',color:'var(--primary)',svg:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>'},
+    system: {bg:'var(--danger-light)',color:'var(--danger)',svg:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>'}
   };
   const defaultIcon = iconMap.salary;
-  container.innerHTML = NOTIF_HISTORY.map(n => {
+  var myNotifs = NOTIF_HISTORY.filter(function(n) { return !n.empCode || n.empCode === currentUser.code; });
+  if (myNotifs.length === 0) {
+    container.innerHTML = '<div style="padding:40px 16px;text-align:center;color:var(--gray-400);font-size:.82rem">No notifications yet</div>';
+    return;
+  }
+  container.innerHTML = myNotifs.map(n => {
     const ic = iconMap[n.category] || defaultIcon;
     const ago = timeAgo(n.time);
     return `<div class="notif-item${n.read?'':' unread'}" onclick="markNotifRead(${n.id})">
