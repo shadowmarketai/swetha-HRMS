@@ -798,6 +798,32 @@ a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.cal-nav bu
 [data-theme="dark"] .progress-meta{color:var(--gray-400)}
 [data-theme="dark"] .job-card{background:var(--card);color:var(--text)}
 [data-theme="dark"] .shift-card{background:var(--card);color:var(--text)}
+[data-theme="dark"] .app-content{background:var(--bg)}
+[data-theme="dark"] .screen{background:var(--bg)}
+[data-theme="dark"] .advance-card{background:linear-gradient(135deg,rgba(34,197,94,.12),rgba(34,197,94,.06));border-color:rgba(34,197,94,.2)}
+[data-theme="dark"] .advance-card h4,[data-theme="dark"] .advance-card p{color:var(--success)}
+[data-theme="dark"] .btn-solid-white{background:var(--card);color:var(--primary)}
+[data-theme="dark"] .adv-pending-banner{background:linear-gradient(135deg,rgba(245,158,11,.12),rgba(245,158,11,.06));border-color:rgba(245,158,11,.2);color:var(--warning)}
+[data-theme="dark"] .loc-map-area{background:var(--gray-100)}
+[data-theme="dark"] .loc-map-area .map-bg{background:linear-gradient(135deg,var(--gray-100),var(--gray-200))}
+[data-theme="dark"] .ql-leave{background:linear-gradient(135deg,rgba(37,99,235,.15),rgba(37,99,235,.08));color:var(--blue)}
+[data-theme="dark"] .ql-expense{background:linear-gradient(135deg,rgba(5,150,105,.15),rgba(5,150,105,.08));color:var(--green)}
+[data-theme="dark"] .ql-site{background:linear-gradient(135deg,rgba(249,115,22,.15),rgba(249,115,22,.08));color:var(--orange)}
+[data-theme="dark"] .ql-advance{background:linear-gradient(135deg,rgba(20,184,166,.15),rgba(20,184,166,.08));color:var(--teal)}
+[data-theme="dark"] .ql-ta{background:linear-gradient(135deg,rgba(236,72,153,.15),rgba(236,72,153,.08));color:var(--pink)}
+[data-theme="dark"] .ql-location{background:linear-gradient(135deg,rgba(239,68,68,.15),rgba(239,68,68,.08));color:var(--red)}
+[data-theme="dark"] .checkin-date,[data-theme="dark"] .checkin-time{color:rgba(255,255,255,.9)}
+[data-theme="dark"] .new-feature-body{background:var(--bg)}
+[data-theme="dark"] .leave-balance-card{background:var(--card)}
+[data-theme="dark"] .summary-card{background:var(--card)}
+[data-theme="dark"] .progress-card{background:var(--card)}
+[data-theme="dark"] .adv-request-card{background:var(--card);border-left-color:var(--gray-200)}
+[data-theme="dark"] .ta-type-card{background:var(--card)}
+[data-theme="dark"] .loc-emp-card{background:var(--card)}
+[data-theme="dark"] .hr-hub-card{background:var(--card);color:var(--text)}
+[data-theme="dark"] .hr-hub-card:hover{background:var(--gray-100)}
+[data-theme="dark"] .salary-row{background:var(--card);color:var(--text)}
+[data-theme="dark"] .ac-icon{opacity:.85}
 
 /* =====================================================
    TABLET LAYOUT (768px – 1024px)

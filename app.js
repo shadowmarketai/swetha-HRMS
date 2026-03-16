@@ -394,6 +394,14 @@ function loginAs(empIndex) {
   initLeaveTabs();
   // Set initial history state so back button has a baseline
   history.replaceState({ tab: 'home' }, '');
+  // MD/HR: check for new employees needing setup (salary=0)
+  if (currentUser.role === 'MD' || currentUser.role === 'HR') {
+    var newEmps = EMPLOYEES.filter(function(e) { return e.salary === 0 && e.code !== currentUser.code; });
+    if (newEmps.length > 0) {
+      var names = newEmps.map(function(e) { return e.name + ' (' + e.code + ')'; }).join(', ');
+      setTimeout(function() { showToast(newEmps.length + ' new employee(s) need setup: ' + names); }, 1000);
+    }
+  }
 }
 function renderProfileOverlay() {
   var c = document.getElementById('profileContent');
@@ -1029,9 +1037,11 @@ window.addEventListener('popstate', function(e) {
 });
 
 function updateGreeting() {
-  const h = new Date().getHours();
+  const now = new Date();
+  const h = now.getHours();
   document.getElementById('timeLabel').textContent = h < 12 ? 'Good Morning' : h < 17 ? 'Good Afternoon' : 'Good Evening';
-  document.getElementById('currentTime').textContent = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+  document.getElementById('currentTime').textContent = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+  document.getElementById('currentDate').textContent = now.toLocaleDateString('en-US', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
 }
 setInterval(updateGreeting, 60000);
 
@@ -1039,10 +1049,15 @@ function buildCalendar() {
   const c = document.getElementById('calDays');
   c.innerHTML = '';
   ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(d => { c.innerHTML += '<div class="cal-day-label">'+d+'</div>'; });
+  const now = new Date();
+  const todayDate = now.getDate();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const firstDayOfWeek = new Date(now.getFullYear(), now.getMonth(), 1).getDay();
   const att = {1:'present',2:'present',3:'present',4:'present',5:'present',6:'present',7:'present',8:'holiday',9:'present',10:'present',11:'present',12:'present',13:'half',14:'holiday',15:'holiday',16:'present',17:'present',18:'present',19:'present',20:'present',21:'holiday',22:'holiday',23:'present',24:'present',25:'absent',26:'present',27:'present',28:'holiday',29:'holiday',30:'present',31:'present'};
-  for (let d = 1; d <= 31; d++) {
-    const isToday = d === 7;
-    const st = d <= 7 ? att[d] : '';
+  for (let e = 0; e < firstDayOfWeek; e++) { c.innerHTML += '<div class="cal-day"></div>'; }
+  for (let d = 1; d <= daysInMonth; d++) {
+    const isToday = d === todayDate;
+    const st = d <= todayDate ? att[d] || '' : '';
     const dot = st ? '<span class="cal-dot '+st+'"></span>' : '';
     c.innerHTML += '<div class="cal-day'+(isToday?' today':'')+'">'+d+dot+'</div>';
   }
@@ -4713,23 +4728,45 @@ async function _handleGoogleRedirect() {
       EMPLOYEES.push(newEmp);
       CREDENTIAL_HASHES[newCode] = { hash: DEFAULT_HASH, idx: EMPLOYEES.length - 1 };
       empIdx = EMPLOYEES.length - 1;
-      // Notify MD and HR about new signup
+      // Notify MD and HR about new signup via local notifications
       var notifTime = new Date().toISOString();
+      var notifBody = displayName + ' (' + userInfo.email + ') signed up via Google. Code: ' + newCode + '. Please assign role, department & salary.';
       EMPLOYEES.forEach(function(e) {
         if (e.role === 'MD' || e.role === 'HR') {
           NOTIF_HISTORY.push({
             id: Date.now() + '_' + e.code,
             empCode: e.code,
             title: 'New Employee Registered',
-            body: displayName + ' (' + userInfo.email + ') signed up via Google. Code: ' + newCode + '. Please assign role, department & salary.',
+            body: notifBody,
             time: notifTime,
             read: false,
             category: 'system'
           });
         }
       });
+      // Also create an announcement so MD/HR sees it on any device
+      var newSignupAnnouncement = {
+        id: Date.now(),
+        title: 'New Employee Registered: ' + displayName,
+        body: notifBody,
+        type: 'info',
+        createdBy: 'System',
+        createdAt: notifTime,
+        readBy: []
+      };
+      if (typeof announcements !== 'undefined') announcements.unshift(newSignupAnnouncement);
       saveAllData();
+      // Post to backend for cross-device sync
       try { await apiCall('POST', '/employees', newEmp); } catch (_) {}
+      try { await apiCall('POST', '/announcements', newSignupAnnouncement); } catch (_) {}
+      try {
+        await apiCall('POST', '/notifications', {
+          title: 'New Employee Registered',
+          body: notifBody,
+          category: 'system',
+          targetRole: 'MD,HR'
+        });
+      } catch (_) {}
       showToast('Welcome ' + escapeHTML(displayName) + '! Account created. Contact MD/HR for role assignment.');
     }
 
@@ -5886,13 +5923,24 @@ function switchSsTab(tab) {
   renderSelfServiceOverlay();
 }
 function updatePersonalDetails() {
-  const phone = document.getElementById('ssPhone').value.trim();
-  const address = document.getElementById('ssAddress').value.trim();
-  const emergency = document.getElementById('ssEmergency').value.trim();
+  var phoneEl = document.getElementById('ssPhone');
+  var addressEl = document.getElementById('ssAddress');
+  var emergencyEl = document.getElementById('ssEmergency');
+  if (!phoneEl || !addressEl || !emergencyEl) { showToast('Error: form not found'); return; }
+  var phone = phoneEl.value.trim();
+  var address = addressEl.value.trim();
+  var emergency = emergencyEl.value.trim();
   if (!employeeSelfData[currentUser.code]) employeeSelfData[currentUser.code] = {};
-  Object.assign(employeeSelfData[currentUser.code], { phone, address, emergencyContact: emergency });
+  Object.assign(employeeSelfData[currentUser.code], { phone: phone, address: address, emergencyContact: emergency });
+  // Also update employee record if phone changed
+  var emp = EMPLOYEES.find(function(e) { return e.code === currentUser.code; });
+  if (emp && phone) emp.phone = phone;
+  apiCall('PUT', '/employees/' + currentUser.code, { phone: phone, address: address, emergencyContact: emergency }).catch(function(){});
   saveAllData();
-  showToast('Personal details updated');
+  showToast('Personal details saved successfully');
+  // Brief visual feedback on button
+  var btn = document.querySelector('#selfServiceContent .nf-btn-primary');
+  if (btn) { btn.textContent = 'Saved ✓'; btn.style.background = 'var(--success)'; setTimeout(function() { btn.textContent = 'Save Changes'; btn.style.background = ''; }, 1500); }
 }
 function renderSelfServiceOverlay() {
   const c = document.getElementById('selfServiceContent');
@@ -5913,7 +5961,7 @@ function renderSelfServiceOverlay() {
     docs.forEach(d => {
       html += `<div class="ss-doc-item"><div><div style="font-weight:600;font-size:.82rem">${escapeHTML(d.name)}</div><div style="font-size:.7rem;color:var(--gray-500)">${escapeHTML(d.type)} &middot; ${d.date}</div></div><span class="badge-status badge-approved">Uploaded</span></div>`;
     });
-    html += '<div style="margin-top:12px"><button class="nf-btn nf-btn-outline" onclick="uploadSelfDocument()">+ Upload Document</button></div></div>';
+    html += '<div id="ssUploadArea" style="margin-top:12px"><button class="nf-btn nf-btn-outline" onclick="showUploadForm()">+ Upload Document</button></div></div>';
   } else {
     html = '<div class="card" style="margin-bottom:12px"><div class="nf-section-title">Download Center</div>';
     html += `<div class="ss-doc-item"><div><div style="font-weight:600;font-size:.82rem">Latest Salary Slip</div><div style="font-size:.7rem;color:var(--gray-500)">Current month payslip PDF</div></div><button class="nf-btn nf-btn-primary nf-btn-sm" onclick="switchTab('salary',document.querySelector('[data-tab=salary]'));hideOverlay('self-service')">View</button></div>`;
@@ -5923,14 +5971,46 @@ function renderSelfServiceOverlay() {
   }
   c.innerHTML = html;
 }
+function showUploadForm() {
+  var area = document.getElementById('ssUploadArea');
+  if (!area) return;
+  area.innerHTML = '<div class="card" style="padding:12px;margin-bottom:8px">' +
+    '<div class="ss-form-group"><label>Document Type *</label><select class="nf-select" id="ssDocType">' +
+    '<option value="">Select type</option><option>Aadhaar Card</option><option>PAN Card</option><option>Passport</option><option>Driving License</option><option>Voter ID</option><option>Bank Passbook</option><option>Photo</option><option>Resume</option><option>Education Certificate</option><option>Experience Letter</option><option>Other</option>' +
+    '</select></div>' +
+    '<div class="ss-form-group"><label>Upload File</label>' +
+    '<div class="doc-upload-zone" onclick="document.getElementById(\'ssFileInput\').click()" style="padding:20px;text-align:center;border:2px dashed var(--gray-300);border-radius:var(--radius-xs);cursor:pointer">' +
+    '<div style="font-size:.8rem;color:var(--gray-400)" id="ssFileName">Tap to select file (PDF, JPG, PNG)</div>' +
+    '<input type="file" id="ssFileInput" accept=".pdf,.jpg,.jpeg,.png" style="display:none" onchange="handleSsFileSelect(this)"></div></div>' +
+    '<div style="display:flex;gap:8px"><button class="nf-btn nf-btn-primary" onclick="uploadSelfDocument()">Upload</button>' +
+    '<button class="nf-btn nf-btn-outline" onclick="renderSelfServiceOverlay()">Cancel</button></div></div>';
+}
+function handleSsFileSelect(input) {
+  var label = document.getElementById('ssFileName');
+  if (input.files && input.files[0] && label) {
+    label.textContent = input.files[0].name;
+    label.style.color = 'var(--success)';
+  }
+}
 function uploadSelfDocument() {
-  const docType = prompt('Document type (e.g. Aadhaar, PAN, Photo):');
-  if (!docType) return;
+  var docTypeEl = document.getElementById('ssDocType');
+  var fileInput = document.getElementById('ssFileInput');
+  if (!docTypeEl || !docTypeEl.value) { showToast('Please select document type'); return; }
+  var docType = docTypeEl.value;
+  var fileName = (fileInput && fileInput.files && fileInput.files[0]) ? fileInput.files[0].name : docType;
   if (!employeeSelfData[currentUser.code]) employeeSelfData[currentUser.code] = {};
   if (!employeeSelfData[currentUser.code].uploadedDocs) employeeSelfData[currentUser.code].uploadedDocs = [];
-  employeeSelfData[currentUser.code].uploadedDocs.push({ name: docType, type: 'Identity', date: new Date().toISOString().split('T')[0] });
+  employeeSelfData[currentUser.code].uploadedDocs.push({ name: fileName, type: docType, date: new Date().toISOString().split('T')[0] });
+  // Try backend upload
+  if (fileInput && fileInput.files && fileInput.files[0]) {
+    var formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+    formData.append('docType', docType);
+    formData.append('empCode', currentUser.code);
+    apiCall('POST', '/documents/upload', formData).catch(function(){});
+  }
   saveAllData();
-  showToast('Document uploaded (mock)');
+  showToast('Document uploaded: ' + escapeHTML(docType));
   renderSelfServiceOverlay();
 }
 
