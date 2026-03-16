@@ -395,6 +395,46 @@ function loginAs(empIndex) {
   // Set initial history state so back button has a baseline
   history.replaceState({ tab: 'home' }, '');
 }
+function renderProfileOverlay() {
+  var c = document.getElementById('profileContent');
+  if (!c || !currentUser) return;
+  var emp = currentUser;
+  var initials = emp.name.split(' ').map(function(w){return w.charAt(0);}).join('').substring(0,2).toUpperCase();
+  var salary = emp.salary || 0;
+  var now = new Date();
+  var monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  var perDay = daysInMonth > 0 ? (salary / daysInMonth) : 0;
+  var accMasked = emp.accNo ? emp.accNo.substring(0,4) + '***' + emp.accNo.slice(-4) : 'N/A';
+
+  var html = '<div class="card profile-card" style="margin:16px;border-radius:var(--radius)">';
+  html += '<div class="profile-avatar">' + escapeHTML(initials) + '</div>';
+  html += '<h2>' + escapeHTML(emp.name) + '</h2>';
+  html += '<div class="designation">' + escapeHTML(emp.designation || emp.dept || '') + '</div>';
+  html += '<div class="emp-id">' + escapeHTML(emp.code) + '</div>';
+  html += '</div>';
+
+  html += '<div class="card profile-section" style="margin:0 16px 12px;border-radius:var(--radius)">';
+  html += '<div style="font-family:var(--font-display);font-weight:600;font-size:.82rem;margin-bottom:8px;color:var(--gray-500)">Salary Details (' + monthNames[now.getMonth()] + ' ' + now.getFullYear() + ')</div>';
+  html += '<div class="profile-row"><span class="label">Monthly Salary</span><span class="value">Rs.' + salary.toLocaleString('en-IN') + '</span></div>';
+  html += '<div class="profile-row"><span class="label">Per Day Salary</span><span class="value">Rs.' + perDay.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) + '</span></div>';
+  html += '<div class="profile-row"><span class="label">Working Days</span><span class="value">' + daysInMonth + '</span></div>';
+  html += '</div>';
+
+  html += '<div class="card profile-section" style="margin:0 16px 12px;border-radius:var(--radius)">';
+  html += '<div style="font-family:var(--font-display);font-weight:600;font-size:.82rem;margin-bottom:8px;color:var(--gray-500)">Company Details</div>';
+  html += '<div class="profile-row"><span class="label">Company</span><span class="value">Swetha Structures Pvt Ltd</span></div>';
+  html += '<div class="profile-row"><span class="label">Department</span><span class="value">' + escapeHTML(emp.dept || 'N/A') + '</span></div>';
+  html += '<div class="profile-row"><span class="label">Bank Account</span><span class="value">' + escapeHTML(emp.bank || '') + ' — ' + escapeHTML(accMasked) + '</span></div>';
+  html += '<div class="profile-row"><span class="label">Employee Code</span><span class="value">' + escapeHTML(emp.code) + '</span></div>';
+  html += '<div class="profile-row"><span class="label">Payment Mode</span><span class="value">NEFT</span></div>';
+  html += '</div>';
+
+  html += '<div style="padding:0 16px 8px"><button class="payroll-report-btn" onclick="downloadIDCard()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>Download ID Card (PDF)</button></div>';
+  html += '<div style="padding:0 16px 24px"><button class="btn btn-outline w-full" style="border-radius:var(--radius);color:var(--danger);border-color:var(--danger-light)" onclick="doLogout()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Log Out</button></div>';
+  c.innerHTML = html;
+}
+
 function doLogout() {
   currentUser = null;
   JWT_TOKEN = null;
@@ -866,6 +906,7 @@ function showOverlay(id) {
   if (id === 'advance-requests' && currentUser.role !== 'MD' && currentUser.role !== 'HR') return;
   // Render content (wrapped in try-catch so errors don't block overlay display)
   try {
+    if (id === 'profile') renderProfileOverlay();
     if (id === 'admin') renderAdminPanel();
     if (id === 'onboarding') resetWizard();
     if (id === 'notifications') renderNotifications();
@@ -4654,7 +4695,13 @@ async function _handleGoogleRedirect() {
     let empIdx = EMPLOYEES.findIndex(e => e.email && e.email.toLowerCase() === gEmail);
 
     if (empIdx < 0) {
-      const nextNum = EMPLOYEES.length + 1;
+      // Find max existing SSC/SSM/SSG code number to avoid collision
+      var maxNum = 0;
+      EMPLOYEES.forEach(function(e) {
+        var m = e.code.match(/^SS[A-Z](\d+)$/);
+        if (m) { var n = parseInt(m[1], 10); if (n > maxNum) maxNum = n; }
+      });
+      const nextNum = maxNum + 1;
       const newCode = 'SSC' + String(nextNum).padStart(3, '0');
       const displayName = userInfo.name || userInfo.email.split('@')[0];
       const newEmp = {
@@ -4666,6 +4713,21 @@ async function _handleGoogleRedirect() {
       EMPLOYEES.push(newEmp);
       CREDENTIAL_HASHES[newCode] = { hash: DEFAULT_HASH, idx: EMPLOYEES.length - 1 };
       empIdx = EMPLOYEES.length - 1;
+      // Notify MD and HR about new signup
+      var notifTime = new Date().toISOString();
+      EMPLOYEES.forEach(function(e) {
+        if (e.role === 'MD' || e.role === 'HR') {
+          NOTIF_HISTORY.push({
+            id: Date.now() + '_' + e.code,
+            empCode: e.code,
+            title: 'New Employee Registered',
+            body: displayName + ' (' + userInfo.email + ') signed up via Google. Code: ' + newCode + '. Please assign role, department & salary.',
+            time: notifTime,
+            read: false,
+            category: 'system'
+          });
+        }
+      });
       saveAllData();
       try { await apiCall('POST', '/employees', newEmp); } catch (_) {}
       showToast('Welcome ' + escapeHTML(displayName) + '! Account created. Contact MD/HR for role assignment.');
