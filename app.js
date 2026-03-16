@@ -294,6 +294,7 @@ const CREDENTIAL_HASHES = {
 };
 const DEFAULT_HASH = 'e03d3ec8d5035f8721f5dc64546e59ed790dbcb3b7b598fe57057ccd7b683b00'; // emp123
 EMPLOYEES.forEach((e,i) => { if (!CREDENTIAL_HASHES[e.code]) CREDENTIAL_HASHES[e.code] = {hash:DEFAULT_HASH, idx:i}; });
+EMPLOYEES.forEach(e => { if (!e.status) e.status = 'Active'; });
 
 // =====================================================
 // LOGIN
@@ -324,9 +325,12 @@ async function doLogin() {
 
   // Fallback to local credentials with hashed comparison
   const cred = CREDENTIAL_HASHES[id];
-  if (!cred) { err.textContent = 'Invalid credentials. Try demo buttons below.'; return; }
+  if (!cred) { err.textContent = 'Invalid Employee Code or Password'; return; }
   const inputHash = await sha256(pass);
-  if (cred.hash !== inputHash) { err.textContent = 'Invalid credentials. Try demo buttons below.'; return; }
+  if (cred.hash !== inputHash) { err.textContent = 'Invalid Employee Code or Password'; return; }
+  // Block inactive employees from logging in
+  const emp = EMPLOYEES[cred.idx];
+  if (emp && emp.status === 'Inactive') { err.textContent = 'Account deactivated. Contact HR.'; return; }
   loginAs(cred.idx);
 }
 // demoLogin removed — production mode, no demo access
@@ -365,6 +369,58 @@ function doLogout() {
   switchTab('home', document.querySelector('[data-tab=home]'), true);
   // Clear all navigation history
   history.replaceState(null, '');
+}
+
+// =====================================================
+// FORGOT PASSWORD
+// =====================================================
+function showForgotPassword() {
+  const form = document.querySelector('.login-form');
+  form.innerHTML = `
+    <div style="margin-bottom:12px;font-family:var(--font-display);font-size:.95rem;font-weight:600">Reset Password</div>
+    <div class="login-field"><label>Employee Code</label><input type="text" id="forgotCode" placeholder="e.g. SSC006" maxlength="20" autocomplete="off"></div>
+    <button class="login-btn" id="forgotSubmitBtn" type="button">Submit</button>
+    <div id="forgotResult" style="margin-top:10px;font-size:.75rem;color:rgba(255,255,255,.85);line-height:1.4"></div>
+    <div style="margin-top:12px;text-align:center"><a href="#" onclick="restoreLoginForm();return false" style="font-size:.72rem;color:rgba(255,255,255,.7);text-decoration:none">&larr; Back to Login</a></div>
+  `;
+  document.getElementById('forgotSubmitBtn').addEventListener('click', processForgotPassword);
+}
+
+function processForgotPassword() {
+  const code = document.getElementById('forgotCode').value.trim().toUpperCase();
+  const result = document.getElementById('forgotResult');
+  if (!code) { result.textContent = 'Please enter your Employee Code'; return; }
+  const emp = EMPLOYEES.find(e => e.code === code);
+  if (!emp) { result.textContent = 'Employee code not found. Contact HR if you need help.'; return; }
+  // Show masked email
+  const email = emp.email || (emp.name.split(' ')[0].toLowerCase() + '@swethastructures.com');
+  const atIdx = email.indexOf('@');
+  const masked = email[0] + '****' + email.substring(atIdx - 1);
+  // Reset to default password
+  CREDENTIAL_HASHES[code] = { hash: DEFAULT_HASH, idx: EMPLOYEES.findIndex(e => e.code === code) };
+  saveAllData();
+  result.innerHTML = 'Password has been reset for <b>' + escapeHTML(code) + '</b>.<br>Email: ' + escapeHTML(masked) + '<br><br>Your new password is the default. Please change it after login.';
+}
+
+function restoreLoginForm() {
+  const form = document.querySelector('.login-form');
+  form.innerHTML = `
+    <div class="login-field"><label>Employee Code / Phone</label><input type="text" id="loginId" placeholder="e.g. MD001, SSC006, SSC011" maxlength="50" autocomplete="username"></div>
+    <div class="login-field"><label>Password</label><input type="password" id="loginPass" placeholder="Enter password" maxlength="128" autocomplete="current-password"></div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+      <input type="checkbox" id="rememberMe" style="accent-color:white;width:16px;height:16px">
+      <label for="rememberMe" style="font-size:.72rem;opacity:.8;cursor:pointer">Remember me</label>
+    </div>
+    <button class="login-btn" id="signInBtn">Sign In</button>
+    <div style="text-align:right;margin-top:4px"><a href="#" id="forgotPwdLink" onclick="showForgotPassword();return false" style="font-size:.7rem;color:rgba(255,255,255,.7);text-decoration:none">Forgot Password?</a></div>
+    <button class="login-btn" id="biometricBtn" style="margin-top:8px;background:transparent;color:white;border:1px solid rgba(255,255,255,.3)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><path d="M12 11c0-1.1.9-2 2-2s2 .9 2 2-2 4-2 4"/><path d="M8 11a4 4 0 0 1 8 0c0 2.5-2 5-4 6.5"/><path d="M6 11a6 6 0 0 1 12 0c0 4-3 7-6 9"/></svg>Biometric Login</button>
+    <div class="login-divider"><span>or</span></div>
+    <button class="google-signin-btn" id="googleSignInBtn" type="button"><svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59a14.5 14.5 0 0 1 0-9.18l-7.98-6.19a24.01 24.01 0 0 0 0 21.56l7.98-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg><span>Sign in with Google</span></button>
+    <div class="login-error" id="loginError"></div>
+  `;
+  // Re-attach event listeners
+  document.getElementById('signInBtn').addEventListener('click', doLogin);
+  document.getElementById('loginPass').addEventListener('keyup', function(e) { if (e.key === 'Enter') doLogin(); });
 }
 
 // =====================================================
@@ -991,7 +1047,8 @@ function submitOnboarding() {
   // Add to employees array
   const newEmp = {
     code, name, dept, designation, salary, bank: bank || 'TBD',
-    accNo: accNo || 'TBD', role: 'Employee', phone: phone || '', doj: doj || new Date().toISOString().split('T')[0]
+    accNo: accNo || 'TBD', role: 'Employee', phone: phone || '', doj: doj || new Date().toISOString().split('T')[0],
+    status: 'Active'
   };
   EMPLOYEES.push(newEmp);
   CREDENTIAL_HASHES[code] = {hash:DEFAULT_HASH, idx: EMPLOYEES.length - 1};
@@ -1070,6 +1127,8 @@ function addDepartment() {
 function renderAllEmpList() {
   const container = document.getElementById('allEmpList');
   const colors = ['#E85D04','#D62828','#14B8A6','#22C55E','#EC4899'];
+  const isMD = currentUser && currentUser.role === 'MD';
+  const isHRorMD = currentUser && (currentUser.role === 'MD' || currentUser.role === 'HR');
   let html = '';
   departments.forEach((dept, di) => {
     const emps = EMPLOYEES.filter(e => e.dept === dept);
@@ -1077,14 +1136,69 @@ function renderAllEmpList() {
     html += `<div style="margin-top:12px;margin-bottom:6px;font-family:var(--font-display);font-size:.75rem;font-weight:600;color:${colors[di % colors.length]};text-transform:uppercase;letter-spacing:.04em">${dept} (${emps.length})</div>`;
     emps.forEach(e => {
       const init = e.name.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
-      html += `<div class="emp-list-item">
+      const isInactive = e.status === 'Inactive';
+      const statusBadge = isInactive
+        ? '<span style="display:inline-block;font-size:.6rem;padding:2px 6px;border-radius:8px;background:#EF4444;color:#fff;margin-left:6px">Inactive</span>'
+        : '<span style="display:inline-block;font-size:.6rem;padding:2px 6px;border-radius:8px;background:#22C55E;color:#fff;margin-left:6px">Active</span>';
+      let actions = '';
+      if (isHRorMD && e.code !== 'MD001') {
+        const toggleLabel = isInactive ? 'Activate' : 'Deactivate';
+        const toggleColor = isInactive ? '#22C55E' : '#F59E0B';
+        actions = `<div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">
+          <button onclick="deactivateEmployee('${e.code}')" style="font-size:.6rem;padding:3px 8px;border:1px solid ${toggleColor};color:${toggleColor};background:transparent;border-radius:6px;cursor:pointer">${toggleLabel}</button>
+          <button onclick="resetEmployeePassword('${e.code}')" style="font-size:.6rem;padding:3px 8px;border:1px solid #3B82F6;color:#3B82F6;background:transparent;border-radius:6px;cursor:pointer">Reset Pwd</button>
+          ${isMD ? `<button onclick="deleteEmployeePermanently('${e.code}')" style="font-size:.6rem;padding:3px 8px;border:1px solid #EF4444;color:#EF4444;background:transparent;border-radius:6px;cursor:pointer">Delete</button>` : ''}
+        </div>`;
+      }
+      html += `<div class="emp-list-item" style="${isInactive ? 'opacity:.6' : ''}">
         <div class="emp-avatar" style="background:${colors[di % colors.length]}">${init}</div>
-        <div class="emp-details"><h4>${e.name}</h4><p>${e.code} &middot; ${e.designation} &middot; &#8377;${e.salary.toLocaleString('en-IN')}</p></div>
+        <div class="emp-details"><h4>${escapeHTML(e.name)}${statusBadge}</h4><p>${e.code} &middot; ${escapeHTML(e.designation)} &middot; &#8377;${e.salary.toLocaleString('en-IN')}</p>${actions}</div>
         <span class="role-badge ${e.role.toLowerCase()}">${e.role}</span>
       </div>`;
     });
   });
   container.innerHTML = html;
+}
+
+// =====================================================
+// EMPLOYEE DEACTIVATE / DELETE / RESET PASSWORD
+// =====================================================
+function deactivateEmployee(code) {
+  const emp = EMPLOYEES.find(e => e.code === code);
+  if (!emp) return;
+  const newStatus = emp.status === 'Inactive' ? 'Active' : 'Inactive';
+  if (!confirm((newStatus === 'Inactive' ? 'Deactivate' : 'Re-activate') + ' ' + emp.name + '?')) return;
+  emp.status = newStatus;
+  apiCall('PUT', '/employees/' + code, { status: newStatus });
+  saveAllData();
+  renderAllEmpList();
+  showToast(emp.name + ' is now ' + newStatus);
+}
+
+function deleteEmployeePermanently(code) {
+  if (!currentUser || currentUser.role !== 'MD') { showToast('Only MD can delete employees'); return; }
+  if (code === 'MD001') { showToast('Cannot delete MD account'); return; }
+  const emp = EMPLOYEES.find(e => e.code === code);
+  if (!emp) return;
+  const confirmCode = prompt('To permanently delete ' + emp.name + ', type their employee code (' + code + '):');
+  if (confirmCode !== code) { showToast('Deletion cancelled — code did not match'); return; }
+  const idx = EMPLOYEES.findIndex(e => e.code === code);
+  if (idx >= 0) EMPLOYEES.splice(idx, 1);
+  delete CREDENTIAL_HASHES[code];
+  apiCall('DELETE', '/employees/' + code, {});
+  saveAllData();
+  renderAllEmpList();
+  showToast(emp.name + ' has been permanently deleted');
+}
+
+function resetEmployeePassword(code) {
+  const emp = EMPLOYEES.find(e => e.code === code);
+  if (!emp) return;
+  if (!confirm('Reset password for ' + emp.name + ' to default (emp123)?')) return;
+  CREDENTIAL_HASHES[code] = { hash: DEFAULT_HASH, idx: EMPLOYEES.findIndex(e => e.code === code) };
+  apiCall('PUT', '/employees/' + code + '/reset-password', {});
+  saveAllData();
+  showToast('Password reset for ' + emp.name);
 }
 
 // =====================================================
@@ -6230,7 +6344,13 @@ async function generateFnFPDF(exitId) {
 function completeExit(id) {
   if (!confirm('Mark this exit as completed? This action cannot be undone.')) return;
   const req = exitRequests.find(e => e.id === id);
-  if (req) { req.status = 'Completed'; req.completedOn = new Date().toISOString().split('T')[0]; apiCall('PUT', '/exit/' + id + '/complete', { fnf_amount: 0 }); saveAllData(); renderExitOverlay(); showToast('Exit completed'); }
+  if (req) {
+    req.status = 'Completed'; req.completedOn = new Date().toISOString().split('T')[0];
+    // Auto-deactivate the employee on exit completion
+    const exitEmp = EMPLOYEES.find(e => e.code === req.empCode);
+    if (exitEmp) exitEmp.status = 'Inactive';
+    apiCall('PUT', '/exit/' + id + '/complete', { fnf_amount: 0 }); saveAllData(); renderExitOverlay(); showToast('Exit completed — employee deactivated');
+  }
 }
 
 // =====================================================
