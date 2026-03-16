@@ -251,6 +251,54 @@ let announcements = [
   {id:3, title:'Employee of the Month - February', body:'Congratulations to Krishna Gowri Sankar for outstanding fabrication work on the Porur project!', category:'Achievement', author:'MD001', date:'2026-03-01', priority:'normal'}
 ];
 let announcementNextId = 4;
+
+// PROJECT MANAGEMENT
+const PROJECT_STATUSES = ['Not Started', 'In Progress', 'On Track', 'Delayed', 'Completed'];
+const TASK_PRIORITIES = ['Low', 'Medium', 'High', 'Urgent'];
+let projects = [
+  { id:1, name:'Porur Villa Project', client:'Mr. Rajesh Kumar', location:'Porur, Chennai',
+    budget:4500000, status:'In Progress', startDate:'2025-08-15', targetDate:'2026-04-30',
+    createdBy:'MD001', team:['SSC008','SSC009','SSC023','SSC024'], tasks:[
+      {id:1,title:'Foundation work',description:'Complete foundation and footing',priority:'High',assignedTo:'SSC008',status:'Done',dueDate:'2025-11-30',createdDate:'2025-08-20'},
+      {id:2,title:'Structural framing',description:'RCC columns and beams',priority:'High',assignedTo:'SSC009',status:'Done',dueDate:'2026-01-15',createdDate:'2025-09-01'},
+      {id:3,title:'Brickwork & plastering',description:'Wall construction and plastering',priority:'Medium',assignedTo:'SSC024',status:'In Progress',dueDate:'2026-03-15',createdDate:'2025-11-10'},
+      {id:4,title:'Electrical & plumbing',description:'MEP rough-in and finishing',priority:'Medium',assignedTo:'SSC023',status:'Pending',dueDate:'2026-04-10',createdDate:'2026-01-05'},
+      {id:5,title:'Painting & finishing',description:'Interior and exterior painting',priority:'Low',assignedTo:'SSC024',status:'Pending',dueDate:'2026-04-25',createdDate:'2026-01-05'}
+    ]},
+  { id:2, name:'Tambaram Warehouse', client:'ABC Logistics', location:'Tambaram, Chennai',
+    budget:8500000, status:'Delayed', startDate:'2025-06-01', targetDate:'2026-06-30',
+    createdBy:'MD001', team:['SSC010','SSC025','SSC026'], tasks:[
+      {id:1,title:'Site clearing & excavation',description:'Clear site and excavate for foundation',priority:'High',assignedTo:'SSC010',status:'Done',dueDate:'2025-08-15',createdDate:'2025-06-05'},
+      {id:2,title:'Foundation & base slab',description:'PCC and RCC slab work',priority:'High',assignedTo:'SSC025',status:'Done',dueDate:'2025-11-30',createdDate:'2025-06-10'},
+      {id:3,title:'Steel structure erection',description:'Pre-engineered steel building frame',priority:'High',assignedTo:'SSC026',status:'In Progress',dueDate:'2026-03-31',createdDate:'2025-09-15'},
+      {id:4,title:'Roofing & cladding',description:'Metal roofing sheets and wall cladding',priority:'Medium',assignedTo:'SSC025',status:'Pending',dueDate:'2026-05-30',createdDate:'2025-12-01'}
+    ]},
+  { id:3, name:'PEB Factory Extension', client:'Swetha Structures', location:'Coimbatore',
+    budget:3200000, status:'On Track', startDate:'2025-10-01', targetDate:'2026-03-31',
+    createdBy:'MD001', team:['SSC030','SSC031','SSC032','SSC033'], tasks:[
+      {id:1,title:'Design & approval',description:'Structural design and municipality approval',priority:'High',assignedTo:'SSC030',status:'Done',dueDate:'2025-11-15',createdDate:'2025-10-05'},
+      {id:2,title:'Foundation work',description:'Foundation for extension bay',priority:'High',assignedTo:'SSC031',status:'Done',dueDate:'2025-12-31',createdDate:'2025-10-10'},
+      {id:3,title:'PEB fabrication',description:'Fabricate steel members at factory',priority:'High',assignedTo:'SSC032',status:'Done',dueDate:'2026-02-15',createdDate:'2025-11-01'},
+      {id:4,title:'Erection & commissioning',description:'Erect PEB structure and commission',priority:'Medium',assignedTo:'SSC033',status:'In Progress',dueDate:'2026-03-25',createdDate:'2026-01-10'}
+    ]},
+  { id:4, name:'Guduvanchery Residence', client:'Mrs. Priya Sharma', location:'Guduvanchery',
+    budget:6000000, status:'In Progress', startDate:'2026-01-10', targetDate:'2026-08-31',
+    createdBy:'MD001', team:['SSC011','SSC027','SSC028'], tasks:[
+      {id:1,title:'Soil testing & survey',description:'Geotechnical investigation and site survey',priority:'High',assignedTo:'SSC011',status:'Done',dueDate:'2026-01-25',createdDate:'2026-01-12'},
+      {id:2,title:'Foundation excavation',description:'Excavation and PCC work',priority:'High',assignedTo:'SSC027',status:'In Progress',dueDate:'2026-03-15',createdDate:'2026-01-20'},
+      {id:3,title:'RCC structure',description:'Column, beam and slab casting',priority:'High',assignedTo:'SSC028',status:'Pending',dueDate:'2026-05-30',createdDate:'2026-02-01'},
+      {id:4,title:'Brickwork',description:'Wall construction all floors',priority:'Medium',assignedTo:'SSC027',status:'Pending',dueDate:'2026-07-15',createdDate:'2026-02-01'},
+      {id:5,title:'Finishing & handover',description:'Plastering, painting, flooring, handover',priority:'Low',assignedTo:'SSC011',status:'Pending',dueDate:'2026-08-25',createdDate:'2026-02-01'}
+    ]}
+];
+let projectNextId = 5;
+let projectTaskNextIds = {1:6, 2:5, 3:5, 4:6};
+
+function getProjectProgress(project) {
+  if (!project.tasks.length) return 0;
+  const done = project.tasks.filter(t => t.status === 'Done').length;
+  return Math.round((done / project.tasks.length) * 100);
+}
 let announcementReadStatus = {};
 
 // Login credentials — SHA-256 hashes (not plaintext)
@@ -808,6 +856,7 @@ function switchTab(id, el, _fromPopstate) {
   }
   if (id === 'advance' || id === 'site' || id === 'ta') { renderAllMyRequests(); renderAllPendingBanners(); }
   if (id === 'leaves') renderLeaveScreen();
+  if (id === 'progress') renderProgressScreen();
 }
 let _overlayPreviousFocus = [];
 function showOverlay(id) {
@@ -3366,7 +3415,10 @@ const STORAGE_KEYS = {
   announcements: 'hrms_announcements',
   announcementNextId: 'hrms_announcement_next_id',
   announcementReadStatus: 'hrms_announcement_read_status',
-  siteLocations: 'hrms_site_locations'
+  siteLocations: 'hrms_site_locations',
+  projects: 'hrms_projects',
+  projectNextId: 'hrms_project_next_id',
+  projectTaskNextIds: 'hrms_project_task_next_ids'
 };
 
 function saveAllData() {
@@ -3408,6 +3460,9 @@ function saveAllData() {
     safeStorage.set(STORAGE_KEYS.announcementNextId, JSON.stringify(announcementNextId));
     safeStorage.set(STORAGE_KEYS.announcementReadStatus, JSON.stringify(announcementReadStatus));
     safeStorage.set(STORAGE_KEYS.siteLocations, JSON.stringify(siteLocations));
+    safeStorage.set(STORAGE_KEYS.projects, JSON.stringify(projects));
+    safeStorage.set(STORAGE_KEYS.projectNextId, JSON.stringify(projectNextId));
+    safeStorage.set(STORAGE_KEYS.projectTaskNextIds, JSON.stringify(projectTaskNextIds));
   } catch (e) {
     // Failed to save data
   }
@@ -3459,6 +3514,9 @@ function loadAllData() {
     d = load(STORAGE_KEYS.announcementNextId); if (d !== null) announcementNextId = d;
     d = load(STORAGE_KEYS.announcementReadStatus); if (d) { Object.keys(announcementReadStatus).forEach(k => delete announcementReadStatus[k]); Object.assign(announcementReadStatus, d); }
     d = load(STORAGE_KEYS.siteLocations); if (d && Array.isArray(d)) { siteLocations.length = 0; d.forEach(e => siteLocations.push(e)); }
+    d = load(STORAGE_KEYS.projects); if (d && Array.isArray(d)) { projects.length = 0; d.forEach(e => projects.push(e)); }
+    d = load(STORAGE_KEYS.projectNextId); if (d !== null) projectNextId = d;
+    d = load(STORAGE_KEYS.projectTaskNextIds); if (d) { Object.keys(projectTaskNextIds).forEach(k => delete projectTaskNextIds[k]); Object.assign(projectTaskNextIds, d); }
   } catch (e) {
     // Failed to load data
   }
@@ -5555,7 +5613,7 @@ function renderSelfServiceOverlay() {
   } else {
     html = '<div class="card" style="margin-bottom:12px"><div class="nf-section-title">Download Center</div>';
     html += `<div class="ss-doc-item"><div><div style="font-weight:600;font-size:.82rem">Latest Salary Slip</div><div style="font-size:.7rem;color:var(--gray-500)">Current month payslip PDF</div></div><button class="nf-btn nf-btn-primary nf-btn-sm" onclick="switchTab('salary',document.querySelector('[data-tab=salary]'));hideOverlay('self-service')">View</button></div>`;
-    html += `<div class="ss-doc-item"><div><div style="font-weight:600;font-size:.82rem">Employee ID Card</div><div style="font-size:.7rem;color:var(--gray-500)">Download ID card PDF</div></div><button class="nf-btn nf-btn-primary nf-btn-sm" onclick="if(typeof generateIdCardPDF==='function')generateIdCardPDF()">Download</button></div>`;
+    html += `<div class="ss-doc-item"><div><div style="font-weight:600;font-size:.82rem">Employee ID Card</div><div style="font-size:.7rem;color:var(--gray-500)">Download ID card PDF</div></div><button class="nf-btn nf-btn-primary nf-btn-sm" onclick="downloadIDCard()">Download</button></div>`;
     html += `<div class="ss-doc-item"><div><div style="font-weight:600;font-size:.82rem">Form 16</div><div style="font-size:.7rem;color:var(--gray-500)">Tax certificate PDF</div></div><button class="nf-btn nf-btn-primary nf-btn-sm" onclick="showOverlay('hr-tax');hideOverlay('self-service')">View</button></div>`;
     html += '</div>';
   }
@@ -6620,6 +6678,417 @@ function renderCelebrationsOverlay() {
   }
   html += '</div>';
   c.innerHTML = html;
+}
+
+// =====================================================
+// PROJECT MANAGEMENT FUNCTIONS
+// =====================================================
+let currentProjectTab = 'overview';
+
+function renderProgressScreen() {
+  const container = document.getElementById('projectsList');
+  const grid = document.getElementById('staffDeploymentGrid');
+  if (!container) return;
+  const isMDorHR = currentUser && (currentUser.role === 'MD' || currentUser.role === 'HR');
+
+  const statusColors = {'Not Started':'var(--gray-400)','In Progress':'var(--primary)','On Track':'var(--success)','Delayed':'var(--warning)','Completed':'var(--success)'};
+  const statusBadge = {'Not Started':'badge-pending','In Progress':'badge-open','On Track':'badge-approved','Delayed':'badge-pending','Completed':'badge-approved'};
+  const barColors = {'Not Started':'var(--gray-300)','In Progress':'var(--primary)','On Track':'var(--success)','Delayed':'var(--warning)','Completed':'var(--success)'};
+
+  let html = '';
+  projects.forEach(function(p) {
+    const pct = getProjectProgress(p);
+    const barColor = barColors[p.status] || 'var(--primary)';
+    const badge = statusBadge[p.status] || 'badge-open';
+    const target = p.targetDate ? new Date(p.targetDate).toLocaleDateString('en-IN', {month:'short',year:'numeric'}) : '';
+    const avatarColors = ['#E85D04','#3B82F6','#10B981','#8B5CF6','#EC4899','#F59E0B'];
+    let teamHtml = '<div class="project-team-stack">';
+    const teamSlice = p.team.slice(0, 4);
+    teamSlice.forEach(function(code, i) {
+      var emp = EMPLOYEES.find(function(e) { return e.code === code; });
+      var init = emp ? emp.name.charAt(0) : '?';
+      teamHtml += '<div class="team-avatar" style="background:' + avatarColors[i % avatarColors.length] + '">' + escapeHTML(init) + '</div>';
+    });
+    if (p.team.length > 4) {
+      teamHtml += '<div class="team-avatar" style="background:var(--gray-400)">+' + (p.team.length - 4) + '</div>';
+    }
+    teamHtml += '</div>';
+
+    html += '<div class="project-card fade-in" onclick="showProjectDetail(' + p.id + ')">';
+    html += '<div class="progress-header"><h4>' + escapeHTML(p.name) + '</h4><span class="badge-status ' + badge + '">' + escapeHTML(p.status) + '</span></div>';
+    html += '<div style="font-size:.72rem;color:var(--gray-500);margin:4px 0">' + escapeHTML(p.client) + ' &middot; ' + escapeHTML(p.location) + '</div>';
+    html += '<div class="progress-bar-bg"><div class="progress-bar-fill" style="width:' + pct + '%;background:linear-gradient(90deg,' + barColor + ',' + barColor + ')"></div></div>';
+    html += '<div class="progress-meta"><span>' + pct + '% Complete (' + p.tasks.filter(function(t){return t.status==='Done';}).length + '/' + p.tasks.length + ' tasks)</span><span>Target: ' + escapeHTML(target) + '</span></div>';
+    html += teamHtml;
+    html += '</div>';
+  });
+
+  if (projects.length === 0) {
+    html = '<div class="nf-empty" style="margin-top:24px">No projects yet. Click "+ New Project" to get started.</div>';
+  }
+  container.innerHTML = html;
+
+  // Staff Deployment grid
+  if (grid) {
+    var deptCounts = {};
+    EMPLOYEES.forEach(function(e) {
+      if (e.status === 'Inactive') return;
+      var dept = e.dept || 'Other';
+      deptCounts[dept] = (deptCounts[dept] || 0) + 1;
+    });
+    var deptMap = {
+      'Office': {cls:'office', label:'Office Staff', sub:'Active employees'},
+      'Site': {cls:'site', label:'Site Staff', sub:'Active employees'},
+      'Factory': {cls:'factory', label:'Factory Staff', sub:'Incl. PEB company'},
+      'PEB': {cls:'factory', label:'PEB Staff', sub:'Factory division'},
+      'Garden': {cls:'garden', label:'Garden Labour', sub:'Security + Gardener'}
+    };
+    var gridHtml = '';
+    var factory = (deptCounts['Factory'] || 0) + (deptCounts['PEB'] || 0);
+    gridHtml += '<div class="dept-card office"><div class="dept-name">Office Staff</div><div class="dept-amount">' + (deptCounts['Office'] || 0) + '</div><div class="dept-count">Active employees</div></div>';
+    gridHtml += '<div class="dept-card site"><div class="dept-name">Site Staff</div><div class="dept-amount">' + (deptCounts['Site'] || 0) + '</div><div class="dept-count">Active employees</div></div>';
+    gridHtml += '<div class="dept-card factory"><div class="dept-name">Factory Staff</div><div class="dept-amount">' + factory + '</div><div class="dept-count">Incl. PEB company</div></div>';
+    gridHtml += '<div class="dept-card garden"><div class="dept-name">Garden Labour</div><div class="dept-amount">' + (deptCounts['Garden'] || 0) + '</div><div class="dept-count">Security + Gardener</div></div>';
+    grid.innerHTML = gridHtml;
+  }
+}
+
+function openProjectForm(editId) {
+  var isMDorHR = currentUser && (currentUser.role === 'MD' || currentUser.role === 'HR');
+  if (!isMDorHR) { showToast('Access denied'); return; }
+  var proj = editId ? projects.find(function(p){return p.id===editId;}) : null;
+  var container = document.getElementById('projectsList');
+  if (!container) return;
+
+  var statusOpts = PROJECT_STATUSES.map(function(s) {
+    return '<option value="' + s + '"' + (proj && proj.status === s ? ' selected' : '') + '>' + s + '</option>';
+  }).join('');
+
+  var html = '<div class="card" style="padding:16px;margin-top:10px;border-left:4px solid var(--primary)">';
+  html += '<div class="nf-section-title">' + (proj ? 'Edit Project' : 'New Project') + '</div>';
+  html += '<div class="form-group"><label class="form-label">Project Name *</label><input class="form-control" id="projName" value="' + (proj ? escapeHTML(proj.name) : '') + '"></div>';
+  html += '<div class="form-group"><label class="form-label">Client</label><input class="form-control" id="projClient" value="' + (proj ? escapeHTML(proj.client) : '') + '"></div>';
+  html += '<div class="form-group"><label class="form-label">Location</label><input class="form-control" id="projLocation" value="' + (proj ? escapeHTML(proj.location) : '') + '"></div>';
+  html += '<div class="form-group"><label class="form-label">Budget (Rs.)</label><input class="form-control" type="number" id="projBudget" value="' + (proj ? proj.budget : '') + '"></div>';
+  html += '<div style="display:flex;gap:8px">';
+  html += '<div class="form-group" style="flex:1"><label class="form-label">Start Date</label><input class="form-control" type="date" id="projStart" value="' + (proj ? proj.startDate : '') + '"></div>';
+  html += '<div class="form-group" style="flex:1"><label class="form-label">Target Date</label><input class="form-control" type="date" id="projTarget" value="' + (proj ? proj.targetDate : '') + '"></div>';
+  html += '</div>';
+  html += '<div class="form-group"><label class="form-label">Status</label><select class="form-control" id="projStatus">' + statusOpts + '</select></div>';
+  html += '<div style="display:flex;gap:8px;margin-top:10px">';
+  html += '<button class="nf-btn nf-btn-primary" onclick="saveProject(' + (editId || 0) + ')">Save Project</button>';
+  html += '<button class="nf-btn nf-btn-secondary" onclick="renderProgressScreen()">Cancel</button>';
+  html += '</div></div>';
+
+  // Show form at top, then existing cards
+  var existingCards = container.innerHTML;
+  container.innerHTML = html;
+}
+
+function saveProject(editId) {
+  var name = document.getElementById('projName').value.trim();
+  if (!name) { showToast('Project name is required'); return; }
+  var data = {
+    name: name,
+    client: document.getElementById('projClient').value.trim(),
+    location: document.getElementById('projLocation').value.trim(),
+    budget: parseFloat(document.getElementById('projBudget').value) || 0,
+    startDate: document.getElementById('projStart').value,
+    targetDate: document.getElementById('projTarget').value,
+    status: document.getElementById('projStatus').value
+  };
+
+  if (editId) {
+    var proj = projects.find(function(p){return p.id===editId;});
+    if (proj) {
+      Object.assign(proj, data);
+      showToast('Project updated');
+    }
+  } else {
+    var newProj = Object.assign({id: projectNextId, createdBy: currentUser.code, tasks: [], team: []}, data);
+    projects.push(newProj);
+    projectTaskNextIds[projectNextId] = 1;
+    projectNextId++;
+    showToast('Project created');
+  }
+  apiCall('POST', '/projects', data).catch(function(){});
+  saveAllData();
+  renderProgressScreen();
+}
+
+function deleteProject(id) {
+  if (!currentUser || currentUser.role !== 'MD') { showToast('Only MD can delete projects'); return; }
+  if (!confirm('Delete this project permanently?')) return;
+  projects = projects.filter(function(p){return p.id !== id;});
+  delete projectTaskNextIds[id];
+  saveAllData();
+  showToast('Project deleted');
+  hideOverlay('project-detail');
+  renderProgressScreen();
+}
+
+function showProjectDetail(id) {
+  var proj = projects.find(function(p){return p.id===id;});
+  if (!proj) return;
+  document.getElementById('projectDetailTitle').textContent = proj.name;
+  currentProjectTab = 'overview';
+  renderProjectDetailContent(proj);
+  showOverlay('project-detail');
+}
+
+function renderProjectDetailContent(proj) {
+  var c = document.getElementById('projectDetailContent');
+  if (!c) return;
+  var isMDorHR = currentUser && (currentUser.role === 'MD' || currentUser.role === 'HR');
+  var isMD = currentUser && currentUser.role === 'MD';
+  var pct = getProjectProgress(proj);
+
+  // Tabs
+  var html = '<div class="proj-detail-tabs">';
+  html += '<button class="proj-detail-tab' + (currentProjectTab==='overview'?' active':'') + '" onclick="currentProjectTab=\'overview\';renderProjectDetailContent(projects.find(function(p){return p.id===' + proj.id + ';}))">Overview</button>';
+  html += '<button class="proj-detail-tab' + (currentProjectTab==='tasks'?' active':'') + '" onclick="currentProjectTab=\'tasks\';renderProjectDetailContent(projects.find(function(p){return p.id===' + proj.id + ';}))">Tasks (' + proj.tasks.length + ')</button>';
+  html += '<button class="proj-detail-tab' + (currentProjectTab==='team'?' active':'') + '" onclick="currentProjectTab=\'team\';renderProjectDetailContent(projects.find(function(p){return p.id===' + proj.id + ';}))">Team (' + proj.team.length + ')</button>';
+  html += '</div>';
+
+  if (currentProjectTab === 'overview') {
+    html += renderProjectOverview(proj, pct, isMDorHR, isMD);
+  } else if (currentProjectTab === 'tasks') {
+    html += renderProjectTasks(proj, isMDorHR);
+  } else if (currentProjectTab === 'team') {
+    html += renderProjectTeam(proj, isMDorHR);
+  }
+
+  c.innerHTML = html;
+}
+
+function renderProjectOverview(proj, pct, isMDorHR, isMD) {
+  var statusColors = {'Not Started':'var(--gray-400)','In Progress':'var(--primary)','On Track':'var(--success)','Delayed':'var(--warning)','Completed':'var(--success)'};
+  var html = '<div style="padding:0 16px">';
+
+  // Info card
+  html += '<div class="card" style="padding:14px;margin-top:10px">';
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><span style="font-weight:700;font-size:.9rem">' + escapeHTML(proj.name) + '</span>';
+  html += '<span class="badge-status" style="background:' + (statusColors[proj.status]||'var(--gray-400)') + ';color:#fff;padding:3px 10px;border-radius:12px;font-size:.68rem">' + escapeHTML(proj.status) + '</span></div>';
+  html += '<div style="font-size:.78rem;color:var(--gray-500);margin-bottom:4px"><strong>Client:</strong> ' + escapeHTML(proj.client || 'N/A') + '</div>';
+  html += '<div style="font-size:.78rem;color:var(--gray-500);margin-bottom:4px"><strong>Location:</strong> ' + escapeHTML(proj.location || 'N/A') + '</div>';
+  html += '<div style="font-size:.78rem;color:var(--gray-500);margin-bottom:4px"><strong>Budget:</strong> Rs.' + (proj.budget ? proj.budget.toLocaleString('en-IN') : '0') + '</div>';
+  html += '<div style="display:flex;gap:16px;font-size:.72rem;color:var(--gray-400);margin-top:6px">';
+  html += '<span>Start: ' + (proj.startDate || 'TBD') + '</span>';
+  html += '<span>Target: ' + (proj.targetDate || 'TBD') + '</span>';
+  html += '</div></div>';
+
+  // Progress
+  html += '<div class="card" style="padding:14px;margin-top:10px">';
+  html += '<div style="font-weight:600;font-size:.82rem;margin-bottom:8px">Progress</div>';
+  html += '<div class="progress-bar-bg"><div class="progress-bar-fill" style="width:' + pct + '%;background:linear-gradient(90deg,var(--primary),var(--primary-light))"></div></div>';
+  html += '<div style="display:flex;justify-content:space-between;font-size:.72rem;color:var(--gray-500);margin-top:4px">';
+  html += '<span>' + pct + '% Complete</span>';
+  html += '<span>' + proj.tasks.filter(function(t){return t.status==='Done';}).length + ' of ' + proj.tasks.length + ' tasks done</span></div>';
+  html += '</div>';
+
+  // Task summary
+  var pending = proj.tasks.filter(function(t){return t.status==='Pending';}).length;
+  var inProg = proj.tasks.filter(function(t){return t.status==='In Progress';}).length;
+  var done = proj.tasks.filter(function(t){return t.status==='Done';}).length;
+  html += '<div class="card" style="padding:14px;margin-top:10px">';
+  html += '<div style="font-weight:600;font-size:.82rem;margin-bottom:8px">Task Summary</div>';
+  html += '<div style="display:flex;gap:8px">';
+  html += '<div style="flex:1;text-align:center;padding:8px;border-radius:8px;background:var(--bg)"><div style="font-size:1.1rem;font-weight:700;color:var(--warning)">' + pending + '</div><div style="font-size:.65rem;color:var(--gray-400)">Pending</div></div>';
+  html += '<div style="flex:1;text-align:center;padding:8px;border-radius:8px;background:var(--bg)"><div style="font-size:1.1rem;font-weight:700;color:var(--primary)">' + inProg + '</div><div style="font-size:.65rem;color:var(--gray-400)">In Progress</div></div>';
+  html += '<div style="flex:1;text-align:center;padding:8px;border-radius:8px;background:var(--bg)"><div style="font-size:1.1rem;font-weight:700;color:var(--success)">' + done + '</div><div style="font-size:.65rem;color:var(--gray-400)">Done</div></div>';
+  html += '</div></div>';
+
+  // Actions
+  if (isMDorHR) {
+    html += '<div style="display:flex;gap:8px;margin-top:12px">';
+    html += '<button class="nf-btn nf-btn-secondary" style="flex:1" onclick="editProject(' + proj.id + ')">Edit Project</button>';
+    if (isMD) {
+      html += '<button class="nf-btn" style="flex:1;background:var(--danger);color:#fff;border:none;border-radius:8px;padding:8px;font-size:.78rem;cursor:pointer" onclick="deleteProject(' + proj.id + ')">Delete</button>';
+    }
+    html += '</div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function renderProjectTasks(proj, isMDorHR) {
+  var html = '<div style="padding:0 16px">';
+
+  if (isMDorHR) {
+    html += '<div style="margin-top:10px;margin-bottom:8px"><button class="nf-btn nf-btn-primary nf-btn-sm" onclick="openTaskForm(' + proj.id + ')">+ Add Task</button></div>';
+  }
+
+  // Task form placeholder
+  html += '<div id="projectTaskFormArea"></div>';
+
+  if (proj.tasks.length === 0) {
+    html += '<div class="nf-empty" style="margin-top:16px">No tasks yet</div>';
+  } else {
+    var priorityColors = {'Low':'var(--gray-400)','Medium':'var(--primary)','High':'var(--warning)','Urgent':'var(--danger)'};
+    proj.tasks.forEach(function(task) {
+      var isDone = task.status === 'Done';
+      var isInProg = task.status === 'In Progress';
+      var checkClass = isDone ? 'done' : '';
+      var checkIcon = isDone ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>' : '';
+      var emp = EMPLOYEES.find(function(e){return e.code === task.assignedTo;});
+
+      html += '<div class="project-task-item">';
+      html += '<div class="task-checkbox ' + checkClass + '" onclick="event.stopPropagation();toggleTaskStatus(' + proj.id + ',' + task.id + ')">' + checkIcon + '</div>';
+      html += '<div class="task-info">';
+      html += '<h4 class="' + (isDone ? 'task-done' : '') + '">' + escapeHTML(task.title) + '</h4>';
+      html += '<p>';
+      if (emp) html += escapeHTML(emp.name);
+      if (task.dueDate) html += (emp ? ' &middot; ' : '') + 'Due: ' + task.dueDate;
+      html += '</p></div>';
+      html += '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:2px">';
+      html += '<span style="font-size:.6rem;padding:2px 6px;border-radius:8px;background:' + (priorityColors[task.priority]||'var(--gray-300)') + ';color:#fff">' + escapeHTML(task.priority) + '</span>';
+      var statusColor = isDone ? 'var(--success)' : isInProg ? 'var(--primary)' : 'var(--warning)';
+      html += '<span style="font-size:.6rem;color:' + statusColor + ';font-weight:600">' + escapeHTML(task.status) + '</span>';
+      html += '</div></div>';
+    });
+  }
+  html += '</div>';
+  return html;
+}
+
+function renderProjectTeam(proj, isMDorHR) {
+  var html = '<div style="padding:0 16px">';
+
+  if (isMDorHR) {
+    html += '<div style="margin-top:10px;margin-bottom:8px"><button class="nf-btn nf-btn-primary nf-btn-sm" onclick="openAddMemberUI(' + proj.id + ')">+ Add Member</button></div>';
+  }
+
+  html += '<div id="projectMemberFormArea"></div>';
+
+  var avatarColors = ['#E85D04','#3B82F6','#10B981','#8B5CF6','#EC4899','#F59E0B'];
+  if (proj.team.length === 0) {
+    html += '<div class="nf-empty" style="margin-top:16px">No team members assigned</div>';
+  } else {
+    proj.team.forEach(function(code, i) {
+      var emp = EMPLOYEES.find(function(e){return e.code === code;});
+      if (!emp) return;
+      html += '<div class="project-task-item">';
+      html += '<div class="team-avatar" style="background:' + avatarColors[i % avatarColors.length] + ';margin-left:0">' + escapeHTML(emp.name.charAt(0)) + '</div>';
+      html += '<div class="task-info"><h4>' + escapeHTML(emp.name) + '</h4><p>' + escapeHTML(emp.code) + ' &middot; ' + escapeHTML(emp.dept || '') + ' &middot; ' + escapeHTML(emp.designation || '') + '</p></div>';
+      if (isMDorHR) {
+        html += '<button style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:.75rem;font-weight:600" onclick="event.stopPropagation();removeProjectMember(' + proj.id + ',\'' + code + '\')">Remove</button>';
+      }
+      html += '</div>';
+    });
+  }
+  html += '</div>';
+  return html;
+}
+
+function openTaskForm(projectId) {
+  var area = document.getElementById('projectTaskFormArea');
+  if (!area) return;
+  var empOpts = '<option value="">Unassigned</option>';
+  EMPLOYEES.forEach(function(e) {
+    if (e.status === 'Inactive') return;
+    empOpts += '<option value="' + e.code + '">' + escapeHTML(e.name) + ' (' + e.code + ')</option>';
+  });
+  var prioOpts = TASK_PRIORITIES.map(function(p) {
+    return '<option value="' + p + '"' + (p==='Medium'?' selected':'') + '>' + p + '</option>';
+  }).join('');
+
+  area.innerHTML = '<div class="card" style="padding:12px;border-left:4px solid var(--primary);margin-bottom:8px">' +
+    '<div class="nf-section-title" style="margin-bottom:8px">Add Task</div>' +
+    '<div class="form-group"><label class="form-label">Title *</label><input class="form-control" id="projTaskTitle"></div>' +
+    '<div class="form-group"><label class="form-label">Description</label><input class="form-control" id="projTaskDesc"></div>' +
+    '<div style="display:flex;gap:8px">' +
+    '<div class="form-group" style="flex:1"><label class="form-label">Priority</label><select class="form-control" id="projTaskPriority">' + prioOpts + '</select></div>' +
+    '<div class="form-group" style="flex:1"><label class="form-label">Due Date</label><input class="form-control" type="date" id="projTaskDue"></div>' +
+    '</div>' +
+    '<div class="form-group"><label class="form-label">Assign To</label><select class="form-control" id="projTaskAssign">' + empOpts + '</select></div>' +
+    '<div style="display:flex;gap:8px;margin-top:8px">' +
+    '<button class="nf-btn nf-btn-primary" onclick="saveProjectTask(' + projectId + ')">Add</button>' +
+    '<button class="nf-btn nf-btn-secondary" onclick="document.getElementById(\'projectTaskFormArea\').innerHTML=\'\'">Cancel</button>' +
+    '</div></div>';
+}
+
+function saveProjectTask(projectId) {
+  var title = document.getElementById('projTaskTitle').value.trim();
+  if (!title) { showToast('Task title is required'); return; }
+  var proj = projects.find(function(p){return p.id===projectId;});
+  if (!proj) return;
+
+  var taskId = projectTaskNextIds[projectId] || 1;
+  var task = {
+    id: taskId,
+    title: title,
+    description: document.getElementById('projTaskDesc').value.trim(),
+    priority: document.getElementById('projTaskPriority').value,
+    assignedTo: document.getElementById('projTaskAssign').value,
+    status: 'Pending',
+    dueDate: document.getElementById('projTaskDue').value,
+    createdDate: new Date().toISOString().split('T')[0]
+  };
+  proj.tasks.push(task);
+  projectTaskNextIds[projectId] = taskId + 1;
+  saveAllData();
+  showToast('Task added');
+  renderProjectDetailContent(proj);
+}
+
+function toggleTaskStatus(projectId, taskId) {
+  var proj = projects.find(function(p){return p.id===projectId;});
+  if (!proj) return;
+  var task = proj.tasks.find(function(t){return t.id===taskId;});
+  if (!task) return;
+  if (task.status === 'Pending') task.status = 'In Progress';
+  else if (task.status === 'In Progress') task.status = 'Done';
+  else task.status = 'Pending';
+  saveAllData();
+  renderProjectDetailContent(proj);
+}
+
+function openAddMemberUI(projectId) {
+  var proj = projects.find(function(p){return p.id===projectId;});
+  if (!proj) return;
+  var area = document.getElementById('projectMemberFormArea');
+  if (!area) return;
+
+  var empOpts = '<option value="">Select employee...</option>';
+  EMPLOYEES.forEach(function(e) {
+    if (e.status === 'Inactive') return;
+    if (proj.team.indexOf(e.code) !== -1) return;
+    empOpts += '<option value="' + e.code + '">' + escapeHTML(e.name) + ' (' + e.code + ' - ' + escapeHTML(e.dept||'') + ')</option>';
+  });
+
+  area.innerHTML = '<div class="card" style="padding:12px;border-left:4px solid var(--primary);margin-bottom:8px">' +
+    '<div style="display:flex;gap:8px;align-items:flex-end">' +
+    '<div class="form-group" style="flex:1;margin-bottom:0"><label class="form-label">Employee</label><select class="form-control" id="projAddMember">' + empOpts + '</select></div>' +
+    '<button class="nf-btn nf-btn-primary" onclick="addProjectMember(' + projectId + ')">Add</button>' +
+    '<button class="nf-btn nf-btn-secondary" onclick="document.getElementById(\'projectMemberFormArea\').innerHTML=\'\'">Cancel</button>' +
+    '</div></div>';
+}
+
+function addProjectMember(projectId) {
+  var code = document.getElementById('projAddMember').value;
+  if (!code) { showToast('Select an employee'); return; }
+  var proj = projects.find(function(p){return p.id===projectId;});
+  if (!proj) return;
+  if (proj.team.indexOf(code) !== -1) { showToast('Already in team'); return; }
+  proj.team.push(code);
+  saveAllData();
+  showToast('Member added');
+  renderProjectDetailContent(proj);
+}
+
+function removeProjectMember(projectId, empCode) {
+  var proj = projects.find(function(p){return p.id===projectId;});
+  if (!proj) return;
+  if (!confirm('Remove this member from the project?')) return;
+  proj.team = proj.team.filter(function(c){return c !== empCode;});
+  saveAllData();
+  showToast('Member removed');
+  renderProjectDetailContent(proj);
+}
+
+function editProject(id) {
+  hideOverlay('project-detail');
+  setTimeout(function() { openProjectForm(id); }, 200);
 }
 
 // =====================================================
