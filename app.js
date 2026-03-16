@@ -4676,7 +4676,7 @@ async function _handleGoogleRedirect() {
 
     // Try backend first
     try {
-      const backendRes = await fetch(API_BASE + '/auth/google-token', {
+      const backendRes = await fetch(API_BASE + '/auth/google', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: userInfo.email, name: userInfo.name, picture: userInfo.picture })
