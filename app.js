@@ -3667,7 +3667,7 @@ async function initAnalyticsCharts(m) {
     }
     if (id === 'hr-shifts') renderShiftsOverlay();
     if (id === 'hr-expenses') renderExpenseOverlay();
-    if (id === 'self-service') { currentSsTab = 'details'; renderSelfServiceOverlay(); }
+    if (id === 'self-service') { renderSelfServiceOverlay(); }
     if (id === 'attendance-log') renderAttendanceLogOverlay();
     if (id === 'hr-tax') { currentTaxTab = 'declaration'; renderTaxOverlay(); }
     if (id === 'hr-compliance') { currentComplianceTab = 'filing'; renderComplianceOverlay(); }
@@ -6049,103 +6049,175 @@ function openExpenseApplyForm() {
 // =====================================================
 // F3: SELF SERVICE FUNCTIONS
 // =====================================================
-let currentSsTab = 'details';
-function switchSsTab(tab) {
-  currentSsTab = tab;
-  document.querySelectorAll('#ssTabs .ss-tab').forEach(t => t.classList.remove('active'));
-  document.querySelector(`#ssTabs .ss-tab:nth-child(${tab==='details'?1:tab==='documents'?2:3})`).classList.add('active');
-  renderSelfServiceOverlay();
+const MANDATORY_DOCS = [
+  { key: 'aadhaar', label: 'Aadhaar Card' },
+  { key: 'pan', label: 'PAN Card' },
+  { key: 'resume', label: 'Resume' },
+  { key: 'education', label: 'Educational Certificate' },
+  { key: 'experience', label: 'Experience Certificate' }
+];
+function migrateSelfData(data) {
+  // Migrate old uploadedDocs[] array to new documents{} map
+  if (data && data.uploadedDocs && !data.documents) {
+    data.documents = { aadhaar: null, pan: null, resume: null, education: null, experience: null };
+    var keyMap = { 'Aadhaar Card': 'aadhaar', 'PAN Card': 'pan', 'Resume': 'resume', 'Education Certificate': 'education', 'Educational Certificate': 'education', 'Experience Letter': 'experience', 'Experience Certificate': 'experience' };
+    data.uploadedDocs.forEach(function(d) {
+      var k = keyMap[d.type || d.name];
+      if (k && !data.documents[k]) data.documents[k] = { name: d.name, date: d.date };
+    });
+    delete data.uploadedDocs;
+  }
+  if (data && !data.documents) {
+    data.documents = { aadhaar: null, pan: null, resume: null, education: null, experience: null };
+  }
+  return data;
+}
+function ensureSelfData(code) {
+  if (!employeeSelfData[code]) employeeSelfData[code] = {};
+  var d = employeeSelfData[code];
+  migrateSelfData(d);
+  if (!d.documents) d.documents = { aadhaar: null, pan: null, resume: null, education: null, experience: null };
+  return d;
 }
 function updatePersonalDetails() {
   var phoneEl = document.getElementById('ssPhone');
-  var addressEl = document.getElementById('ssAddress');
-  var emergencyEl = document.getElementById('ssEmergency');
-  if (!phoneEl || !addressEl || !emergencyEl) { showToast('Error: form not found'); return; }
-  var phone = phoneEl.value.trim();
-  var address = addressEl.value.trim();
-  var emergency = emergencyEl.value.trim();
-  if (!employeeSelfData[currentUser.code]) employeeSelfData[currentUser.code] = {};
-  Object.assign(employeeSelfData[currentUser.code], { phone: phone, address: address, emergencyContact: emergency });
+  var presentAddrEl = document.getElementById('ssPresentAddress');
+  var permanentAddrEl = document.getElementById('ssPermanentAddress');
+  var sameAddrEl = document.getElementById('ssSameAddress');
+  var fatherNameEl = document.getElementById('ssFatherName');
+  var fatherMobileEl = document.getElementById('ssFatherMobile');
+  var motherNameEl = document.getElementById('ssMotherName');
+  var motherMobileEl = document.getElementById('ssMotherMobile');
+  var spouseNameEl = document.getElementById('ssSpouseName');
+  var spouseMobileEl = document.getElementById('ssSpouseMobile');
+  var bloodGroupEl = document.getElementById('ssBloodGroup');
+  if (!phoneEl || !presentAddrEl) { showToast('Error: form not found'); return; }
+  var selfData = ensureSelfData(currentUser.code);
+  Object.assign(selfData, {
+    phone: phoneEl.value.trim(),
+    presentAddress: presentAddrEl.value.trim(),
+    permanentAddress: permanentAddrEl ? permanentAddrEl.value.trim() : '',
+    sameAddress: sameAddrEl ? sameAddrEl.checked : false,
+    fatherName: fatherNameEl ? fatherNameEl.value.trim() : '',
+    fatherMobile: fatherMobileEl ? fatherMobileEl.value.trim() : '',
+    motherName: motherNameEl ? motherNameEl.value.trim() : '',
+    motherMobile: motherMobileEl ? motherMobileEl.value.trim() : '',
+    spouseName: spouseNameEl ? spouseNameEl.value.trim() : '',
+    spouseMobile: spouseMobileEl ? spouseMobileEl.value.trim() : '',
+    bloodGroup: bloodGroupEl ? bloodGroupEl.value : ''
+  });
   // Also update employee record if phone changed
   var emp = EMPLOYEES.find(function(e) { return e.code === currentUser.code; });
-  if (emp && phone) emp.phone = phone;
-  apiCall('PUT', '/employees/' + currentUser.code, { phone: phone, address: address, emergencyContact: emergency }).catch(function(){});
+  if (emp && selfData.phone) emp.phone = selfData.phone;
+  apiCall('PUT', '/employees/' + currentUser.code, {
+    phone: selfData.phone, presentAddress: selfData.presentAddress, permanentAddress: selfData.permanentAddress,
+    fatherName: selfData.fatherName, fatherMobile: selfData.fatherMobile,
+    motherName: selfData.motherName, motherMobile: selfData.motherMobile,
+    spouseName: selfData.spouseName, spouseMobile: selfData.spouseMobile,
+    bloodGroup: selfData.bloodGroup
+  }).catch(function(){});
   saveAllData();
   showToast('Personal details saved successfully');
-  // Brief visual feedback on button
-  var btn = document.querySelector('#selfServiceContent .nf-btn-primary');
+  var btn = document.querySelector('#selfServiceContent .ss-save-btn');
   if (btn) { btn.textContent = 'Saved ✓'; btn.style.background = 'var(--success)'; setTimeout(function() { btn.textContent = 'Save Changes'; btn.style.background = ''; }, 1500); }
 }
-function renderSelfServiceOverlay() {
-  const c = document.getElementById('selfServiceContent');
-  if (!c || !currentUser) return;
-  const selfData = employeeSelfData[currentUser.code] || {};
-  let html = '';
-  if (currentSsTab === 'details') {
-    html = '<div class="card" style="margin-bottom:12px"><div class="nf-section-title">Personal Information</div>';
-    html += `<div style="display:flex;gap:10px;align-items:center;margin-bottom:12px"><div class="avatar-sm" style="width:48px;height:48px;font-size:1rem">${escapeHTML(currentUser.name.charAt(0))}</div><div><div style="font-weight:600">${escapeHTML(currentUser.name)}</div><div style="font-size:.75rem;color:var(--gray-500)">${escapeHTML(currentUser.code)} &middot; ${escapeHTML(currentUser.designation)}</div></div></div>`;
-    html += `<div class="ss-form-group"><label>Phone</label><input type="tel" id="ssPhone" value="${escapeHTML(selfData.phone||currentUser.phone||'')}" placeholder="Mobile number"></div>`;
-    html += `<div class="ss-form-group"><label>Address</label><textarea id="ssAddress" rows="2" placeholder="Current address">${escapeHTML(selfData.address||'')}</textarea></div>`;
-    html += `<div class="ss-form-group"><label>Emergency Contact</label><input type="text" id="ssEmergency" value="${escapeHTML(selfData.emergencyContact||'')}" placeholder="Name - Phone"></div>`;
-    html += `<button class="nf-btn nf-btn-primary" onclick="updatePersonalDetails()">Save Changes</button></div>`;
-  } else if (currentSsTab === 'documents') {
-    const docs = selfData.uploadedDocs || [];
-    html = '<div class="card" style="margin-bottom:12px"><div class="nf-section-title">Uploaded Documents</div>';
-    if (docs.length === 0) html += '<div class="nf-empty">No documents uploaded yet</div>';
-    docs.forEach(d => {
-      html += `<div class="ss-doc-item"><div><div style="font-weight:600;font-size:.82rem">${escapeHTML(d.name)}</div><div style="font-size:.7rem;color:var(--gray-500)">${escapeHTML(d.type)} &middot; ${d.date}</div></div><span class="badge-status badge-approved">Uploaded</span></div>`;
-    });
-    html += '<div id="ssUploadArea" style="margin-top:12px"><button class="nf-btn nf-btn-outline" onclick="showUploadForm()">+ Upload Document</button></div></div>';
-  } else {
-    html = '<div class="card" style="margin-bottom:12px"><div class="nf-section-title">Download Center</div>';
-    html += `<div class="ss-doc-item"><div><div style="font-weight:600;font-size:.82rem">Latest Salary Slip</div><div style="font-size:.7rem;color:var(--gray-500)">Current month payslip PDF</div></div><button class="nf-btn nf-btn-primary nf-btn-sm" onclick="switchTab('salary',document.querySelector('[data-tab=salary]'));hideOverlay('self-service')">View</button></div>`;
-    html += `<div class="ss-doc-item"><div><div style="font-weight:600;font-size:.82rem">Employee ID Card</div><div style="font-size:.7rem;color:var(--gray-500)">Download ID card PDF</div></div><button class="nf-btn nf-btn-primary nf-btn-sm" onclick="downloadIDCard()">Download</button></div>`;
-    html += `<div class="ss-doc-item"><div><div style="font-weight:600;font-size:.82rem">Form 16</div><div style="font-size:.7rem;color:var(--gray-500)">Tax certificate PDF</div></div><button class="nf-btn nf-btn-primary nf-btn-sm" onclick="showOverlay('hr-tax');hideOverlay('self-service')">View</button></div>`;
-    html += '</div>';
+function handleSameAddress() {
+  var cb = document.getElementById('ssSameAddress');
+  var permEl = document.getElementById('ssPermanentAddress');
+  if (cb && permEl) {
+    if (cb.checked) {
+      var presEl = document.getElementById('ssPresentAddress');
+      permEl.value = presEl ? presEl.value : '';
+      permEl.disabled = true;
+    } else {
+      permEl.disabled = false;
+    }
   }
+}
+function renderSelfServiceOverlay() {
+  var c = document.getElementById('selfServiceContent');
+  if (!c || !currentUser) return;
+  var selfData = ensureSelfData(currentUser.code);
+  var html = '';
+  // Section A: Personal Information
+  html += '<div class="card" style="margin-bottom:12px"><div class="nf-section-title">Personal Information</div>';
+  html += '<div style="display:flex;gap:10px;align-items:center;margin-bottom:14px"><div class="avatar-sm" style="width:48px;height:48px;font-size:1rem">' + escapeHTML(currentUser.name.charAt(0)) + '</div><div><div style="font-weight:600">' + escapeHTML(currentUser.name) + '</div><div style="font-size:.75rem;color:var(--gray-500)">' + escapeHTML(currentUser.code) + ' &middot; ' + escapeHTML(currentUser.designation) + '</div></div></div>';
+  html += '<div class="ss-form-group"><label>Phone</label><input type="tel" id="ssPhone" value="' + escapeHTML(selfData.phone || currentUser.phone || '') + '" placeholder="Mobile number"></div>';
+  html += '<div class="ss-form-group"><label>Present Address</label><textarea id="ssPresentAddress" rows="2" placeholder="Current residential address">' + escapeHTML(selfData.presentAddress || selfData.address || '') + '</textarea></div>';
+  html += '<div class="ss-form-group"><label style="display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;font-size:.78rem"><input type="checkbox" id="ssSameAddress" onchange="handleSameAddress()"' + (selfData.sameAddress ? ' checked' : '') + '> Same as present address</label></div>';
+  html += '<div class="ss-form-group"><label>Permanent Address</label><textarea id="ssPermanentAddress" rows="2" placeholder="Permanent address"' + (selfData.sameAddress ? ' disabled' : '') + '>' + escapeHTML(selfData.permanentAddress || '') + '</textarea></div>';
+  // Emergency Contacts
+  html += '<div class="nf-section-title" style="margin-top:8px;font-size:.78rem">Emergency Contacts</div>';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+  html += '<div class="ss-form-group"><label>Father Name</label><input type="text" id="ssFatherName" value="' + escapeHTML(selfData.fatherName || '') + '" placeholder="Father name"></div>';
+  html += '<div class="ss-form-group"><label>Father Mobile</label><input type="tel" id="ssFatherMobile" value="' + escapeHTML(selfData.fatherMobile || '') + '" placeholder="Mobile"></div>';
+  html += '<div class="ss-form-group"><label>Mother Name</label><input type="text" id="ssMotherName" value="' + escapeHTML(selfData.motherName || '') + '" placeholder="Mother name"></div>';
+  html += '<div class="ss-form-group"><label>Mother Mobile</label><input type="tel" id="ssMotherMobile" value="' + escapeHTML(selfData.motherMobile || '') + '" placeholder="Mobile"></div>';
+  html += '<div class="ss-form-group"><label>Spouse Name</label><input type="text" id="ssSpouseName" value="' + escapeHTML(selfData.spouseName || '') + '" placeholder="Spouse name (optional)"></div>';
+  html += '<div class="ss-form-group"><label>Spouse Mobile</label><input type="tel" id="ssSpouseMobile" value="' + escapeHTML(selfData.spouseMobile || '') + '" placeholder="Mobile (optional)"></div>';
+  html += '</div>';
+  // Blood Group
+  html += '<div class="ss-form-group"><label>Blood Group</label><select class="nf-select" id="ssBloodGroup">';
+  var bgs = ['', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+  bgs.forEach(function(bg) { html += '<option value="' + bg + '"' + (selfData.bloodGroup === bg ? ' selected' : '') + '>' + (bg || 'Select blood group') + '</option>'; });
+  html += '</select></div>';
+  html += '<button class="nf-btn nf-btn-primary ss-save-btn" onclick="updatePersonalDetails()">Save Changes</button></div>';
+  // Section B: Mandatory Documents
+  var docs = selfData.documents || {};
+  var uploadedCount = MANDATORY_DOCS.filter(function(d) { return docs[d.key]; }).length;
+  html += '<div class="card" style="margin-bottom:12px"><div class="nf-section-title">Mandatory Documents</div>';
+  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span style="font-size:.78rem;color:var(--gray-500)">' + uploadedCount + '/' + MANDATORY_DOCS.length + ' documents uploaded</span>';
+  if (uploadedCount === MANDATORY_DOCS.length) html += '<span class="ss-doc-uploaded">All Complete</span>';
+  else html += '<span class="ss-doc-required">' + (MANDATORY_DOCS.length - uploadedCount) + ' remaining</span>';
+  html += '</div>';
+  html += '<div class="ss-completion-bar"><div class="ss-completion-fill" style="width:' + (uploadedCount / MANDATORY_DOCS.length * 100) + '%"></div></div>';
+  MANDATORY_DOCS.forEach(function(doc) {
+    var uploaded = docs[doc.key];
+    html += '<div class="ss-doc-row">';
+    html += '<div><div style="font-weight:600;font-size:.82rem">' + escapeHTML(doc.label) + '</div>';
+    if (uploaded) {
+      html += '<div style="font-size:.7rem;color:var(--gray-500)">' + escapeHTML(uploaded.name) + ' &middot; ' + uploaded.date + '</div>';
+    }
+    html += '</div><div style="display:flex;align-items:center;gap:8px">';
+    if (uploaded) {
+      html += '<span class="ss-doc-uploaded">Uploaded ✓</span>';
+      html += '<button class="nf-btn nf-btn-outline nf-btn-sm" onclick="uploadMandatoryDoc(\'' + doc.key + '\',\'' + escapeHTML(doc.label) + '\')">Re-upload</button>';
+    } else {
+      html += '<span class="ss-doc-required">Required</span>';
+      html += '<button class="nf-btn nf-btn-primary nf-btn-sm" onclick="uploadMandatoryDoc(\'' + doc.key + '\',\'' + escapeHTML(doc.label) + '\')">Upload</button>';
+    }
+    html += '</div></div>';
+  });
+  html += '</div>';
   c.innerHTML = html;
 }
-function showUploadForm() {
-  var area = document.getElementById('ssUploadArea');
-  if (!area) return;
-  area.innerHTML = '<div class="card" style="padding:12px;margin-bottom:8px">' +
-    '<div class="ss-form-group"><label>Document Type *</label><select class="nf-select" id="ssDocType">' +
-    '<option value="">Select type</option><option>Aadhaar Card</option><option>PAN Card</option><option>Passport</option><option>Driving License</option><option>Voter ID</option><option>Bank Passbook</option><option>Photo</option><option>Resume</option><option>Education Certificate</option><option>Experience Letter</option><option>Other</option>' +
-    '</select></div>' +
-    '<div class="ss-form-group"><label>Upload File</label>' +
-    '<div class="doc-upload-zone" onclick="document.getElementById(\'ssFileInput\').click()" style="padding:20px;text-align:center;border:2px dashed var(--gray-300);border-radius:var(--radius-xs);cursor:pointer">' +
-    '<div style="font-size:.8rem;color:var(--gray-400)" id="ssFileName">Tap to select file (PDF, JPG, PNG)</div>' +
-    '<input type="file" id="ssFileInput" accept=".pdf,.jpg,.jpeg,.png" style="display:none" onchange="handleSsFileSelect(this)"></div></div>' +
-    '<div style="display:flex;gap:8px"><button class="nf-btn nf-btn-primary" onclick="uploadSelfDocument()">Upload</button>' +
-    '<button class="nf-btn nf-btn-outline" onclick="renderSelfServiceOverlay()">Cancel</button></div></div>';
-}
-function handleSsFileSelect(input) {
-  var label = document.getElementById('ssFileName');
-  if (input.files && input.files[0] && label) {
-    label.textContent = input.files[0].name;
-    label.style.color = 'var(--success)';
-  }
-}
-function uploadSelfDocument() {
-  var docTypeEl = document.getElementById('ssDocType');
-  var fileInput = document.getElementById('ssFileInput');
-  if (!docTypeEl || !docTypeEl.value) { showToast('Please select document type'); return; }
-  var docType = docTypeEl.value;
-  var fileName = (fileInput && fileInput.files && fileInput.files[0]) ? fileInput.files[0].name : docType;
-  if (!employeeSelfData[currentUser.code]) employeeSelfData[currentUser.code] = {};
-  if (!employeeSelfData[currentUser.code].uploadedDocs) employeeSelfData[currentUser.code].uploadedDocs = [];
-  employeeSelfData[currentUser.code].uploadedDocs.push({ name: fileName, type: docType, date: new Date().toISOString().split('T')[0] });
-  // Try backend upload
-  if (fileInput && fileInput.files && fileInput.files[0]) {
+function uploadMandatoryDoc(docKey, docLabel) {
+  // Create a hidden file input and trigger it
+  var existingInput = document.getElementById('ssMandatoryFileInput');
+  if (existingInput) existingInput.remove();
+  var input = document.createElement('input');
+  input.type = 'file';
+  input.id = 'ssMandatoryFileInput';
+  input.accept = '.pdf,.jpg,.jpeg,.png';
+  input.style.display = 'none';
+  document.body.appendChild(input);
+  input.onchange = function() {
+    if (!input.files || !input.files[0]) return;
+    var file = input.files[0];
+    var selfData = ensureSelfData(currentUser.code);
+    selfData.documents[docKey] = { name: file.name, date: new Date().toISOString().split('T')[0] };
+    // Try backend upload
     var formData = new FormData();
-    formData.append('file', fileInput.files[0]);
-    formData.append('docType', docType);
+    formData.append('file', file);
+    formData.append('docType', docLabel);
     formData.append('empCode', currentUser.code);
     apiCall('POST', '/documents/upload', formData).catch(function(){});
-  }
-  saveAllData();
-  showToast('Document uploaded: ' + escapeHTML(docType));
-  renderSelfServiceOverlay();
+    saveAllData();
+    showToast(escapeHTML(docLabel) + ' uploaded successfully');
+    renderSelfServiceOverlay();
+    input.remove();
+  };
+  input.click();
 }
 
 // =====================================================
