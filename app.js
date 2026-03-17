@@ -1603,14 +1603,14 @@ function renderMapDotsClickable(emps) {
 const ADV_TYPE_LABELS = {site:'Site Expense', salary:'Salary Advance', travel:'Travel Expense'};
 const ADV_TYPE_ICONS = {site:'\u{1F3D7}', salary:'\u{1F4B0}', travel:'\u{1F699}'};
 let advanceRequests = [
-  {id:1, type:'salary', empCode:'SSC020', empName:'Dhanush.R', dept:'Site', amount:25000, reason:'Medical', details:'Hospital expenses', project:null, category:null, travelFrom:null, travelTo:null, vehicle:null, travelKm:null, emiAmount:5000, emiMonths:5, urgency:'urgent', status:'pending', appliedDate:'2026-03-06', reviewedBy:null, reviewDate:null, rejectReason:null},
+  {id:1, type:'salary', empCode:'SSC020', empName:'Dhanush.R', dept:'Site', amount:25000, reason:'Medical', details:'Hospital expenses', project:null, category:null, travelFrom:null, travelTo:null, vehicle:null, travelKm:null, emiAmount:25000, emiMonths:1, urgency:'urgent', status:'pending', appliedDate:'2026-03-06', reviewedBy:null, reviewDate:null, rejectReason:null},
   {id:2, type:'site', empCode:'SSC003', empName:'N.Hari Haran', dept:'Site', amount:45000, reason:null, details:'Cement & steel for foundation', project:'Porur Villa Project', category:'Material', travelFrom:null, travelTo:null, vehicle:null, travelKm:null, emiAmount:null, emiMonths:null, urgency:'normal', status:'pending', appliedDate:'2026-03-05', reviewedBy:null, reviewDate:null, rejectReason:null},
   {id:3, type:'travel', empCode:'SSM003', empName:'Krishna Gowri Sankar.S', dept:'Factory', amount:539, reason:null, details:'Daily commute to factory', project:null, category:null, travelFrom:'Tambaram', travelTo:'Kundrathur Factory', vehicle:'Bike', travelKm:28, emiAmount:null, emiMonths:null, urgency:'normal', status:'pending', appliedDate:'2026-03-04', reviewedBy:null, reviewDate:null, rejectReason:null},
-  {id:4, type:'salary', empCode:'SSC008', empName:'Karthik Rajan', dept:'Office', amount:15000, reason:'Education', details:'Course fee', project:null, category:null, travelFrom:null, travelTo:null, vehicle:null, travelKm:null, emiAmount:5000, emiMonths:3, urgency:'normal', status:'pending', appliedDate:'2026-03-04', reviewedBy:null, reviewDate:null, rejectReason:null},
+  {id:4, type:'salary', empCode:'SSC008', empName:'Karthik Rajan', dept:'Office', amount:15000, reason:'Education', details:'Course fee', project:null, category:null, travelFrom:null, travelTo:null, vehicle:null, travelKm:null, emiAmount:15000, emiMonths:1, urgency:'normal', status:'pending', appliedDate:'2026-03-04', reviewedBy:null, reviewDate:null, rejectReason:null},
   {id:5, type:'site', empCode:'SSC025', empName:'Harish.V', dept:'Site', amount:18400, reason:null, details:'Labour payment - 8 workers daily wages', project:'Tambaram Warehouse', category:'Labour', travelFrom:null, travelTo:null, vehicle:null, travelKm:null, emiAmount:null, emiMonths:null, urgency:'urgent', status:'approved', appliedDate:'2026-02-28', reviewedBy:'Selvam (MD)', reviewDate:'2026-03-01', rejectReason:null},
-  {id:6, type:'salary', empCode:'SSC025', empName:'Harish.V', dept:'Site', amount:10000, reason:'Emergency', details:'Family emergency', project:null, category:null, travelFrom:null, travelTo:null, vehicle:null, travelKm:null, emiAmount:5000, emiMonths:2, urgency:'urgent', status:'approved', appliedDate:'2026-02-28', reviewedBy:'Selvam (MD)', reviewDate:'2026-03-01', rejectReason:null},
+  {id:6, type:'salary', empCode:'SSC025', empName:'Harish.V', dept:'Site', amount:10000, reason:'Emergency', details:'Family emergency', project:null, category:null, travelFrom:null, travelTo:null, vehicle:null, travelKm:null, emiAmount:10000, emiMonths:1, urgency:'urgent', status:'approved', appliedDate:'2026-02-28', reviewedBy:'Selvam (MD)', reviewDate:'2026-03-01', rejectReason:null},
   {id:7, type:'travel', empCode:'SSM002', empName:'Govarthanan', dept:'Factory', amount:1014, reason:null, details:'Factory commute Dec 2025', project:null, category:null, travelFrom:'Home', travelTo:'Kundrathur Factory', vehicle:'Bike', travelKm:45, emiAmount:null, emiMonths:null, urgency:'normal', status:'approved', appliedDate:'2026-02-20', reviewedBy:'Priyanka (HR)', reviewDate:'2026-02-22', rejectReason:null},
-  {id:8, type:'salary', empCode:'SSC012', empName:'Murugan.S', dept:'Office', amount:50000, reason:'Housing', details:'Home repair', project:null, category:null, travelFrom:null, travelTo:null, vehicle:null, travelKm:null, emiAmount:10000, emiMonths:5, urgency:'normal', status:'rejected', appliedDate:'2026-02-25', reviewedBy:'Selvam (MD)', reviewDate:'2026-02-26', rejectReason:'Exceeds 50% salary limit'}
+  {id:8, type:'salary', empCode:'SSC012', empName:'Murugan.S', dept:'Office', amount:50000, reason:'Housing', details:'Home repair', project:null, category:null, travelFrom:null, travelTo:null, vehicle:null, travelKm:null, emiAmount:50000, emiMonths:1, urgency:'normal', status:'rejected', appliedDate:'2026-02-25', reviewedBy:'Selvam (MD)', reviewDate:'2026-02-26', rejectReason:'Exceeds 50% salary limit'}
 ];
 let advNextId = 9;
 let advSelectedType = 'site';
@@ -1631,7 +1631,7 @@ function showInlineExpenseForm() {
   html += '<option value="salary">Salary Advance</option>';
   html += '<option value="travel">Travel Expense</option>';
   html += '</select></div>';
-  html += '<div class="form-row"><label>Amount (Rs.) *</label><input type="number" id="inlineExpAmount" placeholder="e.g. 25000" oninput="updateInlineEmiCalc()"></div>';
+  html += '<div class="form-row"><label>Amount (Rs.) *</label><input type="number" id="inlineExpAmount" placeholder="e.g. 25000"></div>';
   // Site fields
   html += '<div id="inlineFieldsSite" style="display:none">';
   html += '<div class="form-row"><label>Project / Site *</label><select id="inlineSiteProject" class="nf-select"><option value="">Select project</option>';
@@ -1642,8 +1642,7 @@ function showInlineExpenseForm() {
   // Salary fields
   html += '<div id="inlineFieldsSalary" style="display:none">';
   html += '<div class="form-row"><label>Reason *</label><select id="inlineSalaryReason" class="nf-select"><option value="">Select reason</option><option>Medical</option><option>Education</option><option>Marriage</option><option>Housing</option><option>Emergency</option><option>Personal</option><option>Other</option></select></div>';
-  html += '<div class="form-row"><label>Preferred EMI / month (Rs.) *</label><input type="number" id="inlineEmi" placeholder="e.g. 5000" oninput="updateInlineEmiCalc()"></div>';
-  html += '<div id="inlineEmiCalc" style="font-size:.75rem;color:var(--primary);font-weight:600;margin:-4px 0 12px;min-height:18px"></div>';
+  html += '<div style="font-size:.75rem;color:var(--primary);font-weight:600;margin:4px 0 12px;background:var(--primary-light);padding:8px 10px;border-radius:var(--radius-xs)">Full amount will be deducted from next month\'s salary</div>';
   html += '</div>';
   // Travel fields
   html += '<div id="inlineFieldsTravel" style="display:none">';
@@ -1680,15 +1679,7 @@ function toggleInlineExpFields() {
   if (t) t.style.display = type === 'travel' ? '' : 'none';
 }
 function updateInlineEmiCalc() {
-  var type = (document.getElementById('inlineExpType') || {}).value || '';
-  if (type !== 'salary') return;
-  var amount = parseInt((document.getElementById('inlineExpAmount') || {}).value, 10) || 0;
-  var emi = parseInt((document.getElementById('inlineEmi') || {}).value, 10) || 0;
-  var el = document.getElementById('inlineEmiCalc');
-  if (el && amount > 0 && emi > 0) {
-    var months = Math.ceil(amount / emi);
-    el.textContent = 'Repayment: ' + months + ' month' + (months > 1 ? 's' : '') + ' @ Rs.' + emi.toLocaleString('en-IN') + '/month';
-  } else if (el) { el.textContent = ''; }
+  // EMI removed — salary advance deducted from next month salary
 }
 function hideInlineExpenseForm() {
   var container = document.getElementById('inlineExpenseForm');
@@ -1713,11 +1704,9 @@ async function submitInlineExpense() {
     if (!category) { showToast('Please select a category'); return; }
   } else if (type === 'salary') {
     reason = (document.getElementById('inlineSalaryReason') || {}).value || '';
-    emiAmount = parseInt((document.getElementById('inlineEmi') || {}).value, 10) || 0;
     if (!reason) { showToast('Please select a reason'); return; }
-    if (!emiAmount) { showToast('Please enter preferred EMI amount'); return; }
-    if (emiAmount > amount) { showToast('EMI cannot exceed the advance amount'); return; }
-    emiMonths = Math.ceil(amount / emiAmount);
+    emiAmount = amount;
+    emiMonths = 1;
   } else if (type === 'travel') {
     travelFrom = (document.getElementById('inlineTravelFrom') || {}).value || '';
     travelTo = (document.getElementById('inlineTravelTo') || {}).value || '';
@@ -1756,8 +1745,6 @@ function openAdvanceApplyForm(type) {
   document.getElementById('advAmount').value = '';
   document.getElementById('advDetails').value = '';
   document.getElementById('advReason').value = '';
-  document.getElementById('advEmi').value = '';
-  document.getElementById('advEmiCalc').textContent = '';
   document.getElementById('advSiteProject').value = '';
   document.getElementById('advSiteCategory').value = '';
   document.getElementById('advTravelFrom').value = '';
@@ -1787,16 +1774,7 @@ function setAdvUrgency(val) {
 }
 
 function updateEmiCalc() {
-  if (advSelectedType !== 'salary') return;
-  const amount = parseInt(document.getElementById('advAmount').value, 10) || 0;
-  const emi = parseInt(document.getElementById('advEmi').value, 10) || 0;
-  const el = document.getElementById('advEmiCalc');
-  if (amount > 0 && emi > 0) {
-    const months = Math.ceil(amount / emi);
-    el.textContent = 'Repayment: ' + months + ' month' + (months > 1 ? 's' : '') + ' @ \u20B9' + emi.toLocaleString('en-IN') + '/month';
-  } else {
-    el.textContent = '';
-  }
+  // EMI removed — salary advance deducted from next month salary
 }
 
 async function submitAdvanceRequest() {
@@ -1810,11 +1788,9 @@ async function submitAdvanceRequest() {
 
   if (advSelectedType === 'salary') {
     reason = document.getElementById('advReason').value;
-    emiAmount = parseInt(document.getElementById('advEmi').value, 10) || 0;
     if (!reason) { showToast('Please select a reason'); return; }
-    if (!emiAmount) { showToast('Please enter preferred EMI amount'); return; }
-    if (emiAmount > amount) { showToast('EMI cannot exceed the advance amount'); return; }
-    emiMonths = Math.ceil(amount / emiAmount);
+    emiAmount = amount;
+    emiMonths = 1;
   } else if (advSelectedType === 'site') {
     project = document.getElementById('advSiteProject').value;
     category = document.getElementById('advSiteCategory').value;
@@ -1865,7 +1841,7 @@ async function submitAdvanceRequest() {
 
 function getAdvMeta(r) {
   if (r.type === 'site') return `<strong>${escapeHTML(r.project)}</strong> &middot; ${escapeHTML(r.category)}${r.details ? ' &middot; ' + escapeHTML(r.details) : ''}`;
-  if (r.type === 'salary') return `<strong>${escapeHTML(r.reason)}</strong>${r.details ? ' — ' + escapeHTML(r.details) : ''}<br>EMI: \u20B9${r.emiAmount.toLocaleString('en-IN')}/month for ${r.emiMonths} months`;
+  if (r.type === 'salary') return `<strong>${escapeHTML(r.reason)}</strong>${r.details ? ' — ' + escapeHTML(r.details) : ''}<br>Deducted from next month salary`;
   if (r.type === 'travel') return `<strong>${escapeHTML(r.travelFrom)} \u2192 ${escapeHTML(r.travelTo)}</strong> &middot; ${escapeHTML(r.vehicle)}${r.travelKm ? ' &middot; ' + r.travelKm + ' km' : ''}${r.details ? '<br>' + escapeHTML(r.details) : ''}`;
   return escapeHTML(r.details) || '';
 }
