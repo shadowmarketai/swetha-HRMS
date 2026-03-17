@@ -1600,7 +1600,7 @@ function renderMapDotsClickable(emps) {
 // =====================================================
 // UNIFIED ADVANCE APPLICATION & APPROVAL (Site / Salary / Travel)
 // =====================================================
-const ADV_TYPE_LABELS = {site:'Site Advance', salary:'Salary Advance', travel:'Travel Advance'};
+const ADV_TYPE_LABELS = {site:'Site Expense', salary:'Salary Advance', travel:'Travel Expense'};
 const ADV_TYPE_ICONS = {site:'\u{1F3D7}', salary:'\u{1F4B0}', travel:'\u{1F699}'};
 let advanceRequests = [
   {id:1, type:'salary', empCode:'SSC020', empName:'Dhanush.R', dept:'Site', amount:25000, reason:'Medical', details:'Hospital expenses', project:null, category:null, travelFrom:null, travelTo:null, vehicle:null, travelKm:null, emiAmount:5000, emiMonths:5, urgency:'urgent', status:'pending', appliedDate:'2026-03-06', reviewedBy:null, reviewDate:null, rejectReason:null},
@@ -1616,6 +1616,140 @@ let advNextId = 9;
 let advSelectedType = 'site';
 let advSelectedUrgency = 'normal';
 let advReqActiveTab = 'pending';
+
+function showInlineExpenseForm() {
+  var container = document.getElementById('inlineExpenseForm');
+  if (!container) return;
+  var btn = document.getElementById('newExpenseBtn');
+  if (btn) btn.style.display = 'none';
+  container.style.display = 'block';
+  var html = '<div class="card fade-in" style="padding:14px;margin-top:10px">';
+  html += '<h3 style="font-family:var(--font-display);font-size:.95rem;font-weight:600;margin-bottom:12px">New Expense Request</h3>';
+  html += '<div class="form-row"><label>Expense Type *</label><select id="inlineExpType" class="nf-select" onchange="toggleInlineExpFields()">';
+  html += '<option value="">Select type</option>';
+  html += '<option value="site">Site Expense</option>';
+  html += '<option value="salary">Salary Advance</option>';
+  html += '<option value="travel">Travel Expense</option>';
+  html += '</select></div>';
+  html += '<div class="form-row"><label>Amount (Rs.) *</label><input type="number" id="inlineExpAmount" placeholder="e.g. 25000" oninput="updateInlineEmiCalc()"></div>';
+  // Site fields
+  html += '<div id="inlineFieldsSite" style="display:none">';
+  html += '<div class="form-row"><label>Project / Site *</label><select id="inlineSiteProject" class="nf-select"><option value="">Select project</option>';
+  if (typeof projects !== 'undefined') { projects.forEach(function(p) { html += '<option>' + escapeHTML(p.name) + '</option>'; }); }
+  html += '<option>Other</option></select></div>';
+  html += '<div class="form-row"><label>Category *</label><select id="inlineSiteCategory" class="nf-select"><option value="">Select category</option><option>Material</option><option>Labour</option><option>Equipment</option><option>Transport</option><option>Other</option></select></div>';
+  html += '</div>';
+  // Salary fields
+  html += '<div id="inlineFieldsSalary" style="display:none">';
+  html += '<div class="form-row"><label>Reason *</label><select id="inlineSalaryReason" class="nf-select"><option value="">Select reason</option><option>Medical</option><option>Education</option><option>Marriage</option><option>Housing</option><option>Emergency</option><option>Personal</option><option>Other</option></select></div>';
+  html += '<div class="form-row"><label>Preferred EMI / month (Rs.) *</label><input type="number" id="inlineEmi" placeholder="e.g. 5000" oninput="updateInlineEmiCalc()"></div>';
+  html += '<div id="inlineEmiCalc" style="font-size:.75rem;color:var(--primary);font-weight:600;margin:-4px 0 12px;min-height:18px"></div>';
+  html += '</div>';
+  // Travel fields
+  html += '<div id="inlineFieldsTravel" style="display:none">';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+  html += '<div class="form-row"><label>From *</label><input type="text" id="inlineTravelFrom" placeholder="e.g. Porur"></div>';
+  html += '<div class="form-row"><label>To *</label><input type="text" id="inlineTravelTo" placeholder="e.g. Tambaram"></div>';
+  html += '</div>';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+  html += '<div class="form-row"><label>Vehicle *</label><select id="inlineTravelVehicle" class="nf-select"><option value="">Select</option><option>Bike</option><option>Car</option><option>Auto</option><option>Bus</option><option>Train</option><option>Other</option></select></div>';
+  html += '<div class="form-row"><label>Distance (km)</label><input type="number" id="inlineTravelKm" placeholder="e.g. 25"></div>';
+  html += '</div></div>';
+  // Common fields
+  html += '<div class="form-row"><label>Details (optional)</label><textarea id="inlineExpDetails" rows="2" placeholder="Brief explanation..." style="width:100%;padding:8px;border:1.5px solid var(--gray-200);border-radius:var(--radius-xs);font-family:var(--font-body);font-size:.82rem"></textarea></div>';
+  html += '<div class="section-title" style="font-size:.72rem;margin-bottom:6px">Attach Bill (optional)</div>';
+  html += '<div class="camera-zone fade-in" onclick="document.getElementById(\'cameraInput\').click()" style="padding:14px">';
+  html += '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
+  html += '<p style="font-size:.78rem">Tap to capture bill photo</p>';
+  html += '<input type="file" id="cameraInput" accept="image/*" capture="environment" style="display:none" onchange="handleBillCapture(this)">';
+  html += '</div>';
+  html += '<div id="billPreview" style="display:none;margin-top:8px;text-align:center"><img id="billImg" style="max-width:100%;border-radius:var(--radius);box-shadow:var(--shadow)"><p style="font-size:.72rem;color:var(--success);font-weight:600;margin-top:4px">Bill captured</p></div>';
+  html += '<div style="display:flex;gap:8px;margin-top:14px">';
+  html += '<button class="nf-btn nf-btn-primary" onclick="submitInlineExpense()" style="flex:1">Submit Request</button>';
+  html += '<button class="nf-btn nf-btn-outline" onclick="hideInlineExpenseForm()">Cancel</button>';
+  html += '</div></div>';
+  container.innerHTML = html;
+}
+function toggleInlineExpFields() {
+  var type = (document.getElementById('inlineExpType') || {}).value || '';
+  var s = document.getElementById('inlineFieldsSite');
+  var a = document.getElementById('inlineFieldsSalary');
+  var t = document.getElementById('inlineFieldsTravel');
+  if (s) s.style.display = type === 'site' ? '' : 'none';
+  if (a) a.style.display = type === 'salary' ? '' : 'none';
+  if (t) t.style.display = type === 'travel' ? '' : 'none';
+}
+function updateInlineEmiCalc() {
+  var type = (document.getElementById('inlineExpType') || {}).value || '';
+  if (type !== 'salary') return;
+  var amount = parseInt((document.getElementById('inlineExpAmount') || {}).value, 10) || 0;
+  var emi = parseInt((document.getElementById('inlineEmi') || {}).value, 10) || 0;
+  var el = document.getElementById('inlineEmiCalc');
+  if (el && amount > 0 && emi > 0) {
+    var months = Math.ceil(amount / emi);
+    el.textContent = 'Repayment: ' + months + ' month' + (months > 1 ? 's' : '') + ' @ Rs.' + emi.toLocaleString('en-IN') + '/month';
+  } else if (el) { el.textContent = ''; }
+}
+function hideInlineExpenseForm() {
+  var container = document.getElementById('inlineExpenseForm');
+  if (container) { container.style.display = 'none'; container.innerHTML = ''; }
+  var btn = document.getElementById('newExpenseBtn');
+  if (btn) btn.style.display = '';
+}
+async function submitInlineExpense() {
+  var typeEl = document.getElementById('inlineExpType');
+  var amountEl = document.getElementById('inlineExpAmount');
+  if (!typeEl || !typeEl.value) { showToast('Please select an expense type'); return; }
+  var type = typeEl.value;
+  var amount = parseInt(amountEl.value, 10) || 0;
+  if (!amount) { showToast('Please enter the amount'); return; }
+  var details = (document.getElementById('inlineExpDetails') || {}).value || '';
+  var project = null, category = null, reason = null, emiAmount = null, emiMonths = null;
+  var travelFrom = null, travelTo = null, vehicle = null, travelKm = null;
+  if (type === 'site') {
+    project = (document.getElementById('inlineSiteProject') || {}).value || '';
+    category = (document.getElementById('inlineSiteCategory') || {}).value || '';
+    if (!project) { showToast('Please select a project/site'); return; }
+    if (!category) { showToast('Please select a category'); return; }
+  } else if (type === 'salary') {
+    reason = (document.getElementById('inlineSalaryReason') || {}).value || '';
+    emiAmount = parseInt((document.getElementById('inlineEmi') || {}).value, 10) || 0;
+    if (!reason) { showToast('Please select a reason'); return; }
+    if (!emiAmount) { showToast('Please enter preferred EMI amount'); return; }
+    if (emiAmount > amount) { showToast('EMI cannot exceed the advance amount'); return; }
+    emiMonths = Math.ceil(amount / emiAmount);
+  } else if (type === 'travel') {
+    travelFrom = (document.getElementById('inlineTravelFrom') || {}).value || '';
+    travelTo = (document.getElementById('inlineTravelTo') || {}).value || '';
+    vehicle = (document.getElementById('inlineTravelVehicle') || {}).value || '';
+    travelKm = parseInt((document.getElementById('inlineTravelKm') || {}).value, 10) || null;
+    if (!travelFrom || !travelTo) { showToast('Please enter From and To locations'); return; }
+    if (!vehicle) { showToast('Please select a vehicle type'); return; }
+  }
+  try {
+    var apiRes = await apiCall('POST', '/advances', {
+      type: type, amount: amount, reason: reason, details: details, project: project, category: category,
+      travelFrom: travelFrom, travelTo: travelTo, vehicle: vehicle, travelKm: travelKm,
+      emiAmount: emiAmount, emiMonths: emiMonths, urgency: 'normal'
+    });
+    advanceRequests.push({
+      id: (apiRes && apiRes.id) || advNextId++,
+      type: type, empCode: currentUser.code, empName: currentUser.name, dept: currentUser.dept,
+      amount: amount, reason: reason, details: details, project: project, category: category,
+      travelFrom: travelFrom, travelTo: travelTo, vehicle: vehicle, travelKm: travelKm,
+      emiAmount: emiAmount, emiMonths: emiMonths, urgency: 'normal',
+      status: 'pending', appliedDate: new Date().toISOString().split('T')[0],
+      reviewedBy: null, reviewDate: null, rejectReason: null
+    });
+    showToast(ADV_TYPE_LABELS[type] + ' request submitted for Rs.' + amount.toLocaleString('en-IN'));
+    hideInlineExpenseForm();
+    renderAllMyRequests();
+    renderAllPendingBanners();
+    saveAllData();
+  } catch (e) {
+    showToast('Error submitting request');
+  }
+}
 
 function openAdvanceApplyForm(type) {
   type = type || 'site';
