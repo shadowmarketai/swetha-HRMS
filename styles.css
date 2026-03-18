@@ -1430,12 +1430,16 @@ textarea.form-control{resize:vertical}
 .org-expand-toggle:hover{background:var(--gray-100);color:var(--primary)}
 .org-child-count{font-size:.58rem;font-weight:600;color:var(--gray-400)}
 
+/* Org Chart: Inner content (pointer-events none so drag hits the node) */
+.org-node-inner{pointer-events:none}
+.org-expand-toggle{pointer-events:auto;position:relative;z-index:2}
+
 /* Org Chart: Edit mode */
 .org-editable{cursor:grab!important;border-style:dashed!important}
 .org-editable:active{cursor:grabbing!important}
-.org-dragging{opacity:.4;transform:scale(.95)}
-.org-drop-hover{border-color:var(--green)!important;background:rgba(5,150,105,.08)!important;transform:scale(1.02);box-shadow:0 0 0 3px rgba(5,150,105,.2)!important}
-.org-drag-ghost{background:var(--card);border-radius:var(--radius-sm);padding:8px 12px;box-shadow:var(--shadow-lg);text-align:center;opacity:.85;border:2px solid var(--primary);min-width:80px;pointer-events:none}
+.org-dragging{opacity:.4;transform:scale(.95);transition:none}
+.org-drop-hover{border-color:#059669!important;background:rgba(5,150,105,.1)!important;transform:scale(1.03);box-shadow:0 0 0 3px rgba(5,150,105,.25)!important;transition:all .15s}
+.org-drag-ghost{position:fixed;background:var(--card);border-radius:var(--radius-sm);padding:8px 12px;box-shadow:var(--shadow-lg);text-align:center;opacity:.9;border:2px solid var(--primary);min-width:80px;pointer-events:none;z-index:9999}
 .org-edit-banner{background:var(--primary-50);color:var(--primary);padding:8px 14px;border-radius:var(--radius-sm);font-size:.72rem;text-align:center;margin-bottom:12px;border:1px solid var(--primary);font-weight:500}
 
 /* Org Chart: Detail modal */
@@ -1453,6 +1457,8 @@ textarea.form-control{resize:vertical}
 .org-detail-change-mgr{margin-top:14px;padding-top:12px;border-top:1px solid var(--gray-100)}
 .org-detail-change-mgr label{display:block;font-size:.72rem;font-weight:600;color:var(--gray-500);margin-bottom:4px}
 .org-detail-change-mgr select{width:100%;padding:8px 10px;border-radius:var(--radius-sm);border:1.5px solid var(--gray-200);font-size:.78rem;background:var(--card);color:var(--text)}
+.org-change-mgr-btn{margin-top:8px;width:100%;padding:8px;border:none;border-radius:var(--radius-sm);background:var(--primary);color:#fff;font-size:.78rem;font-weight:600;cursor:pointer;transition:background .2s}
+.org-change-mgr-btn:hover{background:var(--primary-700, #c44e03)}
 
 /* Org Chart: Dark mode overrides */
 [data-theme="dark"] .org-edit-toggle{border-color:var(--primary);color:var(--primary)}

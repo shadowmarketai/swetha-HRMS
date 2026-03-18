@@ -7013,9 +7013,12 @@ async function completeExit(id) {
 var orgExpandedNodes = new Set();
 var orgEditModeActive = false;
 var orgDragEmpCode = null;
+var orgDragDidDrop = false;
 var orgTouchTimer = null;
 var orgTouchGhost = null;
 var orgTouchDragging = false;
+var orgTouchStartX = 0;
+var orgTouchStartY = 0;
 
 function buildOrgTree(empCode, visited) {
   if (!visited) visited = {};
@@ -7035,7 +7038,6 @@ function buildOrgTree(empCode, visited) {
 }
 
 function getOrgRoots() {
-  // Find all emp codes that are NOT in anyone's reports list
   var allChildren = {};
   Object.keys(REPORTING_MAP).forEach(function(k) {
     if (REPORTING_MAP[k].reports) {
@@ -7043,14 +7045,12 @@ function getOrgRoots() {
     }
   });
   var roots = Object.keys(REPORTING_MAP).filter(function(k) { return !allChildren[k]; });
-  // Ensure MD001 is first
   roots.sort(function(a, b) { return a === 'MD001' ? -1 : b === 'MD001' ? 1 : 0; });
   return roots;
 }
 
 function initOrgExpanded() {
   orgExpandedNodes.clear();
-  // Expand roots and their direct children (first 2 levels)
   var roots = getOrgRoots();
   roots.forEach(function(r) {
     orgExpandedNodes.add(r);
@@ -7060,8 +7060,7 @@ function initOrgExpanded() {
   });
 }
 
-function toggleOrgExpand(empCode, evt) {
-  if (evt) { evt.stopPropagation(); evt.preventDefault(); }
+function toggleOrgExpand(empCode) {
   if (orgExpandedNodes.has(empCode)) {
     orgExpandedNodes.delete(empCode);
   } else {
@@ -7076,15 +7075,19 @@ function renderOrgNode(node, depth) {
   var editCls = orgEditModeActive ? ' org-editable' : '';
   var childCount = node.children.length;
   var isExpanded = orgExpandedNodes.has(node.emp.code);
-  var dragAttrs = orgEditModeActive ? ' draggable="true" data-emp-code="' + escapeAttr(node.emp.code) + '"' : '';
-  var dropAttr = orgEditModeActive ? ' data-drop-target="' + escapeAttr(node.emp.code) + '"' : '';
+  var code = escapeAttr(node.emp.code);
+  // Always add data-emp-code for click handling; add draggable + drop-target only in edit mode
+  var dragAttr = orgEditModeActive ? ' draggable="true"' : '';
+  var dropAttr = ' data-drop-target="' + code + '"';
 
   var html = '<div class="org-branch">';
-  html += '<div class="org-node' + cls + editCls + '"' + dragAttrs + dropAttr + ' onclick="showOrgNodeModal(\'' + escapeAttr(node.emp.code) + '\')">';
+  html += '<div class="org-node' + cls + editCls + '" data-emp-code="' + code + '"' + dragAttr + dropAttr + '>';
+  html += '<div class="org-node-inner">';
   html += '<div class="org-name">' + escapeHTML(node.emp.name) + '</div>';
   html += '<div class="org-desg">' + escapeHTML(node.emp.designation) + '</div>';
+  html += '</div>';
   if (childCount > 0) {
-    html += '<button class="org-expand-toggle" onclick="toggleOrgExpand(\'' + escapeAttr(node.emp.code) + '\', event)" aria-label="' + (isExpanded ? 'Collapse' : 'Expand') + '">';
+    html += '<button class="org-expand-toggle" data-expand-code="' + code + '" aria-label="' + (isExpanded ? 'Collapse' : 'Expand') + '">';
     html += '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">';
     if (isExpanded) {
       html += '<polyline points="6 9 12 15 18 9"/>';
@@ -7107,7 +7110,6 @@ function renderOrgNode(node, depth) {
 }
 
 function showOrgNodeModal(empCode) {
-  if (orgTouchDragging) return;
   var emp = EMPLOYEES.find(function(e) { return e.code === empCode; });
   if (!emp) return;
   var reports = REPORTING_MAP[empCode] ? REPORTING_MAP[empCode].reports.length : 0;
@@ -7117,27 +7119,33 @@ function showOrgNodeModal(empCode) {
   var manager = reportsTo ? EMPLOYEES.find(function(e) { return e.code === reportsTo; }) : null;
   var isMDorHR = currentUser && (currentUser.role === 'MD' || currentUser.role === 'HR');
 
-  // Build dropdown for change manager (edit mode + MD/HR)
   var changeManagerHTML = '';
   if (orgEditModeActive && isMDorHR) {
-    changeManagerHTML = '<div class="org-detail-change-mgr"><label>Change Manager:</label><select id="orgChangeMgrSelect" onchange="orgChangeMgrFromModal(\'' + escapeAttr(empCode) + '\')">';
-    changeManagerHTML += '<option value="">— Select —</option>';
+    changeManagerHTML = '<div class="org-detail-change-mgr"><label>Change Manager:</label><select id="orgChangeMgrSelect">';
+    changeManagerHTML += '<option value="">-- Select new manager --</option>';
     changeManagerHTML += '<option value="__root__">(Root / No Manager)</option>';
     EMPLOYEES.filter(function(e) { return e.code !== empCode && e.status === 'Active'; }).forEach(function(e) {
       var sel = (reportsTo === e.code) ? ' selected' : '';
       changeManagerHTML += '<option value="' + escapeAttr(e.code) + '"' + sel + '>' + escapeHTML(e.name) + ' (' + escapeHTML(e.code) + ')</option>';
     });
-    changeManagerHTML += '</select></div>';
+    changeManagerHTML += '</select>';
+    changeManagerHTML += '<button class="org-change-mgr-btn" id="orgChangeMgrBtn">Reassign</button>';
+    changeManagerHTML += '</div>';
   }
+
+  // Remove any existing modal
+  closeOrgNodeModal();
 
   var backdrop = document.createElement('div');
   backdrop.className = 'org-detail-backdrop';
+  backdrop.id = 'orgDetailBackdrop';
   backdrop.onclick = function() { closeOrgNodeModal(); };
 
   var modal = document.createElement('div');
   modal.className = 'org-detail-modal';
   modal.id = 'orgDetailModal';
-  modal.innerHTML = '<button class="org-detail-close" onclick="closeOrgNodeModal()" aria-label="Close">&times;</button>'
+  modal.setAttribute('data-modal-emp', empCode);
+  modal.innerHTML = '<button class="org-detail-close" aria-label="Close">&times;</button>'
     + '<div class="org-detail-name">' + escapeHTML(emp.name) + '</div>'
     + '<div class="org-detail-desg">' + escapeHTML(emp.designation) + ' — ' + escapeHTML(emp.dept) + '</div>'
     + '<div class="org-detail-info">'
@@ -7148,6 +7156,21 @@ function showOrgNodeModal(empCode) {
     + '</div>'
     + changeManagerHTML;
 
+  // Wire close button
+  modal.querySelector('.org-detail-close').onclick = function() { closeOrgNodeModal(); };
+
+  // Wire reassign button
+  var reassignBtn = modal.querySelector('#orgChangeMgrBtn');
+  if (reassignBtn) {
+    reassignBtn.onclick = function() {
+      var sel = modal.querySelector('#orgChangeMgrSelect');
+      if (!sel || !sel.value) { showToast('Select a new manager first'); return; }
+      var newMgr = sel.value === '__root__' ? null : sel.value;
+      closeOrgNodeModal();
+      confirmOrgReassign(empCode, newMgr);
+    };
+  }
+
   document.body.appendChild(backdrop);
   document.body.appendChild(modal);
   requestAnimationFrame(function() {
@@ -7157,18 +7180,10 @@ function showOrgNodeModal(empCode) {
 }
 
 function closeOrgNodeModal() {
-  var backdrop = document.querySelector('.org-detail-backdrop');
+  var backdrop = document.getElementById('orgDetailBackdrop');
   var modal = document.getElementById('orgDetailModal');
   if (backdrop) backdrop.remove();
   if (modal) modal.remove();
-}
-
-function orgChangeMgrFromModal(empCode) {
-  var sel = document.getElementById('orgChangeMgrSelect');
-  if (!sel || !sel.value) return;
-  var newMgr = sel.value === '__root__' ? null : sel.value;
-  closeOrgNodeModal();
-  confirmOrgReassign(empCode, newMgr);
 }
 
 function toggleOrgEditMode() {
@@ -7219,20 +7234,45 @@ function saveOrgReassign(empCode, newManager) {
   });
 }
 
-function wireOrgDragEvents() {
+function wireOrgEvents() {
   var container = document.getElementById('orgchartContent');
   if (!container) return;
 
-  container.addEventListener('dragstart', function(e) {
+  // --- Delegated CLICK handler (handles node click + expand toggle) ---
+  container.addEventListener('click', function(e) {
+    // If a drag just completed, ignore the click
+    if (orgDragDidDrop) { orgDragDidDrop = false; return; }
+    if (orgTouchDragging) return;
+
+    // Check expand toggle first
+    var expandBtn = e.target.closest('[data-expand-code]');
+    if (expandBtn) {
+      e.stopPropagation();
+      e.preventDefault();
+      toggleOrgExpand(expandBtn.getAttribute('data-expand-code'));
+      return;
+    }
+
+    // Node click — open detail modal
     var node = e.target.closest('[data-emp-code]');
-    if (!node || !orgEditModeActive) return;
-    orgDragEmpCode = node.getAttribute('data-emp-code');
-    node.classList.add('org-dragging');
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', orgDragEmpCode);
+    if (node) {
+      showOrgNodeModal(node.getAttribute('data-emp-code'));
+    }
   });
 
-  container.addEventListener('dragend', function(e) {
+  // --- HTML5 DRAG AND DROP (desktop) ---
+  container.addEventListener('dragstart', function(e) {
+    var node = e.target.closest('[data-emp-code]');
+    if (!node || !orgEditModeActive) { e.preventDefault(); return; }
+    orgDragEmpCode = node.getAttribute('data-emp-code');
+    orgDragDidDrop = false;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', orgDragEmpCode);
+    // Apply dragging style after a frame so browser captures the ghost image first
+    setTimeout(function() { node.classList.add('org-dragging'); }, 0);
+  });
+
+  container.addEventListener('dragend', function() {
     orgDragEmpCode = null;
     container.querySelectorAll('.org-dragging').forEach(function(el) { el.classList.remove('org-dragging'); });
     container.querySelectorAll('.org-drop-hover').forEach(function(el) { el.classList.remove('org-drop-hover'); });
@@ -7246,7 +7286,6 @@ function wireOrgDragEvents() {
     if (targetCode === orgDragEmpCode) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
-    // Remove hover from all, add to current
     container.querySelectorAll('.org-drop-hover').forEach(function(el) { el.classList.remove('org-drop-hover'); });
     target.classList.add('org-drop-hover');
   });
@@ -7260,57 +7299,69 @@ function wireOrgDragEvents() {
 
   container.addEventListener('drop', function(e) {
     e.preventDefault();
+    e.stopPropagation();
     container.querySelectorAll('.org-drop-hover').forEach(function(el) { el.classList.remove('org-drop-hover'); });
+    container.querySelectorAll('.org-dragging').forEach(function(el) { el.classList.remove('org-dragging'); });
     if (!orgEditModeActive || !orgDragEmpCode) return;
     var target = e.target.closest('[data-drop-target]');
     if (!target) return;
     var targetCode = target.getAttribute('data-drop-target');
     if (targetCode === orgDragEmpCode) return;
-    confirmOrgReassign(orgDragEmpCode, targetCode);
+    var draggedCode = orgDragEmpCode;
     orgDragEmpCode = null;
+    orgDragDidDrop = true;
+    confirmOrgReassign(draggedCode, targetCode);
   });
-}
 
-function wireOrgTouchEvents() {
-  var container = document.getElementById('orgchartContent');
-  if (!container) return;
-
+  // --- TOUCH DRAG (mobile) ---
   container.addEventListener('touchstart', function(e) {
     if (!orgEditModeActive) return;
     var node = e.target.closest('[data-emp-code]');
     if (!node) return;
+    // Don't initiate drag on expand toggle
+    if (e.target.closest('[data-expand-code]')) return;
     var code = node.getAttribute('data-emp-code');
+    var touch = e.touches[0];
+    orgTouchStartX = touch.clientX;
+    orgTouchStartY = touch.clientY;
     orgTouchDragging = false;
     orgTouchTimer = setTimeout(function() {
       orgTouchDragging = true;
       orgDragEmpCode = code;
       node.classList.add('org-dragging');
-      // Create ghost
-      orgTouchGhost = node.cloneNode(true);
+      // Create floating ghost
+      orgTouchGhost = document.createElement('div');
       orgTouchGhost.className = 'org-node org-drag-ghost';
-      orgTouchGhost.style.position = 'fixed';
-      orgTouchGhost.style.pointerEvents = 'none';
-      orgTouchGhost.style.zIndex = '9999';
+      var emp = EMPLOYEES.find(function(e2) { return e2.code === code; });
+      orgTouchGhost.innerHTML = '<div class="org-name">' + escapeHTML(emp ? emp.name : code) + '</div>';
       document.body.appendChild(orgTouchGhost);
-      var touch = e.touches[0];
-      orgTouchGhost.style.left = (touch.clientX - 50) + 'px';
-      orgTouchGhost.style.top = (touch.clientY - 20) + 'px';
-    }, 300);
+      orgTouchGhost.style.left = (orgTouchStartX - 50) + 'px';
+      orgTouchGhost.style.top = (orgTouchStartY - 20) + 'px';
+      // Vibrate feedback if available
+      if (navigator.vibrate) navigator.vibrate(30);
+    }, 400);
   }, { passive: true });
 
   container.addEventListener('touchmove', function(e) {
     if (!orgTouchDragging || !orgTouchGhost) {
-      // Not dragging yet — clear timer (it was a scroll)
-      if (orgTouchTimer) { clearTimeout(orgTouchTimer); orgTouchTimer = null; }
+      if (orgTouchTimer) {
+        // Cancel long-press if finger moved too far (it's a scroll)
+        var t = e.touches[0];
+        var dx = Math.abs(t.clientX - orgTouchStartX);
+        var dy = Math.abs(t.clientY - orgTouchStartY);
+        if (dx > 10 || dy > 10) { clearTimeout(orgTouchTimer); orgTouchTimer = null; }
+      }
       return;
     }
     e.preventDefault();
     var touch = e.touches[0];
     orgTouchGhost.style.left = (touch.clientX - 50) + 'px';
     orgTouchGhost.style.top = (touch.clientY - 20) + 'px';
-    // Highlight drop target
+    // Highlight drop target under finger (hide ghost temporarily for elementFromPoint)
+    orgTouchGhost.style.display = 'none';
     container.querySelectorAll('.org-drop-hover').forEach(function(el) { el.classList.remove('org-drop-hover'); });
     var el = document.elementFromPoint(touch.clientX, touch.clientY);
+    orgTouchGhost.style.display = '';
     if (el) {
       var target = el.closest('[data-drop-target]');
       if (target && target.getAttribute('data-drop-target') !== orgDragEmpCode) {
@@ -7322,7 +7373,6 @@ function wireOrgTouchEvents() {
   container.addEventListener('touchend', function(e) {
     if (orgTouchTimer) { clearTimeout(orgTouchTimer); orgTouchTimer = null; }
     if (!orgTouchDragging) return;
-    // Find drop target
     container.querySelectorAll('.org-dragging').forEach(function(el) { el.classList.remove('org-dragging'); });
     container.querySelectorAll('.org-drop-hover').forEach(function(el) { el.classList.remove('org-drop-hover'); });
     if (orgTouchGhost) { orgTouchGhost.remove(); orgTouchGhost = null; }
@@ -7334,13 +7384,17 @@ function wireOrgTouchEvents() {
         if (target) {
           var targetCode = target.getAttribute('data-drop-target');
           if (targetCode !== orgDragEmpCode) {
-            confirmOrgReassign(orgDragEmpCode, targetCode);
+            var draggedCode = orgDragEmpCode;
+            orgDragEmpCode = null;
+            orgTouchDragging = false;
+            confirmOrgReassign(draggedCode, targetCode);
+            return;
           }
         }
       }
     }
     orgDragEmpCode = null;
-    setTimeout(function() { orgTouchDragging = false; }, 100);
+    setTimeout(function() { orgTouchDragging = false; }, 50);
   });
 
   container.addEventListener('touchcancel', function() {
@@ -7352,7 +7406,7 @@ function wireOrgTouchEvents() {
   });
 }
 
-var orgDragEventsWired = false;
+var orgEventsWired = false;
 function renderOrgchartOverlay() {
   var c = document.getElementById('orgchartContent');
   if (!c) return;
@@ -7379,11 +7433,10 @@ function renderOrgchartOverlay() {
   html += '</div>';
   c.innerHTML = html;
 
-  // Wire drag events once
-  if (!orgDragEventsWired) {
-    wireOrgDragEvents();
-    wireOrgTouchEvents();
-    orgDragEventsWired = true;
+  // Wire all events once (delegation — survives innerHTML replacement)
+  if (!orgEventsWired) {
+    wireOrgEvents();
+    orgEventsWired = true;
   }
 }
 
