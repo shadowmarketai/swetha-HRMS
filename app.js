@@ -3460,6 +3460,12 @@ function loadAllData() {
     d = load(STORAGE_KEYS.employees); if (d) { EMPLOYEES.length = 0; d.forEach(e => EMPLOYEES.push(e)); }
     d = load(STORAGE_KEYS.departments); if (d) { departments.length = 0; d.forEach(e => departments.push(e)); }
     d = load(STORAGE_KEYS.credentials); if (d) { Object.keys(CREDENTIAL_HASHES).forEach(k => delete CREDENTIAL_HASHES[k]); Object.assign(CREDENTIAL_HASHES, d); }
+    // Always restore core account credentials & correct idx so they can never be locked out
+    CREDENTIAL_HASHES['MD001'] = {hash:'240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9', idx: EMPLOYEES.findIndex(function(e){return e.code==='MD001';})};
+    CREDENTIAL_HASHES['SSC006'] = {hash:'070a3b5e8d4bd5c46acccb91c9c54614c0cd649e78c4c4719e3a64270bae5ddf', idx: EMPLOYEES.findIndex(function(e){return e.code==='SSC006';})};
+    CREDENTIAL_HASHES['SSC011'] = {hash:'e03d3ec8d5035f8721f5dc64546e59ed790dbcb3b7b598fe57057ccd7b683b00', idx: EMPLOYEES.findIndex(function(e){return e.code==='SSC011';})};
+    // Ensure core accounts are never deactivated
+    EMPLOYEES.forEach(function(e){ if (e.code==='MD001'||e.code==='SSC006'||e.code==='SSC011') e.status='Active'; });
     d = load(STORAGE_KEYS.advanceRequests); if (d) { advanceRequests.length = 0; d.forEach(e => advanceRequests.push(e)); }
     d = load(STORAGE_KEYS.advNextId); if (d !== null) advNextId = d;
     d = load(STORAGE_KEYS.kpiData); if (d) { Object.keys(KPI_DATA).forEach(k => delete KPI_DATA[k]); Object.assign(KPI_DATA, d); }
