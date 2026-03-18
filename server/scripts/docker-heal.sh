@@ -2,14 +2,17 @@
 # =============================================================
 # Docker Self-Healing Script for Coolify
 # Runs via cron every 5 minutes
-# - Restarts unhealthy containers
+# - Restarts unhealthy containers (with retry limit)
 # - Prunes stale build containers (fixes Coolify name conflicts)
 # - Alerts via Telegram (optional)
-# - Monitors disk usage
+# - Monitors disk + memory usage
 # =============================================================
 
 LOG="/var/log/docker-heal.log"
 MAX_LOG_SIZE=5242880  # 5MB
+RESTART_TRACKER="/tmp/docker-heal-restarts"
+MAX_RESTARTS=3        # max restarts per container per hour
+TRACKER_TTL=3600      # reset counters after 1 hour (seconds)
 
 # --- Optional Telegram alerts (fill in to enable) ---
 TELEGRAM_BOT_TOKEN=""
@@ -22,6 +25,12 @@ send_alert() {
   fi
 }
 
+# Initialize restart tracker directory
+mkdir -p "$RESTART_TRACKER"
+
+# Clean stale tracker files (older than 1 hour)
+find "$RESTART_TRACKER" -type f -mmin +60 -delete 2>/dev/null
+
 # Rotate log if too large
 if [ -f "$LOG" ] && [ $(stat -c%s "$LOG" 2>/dev/null || echo 0) -gt $MAX_LOG_SIZE ]; then
   mv "$LOG" "${LOG}.old"
@@ -31,12 +40,27 @@ echo "---- $(date '+%Y-%m-%d %H:%M:%S') ----" >> "$LOG"
 
 ACTIONS=0
 
-# 1. Restart unhealthy containers
+# 1. Restart unhealthy containers (with retry protection)
 for id in $(docker ps --filter "health=unhealthy" -q 2>/dev/null); do
-  name=$(docker inspect --format '{{.Name}}' "$id" 2>/dev/null | sed 's/^\/\///')
-  echo "[HEAL] Restarting unhealthy container: $name ($id)" >> "$LOG"
+  name=$(docker inspect --format '{{.Name}}' "$id" 2>/dev/null | sed 's/^\///')
+  tracker_file="$RESTART_TRACKER/$id"
+
+  # Count recent restarts for this container
+  count=0
+  if [ -f "$tracker_file" ]; then
+    count=$(cat "$tracker_file")
+  fi
+
+  if [ "$count" -ge "$MAX_RESTARTS" ]; then
+    echo "[SKIP] Container $name ($id) hit restart limit ($MAX_RESTARTS/hr) — needs manual intervention" >> "$LOG"
+    send_alert "🔴 HRMS: Container $name stuck unhealthy after $MAX_RESTARTS restarts — check manually"
+    continue
+  fi
+
+  echo "[HEAL] Restarting unhealthy container: $name ($id) (attempt $((count + 1))/$MAX_RESTARTS)" >> "$LOG"
   docker restart "$id" >> "$LOG" 2>&1
-  send_alert "⚠️ HRMS: Restarted unhealthy container $name"
+  echo $((count + 1)) > "$tracker_file"
+  send_alert "⚠️ HRMS: Restarted unhealthy container $name (attempt $((count + 1))/$MAX_RESTARTS)"
   ACTIONS=$((ACTIONS + 1))
 done
 
