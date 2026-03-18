@@ -2,9 +2,9 @@
 # =============================================================
 # One-Time Setup: Self-Healing Docker System for Coolify Server
 #
-# Usage: SSH into your server and run:
-#   curl -sSL <raw-github-url> | bash
-#   — or —
+# Usage: SSH into your server, download both scripts, review, then run:
+#   nano setup-self-healing.sh   # review first!
+#   nano docker-heal.sh          # review first!
 #   bash setup-self-healing.sh
 # =============================================================
 
@@ -43,7 +43,7 @@ for id in $(docker ps --filter "health=unhealthy" -q 2>/dev/null); do
   ACTIONS=$((ACTIONS + 1))
 done
 
-PRUNED=$(docker container prune -f 2>/dev/null | grep "Total reclaimed" || echo "nothing")
+PRUNED=$(docker container prune -f --filter "until=5m" 2>/dev/null | grep "Total reclaimed" || echo "nothing")
 if echo "$PRUNED" | grep -qv "0B"; then
   echo "[CLEAN] $PRUNED" >> "$LOG"
   ACTIONS=$((ACTIONS + 1))

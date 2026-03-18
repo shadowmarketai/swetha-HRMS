@@ -40,8 +40,9 @@ for id in $(docker ps --filter "health=unhealthy" -q 2>/dev/null); do
   ACTIONS=$((ACTIONS + 1))
 done
 
-# 2. Prune stopped containers (prevents Coolify build name conflicts)
-PRUNED=$(docker container prune -f 2>/dev/null | grep "Total reclaimed" || echo "nothing pruned")
+# 2. Prune stopped containers older than 5 min (prevents Coolify build conflicts)
+#    The --filter "until=5m" avoids killing containers from active deployments
+PRUNED=$(docker container prune -f --filter "until=5m" 2>/dev/null | grep "Total reclaimed" || echo "nothing pruned")
 if echo "$PRUNED" | grep -qv "0B"; then
   echo "[CLEAN] $PRUNED" >> "$LOG"
   ACTIONS=$((ACTIONS + 1))
