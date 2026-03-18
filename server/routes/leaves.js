@@ -4,7 +4,7 @@ const { verifyToken, requireRole } = require('../middleware/auth');
 const { body, validationResult } = require('express-validator');
 const { auditLog } = require('../middleware/audit');
 
-const VALID_LEAVE_TYPES = ['casual', 'earned', 'sick', 'comp'];
+const VALID_LEAVE_TYPES = ['casual', 'comp'];
 
 // GET /api/leaves — list leave applications
 router.get('/', verifyToken, async (req, res) => {
@@ -131,10 +131,10 @@ router.get('/balance', verifyToken, async (req, res) => {
     if (rows.length === 0) {
       // Create default balance
       await pool.query('INSERT INTO leave_balances (emp_code) VALUES (?)', [req.user.empCode]);
-      return res.json({ casual: 12, earned: 20, sick: 6, comp: 3 });
+      return res.json({ casual: 12, comp: 3 });
     }
     const b = rows[0];
-    res.json({ casual: b.casual, earned: b.earned, sick: b.sick, comp: b.comp });
+    res.json({ casual: b.casual, comp: b.comp });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
@@ -160,9 +160,9 @@ router.get('/balance/all', verifyToken, requireRole('MD', 'HR'), async (req, res
 router.get('/balance/:code', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM leave_balances WHERE emp_code = ?', [req.params.code]);
-    if (rows.length === 0) return res.json({ casual: 12, earned: 20, sick: 6, comp: 3 });
+    if (rows.length === 0) return res.json({ casual: 12, comp: 3 });
     const b = rows[0];
-    res.json({ casual: b.casual, earned: b.earned, sick: b.sick, comp: b.comp });
+    res.json({ casual: b.casual, comp: b.comp });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });

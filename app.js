@@ -672,6 +672,10 @@ function applyRole() {
   // Settings button (hide for MD since they have admin)
   document.getElementById('settingsBtn').style.display = isMD ? 'none' : '';
 
+  // Hide "Apply Leave" quick link for MD
+  var qlLeave = document.getElementById('qlApplyLeave');
+  if (qlLeave) qlLeave.style.display = isMD ? 'none' : '';
+
   // Show/hide MD/HR-only elements (skip nav — it's rendered dynamically)
   document.querySelectorAll('.md-hr-only').forEach(el => {
     if (el.closest('#bottomTabs')) return;
@@ -5538,12 +5542,13 @@ function restoreNotifPrefToggles() {
 // =====================================================
 function getLeaveBalance(empCode) {
   if (!leaveBalances[empCode]) {
-    leaveBalances[empCode] = { casual: 12, earned: 20, sick: 6, comp: 3 };
+    leaveBalances[empCode] = { casual: 12, comp: 3 };
   }
   return leaveBalances[empCode];
 }
 
 function openLeaveForm() {
+  if (currentUser && currentUser.role === 'MD') { showToast('MD does not apply for leave'); return; }
   document.getElementById('leaveFormOverlay').classList.add('active');
   selectedLeaveType = 'casual';
   document.querySelectorAll('#leaveTypePills .lt-pill').forEach((p,i) => p.classList.toggle('active', i===0));
@@ -5573,7 +5578,7 @@ async function submitLeave() {
 
   const days = Math.ceil((new Date(to) - new Date(from)) / 86400000) + 1;
   const bal = getLeaveBalance(currentUser.code);
-  const typeMap = { casual: 'casual', earned: 'earned', sick: 'sick', comp: 'comp' };
+  const typeMap = { casual: 'casual', comp: 'comp' };
   const balKey = typeMap[selectedLeaveType];
   if (bal[balKey] < days) { showToast('Insufficient ' + selectedLeaveType + ' leave balance (' + bal[balKey] + ' remaining)'); return; }
 
@@ -5634,30 +5639,46 @@ function switchLeaveTab(tab, el) {
 function renderLeaveScreen() {
   if (!currentUser) return;
   const isMDorHR = currentUser.role === 'MD' || currentUser.role === 'HR';
+  const isMD = currentUser.role === 'MD';
   const bal = getLeaveBalance(currentUser.code);
   const circumference = 163.4;
+  // Hide apply button and balance for MD
+  var applyBtn = document.getElementById('applyLeaveBtn');
+  if (applyBtn) applyBtn.style.display = isMD ? 'none' : '';
 
-  // Balance grid
+  // Balance grid (hidden for MD)
   const balGrid = document.getElementById('leaveBalanceGrid');
   if (balGrid) {
-    const leaveTypes = [
-      {key:'casual',label:'Casual Leave',total:12,color:'#E85D04',cls:'casual'},
-      {key:'earned',label:'Earned Leave',total:20,color:'#22C55E',cls:'earned'},
-      {key:'sick',label:'Sick Leave',total:6,color:'#F59E0B',cls:'sick'},
-      {key:'comp',label:'Comp Off',total:3,color:'#EC4899',cls:'comp'}
-    ];
-    balGrid.innerHTML = '<div class="section-title" style="margin-top:4px">Leave Balance</div><div class="leave-balance-grid fade-in">' +
-      leaveTypes.map(lt => {
-        const rem = bal[lt.key];
-        const used = lt.total - rem;
-        const offset = circumference * (used / lt.total);
-        return `<div class="leave-balance-card ${lt.cls}"><div class="donut-chart"><svg viewBox="0 0 65 65"><circle class="donut-bg" cx="32.5" cy="32.5" r="26"/><circle class="donut-fill" cx="32.5" cy="32.5" r="26" stroke="${lt.color}" stroke-dasharray="${circumference}" stroke-dashoffset="${offset}"/></svg><div class="donut-center">${rem}</div></div><div class="leave-type-name">${lt.label}</div><div class="leave-detail">${rem} of ${lt.total} remaining</div></div>`;
-      }).join('') + '</div>';
+    if (isMD) {
+      balGrid.innerHTML = '';
+    } else {
+      const leaveTypes = [
+        {key:'casual',label:'Casual Leave',total:12,color:'#E85D04',cls:'casual'},
+        {key:'comp',label:'Comp Off',total:3,color:'#EC4899',cls:'comp'}
+      ];
+      balGrid.innerHTML = '<div class="section-title" style="margin-top:4px">Leave Balance</div><div class="leave-balance-grid fade-in">' +
+        leaveTypes.map(lt => {
+          const rem = bal[lt.key] || 0;
+          const used = lt.total - rem;
+          const offset = circumference * (used / lt.total);
+          return `<div class="leave-balance-card ${lt.cls}"><div class="donut-chart"><svg viewBox="0 0 65 65"><circle class="donut-bg" cx="32.5" cy="32.5" r="26"/><circle class="donut-fill" cx="32.5" cy="32.5" r="26" stroke="${lt.color}" stroke-dasharray="${circumference}" stroke-dashoffset="${offset}"/></svg><div class="donut-center">${rem}</div></div><div class="leave-type-name">${lt.label}</div><div class="leave-detail">${rem} of ${lt.total} remaining</div></div>`;
+        }).join('') + '</div>';
+    }
+  }
+
+  // Hide "My Leaves" tab pill for MD, default to Team Leaves
+  var myPill = document.querySelector('#leaveTabPills [data-ltab="my"]');
+  if (myPill) myPill.style.display = isMD ? 'none' : '';
+  if (isMD) {
+    document.getElementById('myLeavesTab').style.display = 'none';
+    document.getElementById('teamLeavesTab').style.display = '';
+    var teamPill = document.querySelector('#leaveTabPills [data-ltab="team"]');
+    if (teamPill) teamPill.classList.add('active');
   }
 
   // My leaves
   const myTab = document.getElementById('myLeavesTab');
-  if (myTab) {
+  if (myTab && !isMD) {
     const myApps = leaveApplications.filter(a => a.empCode === currentUser.code);
     if (myApps.length === 0) {
       myTab.innerHTML = '<div style="padding:16px;text-align:center;font-size:.78rem;color:var(--gray-400)">No leave applications yet</div>';
@@ -6873,7 +6894,7 @@ function calculateFnF(exitId) {
   const pendingSalaryDays = 15;
   const pendingSalary = Math.round(dailySalary * pendingSalaryDays);
   const leaveBalance = leaveBalances[emp.code] || {};
-  const unusedLeaves = (leaveBalance.casual || 0) + (leaveBalance.earned || 0);
+  const unusedLeaves = (leaveBalance.casual || 0) + (leaveBalance.comp || 0);
   const leaveEncashment = Math.round(dailySalary * unusedLeaves);
   const gratuity = yearsOfService >= 5 ? Math.round(15 * dailySalary * yearsOfService / 26) : 0;
   const bonus = Math.round(emp.salary * 0.0833);

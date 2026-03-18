@@ -97,7 +97,7 @@
         <button class="quick-link" onclick="switchTab('progress',document.querySelector('[data-tab=progress]'))"><div class="ql-icon ql-progress"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div><span>Progress</span></button>
         <button class="quick-link" onclick="switchTab('salary',document.querySelector('[data-tab=salary]'))"><div class="ql-icon ql-salary"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div><span>Salary Slip</span></button>
         <button class="quick-link" onclick="switchTab('attendance',document.querySelector('[data-tab=attendance]'))"><div class="ql-icon ql-attendance"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg></div><span>Attendance</span></button>
-        <button class="quick-link" onclick="switchTab('leaves',document.querySelector('[data-tab=leaves]'))"><div class="ql-icon ql-leave"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/></svg></div><span>Apply Leave</span></button>
+        <button class="quick-link" id="qlApplyLeave" onclick="switchTab('leaves',document.querySelector('[data-tab=leaves]'))"><div class="ql-icon ql-leave"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/></svg></div><span>Apply Leave</span></button>
       </div>
       <div class="quick-links fade-in" style="margin-top:0">
         <button class="quick-link" onclick="showOverlay('hr-kpi')"><div class="ql-icon" style="background:linear-gradient(135deg,#FFF7ED,#FFEDD5);color:#E85D04"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div><span>My KPI</span></button>
@@ -312,7 +312,7 @@
         <div class="holiday-item"><div class="holiday-date-box"><span class="day">30</span><span class="month">Mar</span></div><div class="holiday-info"><h4>Id-ul-Fitr</h4><p>Monday &middot; Gazetted Holiday</p></div></div>
         <div class="holiday-item"><div class="holiday-date-box"><span class="day">14</span><span class="month">Apr</span></div><div class="holiday-info"><h4>Dr. Ambedkar Jayanti</h4><p>Tuesday &middot; Gazetted Holiday</p></div></div>
       </div></div>
-      <div style="margin-top:12px"><button class="btn btn-primary w-full" style="border-radius:var(--radius)" onclick="openLeaveForm()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Apply for Leave</button></div>
+      <div id="applyLeaveBtn" style="margin-top:12px"><button class="btn btn-primary w-full" style="border-radius:var(--radius)" onclick="openLeaveForm()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Apply for Leave</button></div>
     </div>
 
     <!-- EXPENSES -->
@@ -469,9 +469,7 @@
         <button style="background:none;border:none;cursor:pointer;font-size:1.2rem;color:var(--gray-400)" onclick="closeLeaveForm()">&times;</button>
       </div>
       <div class="leave-type-pills" id="leaveTypePills">
-        <div class="lt-pill active" onclick="selectLeaveType('casual',this)">Casual</div>
-        <div class="lt-pill" onclick="selectLeaveType('earned',this)">Earned</div>
-        <div class="lt-pill" onclick="selectLeaveType('sick',this)">Sick</div>
+        <div class="lt-pill active" onclick="selectLeaveType('casual',this)">Casual Leave</div>
         <div class="lt-pill" onclick="selectLeaveType('comp',this)">Comp Off</div>
       </div>
       <div class="form-row"><label>From Date</label><input type="date" id="leaveFromDate" onclick="this.showPicker&&this.showPicker()"></div>
@@ -919,6 +917,10 @@
 </div>
 
 
+<script>
+// Prevent login screen flash on refresh if session exists
+try{var s=localStorage.getItem('hrms_session');if(s){var p=JSON.parse(s);if(p&&p.token&&p.token.includes('.')&&Date.now()<p.expiry){document.getElementById('loginScreen').classList.add('hidden');}}}catch(e){}
+</script>
 <script src="app.js"></script>
 </body>
 </html>
