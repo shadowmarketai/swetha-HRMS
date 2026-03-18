@@ -150,8 +150,20 @@ router.post('/change-password', verifyToken, async (req, res) => {
   }
 });
 
-// POST /api/auth/seed — seed default users from EMPLOYEES data (MD only)
-router.post('/seed', verifyToken, requireRole('MD'), async (req, res) => {
+// Middleware: allow seed without auth if DB has zero users (bootstrap)
+async function bootstrapOrAuth(req, res, next) {
+  try {
+    const [rows] = await pool.query('SELECT COUNT(*) as cnt FROM users');
+    if (rows[0].cnt === 0) return next(); // empty DB — allow bootstrap
+  } catch (e) { /* table may not exist yet */ }
+  verifyToken(req, res, (err) => {
+    if (err) return; // verifyToken already sent response
+    requireRole('MD')(req, res, next);
+  });
+}
+
+// POST /api/auth/seed — seed default users from EMPLOYEES data (MD only, or bootstrap if empty)
+router.post('/seed', bootstrapOrAuth, async (req, res) => {
   try {
     const { employees, credentials } = req.body;
     if (!employees || !credentials) {
