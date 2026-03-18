@@ -45,19 +45,21 @@ echo "    Done."
 echo "[4/4] Running initial cleanup..."
 docker container prune -f > /dev/null 2>&1
 docker image prune -f > /dev/null 2>&1
-mkdir -p /tmp/docker-heal-restarts
+mkdir -p /var/lib/docker-heal
 echo "    Done."
 
 echo ""
 echo "=== Self-Healing System Active ==="
 echo ""
 echo "What's running:"
-echo "  - Every 5 min: restart unhealthy (max 3/hr per container) + prune stale (>5min)"
+echo "  - Every 5 min: restart unhealthy (max 3/hr per container, tracked by name)"
+echo "  - Every 5 min: prune stale containers (>5min old only)"
+echo "  - Every 5 min: reset retry counter when container recovers"
 echo "  - Daily 3 AM:  deep Docker cleanup (images > 72h)"
 echo "  - All containers: restart=unless-stopped"
 echo ""
 echo "Logs:    /var/log/docker-heal.log"
-echo "Tracker: /tmp/docker-heal-restarts/ (auto-cleans after 1hr)"
+echo "Tracker: /var/lib/docker-heal/ (persists across reboots, auto-cleans after 1hr)"
 echo ""
 echo "Optional: Edit /root/docker-heal.sh to add Telegram alerts:"
 echo "  TELEGRAM_BOT_TOKEN=\"your-bot-token\""

@@ -2,7 +2,8 @@
 # =============================================================
 # Docker Self-Healing Script for Coolify
 # Runs via cron every 5 minutes
-# - Restarts unhealthy containers (with retry limit)
+# - Restarts unhealthy containers (with retry limit per name)
+# - Clears retry counter when container recovers
 # - Prunes stale build containers (fixes Coolify name conflicts)
 # - Alerts via Telegram (optional)
 # - Monitors disk + memory usage
@@ -10,9 +11,8 @@
 
 LOG="/var/log/docker-heal.log"
 MAX_LOG_SIZE=5242880  # 5MB
-RESTART_TRACKER="/tmp/docker-heal-restarts"
-MAX_RESTARTS=3        # max restarts per container per hour
-TRACKER_TTL=3600      # reset counters after 1 hour (seconds)
+RESTART_TRACKER="/var/lib/docker-heal"   # persistent across reboots
+MAX_RESTARTS=3                            # max restarts per container per hour
 
 # --- Optional Telegram alerts (fill in to enable) ---
 TELEGRAM_BOT_TOKEN=""
@@ -25,10 +25,10 @@ send_alert() {
   fi
 }
 
-# Initialize restart tracker directory
+# Initialize tracker directory
 mkdir -p "$RESTART_TRACKER"
 
-# Clean stale tracker files (older than 1 hour)
+# Clean stale tracker files (older than 1 hour — resets retry window)
 find "$RESTART_TRACKER" -type f -mmin +60 -delete 2>/dev/null
 
 # Rotate log if too large
@@ -40,39 +40,49 @@ echo "---- $(date '+%Y-%m-%d %H:%M:%S') ----" >> "$LOG"
 
 ACTIONS=0
 
-# 1. Restart unhealthy containers (with retry protection)
+# 1. Clear retry counters for containers that recovered (healthy now)
+for id in $(docker ps --filter "health=healthy" -q 2>/dev/null); do
+  name=$(docker inspect --format '{{.Name}}' "$id" 2>/dev/null | sed 's/^\///')
+  if [ -n "$name" ] && [ -f "$RESTART_TRACKER/$name" ]; then
+    echo "[RECOVERED] Container $name is healthy again — reset retry counter" >> "$LOG"
+    rm -f "$RESTART_TRACKER/$name"
+  fi
+done
+
+# 2. Restart unhealthy containers (with retry protection by name)
 for id in $(docker ps --filter "health=unhealthy" -q 2>/dev/null); do
   name=$(docker inspect --format '{{.Name}}' "$id" 2>/dev/null | sed 's/^\///')
-  tracker_file="$RESTART_TRACKER/$id"
+  if [ -z "$name" ]; then continue; fi
+  tracker_file="$RESTART_TRACKER/$name"
 
-  # Count recent restarts for this container
+  # Count recent restarts for this container (by name, survives redeploys)
   count=0
   if [ -f "$tracker_file" ]; then
-    count=$(cat "$tracker_file")
+    count=$(cat "$tracker_file" 2>/dev/null || echo 0)
   fi
 
   if [ "$count" -ge "$MAX_RESTARTS" ]; then
-    echo "[SKIP] Container $name ($id) hit restart limit ($MAX_RESTARTS/hr) — needs manual intervention" >> "$LOG"
-    send_alert "🔴 HRMS: Container $name stuck unhealthy after $MAX_RESTARTS restarts — check manually"
+    echo "[SKIP] Container $name unhealthy for $MAX_RESTARTS attempts in 1 hour. Auto-healing paused. Manual check required." >> "$LOG"
+    send_alert "🚨 Container $name unhealthy for $MAX_RESTARTS attempts in 1 hour. Auto-healing paused. Manual check required."
     continue
   fi
 
-  echo "[HEAL] Restarting unhealthy container: $name ($id) (attempt $((count + 1))/$MAX_RESTARTS)" >> "$LOG"
+  echo "[HEAL] Restarting unhealthy container: $name (attempt $((count + 1))/$MAX_RESTARTS)" >> "$LOG"
   docker restart "$id" >> "$LOG" 2>&1
   echo $((count + 1)) > "$tracker_file"
-  send_alert "⚠️ HRMS: Restarted unhealthy container $name (attempt $((count + 1))/$MAX_RESTARTS)"
+  send_alert "⚠️ Restarted unhealthy container $name (attempt $((count + 1))/$MAX_RESTARTS)"
   ACTIONS=$((ACTIONS + 1))
 done
 
-# 2. Prune stopped containers older than 5 min (prevents Coolify build conflicts)
-#    The --filter "until=5m" avoids killing containers from active deployments
+# 3. Prune stopped containers older than 5 min (prevents Coolify build conflicts)
+#    --filter "until=5m" avoids killing containers from active deployments
 PRUNED=$(docker container prune -f --filter "until=5m" 2>/dev/null | grep "Total reclaimed" || echo "nothing pruned")
 if echo "$PRUNED" | grep -qv "0B"; then
   echo "[CLEAN] $PRUNED" >> "$LOG"
   ACTIONS=$((ACTIONS + 1))
 fi
 
-# 3. Remove dangling images (saves disk)
+# 4. Remove dangling images (saves disk)
 DANGLING=$(docker images -f "dangling=true" -q 2>/dev/null | wc -l)
 if [ "$DANGLING" -gt 5 ]; then
   echo "[CLEAN] Removing $DANGLING dangling images" >> "$LOG"
@@ -80,7 +90,7 @@ if [ "$DANGLING" -gt 5 ]; then
   ACTIONS=$((ACTIONS + 1))
 fi
 
-# 4. Check disk usage
+# 5. Check disk usage
 USAGE=$(df / | awk 'NR==2 {print $5}' | sed 's/%//')
 if [ "$USAGE" -gt 85 ]; then
   echo "[WARN] High disk usage: ${USAGE}%" >> "$LOG"
@@ -91,7 +101,7 @@ elif [ "$USAGE" -gt 75 ]; then
   echo "[INFO] Disk usage: ${USAGE}% (watching)" >> "$LOG"
 fi
 
-# 5. Check memory usage
+# 6. Check memory usage
 MEM_USED=$(free | awk '/Mem:/ {printf "%.0f", $3/$2 * 100}')
 if [ "$MEM_USED" -gt 90 ]; then
   echo "[WARN] High memory: ${MEM_USED}%" >> "$LOG"
