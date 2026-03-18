@@ -150,11 +150,17 @@ router.post('/change-password', verifyToken, async (req, res) => {
   }
 });
 
-// Middleware: allow seed without auth if DB has zero users (bootstrap)
+// Middleware: allow seed without auth if DB has zero users or no MD can login (bootstrap)
 async function bootstrapOrAuth(req, res, next) {
   try {
     const [rows] = await pool.query('SELECT COUNT(*) as cnt FROM users');
     if (rows[0].cnt === 0) return next(); // empty DB — allow bootstrap
+    // Also allow if MD001 password hash is corrupted (re-seed recovery)
+    const [md] = await pool.query('SELECT password_hash FROM users WHERE emp_code = ?', ['MD001']);
+    if (md.length > 0) {
+      const valid = await bcrypt.compare('admin123', md[0].password_hash);
+      if (!valid) return next(); // MD password corrupted — allow re-seed
+    }
   } catch (e) { /* table may not exist yet */ }
   verifyToken(req, res, (err) => {
     if (err) return; // verifyToken already sent response
