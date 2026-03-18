@@ -110,9 +110,18 @@ app.use('/api/assets', require('./routes/assets'));
 app.use('/api/exit', require('./routes/exit'));
 app.use('/api/announcements', require('./routes/announcements'));
 
-// Health check
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+// Health check — verifies app + DB connectivity
+app.get('/api/health', async (req, res) => {
+  const health = { status: 'ok', timestamp: new Date().toISOString(), db: 'ok', uptime: process.uptime() };
+  try {
+    const pool = require('./config/db');
+    await pool.query('SELECT 1');
+  } catch (e) {
+    health.status = 'degraded';
+    health.db = 'unreachable';
+  }
+  const code = health.status === 'ok' ? 200 : 503;
+  res.status(code).json(health);
 });
 
 // Fallback to frontend
