@@ -165,6 +165,43 @@ async function seed() {
   }
   console.log('   Created ' + sampleFilings.length + ' sample compliance filings');
 
+  // 8. Seed reporting structure (org chart) via API
+  console.log('\n8. Seeding reporting structure...');
+  const REPORTING_MAP = {
+    'MD001': { reports: ['SSC006','SSC001','SSC002','SSC009','SSC023'] },
+    'SSC006': { reports: ['SSC005','SSC015','SSC016'] },
+    'SSC001': { reports: ['SSC007','SSC008','SSC004'] },
+    'SSC002': { reports: ['SSC012','SSC014','SSC013'] },
+    'SSC003': { reports: ['SSC017','SSC019','SSC010'] },
+    'SSC009': { reports: ['SSC003','SSM001'] },
+    'SSC017': { reports: ['SSC018','SSC020','SSC021','SSC024','SSC025','SSC026','SSC027','SSC028','SSC029','SSC030','SSC022'] },
+    'SSM001': { reports: ['SSM002','SSM003','SSM004','SSM005','SSM006','SSM007','SSM008','SSM009','SSM010','SSM011'] },
+    'SSM011': { reports: ['SSM012','SSM013','SSM014'] },
+    'SSC023': { reports: ['SSC011'] },
+    'SSG003': { reports: ['SSG001','SSG002','SSG004','SSG005'] }
+  };
+  // Build flat rows: each child maps to its parent
+  const orgRows = [];
+  orgRows.push({ emp_code: 'MD001', reports_to: null });
+  orgRows.push({ emp_code: 'SSG003', reports_to: null });
+  Object.keys(REPORTING_MAP).forEach(parent => {
+    REPORTING_MAP[parent].reports.forEach(child => {
+      orgRows.push({ emp_code: child, reports_to: parent });
+    });
+  });
+  let orgSeeded = 0;
+  for (const row of orgRows) {
+    try {
+      await fetch(API_BASE + '/orgchart/' + row.emp_code, {
+        method: 'PUT',
+        headers: authHeaders,
+        body: JSON.stringify({ reports_to: row.reports_to })
+      });
+      orgSeeded++;
+    } catch (e) { /* skip failures */ }
+  }
+  console.log('   Seeded ' + orgSeeded + '/' + orgRows.length + ' reporting structure rows');
+
   console.log('\nSeed complete! Database is ready.');
   console.log('Login credentials:');
   console.log('  MD:       MD001 / admin123');
