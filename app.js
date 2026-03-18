@@ -2363,7 +2363,7 @@ function renderRecruitmentOverlay() {
         '<div id="candidateFormArea_' + j.id + '"></div>' +
       '</div>';
     }).join('');
-  } else {
+  } else if (activeTab === 'pipeline') {
     var stageDivs = PIPELINE_STAGES.map(function(stage) {
       var cands = CANDIDATES.filter(function(c) { return c.stage === stage; });
       var cards = cands.map(function(c) {
