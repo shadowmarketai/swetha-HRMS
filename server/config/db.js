@@ -1,4 +1,6 @@
 const mysql = require('mysql2/promise');
+const fs = require('fs');
+const path = require('path');
 require('dotenv').config();
 
 const pool = mysql.createPool({
@@ -14,15 +16,61 @@ const pool = mysql.createPool({
   keepAliveInitialDelay: 0
 });
 
-// Test connection on startup
-pool.getConnection()
-  .then(conn => {
+// Auto-initialize schema if tables are missing
+async function initSchema() {
+  let conn;
+  try {
+    conn = await pool.getConnection();
     console.log('MySQL connected successfully');
-    conn.release();
-  })
-  .catch(err => {
-    console.error('MySQL connection failed:', err.message);
+
+    // Check if tables exist
+    const [tables] = await conn.query('SHOW TABLES');
+    if (tables.length === 0) {
+      console.log('No tables found — auto-initializing schema...');
+      const schemaPath = path.join(__dirname, '..', '..', 'database', 'schema.sql');
+      if (fs.existsSync(schemaPath)) {
+        let sql = fs.readFileSync(schemaPath, 'utf8');
+        // Remove CREATE DATABASE / USE statements (pool already targets the DB)
+        sql = sql.replace(/CREATE DATABASE.*?;\s*/gi, '');
+        sql = sql.replace(/USE\s+\w+;\s*/gi, '');
+
+        // Split and execute statements individually to handle index-exists errors gracefully
+        const statements = sql.split(';').map(s => s.trim()).filter(s => s.length > 0);
+        let success = 0, skipped = 0;
+        for (const stmt of statements) {
+          try {
+            await conn.query(stmt);
+            success++;
+          } catch (stmtErr) {
+            // Ignore duplicate index/key errors (1061), already exists errors
+            if (stmtErr.errno === 1061 || stmtErr.code === 'ER_DUP_KEYNAME') {
+              skipped++;
+            } else {
+              console.error('Schema statement error:', stmtErr.message);
+              console.error('Statement:', stmt.substring(0, 100) + '...');
+            }
+          }
+        }
+        console.log('Schema init: ' + success + ' statements executed, ' + skipped + ' skipped (already exist)');
+        console.log('Schema initialized successfully (' + tables.length + ' → check SHOW TABLES)');
+
+        // Verify
+        const [newTables] = await conn.query('SHOW TABLES');
+        console.log('Tables created:', newTables.length);
+      } else {
+        console.log('schema.sql not found at', schemaPath, '— skipping auto-init');
+      }
+    } else {
+      console.log('Database has', tables.length, 'tables — schema OK');
+    }
+  } catch (err) {
+    console.error('MySQL connection/init failed:', err.message);
     console.log('Server will continue without database — localStorage fallback active');
-  });
+  } finally {
+    if (conn) conn.release();
+  }
+}
+
+initSchema();
 
 module.exports = pool;

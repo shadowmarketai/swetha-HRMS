@@ -37,7 +37,6 @@ services:
       MYSQL_DATABASE: hrms
     volumes:
       - hrms_testing_data:/var/lib/mysql
-      - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-hrms2026}"]
       interval: 10s
