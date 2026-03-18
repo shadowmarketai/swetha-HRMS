@@ -827,6 +827,17 @@ a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.cal-nav bu
 [data-theme="dark"] .hr-hub-card:hover{background:var(--gray-100)}
 [data-theme="dark"] .salary-row{background:var(--card);color:var(--text)}
 [data-theme="dark"] .ac-icon{opacity:.85}
+[data-theme="dark"] .sidebar-child{color:var(--gray-400)}
+[data-theme="dark"] .sidebar-child:hover{background:var(--gray-100);color:var(--gray-600)}
+[data-theme="dark"] .sidebar-child.active{color:var(--primary);background:var(--primary-50)}
+[data-theme="dark"] .sidebar-child .child-dot{background:var(--gray-400)}
+[data-theme="dark"] .sidebar-child.active .child-dot{background:var(--primary)}
+[data-theme="dark"] .sidebar-footer{border-top-color:rgba(255,255,255,.06)}
+[data-theme="dark"] .more-menu-sheet{background:var(--card);border-color:rgba(255,255,255,.06)}
+[data-theme="dark"] .more-menu-item{color:var(--text)}
+[data-theme="dark"] .more-menu-item:hover{background:var(--gray-100)}
+[data-theme="dark"] .more-menu-backdrop{background:rgba(0,0,0,.6)}
+[data-theme="dark"] .more-menu-title{color:var(--gray-400);border-bottom-color:rgba(255,255,255,.06)}
 
 /* =====================================================
    TABLET LAYOUT (768px – 1024px)
@@ -916,6 +927,19 @@ a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.cal-nav bu
   .sidebar-footer-btn.logout-btn { color: var(--danger); }
   .sidebar-footer-btn.logout-btn:hover { background: var(--danger-light); }
   .sidebar-footer-btn svg { width: 20px; height: 20px; flex-shrink: 0; }
+  /* Sidebar sub-menu styles */
+  .sidebar-main { display: flex; flex-direction: column; gap: 2px; flex: 1; overflow-y: auto; }
+  .sidebar-group { display: flex; flex-direction: column; }
+  .sidebar-parent { position: relative; }
+  .sidebar-parent .chevron { width: 16px; height: 16px; margin-left: auto; flex-shrink: 0; transition: transform .25s; color: var(--gray-400); }
+  .sidebar-parent.expanded .chevron { transform: rotate(180deg); }
+  .sidebar-children { max-height: 0; overflow: hidden; transition: max-height .3s ease; }
+  .sidebar-children.expanded { max-height: 400px; }
+  .sidebar-child { display: flex; align-items: center; gap: 8px; padding: 8px 14px 8px 44px; border: none; background: none; cursor: pointer; font-family: var(--font-body); font-size: .78rem; font-weight: 400; color: var(--gray-500); width: 100%; transition: all .2s; border-radius: 8px; text-align: left; }
+  .sidebar-child:hover { background: var(--gray-50); color: var(--gray-700); }
+  .sidebar-child.active { color: var(--primary); font-weight: 600; background: var(--primary-50); }
+  .child-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--gray-300); flex-shrink: 0; }
+  .sidebar-child.active .child-dot { background: var(--primary); }
   /* Login — split layout */
   .login-screen { display: flex; flex-direction: row; align-items: stretch; grid-column: 1 / -1; grid-row: 1 / -1; overflow-y: auto; padding: 0; }
   .login-screen::before, .login-screen::after { display: none; }
@@ -1189,6 +1213,20 @@ a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.cal-nav bu
   .sidebar-footer-btn.logout-btn:hover { background: var(--danger-light); }
   .sidebar-footer-btn svg { width: 22px; height: 22px; flex-shrink: 0; }
 
+  /* ── Sidebar sub-menu (desktop) ── */
+  .sidebar-main { display: flex; flex-direction: column; gap: 4px; flex: 1; overflow-y: auto; }
+  .sidebar-group { display: flex; flex-direction: column; }
+  .sidebar-parent { position: relative; }
+  .sidebar-parent .chevron { width: 18px; height: 18px; margin-left: auto; flex-shrink: 0; transition: transform .25s; color: var(--gray-400); }
+  .sidebar-parent.expanded .chevron { transform: rotate(180deg); }
+  .sidebar-children { max-height: 0; overflow: hidden; transition: max-height .3s ease; }
+  .sidebar-children.expanded { max-height: 500px; }
+  .sidebar-child { display: flex; align-items: center; gap: 10px; padding: 9px 18px 9px 52px; border: none; background: none; cursor: pointer; font-family: var(--font-body); font-size: .85rem; font-weight: 400; color: var(--gray-500); width: 100%; transition: all .2s; border-radius: 10px; text-align: left; }
+  .sidebar-child:hover { background: var(--gray-50); color: var(--gray-700); }
+  .sidebar-child.active { color: var(--primary); font-weight: 600; background: var(--primary-50); }
+  .child-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--gray-300); flex-shrink: 0; }
+  .sidebar-child.active .child-dot { background: var(--primary); }
+
   /* ── Step 8: Login — split layout ── */
   .login-screen {
     display: flex; flex-direction: row; align-items: stretch;
@@ -1252,6 +1290,16 @@ a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.cal-nav bu
   .leave-balance-grid{grid-template-columns:1fr 1fr;gap:4px}
   .payroll-report-btn{font-size:.72rem;padding:12px 12px}
 }
+
+/* ===== MOBILE MORE MENU (bottom sheet) ===== */
+.more-menu-overlay{position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;display:flex;align-items:flex-end;justify-content:center}
+.more-menu-backdrop{position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.4)}
+.more-menu-sheet{position:relative;width:100%;max-width:430px;background:white;border-radius:16px 16px 0 0;padding:8px 0 calc(8px + env(safe-area-inset-bottom,0px));max-height:70vh;overflow-y:auto;animation:slideUp .25s ease}
+@keyframes slideUp{from{transform:translateY(100%)}to{transform:translateY(0)}}
+.more-menu-title{padding:12px 20px 8px;font-family:var(--font-display);font-weight:600;font-size:.85rem;color:var(--gray-500);border-bottom:1px solid var(--gray-100)}
+.more-menu-item{display:flex;align-items:center;gap:14px;width:100%;padding:14px 20px;border:none;background:none;cursor:pointer;font-family:var(--font-body);font-size:.9rem;font-weight:500;color:var(--text);transition:background .15s}
+.more-menu-item:hover{background:var(--gray-50)}
+.more-menu-item svg{width:22px;height:22px;color:var(--gray-500);flex-shrink:0}
 
 /* ===== F1: SHIFT MANAGEMENT ===== */
 .shift-card{background:var(--card);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);margin-bottom:10px;display:flex;align-items:center;gap:12px}

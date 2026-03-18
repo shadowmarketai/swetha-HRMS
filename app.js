@@ -164,6 +164,111 @@ const EXPENSE_CATEGORIES = ['Travel','Food','Accommodation','Equipment','Office 
 let expenseReimbursements = [];
 let expReimbNextId = 1;
 
+// =====================================================
+// ROLE-SPECIFIC NAVIGATION CONFIG
+// =====================================================
+let _activeNavId = 'home';
+let _navExpandedGroups = {};
+let _lastNavWidth = 0;
+
+const NAV_ICONS = {
+  home:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>',
+  attendance:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M9 16l2 2 4-4"/></svg>',
+  advance:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>',
+  location: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>',
+  progress: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>',
+  performance:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+  orgchart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="8" y="2" width="8" height="6" rx="1"/><rect x="1" y="16" width="8" height="6" rx="1"/><rect x="15" y="16" width="8" height="6" rx="1"/><line x1="12" y1="8" x2="12" y2="13"/><line x1="5" y1="13" x2="19" y2="13"/><line x1="5" y1="13" x2="5" y2="16"/><line x1="19" y1="13" x2="19" y2="16"/></svg>',
+  tax:      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>',
+  salary:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>',
+  expense:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 20h20"/><path d="M5 20V8l7-5 7 5v12"/><rect x="9" y="12" width="6" height="8"/></svg>',
+  recruit:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>',
+  profile:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
+  settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.73 12.73 1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>',
+  admin:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1.08 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.604.852.997 1.51 1.08H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1.08z"/></svg>',
+  logout:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>',
+  ta:       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>',
+  more:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>'
+};
+
+const NAV_CONFIG = {
+  MD: [
+    { id:'home', label:'Home', icon:'home', action:{type:'tab',target:'home'} },
+    { id:'md-attendance', label:'Attendance', icon:'attendance', children:[
+      { id:'md-att-report', label:'Employee Attendance Report', action:{type:'tab',target:'attendance'} },
+      { id:'md-att-leave', label:'Employee Leave Request', action:{type:'tab',target:'leaves'} }
+    ]},
+    { id:'md-advance', label:'Advance', icon:'advance', children:[
+      { id:'md-adv-history', label:'Advance History', action:{type:'tab',target:'advance'} },
+      { id:'md-adv-requests', label:'Advance Requests', action:{type:'overlay',target:'advance-requests'} }
+    ]},
+    { id:'md-location', label:'Live Location', icon:'location', action:{type:'overlay',target:'location'} },
+    { id:'md-progress', label:'Progress', icon:'progress', action:{type:'tab',target:'progress'} },
+    { id:'md-performance', label:'Employee Performance', icon:'performance', children:[
+      { id:'md-perf-kpi', label:'Track History', action:{type:'overlay',target:'hr-kpi'} },
+      { id:'md-perf-docs', label:'Verification', action:{type:'overlay',target:'hr-documents'} },
+      { id:'md-perf-onboard', label:'Add Employee', action:{type:'overlay',target:'onboarding'} }
+    ]},
+    { id:'md-orgchart', label:'Org Chart', icon:'orgchart', action:{type:'overlay',target:'hr-orgchart'} },
+    { id:'md-tax', label:'Form 16 & Tax', icon:'tax', action:{type:'overlay',target:'hr-tax'} },
+    { id:'md-salary', label:'Salary', icon:'salary', children:[
+      { id:'md-sal-structure', label:'Salary Structure', action:{type:'tab',target:'expenses'} },
+      { id:'md-sal-check', label:'Salary Check', action:{type:'tab',target:'salary'} }
+    ]},
+    // Footer items
+    { id:'md-profile', label:'Profile', icon:'profile', action:{type:'overlay',target:'profile'}, isFooter:true },
+    { id:'md-admin', label:'Settings', icon:'admin', action:{type:'overlay',target:'admin'}, isFooter:true },
+    { id:'md-logout', label:'Log Out', icon:'logout', action:{type:'logout'}, isFooter:true, isDanger:true }
+  ],
+  HR: [
+    { id:'home', label:'Home', icon:'home', action:{type:'tab',target:'home'} },
+    { id:'hr-attendance', label:'Attendance', icon:'attendance', children:[
+      { id:'hr-att-self', label:'Self Calendar', action:{type:'tab',target:'attendance'} },
+      { id:'hr-att-leave', label:'Apply Leave', action:{type:'tab',target:'leaves'} },
+      { id:'hr-att-emp', label:'Employee Attendance', action:{type:'tab',target:'attendance'} },
+      { id:'hr-att-leavereq', label:'Employee Leave Req', action:{type:'tab',target:'leaves'} }
+    ]},
+    { id:'hr-advance', label:'Advance', icon:'advance', children:[
+      { id:'hr-adv-salary', label:'Salary Advance', action:{type:'tab',target:'advance'} },
+      { id:'hr-adv-travel', label:'Travel Advance', action:{type:'tab',target:'ta'} },
+      { id:'hr-adv-expense', label:'Travel Expense', action:{type:'tab',target:'site'} }
+    ]},
+    { id:'hr-performance', label:'Employee Performance', icon:'performance', children:[
+      { id:'hr-perf-docs', label:'Verification', action:{type:'overlay',target:'hr-documents'} },
+      { id:'hr-perf-onboard', label:'Add Employee', action:{type:'overlay',target:'onboarding'} }
+    ]},
+    { id:'hr-recruit', label:'Interview Process', icon:'recruit', action:{type:'overlay',target:'hr-recruit'} },
+    { id:'hr-orgchart', label:'Org Chart', icon:'orgchart', action:{type:'overlay',target:'hr-orgchart'} },
+    { id:'hr-tax', label:'Form 16 & Tax', icon:'tax', action:{type:'overlay',target:'hr-tax'} },
+    { id:'hr-salary', label:'Salary', icon:'salary', children:[
+      { id:'hr-sal-self', label:'Self Salary', action:{type:'tab',target:'salary'} },
+      { id:'hr-sal-list', label:'Employee List', action:{type:'tab',target:'expenses'} }
+    ]},
+    // Footer
+    { id:'hr-profile', label:'Profile', icon:'profile', action:{type:'overlay',target:'profile'}, isFooter:true },
+    { id:'hr-settings', label:'Settings', icon:'settings', action:{type:'overlay',target:'settings'}, isFooter:true },
+    { id:'hr-logout', label:'Log Out', icon:'logout', action:{type:'logout'}, isFooter:true, isDanger:true }
+  ],
+  Employee: [
+    { id:'home', label:'Home', icon:'home', action:{type:'tab',target:'home'} },
+    { id:'emp-attendance', label:'Attendance', icon:'attendance', children:[
+      { id:'emp-att-cal', label:'Calendar', action:{type:'tab',target:'attendance'} },
+      { id:'emp-att-leave', label:'Apply Leave', action:{type:'tab',target:'leaves'} }
+    ]},
+    { id:'emp-expense', label:'Expense', icon:'expense', children:[
+      { id:'emp-exp-travel', label:'Travel Advance', action:{type:'tab',target:'ta'} },
+      { id:'emp-exp-site', label:'Travel Expense', action:{type:'tab',target:'site'} },
+      { id:'emp-exp-salary', label:'Salary Advance', action:{type:'tab',target:'advance'} }
+    ]},
+    { id:'emp-progress', label:'Project Progress', icon:'progress', action:{type:'tab',target:'progress'} },
+    { id:'emp-salary', label:'Salary Statement', icon:'salary', action:{type:'tab',target:'salary'} },
+    // Footer
+    { id:'emp-profile', label:'Profile', icon:'profile', action:{type:'overlay',target:'profile'}, isFooter:true },
+    { id:'emp-settings', label:'Settings', icon:'settings', action:{type:'overlay',target:'settings'}, isFooter:true },
+    { id:'emp-logout', label:'Log Out', icon:'logout', action:{type:'logout'}, isFooter:true, isDanger:true }
+  ]
+};
+
 // F3: Self Service
 let employeeSelfData = {};
 
@@ -388,7 +493,10 @@ function loginAs(empIndex) {
   document.getElementById('appHeader').style.display = '';
   document.getElementById('appContent').style.display = '';
   document.getElementById('bottomTabs').style.display = '';
+  _activeNavId = 'home';
+  _navExpandedGroups = {};
   applyRole();
+  renderNavigation();
   updateGreeting();
   buildCalendar();
   initLeaveTabs();
@@ -542,13 +650,15 @@ function applyRole() {
   // Settings button (hide for MD since they have admin)
   document.getElementById('settingsBtn').style.display = isMD ? 'none' : '';
 
-  // Show/hide MD/HR-only elements
+  // Show/hide MD/HR-only elements (skip nav — it's rendered dynamically)
   document.querySelectorAll('.md-hr-only').forEach(el => {
+    if (el.closest('#bottomTabs')) return;
     el.classList.toggle('hidden', !isMDorHR);
   });
 
-  // Show/hide MD-only elements (location tracker etc.)
+  // Show/hide MD-only elements (skip nav)
   document.querySelectorAll('.md-only').forEach(el => {
+    if (el.closest('#bottomTabs')) return;
     el.classList.toggle('hidden', !isMD);
   });
   document.getElementById('locationBtn').style.display = isMD ? '' : 'none';
@@ -905,6 +1015,7 @@ function switchTab(id, el, _fromPopstate) {
   if (id === 'advance' || id === 'site' || id === 'ta') { renderAllMyRequests(); renderAllPendingBanners(); }
   if (id === 'leaves') renderLeaveScreen();
   if (id === 'progress') renderProgressScreen();
+  updateNavActiveState();
 }
 let _overlayPreviousFocus = [];
 function showOverlay(id) {
@@ -5122,46 +5233,245 @@ async function seedBackendData() {
 })();
 
 // =====================================================
-// DESKTOP SIDEBAR FOOTER (Profile, Settings, Logout)
+// ROLE-SPECIFIC NAVIGATION RENDERER
 // =====================================================
-(function initDesktopSidebar() {
-  let footer = null;
-  let wasDesktop = window.innerWidth >= 768;
-
-  function ensureFooter() {
-    if (footer) return footer;
-    const tabs = document.getElementById('bottomTabs');
-    if (!tabs) return null;
-    footer = document.createElement('div');
-    footer.className = 'sidebar-footer';
-    footer.innerHTML = `
-      <button class="sidebar-footer-btn" onclick="showOverlay('profile')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-        <span>Profile</span>
-      </button>
-      <button class="sidebar-footer-btn" onclick="showOverlay('settings')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.73 12.73 1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
-        <span>Settings</span>
-      </button>
-      <button class="sidebar-footer-btn logout-btn" onclick="doLogout()">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-        <span>Log Out</span>
-      </button>`;
-    tabs.appendChild(footer);
-    return footer;
+function renderNavigation() {
+  if (!currentUser) return;
+  var config = NAV_CONFIG[currentUser.role] || NAV_CONFIG.Employee;
+  var container = document.getElementById('bottomTabs');
+  if (!container) return;
+  var isDesktop = window.innerWidth >= 768;
+  container.innerHTML = '';
+  if (isDesktop) {
+    renderDesktopSidebar(config, container);
+  } else {
+    renderMobileBottomTabs(config, container);
   }
+}
 
-  // Create immediately if desktop
-  if (wasDesktop) ensureFooter();
+function renderMobileBottomTabs(config, container) {
+  var mainItems = config.filter(function(i) { return !i.isFooter; });
+  var maxVisible = 5;
+  var visibleItems, overflowItems;
+  if (mainItems.length <= maxVisible) {
+    visibleItems = mainItems;
+    overflowItems = [];
+  } else {
+    visibleItems = mainItems.slice(0, maxVisible - 1);
+    overflowItems = mainItems.slice(maxVisible - 1);
+  }
+  visibleItems.forEach(function(item) {
+    var btn = document.createElement('button');
+    btn.className = 'tab-item' + (_activeNavId === item.id ? ' active' : '');
+    btn.setAttribute('data-nav-id', item.id);
+    btn.innerHTML = NAV_ICONS[item.icon] + '<span>' + escapeHTML(item.label) + '</span>';
+    btn.onclick = function() {
+      if (item.children && item.children.length) {
+        executeNavAction(item.children[0], btn);
+        _activeNavId = item.children[0].id;
+      } else {
+        executeNavAction(item, btn);
+        _activeNavId = item.id;
+      }
+      updateNavActiveState();
+    };
+    container.appendChild(btn);
+  });
+  if (overflowItems.length > 0) {
+    var moreBtn = document.createElement('button');
+    moreBtn.className = 'tab-item';
+    moreBtn.innerHTML = NAV_ICONS.more + '<span>More</span>';
+    moreBtn.onclick = function() { showMobileMoreMenu(overflowItems); };
+    container.appendChild(moreBtn);
+  }
+}
 
-  window.addEventListener('resize', () => {
-    const isDesktop = window.innerWidth >= 768;
-    if (isDesktop && !wasDesktop) {
-      const f = ensureFooter();
-      if (f) f.style.display = '';
+function renderDesktopSidebar(config, container) {
+  var mainItems = config.filter(function(i) { return !i.isFooter; });
+  var footerItems = config.filter(function(i) { return i.isFooter; });
+
+  var mainDiv = document.createElement('div');
+  mainDiv.className = 'sidebar-main';
+
+  mainItems.forEach(function(item) {
+    var group = document.createElement('div');
+    group.className = 'sidebar-group';
+
+    if (item.children && item.children.length) {
+      // Parent with children — expandable
+      var isExpanded = !!_navExpandedGroups[item.id];
+      var parentBtn = document.createElement('button');
+      parentBtn.className = 'tab-item sidebar-parent' + (isExpanded ? ' expanded' : '');
+      parentBtn.setAttribute('data-nav-id', item.id);
+      parentBtn.innerHTML = NAV_ICONS[item.icon] + '<span>' + escapeHTML(item.label) + '</span>' +
+        '<svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>';
+      parentBtn.onclick = function() { toggleSidebarGroup(item.id); };
+      group.appendChild(parentBtn);
+
+      var childrenDiv = document.createElement('div');
+      childrenDiv.className = 'sidebar-children' + (isExpanded ? ' expanded' : '');
+      childrenDiv.id = 'nav-children-' + item.id;
+      item.children.forEach(function(child) {
+        var childBtn = document.createElement('button');
+        childBtn.className = 'sidebar-child' + (_activeNavId === child.id ? ' active' : '');
+        childBtn.setAttribute('data-nav-id', child.id);
+        childBtn.innerHTML = '<span class="child-dot"></span><span>' + escapeHTML(child.label) + '</span>';
+        childBtn.onclick = function() {
+          _activeNavId = child.id;
+          executeNavAction(child, childBtn);
+          updateNavActiveState();
+        };
+        childrenDiv.appendChild(childBtn);
+      });
+      group.appendChild(childrenDiv);
+    } else {
+      // Leaf item
+      var btn = document.createElement('button');
+      btn.className = 'tab-item' + (_activeNavId === item.id ? ' active' : '');
+      btn.setAttribute('data-nav-id', item.id);
+      btn.innerHTML = NAV_ICONS[item.icon] + '<span>' + escapeHTML(item.label) + '</span>';
+      btn.onclick = function() {
+        _activeNavId = item.id;
+        executeNavAction(item, btn);
+        updateNavActiveState();
+      };
+      group.appendChild(btn);
     }
-    if (!isDesktop && wasDesktop && footer) { footer.style.display = 'none'; }
-    wasDesktop = isDesktop;
+    mainDiv.appendChild(group);
+  });
+  container.appendChild(mainDiv);
+
+  // Footer
+  if (footerItems.length) {
+    var footerDiv = document.createElement('div');
+    footerDiv.className = 'sidebar-footer';
+    footerItems.forEach(function(fi) {
+      var fbtn = document.createElement('button');
+      fbtn.className = 'sidebar-footer-btn' + (fi.isDanger ? ' logout-btn' : '');
+      fbtn.innerHTML = NAV_ICONS[fi.icon] + '<span>' + escapeHTML(fi.label) + '</span>';
+      fbtn.onclick = function() { executeNavAction(fi, fbtn); };
+      footerDiv.appendChild(fbtn);
+    });
+    container.appendChild(footerDiv);
+  }
+}
+
+function executeNavAction(item, btn) {
+  if (!item || !item.action) return;
+  var a = item.action;
+  if (a.type === 'tab') {
+    switchTab(a.target, btn);
+  } else if (a.type === 'overlay') {
+    showOverlay(a.target);
+  } else if (a.type === 'logout') {
+    confirmLogout();
+  }
+}
+
+function toggleSidebarGroup(groupId) {
+  _navExpandedGroups[groupId] = !_navExpandedGroups[groupId];
+  var childrenDiv = document.getElementById('nav-children-' + groupId);
+  if (childrenDiv) childrenDiv.classList.toggle('expanded', _navExpandedGroups[groupId]);
+  var parentBtn = document.querySelector('[data-nav-id="' + groupId + '"].sidebar-parent');
+  if (parentBtn) parentBtn.classList.toggle('expanded', _navExpandedGroups[groupId]);
+}
+
+function updateNavActiveState() {
+  // Desktop: highlight correct child or parent item
+  document.querySelectorAll('#bottomTabs .tab-item, #bottomTabs .sidebar-child').forEach(function(el) {
+    var navId = el.getAttribute('data-nav-id');
+    if (navId === _activeNavId) {
+      el.classList.add('active');
+    } else {
+      el.classList.remove('active');
+    }
+  });
+  // Mobile: highlight top-level tab matching active child's parent
+  if (window.innerWidth < 768 && currentUser) {
+    var config = NAV_CONFIG[currentUser.role] || NAV_CONFIG.Employee;
+    var parentId = null;
+    config.forEach(function(item) {
+      if (item.id === _activeNavId) parentId = item.id;
+      if (item.children) {
+        item.children.forEach(function(c) {
+          if (c.id === _activeNavId) parentId = item.id;
+        });
+      }
+    });
+    if (parentId) {
+      document.querySelectorAll('#bottomTabs .tab-item').forEach(function(el) {
+        var navId = el.getAttribute('data-nav-id');
+        el.classList.toggle('active', navId === parentId);
+      });
+    }
+  }
+}
+
+function showMobileMoreMenu(items) {
+  // Remove existing
+  var existing = document.querySelector('.more-menu-overlay');
+  if (existing) existing.remove();
+
+  var overlay = document.createElement('div');
+  overlay.className = 'more-menu-overlay';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-label', 'More navigation options');
+
+  var backdrop = document.createElement('div');
+  backdrop.className = 'more-menu-backdrop';
+  backdrop.onclick = function() { overlay.remove(); };
+
+  var sheet = document.createElement('div');
+  sheet.className = 'more-menu-sheet';
+
+  var title = document.createElement('div');
+  title.className = 'more-menu-title';
+  title.textContent = 'More';
+  sheet.appendChild(title);
+
+  items.forEach(function(item) {
+    var menuItem = document.createElement('button');
+    menuItem.className = 'more-menu-item';
+    menuItem.innerHTML = NAV_ICONS[item.icon] + '<span>' + escapeHTML(item.label) + '</span>';
+    menuItem.onclick = function() {
+      overlay.remove();
+      if (item.children && item.children.length) {
+        executeNavAction(item.children[0], null);
+        _activeNavId = item.children[0].id;
+      } else {
+        executeNavAction(item, null);
+        _activeNavId = item.id;
+      }
+      updateNavActiveState();
+    };
+    sheet.appendChild(menuItem);
+  });
+
+  overlay.appendChild(backdrop);
+  overlay.appendChild(sheet);
+  document.body.appendChild(overlay);
+
+  // Close on Escape
+  var escHandler = function(e) {
+    if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', escHandler); }
+  };
+  document.addEventListener('keydown', escHandler);
+}
+
+function confirmLogout() {
+  if (confirm('Log out?')) doLogout();
+}
+
+// Re-render nav on crossing 768px breakpoint
+(function initNavResize() {
+  _lastNavWidth = window.innerWidth;
+  window.addEventListener('resize', function() {
+    var w = window.innerWidth;
+    var wasMobile = _lastNavWidth < 768;
+    var isMobile = w < 768;
+    if (wasMobile !== isMobile) renderNavigation();
+    _lastNavWidth = w;
   });
 })();
 
