@@ -97,7 +97,7 @@
       <div class="quick-links fade-in" style="margin-top:0">
         <button class="quick-link" onclick="showOverlay('hr-kpi')"><div class="ql-icon" style="background:linear-gradient(135deg,#FFF7ED,#FFEDD5);color:#E85D04"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div><span>My KPI</span></button>
         <button class="quick-link" onclick="showOverlay('hr-tasks')"><div class="ql-icon" style="background:linear-gradient(135deg,#FFEDD5,#FED7AA);color:#C2410C"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div><span>Tasks</span></button>
-        <button class="quick-link" onclick="showOverlay('hr-events')"><div class="ql-icon" style="background:linear-gradient(135deg,#FEF3C7,#FDE68A);color:#D97706"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><span>Events</span></button>
+        <button class="quick-link" onclick="showOverlay('hr-announcements')"><div class="ql-icon" style="background:linear-gradient(135deg,#FEF3C7,#FDE68A);color:#D97706"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div><span>Notices</span></button>
         <button class="quick-link" onclick="switchTab('hr',document.querySelector('[data-tab=hr]'))"><div class="ql-icon" style="background:linear-gradient(135deg,#DBEAFE,#BFDBFE);color:#2563EB"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><span>HR Hub</span></button>
       </div>
       <div id="dashboardCelebrations"></div>
@@ -353,7 +353,7 @@
           <div class="hc-icon" style="background:linear-gradient(135deg,#DBEAFE,#BFDBFE);color:#2563EB">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
           </div>
-          <span>Recruitment</span>
+          <span>Hiring Activity</span>
         </button>
         <button class="hr-hub-card" onclick="showOverlay('hr-documents')">
           <div class="hc-icon" style="background:linear-gradient(135deg,#D1FAE5,#A7F3D0);color:#059669">
@@ -361,53 +361,17 @@
           </div>
           <span>Legal Docs</span>
         </button>
-        <button class="hr-hub-card" onclick="showOverlay('hr-career')">
-          <div class="hc-icon" style="background:linear-gradient(135deg,#FEF3C7,#FDE68A);color:#D97706">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
-          </div>
-          <span>Career Ladder</span>
-        </button>
-        <button class="hr-hub-card md-hr-only" onclick="showOverlay('hr-incentive')">
-          <div class="hc-icon" style="background:linear-gradient(135deg,#CCFBF1,#99F6E4);color:#0F766E">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><path d="M12 22V7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>
-          </div>
-          <span>Incentive &amp; Pay</span>
-        </button>
-        <button class="hr-hub-card" onclick="showOverlay('hr-temperament')">
-          <div class="hc-icon" style="background:linear-gradient(135deg,#FCE7F3,#FBCFE8);color:#BE185D">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-          </div>
-          <span>Temperament</span>
-        </button>
         <button class="hr-hub-card" onclick="showOverlay('hr-tasks')">
           <div class="hc-icon" style="background:linear-gradient(135deg,#FFEDD5,#FED7AA);color:#C2410C">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
           </div>
           <span>Tasks &amp; To-Do</span>
         </button>
-        <button class="hr-hub-card" onclick="showOverlay('hr-skills')">
-          <div class="hc-icon" style="background:linear-gradient(135deg,#FED7AA,#FDBA74);color:#C2410C">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
-          </div>
-          <span>Skills Matrix</span>
-        </button>
-        <button class="hr-hub-card md-hr-only" onclick="showOverlay('hr-hotseat')">
-          <div class="hc-icon" style="background:linear-gradient(135deg,#FEE2E2,#FECACA);color:#DC2626">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2c0 0-4 4-4 9a4 4 0 0 0 8 0c0-5-4-9-4-9z"/><path d="M12 11c0 0-2 2-2 4.5a2 2 0 0 0 4 0C14 13 12 11 12 11z"/></svg>
-          </div>
-          <span>HOT Seat</span>
-        </button>
         <button class="hr-hub-card" onclick="showOverlay('hr-vision')">
           <div class="hc-icon" style="background:linear-gradient(135deg,#CCFBF1,#99F6E4);color:#0F766E">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
           </div>
           <span>Vision</span>
-        </button>
-        <button class="hr-hub-card" onclick="showOverlay('hr-events')">
-          <div class="hc-icon" style="background:linear-gradient(135deg,#FEF3C7,#FDE68A);color:#D97706">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-          </div>
-          <span>Events &amp; Awards</span>
         </button>
         <button class="hr-hub-card md-hr-only" onclick="showOverlay('hr-analytics')">
           <div class="hc-icon" style="background:linear-gradient(135deg,#FFF7ED,#FFEDD5);color:#E85D04">
@@ -474,7 +438,7 @@
       <div class="quick-links fade-in">
         <button class="quick-link" onclick="showOverlay('hr-kpi')"><div class="ql-icon" style="background:linear-gradient(135deg,#FFF7ED,#FFEDD5);color:#E85D04"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div><span>My KPI</span></button>
         <button class="quick-link" onclick="showOverlay('hr-tasks')"><div class="ql-icon" style="background:linear-gradient(135deg,#FFEDD5,#FED7AA);color:#C2410C"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div><span>Tasks</span></button>
-        <button class="quick-link" onclick="showOverlay('hr-events')"><div class="ql-icon" style="background:linear-gradient(135deg,#FEF3C7,#FDE68A);color:#D97706"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><span>Events</span></button>
+        <button class="quick-link" onclick="showOverlay('hr-announcements')"><div class="ql-icon" style="background:linear-gradient(135deg,#FEF3C7,#FDE68A);color:#D97706"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div><span>Notices</span></button>
         <button class="quick-link md-hr-only" onclick="showOverlay('hr-analytics')"><div class="ql-icon" style="background:linear-gradient(135deg,#DBEAFE,#BFDBFE);color:#2563EB"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><span>Analytics</span></button>
       </div>
     </div>
@@ -780,10 +744,10 @@
   </div>
 
   <!-- HR RECRUITMENT OVERLAY -->
-  <div class="overlay-screen" id="overlay-hr-recruit" role="dialog" aria-modal="true" aria-label="Recruitment">
+  <div class="overlay-screen" id="overlay-hr-recruit" role="dialog" aria-modal="true" aria-label="Hiring Activity">
     <div class="overlay-header">
       <button class="back-btn" aria-label="Go back" onclick="hideOverlay('hr-recruit')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
-      <h2>Recruitment</h2>
+      <h2>Hiring Activity</h2>
     </div>
     <div class="hr-overlay-body" id="hrRecruitContent"></div>
   </div>
@@ -797,32 +761,6 @@
     <div class="hr-overlay-body" id="hrDocumentsContent"></div>
   </div>
 
-  <!-- HR CAREER LADDER OVERLAY -->
-  <div class="overlay-screen" id="overlay-hr-career" role="dialog" aria-modal="true" aria-label="Career Path">
-    <div class="overlay-header">
-      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('hr-career')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
-      <h2>Career Ladder</h2>
-    </div>
-    <div class="hr-overlay-body" id="hrCareerContent"></div>
-  </div>
-
-  <!-- HR INCENTIVE & PAY OVERLAY -->
-  <div class="overlay-screen" id="overlay-hr-incentive" role="dialog" aria-modal="true" aria-label="Incentive Report">
-    <div class="overlay-header">
-      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('hr-incentive')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
-      <h2>Incentive &amp; Pay</h2>
-    </div>
-    <div class="hr-overlay-body" id="hrIncentiveContent"></div>
-  </div>
-
-  <!-- HR TEMPERAMENT OVERLAY -->
-  <div class="overlay-screen" id="overlay-hr-temperament" role="dialog" aria-modal="true" aria-label="Temperament Test">
-    <div class="overlay-header">
-      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('hr-temperament')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
-      <h2>Temperament Profile</h2>
-    </div>
-    <div class="hr-overlay-body" id="hrTemperamentContent"></div>
-  </div>
 
   <!-- HR TASKS OVERLAY -->
   <div class="overlay-screen" id="overlay-hr-tasks" role="dialog" aria-modal="true" aria-label="Tasks">
@@ -833,23 +771,6 @@
     <div class="hr-overlay-body" id="hrTasksContent"></div>
   </div>
 
-  <!-- HR SKILLS MATRIX OVERLAY -->
-  <div class="overlay-screen" id="overlay-hr-skills" role="dialog" aria-modal="true" aria-label="Skills Matrix">
-    <div class="overlay-header">
-      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('hr-skills')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
-      <h2>Skills Matrix</h2>
-    </div>
-    <div class="hr-overlay-body" id="hrSkillsContent"></div>
-  </div>
-
-  <!-- HR HOT SEAT OVERLAY -->
-  <div class="overlay-screen" id="overlay-hr-hotseat" role="dialog" aria-modal="true" aria-label="Hot Seat Sessions">
-    <div class="overlay-header">
-      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('hr-hotseat')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
-      <h2>HOT Seat Sessions</h2>
-    </div>
-    <div class="hr-overlay-body" id="hrHotseatContent"></div>
-  </div>
 
   <!-- HR VISION OVERLAY -->
   <div class="overlay-screen" id="overlay-hr-vision" role="dialog" aria-modal="true" aria-label="Personal Vision">
@@ -860,14 +781,6 @@
     <div class="hr-overlay-body" id="hrVisionContent"></div>
   </div>
 
-  <!-- HR EVENTS & AWARDS OVERLAY -->
-  <div class="overlay-screen" id="overlay-hr-events" role="dialog" aria-modal="true" aria-label="Events">
-    <div class="overlay-header">
-      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('hr-events')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
-      <h2>Events &amp; Awards</h2>
-    </div>
-    <div class="hr-overlay-body" id="hrEventsContent"></div>
-  </div>
 
   <!-- HR ANALYTICS OVERLAY -->
   <div class="overlay-screen" id="overlay-hr-analytics" role="dialog" aria-modal="true" aria-label="Analytics">

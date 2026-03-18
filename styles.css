@@ -1488,3 +1488,20 @@ textarea.form-control{resize:vertical}
 .nf-modal h3{font-family:var(--font-display);font-size:1rem;font-weight:600;margin-bottom:12px}
 .nf-select{width:100%;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:var(--radius-xs);font-size:.82rem;background:white}
 .nf-select:focus{outline:none;border-color:var(--primary)}
+
+/* ===== RESUME BANK ===== */
+.resume-upload-zone{border:2px dashed var(--gray-300);border-radius:var(--radius);padding:24px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:12px;background:var(--card)}
+.resume-upload-zone:hover{border-color:var(--primary);background:var(--primary-50)}
+.resume-upload-zone.dragover{border-color:var(--primary);background:var(--primary-50);transform:scale(1.01)}
+.resume-card{background:var(--card);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);margin-bottom:10px;transition:all .2s}
+.resume-card:hover{box-shadow:var(--shadow-lg)}
+.resume-skills-tag{display:inline-block;padding:2px 8px;border-radius:12px;font-size:.65rem;font-weight:600;background:var(--blue-light);color:var(--blue);margin:2px}
+.resume-filter-bar{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
+.resume-filter-bar input,.resume-filter-bar select{padding:8px 12px;border:1.5px solid var(--gray-200);border-radius:var(--radius-xs);font-size:.8rem;font-family:var(--font-body);background:var(--card);color:var(--text);transition:border-color .2s}
+.resume-filter-bar input{flex:1;min-width:120px}
+.resume-filter-bar input:focus,.resume-filter-bar select:focus{outline:none;border-color:var(--primary)}
+[data-theme="dark"] .resume-upload-zone{background:var(--card);border-color:var(--gray-600)}
+[data-theme="dark"] .resume-upload-zone:hover,[data-theme="dark"] .resume-upload-zone.dragover{border-color:var(--primary);background:var(--gray-800)}
+[data-theme="dark"] .resume-card{background:var(--card)}
+[data-theme="dark"] .resume-skills-tag{background:rgba(37,99,235,.15);color:#60A5FA}
+[data-theme="dark"] .resume-filter-bar input,[data-theme="dark"] .resume-filter-bar select{background:var(--gray-800);border-color:var(--gray-600);color:var(--text)}

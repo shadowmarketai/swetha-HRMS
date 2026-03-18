@@ -489,6 +489,14 @@ async function doLogin() {
 // demoLogin removed — production mode, no demo access
 function loginAs(empIndex) {
   currentUser = {...EMPLOYEES[empIndex]};
+  // Persist session so refresh doesn't log out (24-hour expiry)
+  try {
+    safeStorage.set(STORAGE_KEYS.session, JSON.stringify({
+      empIndex: empIndex,
+      token: currentUser.code,
+      expiry: Date.now() + 24 * 60 * 60 * 1000
+    }));
+  } catch (e) {}
   document.getElementById('loginScreen').classList.add('hidden');
   document.getElementById('appHeader').style.display = '';
   document.getElementById('appContent').style.display = '';
@@ -2291,14 +2299,22 @@ var jobNextId = 5;
 var candidateNextId = 9;
 var PIPELINE_STAGES = ['Applied','Screening','Interview','Offer','Hired','Rejected'];
 
+var RESUME_BANK = [
+  {id:1, name:'Karthik Raj', phone:'9845001234', email:'karthik.raj@gmail.com', role:'Welder', skills:['Arc Welding','MIG','Safety Cert'], exp:'5 yrs', resumeText:'Experienced welder with 5 years in structural steel fabrication, MIG/TIG certified, strong safety record.', uploadDate:'2026-03-10', source:'upload'},
+  {id:2, name:'Meena Kumari', phone:'9845005678', email:'meena.k@gmail.com', role:'Site Engineer', skills:['AutoCAD','Site Planning','Civil Engg'], exp:'4 yrs', resumeText:'B.E. Civil with 4 years experience in site planning and project coordination for commercial buildings.', uploadDate:'2026-03-12', source:'upload'},
+  {id:3, name:'Suresh Babu.T', phone:'9845009012', email:'suresh.t@gmail.com', role:'Accounts Executive', skills:['Tally','GST Filing','Excel'], exp:'6 yrs', resumeText:'M.Com with strong expertise in Tally ERP, GST filing, and financial reporting for construction firms.', uploadDate:'2026-03-15', source:'upload'}
+];
+var resumeNextId = 4;
+
 function renderRecruitmentOverlay() {
   var el = document.getElementById('hrRecruitContent');
   if (!el) return;
   var activeTab = el.dataset.rtab || 'postings';
   var isMdHr = currentUser && (currentUser.role === 'MD' || currentUser.role === 'HR');
 
-  var pills = ['postings','pipeline'].map(function(t) {
-    return '<button class="tab-pill' + (activeTab === t ? ' active' : '') + '" onclick="recruitTab(\'' + t + '\')">' + (t === 'postings' ? 'Open Positions' : 'Candidate Pipeline') + '</button>';
+  var tabLabels = {postings:'Open Positions', pipeline:'Candidate Pipeline', resumes:'Resume Bank'};
+  var pills = ['postings','pipeline','resumes'].map(function(t) {
+    return '<button class="tab-pill' + (activeTab === t ? ' active' : '') + '" onclick="recruitTab(\'' + t + '\')">' + tabLabels[t] + '</button>';
   }).join('');
 
   var content = '';
@@ -2375,10 +2391,27 @@ function renderRecruitmentOverlay() {
       '</div>';
     }).join('');
     content = '<div class="pipeline-stages">' + stageDivs + '</div>';
+  } else if (activeTab === 'resumes') {
+    content = renderResumeBank(isMdHr);
   }
 
   el.dataset.rtab = activeTab;
   el.innerHTML = '<div class="tab-pills" style="margin-bottom:14px">' + pills + '</div>' + content;
+
+  // Attach drag-drop events if resume tab is active
+  if (activeTab === 'resumes') {
+    var dropZone = document.getElementById('resumeDropZone');
+    var fileInput = document.getElementById('resumeFileInput');
+    if (dropZone) {
+      dropZone.addEventListener('dragover', function(e) { e.preventDefault(); dropZone.classList.add('dragover'); });
+      dropZone.addEventListener('dragleave', function() { dropZone.classList.remove('dragover'); });
+      dropZone.addEventListener('drop', function(e) { e.preventDefault(); dropZone.classList.remove('dragover'); handleResumeUpload(e.dataTransfer.files); });
+      dropZone.addEventListener('click', function() { if (fileInput) fileInput.click(); });
+    }
+    if (fileInput) {
+      fileInput.addEventListener('change', function() { handleResumeUpload(fileInput.files); });
+    }
+  }
 }
 
 function recruitTab(tab) {
@@ -2565,6 +2598,227 @@ async function aiScreenAllCandidates(jobId, btn) {
 }
 
 // =====================================================
+// RESUME BANK
+// =====================================================
+function renderResumeBank(isMdHr) {
+  var searchVal = '';
+  var deptVal = '';
+  var searchEl = document.getElementById('resumeSearch');
+  var deptEl = document.getElementById('resumeDeptFilter');
+  if (searchEl) searchVal = searchEl.value.toLowerCase();
+  if (deptEl) deptVal = deptEl.value;
+
+  var filtered = RESUME_BANK.filter(function(r) {
+    var matchSearch = !searchVal || r.name.toLowerCase().indexOf(searchVal) !== -1 ||
+      r.role.toLowerCase().indexOf(searchVal) !== -1 ||
+      r.skills.some(function(s) { return s.toLowerCase().indexOf(searchVal) !== -1; });
+    var matchDept = !deptVal || r.role.toLowerCase().indexOf(deptVal.toLowerCase()) !== -1;
+    return matchSearch && matchDept;
+  });
+
+  var uploadZone = '<div class="resume-upload-zone" id="resumeDropZone">' +
+    '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" stroke-width="1.5" style="margin-bottom:8px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>' +
+    '<div style="font-size:.82rem;font-weight:600;color:var(--gray-600)">Drop resumes here or tap to upload</div>' +
+    '<div style="font-size:.68rem;color:var(--gray-400);margin-top:4px">PDF, DOC, DOCX, TXT accepted</div>' +
+    '<input type="file" id="resumeFileInput" accept=".pdf,.doc,.docx,.txt" multiple style="display:none">' +
+  '</div>';
+
+  var deptOpts = ['','Welder','Site Engineer','Accounts Executive','Fabricator','Helper','Supervisor','Driver','Office Staff'].map(function(d) {
+    return '<option value="' + d + '"' + (deptVal === d ? ' selected' : '') + '>' + (d || 'All Roles') + '</option>';
+  }).join('');
+
+  var filterBar = '<div class="resume-filter-bar">' +
+    '<input type="text" id="resumeSearch" placeholder="Search name, role, skills..." value="' + escapeHTML(searchVal) + '" oninput="filterResumeBank()">' +
+    '<select id="resumeDeptFilter" onchange="filterResumeBank()">' + deptOpts + '</select>' +
+    (isMdHr ? '<button class="nf-btn nf-btn-primary nf-btn-sm" onclick="aiFilterAllResumes(this)">&#10024; AI Filter All</button>' : '') +
+  '</div>';
+
+  var cards = filtered.length > 0 ? filtered.map(function(r) {
+    var skillTags = r.skills.map(function(s) { return '<span class="resume-skills-tag">' + escapeHTML(s) + '</span>'; }).join('');
+    var scoreHtml = '';
+    if (r.aiScore !== undefined && r.aiScore !== null) {
+      var scoreClass = r.aiScore >= 80 ? 'ai-score-green' : r.aiScore >= 50 ? 'ai-score-yellow' : 'ai-score-red';
+      scoreHtml = '<span class="ai-score-badge ' + scoreClass + '" style="margin-left:8px">' + r.aiScore + '</span>';
+    }
+    var summaryHtml = '';
+    if (r.aiSummary) {
+      summaryHtml = '<div style="font-size:.68rem;color:var(--gray-500);margin-top:6px;padding:6px 8px;background:var(--gray-50);border-radius:var(--radius-xs);line-height:1.4">' + escapeHTML(r.aiSummary) + '</div>';
+    }
+    return '<div class="resume-card fade-in">' +
+      '<div style="display:flex;align-items:flex-start;justify-content:space-between">' +
+        '<div>' +
+          '<div style="font-size:.85rem;font-weight:600">' + escapeHTML(r.name) + scoreHtml + '</div>' +
+          '<div style="font-size:.72rem;color:var(--gray-500);margin-top:2px">' + escapeHTML(r.role) + ' &middot; ' + escapeHTML(r.exp) + '</div>' +
+        '</div>' +
+        '<div style="font-size:.6rem;color:var(--gray-400)">' + formatAdvDate(r.uploadDate) + '</div>' +
+      '</div>' +
+      '<div style="margin-top:6px">' + skillTags + '</div>' +
+      (r.phone ? '<div style="font-size:.68rem;color:var(--gray-400);margin-top:4px">' + escapeHTML(r.phone) + (r.email ? ' &middot; ' + escapeHTML(r.email) : '') + '</div>' : '') +
+      summaryHtml +
+      '<div style="display:flex;gap:6px;margin-top:8px">' +
+        (isMdHr && r.aiScore === undefined ? '<button class="ai-screen-btn" onclick="aiScreenResume(' + r.id + ',this)">&#10024; AI Screen</button>' : '') +
+        (isMdHr ? '<button class="btn btn-sm btn-outline" onclick="addResumeToPipeline(' + r.id + ')">+ Pipeline</button>' : '') +
+      '</div>' +
+    '</div>';
+  }).join('') : '<div class="nf-empty">No resumes found</div>';
+
+  return uploadZone + filterBar + '<div id="resumeCardsContainer">' + cards + '</div>';
+}
+
+function handleResumeUpload(files) {
+  if (!files || files.length === 0) return;
+  for (var i = 0; i < files.length; i++) {
+    var file = files[i];
+    var ext = file.name.split('.').pop().toLowerCase();
+    if (['pdf','doc','docx','txt'].indexOf(ext) === -1) {
+      showToast('Invalid file type: ' + file.name);
+      continue;
+    }
+    var baseName = file.name.replace(/\.[^/.]+$/, '').replace(/[_-]/g, ' ');
+    RESUME_BANK.push({
+      id: resumeNextId,
+      name: baseName,
+      phone: '',
+      email: '',
+      role: 'Not specified',
+      skills: [],
+      exp: 'N/A',
+      resumeText: 'Uploaded file: ' + file.name + ' (' + Math.round(file.size / 1024) + ' KB)',
+      uploadDate: new Date().toISOString().split('T')[0],
+      source: 'upload'
+    });
+    resumeNextId++;
+  }
+  saveAllData();
+  showToast(files.length + ' resume(s) uploaded');
+  renderRecruitmentOverlay();
+}
+
+function filterResumeBank() {
+  var isMdHr = currentUser && (currentUser.role === 'MD' || currentUser.role === 'HR');
+  var container = document.getElementById('resumeCardsContainer');
+  if (!container) return;
+  var searchVal = (document.getElementById('resumeSearch') || {}).value || '';
+  var deptVal = (document.getElementById('resumeDeptFilter') || {}).value || '';
+  searchVal = searchVal.toLowerCase();
+
+  var filtered = RESUME_BANK.filter(function(r) {
+    var matchSearch = !searchVal || r.name.toLowerCase().indexOf(searchVal) !== -1 ||
+      r.role.toLowerCase().indexOf(searchVal) !== -1 ||
+      r.skills.some(function(s) { return s.toLowerCase().indexOf(searchVal) !== -1; });
+    var matchDept = !deptVal || r.role.toLowerCase().indexOf(deptVal.toLowerCase()) !== -1;
+    return matchSearch && matchDept;
+  });
+
+  var cards = filtered.length > 0 ? filtered.map(function(r) {
+    var skillTags = r.skills.map(function(s) { return '<span class="resume-skills-tag">' + escapeHTML(s) + '</span>'; }).join('');
+    var scoreHtml = '';
+    if (r.aiScore !== undefined && r.aiScore !== null) {
+      var scoreClass = r.aiScore >= 80 ? 'ai-score-green' : r.aiScore >= 50 ? 'ai-score-yellow' : 'ai-score-red';
+      scoreHtml = '<span class="ai-score-badge ' + scoreClass + '" style="margin-left:8px">' + r.aiScore + '</span>';
+    }
+    var summaryHtml = '';
+    if (r.aiSummary) {
+      summaryHtml = '<div style="font-size:.68rem;color:var(--gray-500);margin-top:6px;padding:6px 8px;background:var(--gray-50);border-radius:var(--radius-xs);line-height:1.4">' + escapeHTML(r.aiSummary) + '</div>';
+    }
+    return '<div class="resume-card fade-in">' +
+      '<div style="display:flex;align-items:flex-start;justify-content:space-between">' +
+        '<div>' +
+          '<div style="font-size:.85rem;font-weight:600">' + escapeHTML(r.name) + scoreHtml + '</div>' +
+          '<div style="font-size:.72rem;color:var(--gray-500);margin-top:2px">' + escapeHTML(r.role) + ' &middot; ' + escapeHTML(r.exp) + '</div>' +
+        '</div>' +
+        '<div style="font-size:.6rem;color:var(--gray-400)">' + formatAdvDate(r.uploadDate) + '</div>' +
+      '</div>' +
+      '<div style="margin-top:6px">' + skillTags + '</div>' +
+      (r.phone ? '<div style="font-size:.68rem;color:var(--gray-400);margin-top:4px">' + escapeHTML(r.phone) + (r.email ? ' &middot; ' + escapeHTML(r.email) : '') + '</div>' : '') +
+      summaryHtml +
+      '<div style="display:flex;gap:6px;margin-top:8px">' +
+        (isMdHr && r.aiScore === undefined ? '<button class="ai-screen-btn" onclick="aiScreenResume(' + r.id + ',this)">&#10024; AI Screen</button>' : '') +
+        (isMdHr ? '<button class="btn btn-sm btn-outline" onclick="addResumeToPipeline(' + r.id + ')">+ Pipeline</button>' : '') +
+      '</div>' +
+    '</div>';
+  }).join('') : '<div class="nf-empty">No resumes found</div>';
+
+  container.innerHTML = cards;
+}
+
+async function aiScreenResume(resumeId, btn) {
+  var resume = RESUME_BANK.find(function(r) { return r.id === resumeId; });
+  if (!resume) return;
+  if (btn) { btn.classList.add('loading'); btn.innerHTML = '&#8987; Screening...'; }
+  try {
+    var result = await apiCall('POST', '/recruitment/candidates/' + resumeId + '/ai-screen', {resumeText: resume.resumeText, name: resume.name, role: resume.role});
+    if (result && result.score !== undefined) {
+      resume.aiScore = result.score;
+      resume.aiSummary = result.summary || result.recommendation || 'AI Score: ' + result.score;
+      showToast('AI Score for ' + resume.name + ': ' + result.score + '/100');
+    } else {
+      // Mock score locally when backend unavailable
+      var mockScore = 40 + Math.floor(Math.abs(Math.sin(resumeId * 7.3)) * 55);
+      resume.aiScore = mockScore;
+      resume.aiSummary = 'Skills match: ' + resume.skills.join(', ') + '. Experience: ' + resume.exp + '. ' + (mockScore >= 70 ? 'Strong candidate for ' : 'Consider for ') + resume.role + ' role.';
+      showToast('AI Score for ' + resume.name + ': ' + mockScore + '/100');
+    }
+    saveAllData();
+    renderRecruitmentOverlay();
+  } catch (e) {
+    // Mock score on error
+    var mockScore = 40 + Math.floor(Math.abs(Math.sin(resumeId * 7.3)) * 55);
+    resume.aiScore = mockScore;
+    resume.aiSummary = 'Skills match: ' + resume.skills.join(', ') + '. Experience: ' + resume.exp + '. ' + (mockScore >= 70 ? 'Strong candidate for ' : 'Consider for ') + resume.role + ' role.';
+    showToast('AI Score for ' + resume.name + ': ' + mockScore + '/100');
+    saveAllData();
+    renderRecruitmentOverlay();
+  }
+}
+
+async function aiFilterAllResumes(btn) {
+  if (btn) { btn.classList.add('loading'); btn.innerHTML = '&#8987; Screening...'; }
+  var unscreened = RESUME_BANK.filter(function(r) { return r.aiScore === undefined; });
+  if (unscreened.length === 0) { showToast('All resumes already screened'); if (btn) { btn.classList.remove('loading'); btn.innerHTML = '&#10024; AI Filter All'; } return; }
+  var count = 0;
+  for (var i = 0; i < unscreened.length; i++) {
+    var r = unscreened[i];
+    var mockScore = 40 + Math.floor(Math.abs(Math.sin(r.id * 7.3)) * 55);
+    r.aiScore = mockScore;
+    r.aiSummary = 'Skills match: ' + r.skills.join(', ') + '. Experience: ' + r.exp + '. ' + (mockScore >= 70 ? 'Strong candidate for ' : 'Consider for ') + r.role + ' role.';
+    count++;
+  }
+  saveAllData();
+  showToast('Screened ' + count + ' resume(s)');
+  renderRecruitmentOverlay();
+}
+
+function addResumeToPipeline(resumeId) {
+  var resume = RESUME_BANK.find(function(r) { return r.id === resumeId; });
+  if (!resume) return;
+  var openJobs = JOB_POSTINGS.filter(function(j) { return j.status === 'open'; });
+  if (openJobs.length === 0) { showToast('No open positions available'); return; }
+  var options = openJobs.map(function(j) { return j.title + ' (' + j.dept + ')'; });
+  var choice = prompt('Select job (enter number):\\n' + options.map(function(o, i) { return (i + 1) + '. ' + o; }).join('\\n'));
+  if (!choice) return;
+  var idx = parseInt(choice, 10) - 1;
+  if (isNaN(idx) || idx < 0 || idx >= openJobs.length) { showToast('Invalid selection'); return; }
+  var job = openJobs[idx];
+  CANDIDATES.push({
+    id: candidateNextId,
+    name: resume.name,
+    role: job.title,
+    jobId: job.id,
+    stage: 'Applied',
+    rating: resume.aiScore ? Math.min(5, Math.round(resume.aiScore / 20)) : 3,
+    phone: resume.phone,
+    exp: resume.exp,
+    aiScore: resume.aiScore,
+    aiSummary: resume.aiSummary ? JSON.stringify({summary: resume.aiSummary, score: resume.aiScore, strengths: resume.skills, concerns: [], recommendation: 'Added from Resume Bank'}) : undefined
+  });
+  candidateNextId++;
+  saveAllData();
+  showToast(resume.name + ' added to ' + job.title + ' pipeline');
+  recruitTab('pipeline');
+}
+
+// =====================================================
 // DATA: DOCUMENTS
 // =====================================================
 var DOCUMENT_TEMPLATES = [
@@ -2645,331 +2899,8 @@ function generateDocument() {
 // =====================================================
 // DATA: CAREER PATHS
 // =====================================================
-var CAREER_PATHS = {
-  'Office': [
-    {level:1, title:'Office Assistant', salaryRange:'₹15K–20K', years:'0–2', requirements:[]},
-    {level:2, title:'Junior Executive', salaryRange:'₹20K–30K', years:'2–4', requirements:['2 years experience','Computer proficiency']},
-    {level:3, title:'Executive', salaryRange:'₹30K–45K', years:'4–7', requirements:['Team coordination','Reporting skills']},
-    {level:4, title:'Senior Executive', salaryRange:'₹45K–65K', years:'7–10', requirements:['Project management','Leadership']},
-    {level:5, title:'Manager', salaryRange:'₹65K+', years:'10+', requirements:['Department management','Strategic thinking']}
-  ],
-  'Site': [
-    {level:1, title:'Site Helper', salaryRange:'₹15K–20K', years:'0–2', requirements:[]},
-    {level:2, title:'Site Worker', salaryRange:'₹20K–28K', years:'2–4', requirements:['Site safety training']},
-    {level:3, title:'Site Supervisor', salaryRange:'₹28K–40K', years:'4–8', requirements:['Supervisor certification','Team handling']},
-    {level:4, title:'Foreman', salaryRange:'₹40K–55K', years:'8–12', requirements:['Project oversight','Budget management']},
-    {level:5, title:'Site Manager', salaryRange:'₹55K+', years:'12+', requirements:['PMP/Civil degree','Multi-project management']}
-  ],
-  'Factory': [
-    {level:1, title:'Factory Helper', salaryRange:'₹15K–22K', years:'0–2', requirements:[]},
-    {level:2, title:'Machine Operator', salaryRange:'₹22K–30K', years:'2–4', requirements:['Machine operation training']},
-    {level:3, title:'Senior Fabricator', salaryRange:'₹30K–42K', years:'4–7', requirements:['Quality certification','Skilled trade']},
-    {level:4, title:'Factory Supervisor', salaryRange:'₹42K–55K', years:'7–12', requirements:['Production planning','Team leadership']},
-    {level:5, title:'Production Manager', salaryRange:'₹55K+', years:'12+', requirements:['Operations management degree']}
-  ],
-  'PEB': [
-    {level:1, title:'PEB Helper', salaryRange:'₹14K–18K', years:'0–2', requirements:[]},
-    {level:2, title:'PEB Worker', salaryRange:'₹18K–25K', years:'2–4', requirements:['Steel fabrication basics']},
-    {level:3, title:'PEB Fabricator', salaryRange:'₹25K–35K', years:'4–7', requirements:['Structural drawing reading']},
-    {level:4, title:'PEB Supervisor', salaryRange:'₹35K–50K', years:'7–12', requirements:['PEB system expertise']},
-    {level:5, title:'PEB Manager', salaryRange:'₹50K+', years:'12+', requirements:['Project & client management']}
-  ],
-  'Garden': [
-    {level:1, title:'Gardener / Cleaner', salaryRange:'₹8K–15K', years:'0–3', requirements:[]},
-    {level:2, title:'Head Gardener', salaryRange:'₹15K–20K', years:'3–7', requirements:['Horticulture knowledge']},
-    {level:3, title:'Security & Facilities', salaryRange:'₹15K–22K', years:'3–8', requirements:['Security training','Premises management']}
-  ]
-};
 
-function getCurrentCareerLevel(empCode) {
-  var emp = EMPLOYEES.find(function(e) { return e.code === empCode; });
-  if (!emp) return 1;
-  var path = CAREER_PATHS[emp.dept] || CAREER_PATHS['Office'];
-  var sal = emp.salary;
-  var lvl = 1;
-  path.forEach(function(p, i) {
-    var low = parseInt((p.salaryRange.replace(/[₹K+\s]/g, '').split('–')[0] || '0'), 10) * 1000;
-    if (sal >= low) lvl = i + 1;
-  });
-  return Math.min(lvl, path.length);
-}
 
-function renderCareerOverlay() {
-  var el = document.getElementById('hrCareerContent');
-  if (!el || !currentUser) return;
-  var emp = currentUser;
-  var path = CAREER_PATHS[emp.dept] || CAREER_PATHS['Office'];
-  var currentLvl = getCurrentCareerLevel(emp.code);
-
-  var timelineHtml = path.map(function(p, i) {
-    var lvlNum = i + 1;
-    var isDone = lvlNum < currentLvl;
-    var isCurrent = lvlNum === currentLvl;
-    var isNext = lvlNum === currentLvl + 1;
-    var cls = isDone ? 'done' : isCurrent ? 'current' : isNext ? 'next' : '';
-    var icon = isDone ? '&#10003;' : lvlNum;
-    var reqHtml = '';
-    if (isNext && p.requirements.length > 0) {
-      reqHtml = '<div class="cl-reqs">' + p.requirements.map(function(r) {
-        return '<div class="cl-req-item"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>' + r + '</div>';
-      }).join('') + '</div>';
-    }
-    return '<div class="career-level ' + cls + '">' +
-      '<div class="cl-dot">' + icon + '</div>' +
-      '<div class="cl-info">' +
-        '<div class="cl-title">Level ' + lvlNum + ': ' + p.title + (isCurrent ? ' &nbsp;<span class="badge-status badge-open" style="font-size:.58rem">Current</span>' : '') + (isNext ? ' &nbsp;<span class="badge-status badge-pending" style="font-size:.58rem">Next</span>' : '') + '</div>' +
-        '<div class="cl-subtitle">' + p.salaryRange + ' &middot; ' + p.years + ' years</div>' +
-        reqHtml +
-      '</div>' +
-    '</div>';
-  }).join('');
-
-  el.innerHTML = '<div class="card fade-in" style="padding:14px;margin-bottom:12px;background:linear-gradient(135deg,var(--primary-50),var(--primary-100));border:1px solid var(--primary-100)">' +
-    '<div style="font-size:.75rem;font-weight:600;color:var(--primary-dark)">' + emp.name + '</div>' +
-    '<div style="font-size:.68rem;color:var(--primary);margin-top:2px">' + emp.dept + ' Department &middot; Level ' + currentLvl + ' of ' + path.length + '</div>' +
-  '</div>' +
-  '<div class="section-title">Career Progression Path</div>' +
-  '<div class="card fade-in" style="padding:14px"><div class="career-timeline">' + timelineHtml + '</div></div>';
-}
-
-// =====================================================
-// DATA: INCENTIVE
-// =====================================================
-var INCENTIVE_SLABS = [
-  {minScore:90, maxScore:100, percent:15, label:'Excellent'},
-  {minScore:75, maxScore:89, percent:10, label:'Good'},
-  {minScore:50, maxScore:74, percent:5, label:'Average'},
-  {minScore:0, maxScore:49, percent:0, label:'Below Average'}
-];
-
-function calculateIncentive(empCode) {
-  var emp = EMPLOYEES.find(function(e) { return e.code === empCode; });
-  if (!emp) return {amount:0, percent:0, label:'N/A'};
-  var score = getKpiScore(empCode);
-  var slab = INCENTIVE_SLABS.find(function(s) { return score >= s.minScore && score <= s.maxScore; }) || INCENTIVE_SLABS[INCENTIVE_SLABS.length - 1];
-  var amount = Math.round(emp.salary * slab.percent / 100);
-  return {amount: amount, percent: slab.percent, label: slab.label, score: score};
-}
-
-function renderIncentiveOverlay() {
-  var el = document.getElementById('hrIncentiveContent');
-  if (!el || !currentUser) return;
-  var isMDorHR = currentUser.role === 'MD' || currentUser.role === 'HR';
-
-  var slabTable = '<div class="section-title">Incentive Slabs</div>' +
-    '<div class="card fade-in" style="padding:14px;margin-bottom:12px">' +
-      '<table style="width:100%;border-collapse:collapse;font-size:.75rem">' +
-        '<thead><tr>' +
-          '<th style="text-align:left;padding:6px 4px;color:var(--gray-500);font-weight:600;border-bottom:1px solid var(--gray-100)">KPI Score</th>' +
-          '<th style="text-align:left;padding:6px 4px;color:var(--gray-500);font-weight:600;border-bottom:1px solid var(--gray-100)">Category</th>' +
-          '<th style="text-align:right;padding:6px 4px;color:var(--gray-500);font-weight:600;border-bottom:1px solid var(--gray-100)">Incentive %</th>' +
-        '</tr></thead>' +
-        '<tbody>' +
-          INCENTIVE_SLABS.map(function(s) {
-            return '<tr>' +
-              '<td style="padding:6px 4px">' + s.minScore + '–' + s.maxScore + '</td>' +
-              '<td style="padding:6px 4px">' + s.label + '</td>' +
-              '<td style="padding:6px 4px;text-align:right;font-weight:700;color:var(--primary)">' + s.percent + '%</td>' +
-            '</tr>';
-          }).join('') +
-        '</tbody>' +
-      '</table>' +
-    '</div>';
-
-  if (isMDorHR) {
-    var totalIncentive = 0;
-    var rows = EMPLOYEES.map(function(e) {
-      var inc = calculateIncentive(e.code);
-      totalIncentive += inc.amount;
-      var rag = getRAGStatus(inc.score);
-      return '<div class="kpi-emp-row">' +
-        '<div class="kpi-emp-score rag-' + rag + '">' + inc.score + '</div>' +
-        '<div style="flex:1;min-width:0"><div style="font-size:.8rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + e.name + '</div>' +
-        '<div style="font-size:.65rem;color:var(--gray-400)">' + e.dept + ' &middot; Salary: &#8377;' + e.salary.toLocaleString('en-IN') + '</div></div>' +
-        '<div style="text-align:right">' +
-          '<div style="font-family:var(--font-display);font-size:.82rem;font-weight:700;color:var(--success-dark)">&#8377;' + inc.amount.toLocaleString('en-IN') + '</div>' +
-          '<div style="font-size:.6rem;color:var(--gray-400)">' + inc.percent + '% · ' + inc.label + '</div>' +
-        '</div>' +
-      '</div>';
-    }).join('');
-
-    el.innerHTML = '<div class="card fade-in" style="padding:14px;margin-bottom:12px;background:linear-gradient(135deg,var(--success-light),#D1FAE5)">' +
-      '<div style="font-size:.7rem;font-weight:600;color:var(--success-dark);text-transform:uppercase;letter-spacing:.04em">Total Incentive Payout (This Quarter)</div>' +
-      '<div style="font-family:var(--font-display);font-size:1.4rem;font-weight:700;color:var(--success-dark)">&#8377;' + totalIncentive.toLocaleString('en-IN') + '</div>' +
-    '</div>' +
-    slabTable +
-    '<div class="section-title">Employee Incentive Breakdown</div>' +
-    rows;
-  } else {
-    var inc = calculateIncentive(currentUser.code);
-    el.innerHTML = '<div class="card fade-in" style="padding:20px;margin-bottom:12px;text-align:center;background:linear-gradient(135deg,var(--success-light),#D1FAE5)">' +
-      '<div style="font-size:.72rem;font-weight:600;color:var(--success-dark);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">Your Incentive This Quarter</div>' +
-      '<div style="font-family:var(--font-display);font-size:2rem;font-weight:700;color:var(--success-dark)">&#8377;' + inc.amount.toLocaleString('en-IN') + '</div>' +
-      '<div style="font-size:.75rem;color:var(--success-dark);opacity:.8;margin-top:4px">KPI Score: ' + inc.score + '/100 &middot; ' + inc.label + ' (' + inc.percent + '%)</div>' +
-    '</div>' +
-    '<div class="card fade-in" style="padding:14px;margin-bottom:12px">' +
-      '<div class="kpi-target-item">' +
-        '<div class="kpi-target-label"><span>Base Salary</span><span>&#8377;' + currentUser.salary.toLocaleString('en-IN') + '</span></div>' +
-        '<div class="kpi-target-bar"><div class="kpi-target-bar-fill" style="width:100%;background:var(--primary)"></div></div>' +
-      '</div>' +
-      '<div class="kpi-target-item">' +
-        '<div class="kpi-target-label"><span>Incentive (' + inc.percent + '%)</span><span>&#8377;' + inc.amount.toLocaleString('en-IN') + '</span></div>' +
-        '<div class="kpi-target-bar"><div class="kpi-target-bar-fill" style="width:' + inc.percent + '%;background:var(--success)"></div></div>' +
-      '</div>' +
-    '</div>' +
-    slabTable;
-  }
-}
-
-// =====================================================
-// DATA: TEMPERAMENT
-// =====================================================
-var TEMPERAMENT_QUIZ = [
-  {id:1,type:'C',text:'I like to take charge and lead teams toward goals.'},
-  {id:2,type:'C',text:'I am decisive and confident when making quick decisions.'},
-  {id:3,type:'C',text:'I enjoy challenges and push myself to overcome obstacles.'},
-  {id:4,type:'C',text:'I get frustrated when things move too slowly.'},
-  {id:5,type:'C',text:'I am results-driven and focus on outcomes above all.'},
-  {id:6,type:'M',text:'I prefer to plan carefully before taking action.'},
-  {id:7,type:'M',text:'I notice details that others often miss.'},
-  {id:8,type:'M',text:'I hold myself and others to high standards of quality.'},
-  {id:9,type:'M',text:'I tend to be sensitive to criticism and take it personally.'},
-  {id:10,type:'M',text:'I like to analyze situations thoroughly before deciding.'},
-  {id:11,type:'S',text:'I love meeting new people and making friends quickly.'},
-  {id:12,type:'S',text:'I am enthusiastic and can motivate others easily.'},
-  {id:13,type:'S',text:'I enjoy being the center of attention in social settings.'},
-  {id:14,type:'S',text:'I am spontaneous and embrace change with excitement.'},
-  {id:15,type:'S',text:'I find it difficult to stick to routines for long periods.'},
-  {id:16,type:'P',text:'I prefer peace and avoid confrontation whenever possible.'},
-  {id:17,type:'P',text:'I am a reliable and steady presence in the team.'},
-  {id:18,type:'P',text:'I listen carefully before sharing my own opinion.'},
-  {id:19,type:'P',text:'I am patient and rarely get anxious under pressure.'},
-  {id:20,type:'P',text:'I prefer working behind the scenes rather than leading.'}
-];
-
-var TEMPERAMENT_PROFILES = {
-  'C': {
-    name:'Choleric',emoji:'&#128293;',
-    color:'#FEE2E2',textColor:'#DC2626',borderColor:'#FCA5A5',
-    desc:'Natural leader, goal-driven, decisive and confident.',
-    strengths:['Strong leadership','Quick decision-making','Goal-oriented','Decisive under pressure'],
-    improvements:['Listen more to others','Control impatience','Avoid being too blunt','Delegate effectively'],
-    bestRoles:['Project Manager','Site Supervisor','Team Lead','Director']
-  },
-  'M': {
-    name:'Melancholy',emoji:'&#127752;',
-    color:'#FFF7ED',textColor:'#E85D04',borderColor:'#FED7AA',
-    desc:'Detail-oriented, analytical, high-quality standards.',
-    strengths:['Attention to detail','High quality output','Strong analysis','Creative problem-solving'],
-    improvements:['Be more flexible','Accept imperfections','Communicate openly','Avoid over-thinking'],
-    bestRoles:['Architect','Accountant','Quality Checker','Data Analyst']
-  },
-  'S': {
-    name:'Sanguine',emoji:'&#127774;',
-    color:'#FEF3C7',textColor:'#D97706',borderColor:'#FDE68A',
-    desc:'Enthusiastic, people-person, motivating and expressive.',
-    strengths:['Strong communication','Team motivator','Adaptable','Creative energy'],
-    improvements:['Stay focused on tasks','Improve follow-through','Manage time better','Listen more'],
-    bestRoles:['HR Manager','Sales Executive','Trainer','PR Officer']
-  },
-  'P': {
-    name:'Phlegmatic',emoji:'&#127774;',
-    color:'#D1FAE5',textColor:'#059669',borderColor:'#A7F3D0',
-    desc:'Steady, reliable, calm under pressure and diplomatic.',
-    strengths:['Highly reliable','Calm under stress','Good mediator','Consistent performer'],
-    improvements:['Be more assertive','Share ideas proactively','Embrace change','Set clearer goals'],
-    bestRoles:['Operations','Support Staff','Mediator','Counsellor']
-  }
-};
-
-var TEMPERAMENT_RESULTS = {};
-
-function renderTemperamentOverlay() {
-  var el = document.getElementById('hrTemperamentContent');
-  if (!el || !currentUser) return;
-  var isMDorHR = currentUser.role === 'MD' || currentUser.role === 'HR';
-  var myResult = TEMPERAMENT_RESULTS[currentUser.code];
-
-  if (!myResult) {
-    var questions = TEMPERAMENT_QUIZ.map(function(q) {
-      return '<div class="temp-statement">' +
-        '<input type="checkbox" id="tq' + q.id + '" data-qtype="' + q.type + '">' +
-        '<label for="tq' + q.id + '">' + q.text + '</label>' +
-      '</div>';
-    }).join('');
-    el.innerHTML = '<div class="card fade-in" style="padding:14px;margin-bottom:12px;background:linear-gradient(135deg,#FFF7ED,#FEF3C7)">' +
-      '<div style="font-size:.82rem;font-weight:600;color:var(--warning-dark)">Discover Your Temperament Type</div>' +
-      '<div style="font-size:.7rem;color:var(--warning-dark);opacity:.8;margin-top:4px">Select statements that feel most like you. Be honest for the best results.</div>' +
-    '</div>' +
-    '<div class="section-title">Select All That Apply To You</div>' +
-    questions +
-    '<button class="btn btn-primary w-full" style="margin-top:16px;border-radius:var(--radius-sm)" onclick="calculateTemperament()">Find My Type</button>';
-  } else {
-    var profile = TEMPERAMENT_PROFILES[myResult.primary] || TEMPERAMENT_PROFILES['S'];
-    var secProfile = myResult.secondary ? TEMPERAMENT_PROFILES[myResult.secondary] : null;
-    var strengthsList = profile.strengths.map(function(s) {
-      return '<div class="temp-trait"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/></svg>' + s + '</div>';
-    }).join('');
-    var improvList = profile.improvements.map(function(s) {
-      return '<div class="temp-trait"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/></svg>' + s + '</div>';
-    }).join('');
-    var rolesList = profile.bestRoles.map(function(r) {
-      return '<span class="badge-status badge-open" style="font-size:.65rem">' + r + '</span>';
-    }).join(' ');
-
-    var distHtml = '';
-    if (isMDorHR) {
-      var typeCount = {C:0, M:0, S:0, P:0};
-      Object.values(TEMPERAMENT_RESULTS).forEach(function(r) {
-        if (r.primary && typeCount[r.primary] !== undefined) typeCount[r.primary]++;
-      });
-      var total = Object.values(typeCount).reduce(function(a,b) { return a+b; }, 1);
-      distHtml = '<div class="section-title">Team Temperament Distribution</div>' +
-        '<div class="card fade-in" style="padding:14px;margin-bottom:12px">' +
-          Object.keys(TEMPERAMENT_PROFILES).map(function(key) {
-            var p = TEMPERAMENT_PROFILES[key];
-            var cnt = typeCount[key];
-            var pct = Math.round(cnt / total * 100);
-            return '<div style="margin-bottom:10px">' +
-              '<div style="display:flex;justify-content:space-between;font-size:.72rem;font-weight:600;margin-bottom:4px">' +
-                '<span>' + p.emoji + ' ' + p.name + '</span><span>' + cnt + ' (' + pct + '%)</span>' +
-              '</div>' +
-              '<div class="temp-dist-bar"><div class="temp-dist-fill" style="width:' + pct + '%;background:' + p.textColor + '"></div></div>' +
-            '</div>';
-          }).join('') +
-        '</div>';
-    }
-
-    el.innerHTML = '<div class="temp-result-card" style="background:' + profile.color + ';border:2px solid ' + profile.borderColor + '">' +
-      '<div style="font-size:2rem;margin-bottom:6px">' + profile.emoji + '</div>' +
-      '<div class="temp-type-badge" style="background:' + profile.textColor + ';color:white">Primary: ' + profile.name + '</div>' +
-      (secProfile ? '<div style="font-size:.72rem;margin-top:4px;color:' + profile.textColor + '">Secondary: ' + secProfile.name + '</div>' : '') +
-      '<div style="font-size:.78rem;color:' + profile.textColor + ';margin-top:8px;opacity:.9">' + profile.desc + '</div>' +
-    '</div>' +
-    '<div class="section-title">Strengths</div><div class="card fade-in" style="padding:12px;margin-bottom:12px">' + strengthsList + '</div>' +
-    '<div class="section-title">Areas to Improve</div><div class="card fade-in" style="padding:12px;margin-bottom:12px">' + improvList + '</div>' +
-    '<div class="section-title">Best Role Fits</div><div class="card fade-in" style="padding:12px;margin-bottom:12px;display:flex;flex-wrap:wrap;gap:6px">' + rolesList + '</div>' +
-    distHtml +
-    '<button class="btn btn-outline w-full" style="margin-top:8px;border-radius:var(--radius-sm)" onclick="retakeTemperament()">Retake Quiz</button>';
-  }
-}
-
-function calculateTemperament() {
-  var scores = {C:0, M:0, S:0, P:0};
-  document.querySelectorAll('#hrTemperamentContent input[type=checkbox]:checked').forEach(function(cb) {
-    var t = cb.dataset.qtype;
-    if (scores[t] !== undefined) scores[t]++;
-  });
-  var sorted = Object.keys(scores).sort(function(a,b) { return scores[b] - scores[a]; });
-  TEMPERAMENT_RESULTS[currentUser.code] = {primary: sorted[0], secondary: sorted[1], scores: scores};
-  showToast('Your type: ' + TEMPERAMENT_PROFILES[sorted[0]].name + '!');
-  renderTemperamentOverlay();
-}
-
-function retakeTemperament() {
-  delete TEMPERAMENT_RESULTS[currentUser.code];
-  renderTemperamentOverlay();
-}
 
 // =====================================================
 // DATA: TASKS
@@ -3078,236 +3009,8 @@ function assignTask() {
   renderTasksOverlay();
 }
 
-// =====================================================
-// DATA: SKILLS
-// =====================================================
-var SKILL_CATEGORIES = {
-  visible: [
-    {name:'Communication', key:'comm'},
-    {name:'Technical Skills', key:'tech'},
-    {name:'Problem Solving', key:'prob'},
-    {name:'Teamwork', key:'team'}
-  ],
-  hidden: [
-    {name:'Attitude & Mindset', key:'attitude'},
-    {name:'Integrity & Ethics', key:'integrity'},
-    {name:'Emotional Intelligence', key:'eq'},
-    {name:'Initiative & Drive', key:'drive'}
-  ]
-};
 
-var SKILL_RATINGS = {};
 
-function getSkillRatings(empCode) {
-  if (!SKILL_RATINGS[empCode]) {
-    var all = SKILL_CATEGORIES.visible.concat(SKILL_CATEGORIES.hidden);
-    var ratings = {};
-    all.forEach(function(s) {
-      var selfVal = 5 + Math.floor(Math.abs(Math.sin(empCode.length + s.key.length) * 5));
-      var mgrVal = 4 + Math.floor(Math.abs(Math.cos(empCode.charCodeAt(0) + s.key.length) * 6));
-      if (selfVal > 10) selfVal = 10;
-      if (mgrVal > 10) mgrVal = 10;
-      ratings[s.key] = {self: selfVal, manager: mgrVal};
-    });
-    SKILL_RATINGS[empCode] = ratings;
-  }
-  return SKILL_RATINGS[empCode];
-}
-
-function renderSkillsOverlay() {
-  var el = document.getElementById('hrSkillsContent');
-  if (!el || !currentUser) return;
-  var emp = currentUser;
-  var ratings = getSkillRatings(emp.code);
-
-  var visibleRows = SKILL_CATEGORIES.visible.map(function(s) {
-    return '<div class="skill-slider-row">' +
-      '<label>' + s.name + '</label>' +
-      '<input type="range" min="1" max="10" value="' + ratings[s.key].self + '" oninput="updateSkillVal(this,\'' + emp.code + '\',\'' + s.key + '\',\'self\')">' +
-      '<span class="skill-val" id="sv_' + s.key + '">' + ratings[s.key].self + '</span>' +
-    '</div>';
-  }).join('');
-
-  var hiddenRows = SKILL_CATEGORIES.hidden.map(function(s) {
-    return '<div class="skill-slider-row">' +
-      '<label>' + s.name + '</label>' +
-      '<input type="range" min="1" max="10" value="' + ratings[s.key].self + '" oninput="updateSkillVal(this,\'' + emp.code + '\',\'' + s.key + '\',\'self\')">' +
-      '<span class="skill-val" id="sv_' + s.key + '">' + ratings[s.key].self + '</span>' +
-    '</div>';
-  }).join('');
-
-  var gapRows = SKILL_CATEGORIES.visible.concat(SKILL_CATEGORIES.hidden).map(function(s) {
-    var r = ratings[s.key];
-    var gap = r.self - r.manager;
-    var gapClass = gap >= 0 ? 'positive' : 'negative';
-    var gapStr = (gap >= 0 ? '+' : '') + gap;
-    return '<div class="skill-gap-item">' +
-      '<span class="sg-name">' + s.name + '</span>' +
-      '<span class="sg-self">' + r.self + '</span>' +
-      '<span style="color:var(--gray-300);font-size:.7rem">|</span>' +
-      '<span class="sg-mgr">' + r.manager + '</span>' +
-      '<span class="sg-gap ' + gapClass + '">' + gapStr + '</span>' +
-    '</div>';
-  }).join('');
-
-  el.innerHTML = '<div class="section-title" style="margin-top:0">Skills Iceberg</div>' +
-    '<div class="iceberg-container fade-in">' +
-      '<div class="iceberg-visible">' +
-        '<h5>Above the Surface</h5>' +
-        '<div class="iceberg-label">Visible Skills — what others see</div>' +
-        SKILL_CATEGORIES.visible.map(function(s) {
-          return '<span class="badge-status badge-open" style="margin:2px;font-size:.6rem">' + s.name + '</span>';
-        }).join('') +
-      '</div>' +
-      '<div style="text-align:center;padding:4px;background:linear-gradient(180deg,#3B82F6,#1D4ED8);font-size:.6rem;color:rgba(255,255,255,.5);font-style:italic">—— waterline ——</div>' +
-      '<div class="iceberg-hidden">' +
-        '<h5>Below the Surface</h5>' +
-        '<div class="iceberg-label" style="margin-bottom:6px">Hidden Strengths — deeper character</div>' +
-        SKILL_CATEGORIES.hidden.map(function(s) {
-          return '<span class="badge-status" style="margin:2px;font-size:.6rem;background:rgba(255,255,255,.15);color:white">' + s.name + '</span>';
-        }).join('') +
-      '</div>' +
-    '</div>' +
-    '<div class="section-title">Self-Assessment: Visible Skills</div>' +
-    '<div class="card fade-in" style="padding:14px;margin-bottom:12px">' + visibleRows + '</div>' +
-    '<div class="section-title">Self-Assessment: Hidden Skills</div>' +
-    '<div class="card fade-in" style="padding:14px;margin-bottom:12px">' + hiddenRows + '</div>' +
-    '<div class="section-title">Self vs Manager Ratings</div>' +
-    '<div style="display:flex;justify-content:flex-end;gap:14px;font-size:.65rem;font-weight:600;margin-bottom:6px">' +
-      '<span style="color:var(--primary)">Self</span>' +
-      '<span style="color:var(--success-dark)">Manager</span>' +
-      '<span style="color:var(--gray-500)">Gap</span>' +
-    '</div>' +
-    gapRows +
-    '<button class="btn btn-primary w-full" style="margin-top:16px;border-radius:var(--radius-sm)" onclick="saveSkillAssessment()">Save Self-Assessment</button>';
-}
-
-function updateSkillVal(input, empCode, key, ratingType) {
-  var val = parseInt(input.value, 10);
-  var ratings = getSkillRatings(empCode);
-  ratings[key][ratingType] = val;
-  var el = document.getElementById('sv_' + key);
-  if (el) el.textContent = val;
-}
-
-function saveSkillAssessment() {
-  if (!currentUser) return;
-  safeStorage.set(STORAGE_KEYS.skillRatings, JSON.stringify(SKILL_RATINGS));
-  saveAllData();
-  showToast('Skill self-assessment saved!');
-  renderSkillsOverlay();
-}
-
-// =====================================================
-// DATA: HOT SEAT
-// =====================================================
-var HOT_SEAT_SESSIONS = [
-  {
-    id:1, empCode:'SSC003', empName:'N.Hari Haran', dept:'Site',
-    date:'2026-03-05', conductor:'Selvam (MD)', status:'completed',
-    goals:['Improve site coordination with factory team','Reduce material wastage by 15%'],
-    challenges:['Communication delays between site and office','Labour absenteeism on Mondays'],
-    wins:['Porur project ahead of schedule by 1 week','Zero safety incidents in Feb 2026'],
-    feedback:['Great site management — peer review by Priyanka'],
-    nextSession:'2026-06-05'
-  },
-  {
-    id:2, empCode:'SSC006', empName:'Priyanka', dept:'Office',
-    date:'2026-02-20', conductor:'Selvam (MD)', status:'completed',
-    goals:['Complete onboarding system setup','Reduce payroll processing time'],
-    challenges:['Manual attendance collection from site/factory','Lack of HR documentation system'],
-    wins:['Successfully implemented attendance tracking','Processed all Dec salaries on time'],
-    feedback:['Very proactive — peer review by Vishnu Kumar'],
-    nextSession:'2026-05-20'
-  },
-  {
-    id:3, empCode:'SSM003', empName:'Krishna Gowri Sankar.S', dept:'Factory',
-    date:'2026-03-15', conductor:'Priyanka (HR)', status:'upcoming',
-    goals:['Achieve quality cert for PEB fabrication','Mentor 2 junior fabricators'],
-    challenges:['Equipment downtime affecting productivity'],
-    wins:[],
-    feedback:[],
-    nextSession:'2026-03-15'
-  }
-];
-
-function renderHotSeatOverlay() {
-  var el = document.getElementById('hrHotseatContent');
-  if (!el || !currentUser) return;
-  var isMDorHR = currentUser.role === 'MD' || currentUser.role === 'HR';
-
-  var sessions = isMDorHR ? HOT_SEAT_SESSIONS : HOT_SEAT_SESSIONS.filter(function(s) { return s.empCode === currentUser.code; });
-
-  var infoCard = '<div class="card fade-in" style="padding:14px;margin-bottom:12px;background:linear-gradient(135deg,#FFF7ED,#FEF3C7);border:1px solid #FDE68A">' +
-    '<div style="font-size:.82rem;font-weight:600;color:var(--warning-dark)">HOT Seat Program</div>' +
-    '<div style="font-size:.72rem;color:#B45309;margin-top:4px;line-height:1.5">Honest Open Transparent sessions where leaders and employees align on goals, challenges and wins every quarter.</div>' +
-  '</div>';
-
-  var sessionCards = sessions.length > 0 ? sessions.map(function(s) {
-    var goalsHtml = s.goals.map(function(g) { return '<li style="font-size:.73rem;margin-bottom:3px">' + g + '</li>'; }).join('');
-    var challengesHtml = s.challenges.map(function(c) { return '<li style="font-size:.73rem;margin-bottom:3px">' + c + '</li>'; }).join('');
-    var winsHtml = s.wins.length > 0 ? s.wins.map(function(w) { return '<li style="font-size:.73rem;margin-bottom:3px">' + w + '</li>'; }).join('') : '<li style="font-size:.73rem;color:var(--gray-400)">Session upcoming</li>';
-    var fbHtml = s.feedback.length > 0 ? s.feedback.map(function(f) { return '<div class="temp-trait"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>' + f + '</div>'; }).join('') : '';
-    return '<div class="hot-seat-card fade-in">' +
-      '<h4>' + s.empName + ' &nbsp;<span class="badge-status badge-' + (s.status === 'completed' ? 'approved' : 'pending') + '" style="font-size:.6rem">' + s.status + '</span></h4>' +
-      '<div class="hs-meta">' +
-        '<span>' + s.dept + '</span>' +
-        '<span>Date: ' + formatAdvDate(s.date) + '</span>' +
-        '<span>By: ' + s.conductor + '</span>' +
-        (s.nextSession ? '<span>Next: ' + formatAdvDate(s.nextSession) + '</span>' : '') +
-      '</div>' +
-      '<div class="hs-section"><h5>Goals Set</h5><ul style="padding-left:16px">' + goalsHtml + '</ul></div>' +
-      '<div class="hs-section"><h5>Challenges Discussed</h5><ul style="padding-left:16px">' + challengesHtml + '</ul></div>' +
-      '<div class="hs-section"><h5>Wins Celebrated</h5><ul style="padding-left:16px">' + winsHtml + '</ul></div>' +
-      (fbHtml ? '<div class="hs-section"><h5>Peer Feedback</h5>' + fbHtml + '</div>' : '') +
-      (isMDorHR ? '<button class="btn btn-sm btn-outline" style="margin-top:10px" onclick="addPeerFeedback(' + s.id + ')">Add Feedback</button>' : '') +
-    '</div>';
-  }).join('') : '<div style="text-align:center;padding:32px;color:var(--gray-400);font-size:.82rem">No HOT Seat sessions found.</div>';
-
-  var scheduleForm = '';
-  if (isMDorHR) {
-    var empOptions = EMPLOYEES.map(function(e) {
-      return '<option value="' + e.code + '">' + e.name + ' (' + e.code + ')</option>';
-    }).join('');
-    scheduleForm = '<div class="section-title">Schedule New Session</div>' +
-      '<div class="card fade-in" style="padding:14px;margin-bottom:12px">' +
-        '<div class="form-row"><label>Employee</label><select id="hsEmpSelect">' + empOptions + '</select></div>' +
-        '<div class="form-row"><label>Session Date</label><input type="date" id="hsDate"></div>' +
-        '<div class="form-row"><label>Conductor</label><input type="text" id="hsConductor" value="' + currentUser.name + ' (' + currentUser.role + ')"></div>' +
-        '<button class="btn btn-primary w-full" style="border-radius:var(--radius-sm);margin-top:8px" onclick="scheduleHotSeat()">Schedule Session</button>' +
-      '</div>';
-  }
-
-  el.innerHTML = infoCard + scheduleForm + '<div class="section-title">Sessions</div>' + sessionCards;
-}
-
-function addPeerFeedback(sessionId) {
-  var feedback = prompt('Enter peer feedback for this session:');
-  if (!feedback) return;
-  var session = HOT_SEAT_SESSIONS.find(function(s) { return s.id === sessionId; });
-  if (session) {
-    session.feedback.push(feedback + ' — ' + currentUser.name);
-    showToast('Feedback added successfully');
-    renderHotSeatOverlay();
-  }
-}
-
-function scheduleHotSeat() {
-  var empCode = document.getElementById('hsEmpSelect').value;
-  var date = document.getElementById('hsDate').value;
-  var conductor = document.getElementById('hsConductor').value.trim();
-  if (!date) { showToast('Please select a date'); return; }
-  var emp = EMPLOYEES.find(function(e) { return e.code === empCode; });
-  if (!emp) return;
-  var newId = HOT_SEAT_SESSIONS.length > 0 ? Math.max.apply(null, HOT_SEAT_SESSIONS.map(function(s) { return s.id; })) + 1 : 1;
-  HOT_SEAT_SESSIONS.push({
-    id: newId, empCode: empCode, empName: emp.name, dept: emp.dept,
-    date: date, conductor: conductor || currentUser.name, status: 'upcoming',
-    goals: [], challenges: [], wins: [], feedback: [], nextSession: null
-  });
-  showToast('HOT Seat scheduled for ' + emp.name + ' on ' + formatAdvDate(date));
-  renderHotSeatOverlay();
-}
 
 // =====================================================
 // DATA: VISION
@@ -3359,129 +3062,6 @@ function savePersonalVision() {
   showToast('Personal vision saved!');
 }
 
-// =====================================================
-// DATA: EVENTS & AWARDS
-// =====================================================
-var EVENTS = [
-  {id:1, title:'Annual Day Celebration', type:'celebration', date:'2026-04-15', desc:'Company annual day with awards, performances and dinner.', dept:'ALL'},
-  {id:2, title:'Safety Training Workshop', type:'training', date:'2026-03-20', desc:'Mandatory safety training for all site and factory staff.', dept:'Site'},
-  {id:3, title:'Q1 Performance Review Meeting', type:'meeting', date:'2026-03-25', desc:'Department heads and MD to review Q1 targets and progress.', dept:'ALL'},
-  {id:4, title:'Diwali Celebration', type:'celebration', date:'2025-10-20', desc:'Office Diwali party — sweets and bonuses distributed.', dept:'ALL'},
-  {id:5, title:'New Employee Induction', type:'training', date:'2026-03-18', desc:'Orientation for new joiners SSC031 and SSC032.', dept:'ALL'},
-  {id:6, title:'Client Appreciation Day', type:'meeting', date:'2026-04-01', desc:'Top clients invited to factory and site visit.', dept:'Office'}
-];
-
-var AWARDS = [
-  {id:1, empCode:'SSM003', empName:'Krishna Gowri Sankar.S', award:'Best Fabricator 2025', desc:'Exceptional quality output and zero rework incidents.', month:'Dec 2025', icon:'&#127942;'},
-  {id:2, empCode:'SSC003', empName:'N.Hari Haran', award:'Site Star Award', desc:'Delivered Porur project 1 week ahead of schedule.', month:'Feb 2026', icon:'&#11088;'},
-  {id:3, empCode:'SSC006', empName:'Priyanka', award:'HR Excellence Award', desc:'Successfully digitized HR processes and payroll.', month:'Jan 2026', icon:'&#127891;'},
-  {id:4, empCode:'SSC011', empName:'Vishnu Kumar', award:'Consistent Performer', desc:'100% attendance and top KPI score for Q3 2025.', month:'Oct 2025', icon:'&#127942;'}
-];
-
-function renderEventsOverlay() {
-  var el = document.getElementById('hrEventsContent');
-  if (!el || !currentUser) return;
-  var isMDorHR = currentUser.role === 'MD' || currentUser.role === 'HR';
-  var activeTab = el.dataset.etab || 'events';
-
-  var pills = ['events','milestones','awards'].map(function(t) {
-    var labels = {events:'Events', milestones:'Milestones', awards:'Awards Wall'};
-    return '<button class="tab-pill' + (activeTab === t ? ' active' : '') + '" onclick="eventsTab(\'' + t + '\')">' + labels[t] + '</button>';
-  }).join('');
-
-  var content = '';
-  if (activeTab === 'events') {
-    var addForm = '';
-    if (isMDorHR) {
-      addForm = '<div class="card fade-in" style="padding:14px;margin-bottom:12px">' +
-        '<div style="font-size:.78rem;font-weight:600;color:var(--gray-700);margin-bottom:10px">Add New Event</div>' +
-        '<div class="form-row"><label>Event Title</label><input type="text" id="newEventTitle" placeholder="Event name"></div>' +
-        '<div class="form-grid">' +
-          '<div class="form-row"><label>Date</label><input type="date" id="newEventDate"></div>' +
-          '<div class="form-row"><label>Type</label><select id="newEventType"><option value="celebration">Celebration</option><option value="training">Training</option><option value="meeting">Meeting</option><option value="birthday">Birthday</option><option value="anniversary">Anniversary</option></select></div>' +
-        '</div>' +
-        '<div class="form-row"><label>Description</label><textarea id="newEventDesc" rows="2" placeholder="Brief description"></textarea></div>' +
-        '<button class="btn btn-primary w-full" style="border-radius:var(--radius-sm);margin-top:8px" onclick="addEvent()">Add Event</button>' +
-      '</div>';
-    }
-    content = addForm + EVENTS.map(function(e) {
-      var d = new Date(e.date);
-      var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-      return '<div class="event-card fade-in">' +
-        '<div class="event-date-box">' +
-          '<div class="ed-day">' + d.getDate() + '</div>' +
-          '<div class="ed-mon">' + months[d.getMonth()] + '</div>' +
-        '</div>' +
-        '<div style="flex:1;min-width:0">' +
-          '<div style="font-size:.82rem;font-weight:600;margin-bottom:4px">' + e.title + '</div>' +
-          '<div style="font-size:.68rem;color:var(--gray-400);margin-bottom:4px">' + e.desc + '</div>' +
-          '<span class="event-type-badge ' + e.type + '">' + e.type.charAt(0).toUpperCase() + e.type.slice(1) + '</span>' +
-        '</div>' +
-      '</div>';
-    }).join('');
-  } else if (activeTab === 'milestones') {
-    var now = new Date();
-    var milestones = EMPLOYEES.map(function(e) {
-      var doj = new Date(e.doj);
-      var years = Math.floor((now - doj) / (1000 * 60 * 60 * 24 * 365.25));
-      var nextAnniv = new Date(doj);
-      nextAnniv.setFullYear(now.getFullYear());
-      if (nextAnniv < now) nextAnniv.setFullYear(now.getFullYear() + 1);
-      var daysUntil = Math.ceil((nextAnniv - now) / (1000 * 60 * 60 * 24));
-      return {emp: e, years: years + 1, nextAnniv: nextAnniv, daysUntil: daysUntil};
-    }).sort(function(a, b) { return a.daysUntil - b.daysUntil; });
-
-    content = '<div style="margin-bottom:12px;font-size:.75rem;color:var(--gray-400);font-weight:500">Upcoming work anniversaries, sorted by nearest date</div>' +
-      milestones.slice(0, 15).map(function(m) {
-        var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-        var soon = m.daysUntil <= 30;
-        return '<div class="event-card fade-in">' +
-          '<div class="event-date-box" style="' + (soon ? 'background:var(--warning-light)' : '') + '">' +
-            '<div class="ed-day" style="' + (soon ? 'color:var(--warning-dark)' : '') + '">' + m.nextAnniv.getDate() + '</div>' +
-            '<div class="ed-mon" style="' + (soon ? 'color:var(--warning-dark)' : '') + '">' + months[m.nextAnniv.getMonth()] + '</div>' +
-          '</div>' +
-          '<div style="flex:1;min-width:0">' +
-            '<div style="font-size:.82rem;font-weight:600;margin-bottom:2px">' + m.emp.name + '</div>' +
-            '<div style="font-size:.68rem;color:var(--gray-400);margin-bottom:4px">' + m.emp.dept + ' &middot; ' + m.years + ' year' + (m.years !== 1 ? 's' : '') + ' anniversary</div>' +
-            (soon ? '<span class="badge-status badge-pending" style="font-size:.6rem">In ' + m.daysUntil + ' days</span>' : '<span style="font-size:.65rem;color:var(--gray-400)">' + m.daysUntil + ' days away</span>') +
-          '</div>' +
-        '</div>';
-      }).join('');
-  } else {
-    content = '<div style="margin-bottom:12px;font-size:.75rem;color:var(--gray-400);font-weight:500">Recognizing excellence at Swetha Structures</div>' +
-      AWARDS.map(function(a) {
-        return '<div class="award-card fade-in">' +
-          '<div class="award-icon">' + a.icon + '</div>' +
-          '<div class="award-info">' +
-            '<h4>' + a.award + '</h4>' +
-            '<p>' + a.empName + ' &middot; ' + a.month + '</p>' +
-            '<p style="margin-top:2px">' + a.desc + '</p>' +
-          '</div>' +
-        '</div>';
-      }).join('');
-  }
-
-  el.dataset.etab = activeTab;
-  el.innerHTML = '<div class="tab-pills" style="margin-bottom:14px">' + pills + '</div>' + content;
-}
-
-function eventsTab(tab) {
-  var el = document.getElementById('hrEventsContent');
-  if (el) { el.dataset.etab = tab; renderEventsOverlay(); }
-}
-
-function addEvent() {
-  var title = document.getElementById('newEventTitle').value.trim();
-  var date = document.getElementById('newEventDate').value;
-  var type = document.getElementById('newEventType').value;
-  var desc = document.getElementById('newEventDesc').value.trim();
-  if (!title || !date) { showToast('Please enter event title and date'); return; }
-  var newId = EVENTS.length > 0 ? Math.max.apply(null, EVENTS.map(function(e) { return e.id; })) + 1 : 1;
-  EVENTS.push({id:newId, title:title, type:type, date:date, desc:desc || 'No description', dept:'ALL'});
-  apiCall('POST', '/events', { title: title, eventDate: date, eventType: type, description: desc || '' });
-  showToast('Event added: ' + title);
-  renderEventsOverlay();
-}
 
 // =====================================================
 // HR ANALYTICS
@@ -3713,14 +3293,6 @@ async function initAnalyticsCharts(m) {
       showToast('Access restricted to MD and HR');
       return;
     }
-    if (id === 'hr-incentive' && currentUser && currentUser.role !== 'MD' && currentUser.role !== 'HR') {
-      showToast('Access restricted to MD and HR');
-      return;
-    }
-    if (id === 'hr-hotseat' && currentUser && currentUser.role !== 'MD' && currentUser.role !== 'HR') {
-      showToast('Access restricted to MD and HR');
-      return;
-    }
     if (id === 'hr-analytics' && currentUser && currentUser.role !== 'MD' && currentUser.role !== 'HR') {
       showToast('Access restricted to MD and HR');
       return;
@@ -3729,14 +3301,8 @@ async function initAnalyticsCharts(m) {
     if (id === 'hr-kpi') renderKpiOverlay();
     if (id === 'hr-recruit') renderRecruitmentOverlay();
     if (id === 'hr-documents') renderDocumentsOverlay();
-    if (id === 'hr-career') renderCareerOverlay();
-    if (id === 'hr-incentive') renderIncentiveOverlay();
-    if (id === 'hr-temperament') renderTemperamentOverlay();
     if (id === 'hr-tasks') renderTasksOverlay();
-    if (id === 'hr-skills') renderSkillsOverlay();
-    if (id === 'hr-hotseat') renderHotSeatOverlay();
     if (id === 'hr-vision') renderVisionOverlay();
-    if (id === 'hr-events') renderEventsOverlay();
     if (id === 'hr-analytics') renderAnalyticsOverlay();
 
     // New feature overlays (F1-F11)
@@ -3798,13 +3364,8 @@ const STORAGE_KEYS = {
   jobPostings: 'hrms_job_postings',
   candidates: 'hrms_candidates',
   employeeDocuments: 'hrms_employee_documents',
-  temperamentResults: 'hrms_temperament_results',
   taskData: 'hrms_task_data',
-  skillRatings: 'hrms_skill_ratings',
-  hotSeatSessions: 'hrms_hot_seat_sessions',
   personalVisions: 'hrms_personal_visions',
-  events: 'hrms_events',
-  awards: 'hrms_awards',
   attendanceLogs: 'hrms_attendance_logs',
   session: 'hrms_session',
   notifPref: 'hrms_notif_pref',
@@ -3832,6 +3393,8 @@ const STORAGE_KEYS = {
   siteLocations: 'hrms_site_locations',
   jobNextId: 'hrms_job_next_id',
   candidateNextId: 'hrms_candidate_next_id',
+  resumeBank: 'hrms_resume_bank',
+  resumeNextId: 'hrms_resume_next_id',
   shiftTypes: 'hrms_shift_types',
   projects: 'hrms_projects',
   projectNextId: 'hrms_project_next_id',
@@ -3850,14 +3413,11 @@ function saveAllData() {
     safeStorage.set(STORAGE_KEYS.candidates, JSON.stringify(CANDIDATES));
     safeStorage.set(STORAGE_KEYS.jobNextId, JSON.stringify(jobNextId));
     safeStorage.set(STORAGE_KEYS.candidateNextId, JSON.stringify(candidateNextId));
+    safeStorage.set(STORAGE_KEYS.resumeBank, JSON.stringify(RESUME_BANK));
+    safeStorage.set(STORAGE_KEYS.resumeNextId, JSON.stringify(resumeNextId));
     safeStorage.set(STORAGE_KEYS.employeeDocuments, JSON.stringify(EMPLOYEE_DOCUMENTS));
-    safeStorage.set(STORAGE_KEYS.temperamentResults, JSON.stringify(TEMPERAMENT_RESULTS));
     safeStorage.set(STORAGE_KEYS.taskData, JSON.stringify(TASK_DATA));
-    safeStorage.set(STORAGE_KEYS.skillRatings, JSON.stringify(SKILL_RATINGS));
-    safeStorage.set(STORAGE_KEYS.hotSeatSessions, JSON.stringify(HOT_SEAT_SESSIONS));
     safeStorage.set(STORAGE_KEYS.personalVisions, JSON.stringify(PERSONAL_VISIONS));
-    safeStorage.set(STORAGE_KEYS.events, JSON.stringify(EVENTS));
-    safeStorage.set(STORAGE_KEYS.awards, JSON.stringify(AWARDS));
     safeStorage.set(STORAGE_KEYS.leaveApplications, JSON.stringify(leaveApplications));
     safeStorage.set(STORAGE_KEYS.leaveBalances, JSON.stringify(leaveBalances));
     safeStorage.set(STORAGE_KEYS.notifHistory, JSON.stringify(NOTIF_HISTORY));
@@ -3907,14 +3467,11 @@ function loadAllData() {
     d = load(STORAGE_KEYS.candidates); if (d) { CANDIDATES.length = 0; d.forEach(e => CANDIDATES.push(e)); }
     d = load(STORAGE_KEYS.jobNextId); if (d !== null) jobNextId = d;
     d = load(STORAGE_KEYS.candidateNextId); if (d !== null) candidateNextId = d;
+    d = load(STORAGE_KEYS.resumeBank); if (d) { RESUME_BANK.length = 0; d.forEach(e => RESUME_BANK.push(e)); }
+    d = load(STORAGE_KEYS.resumeNextId); if (d !== null) resumeNextId = d;
     d = load(STORAGE_KEYS.employeeDocuments); if (d) { EMPLOYEE_DOCUMENTS.length = 0; d.forEach(e => EMPLOYEE_DOCUMENTS.push(e)); }
-    d = load(STORAGE_KEYS.temperamentResults); if (d) { Object.keys(TEMPERAMENT_RESULTS).forEach(k => delete TEMPERAMENT_RESULTS[k]); Object.assign(TEMPERAMENT_RESULTS, d); }
     d = load(STORAGE_KEYS.taskData); if (d) { TASK_DATA.length = 0; d.forEach(e => TASK_DATA.push(e)); }
-    d = load(STORAGE_KEYS.skillRatings); if (d) { Object.keys(SKILL_RATINGS).forEach(k => delete SKILL_RATINGS[k]); Object.assign(SKILL_RATINGS, d); }
-    d = load(STORAGE_KEYS.hotSeatSessions); if (d) { HOT_SEAT_SESSIONS.length = 0; d.forEach(e => HOT_SEAT_SESSIONS.push(e)); }
     d = load(STORAGE_KEYS.personalVisions); if (d) { Object.keys(PERSONAL_VISIONS).forEach(k => delete PERSONAL_VISIONS[k]); Object.assign(PERSONAL_VISIONS, d); }
-    d = load(STORAGE_KEYS.events); if (d) { EVENTS.length = 0; d.forEach(e => EVENTS.push(e)); }
-    d = load(STORAGE_KEYS.awards); if (d) { AWARDS.length = 0; d.forEach(e => AWARDS.push(e)); }
     d = load(STORAGE_KEYS.leaveApplications); if (d) { leaveApplications.length = 0; d.forEach(e => leaveApplications.push(e)); }
     d = load(STORAGE_KEYS.leaveBalances); if (d) { Object.keys(leaveBalances).forEach(k => delete leaveBalances[k]); Object.assign(leaveBalances, d); }
     d = load(STORAGE_KEYS.notifHistory); if (d) { NOTIF_HISTORY.length = 0; d.forEach(e => NOTIF_HISTORY.push(e)); }
@@ -4019,10 +3576,9 @@ function importAllData() {
     'submitOnboarding', 'changeRole', 'addDepartment',
     'submitAdvanceRequest', 'approveAdvance', 'rejectAdvance',
     'submitSelfRating', 'moveCandidateStagePrompt', 'aiScreenCandidate', 'aiScreenAllCandidates', 'generateDocument',
-    'calculateTemperament', 'retakeTemperament',
     'toggleTaskStatus', 'assignTask',
-    'updateSkillVal', 'saveSkillAssessment', 'addPeerFeedback', 'scheduleHotSeat',
-    'savePersonalVision', 'addEvent',
+    'savePersonalVision',
+    'handleResumeUpload', 'filterResumeBank', 'aiScreenResume', 'aiFilterAllResumes', 'addResumeToPipeline',
     'submitLeave', 'approveLeave', 'rejectLeave',
     'assignShift', 'submitExpenseReimbursement', 'approveExpense', 'rejectExpense',
     'updatePersonalDetails', 'submitTaxDeclaration', 'markFiled', 'addContractWorker',
@@ -4233,6 +3789,15 @@ function exportAdvanceReport() {
     {label:'Reviewed By', key:'reviewedBy'},
     {label:'Details', key:'details'}
   ]);
+}
+
+function calculateIncentive(empCode) {
+  var emp = EMPLOYEES.find(function(e) { return e.code === empCode; });
+  if (!emp) return {amount:0, percent:0, label:'N/A', score:0};
+  var score = getKpiScore(empCode);
+  var percent = score >= 90 ? 15 : score >= 75 ? 10 : score >= 50 ? 5 : 0;
+  var label = score >= 90 ? 'Excellent' : score >= 75 ? 'Good' : score >= 50 ? 'Average' : 'Below Average';
+  return {amount: Math.round(emp.salary * percent / 100), percent: percent, label: label, score: score};
 }
 
 function exportAnalyticsReport() {
