@@ -2,17 +2,33 @@
 # =============================================================
 # Docker Self-Healing Script for Coolify
 # Runs via cron every 5 minutes
-# - Restarts unhealthy containers (with retry limit per name)
+# - Lock file prevents overlapping runs
+# - Skips containers still in startup grace period (<2min)
+# - Restarts unhealthy containers (max 3/hr per name)
 # - Clears retry counter when container recovers
 # - Prunes stale build containers (fixes Coolify name conflicts)
 # - Alerts via Telegram (optional)
 # - Monitors disk + memory usage
 # =============================================================
 
+# --- Prevent overlapping runs ---
+LOCK_FILE="/var/run/docker-heal.lock"
+if [ -f "$LOCK_FILE" ]; then
+  # Check if lock is stale (older than 10 min = stuck previous run)
+  if [ "$(find "$LOCK_FILE" -mmin +10 2>/dev/null)" ]; then
+    rm -f "$LOCK_FILE"
+  else
+    exit 0
+  fi
+fi
+trap "rm -f $LOCK_FILE" EXIT
+touch "$LOCK_FILE"
+
 LOG="/var/log/docker-heal.log"
 MAX_LOG_SIZE=5242880  # 5MB
 RESTART_TRACKER="/var/lib/docker-heal"   # persistent across reboots
 MAX_RESTARTS=3                            # max restarts per container per hour
+STARTUP_GRACE=120                         # skip containers younger than 2 min (seconds)
 
 # --- Optional Telegram alerts (fill in to enable) ---
 TELEGRAM_BOT_TOKEN=""
@@ -49,13 +65,26 @@ for id in $(docker ps --filter "health=healthy" -q 2>/dev/null); do
   fi
 done
 
-# 2. Restart unhealthy containers (with retry protection by name)
+# 2. Restart unhealthy containers (with startup grace + retry protection)
 for id in $(docker ps --filter "health=unhealthy" -q 2>/dev/null); do
   name=$(docker inspect --format '{{.Name}}' "$id" 2>/dev/null | sed 's/^\///')
   if [ -z "$name" ]; then continue; fi
+
+  # Skip containers still in startup grace period
+  started_at=$(docker inspect --format '{{.State.StartedAt}}' "$id" 2>/dev/null)
+  if [ -n "$started_at" ]; then
+    started_epoch=$(date -d "$started_at" +%s 2>/dev/null || echo 0)
+    now_epoch=$(date +%s)
+    age=$((now_epoch - started_epoch))
+    if [ "$age" -lt "$STARTUP_GRACE" ]; then
+      echo "[WAIT] Container $name is ${age}s old (grace period: ${STARTUP_GRACE}s) — skipping" >> "$LOG"
+      continue
+    fi
+  fi
+
   tracker_file="$RESTART_TRACKER/$name"
 
-  # Count recent restarts for this container (by name, survives redeploys)
+  # Count recent restarts (by name, survives redeploys)
   count=0
   if [ -f "$tracker_file" ]; then
     count=$(cat "$tracker_file" 2>/dev/null || echo 0)
