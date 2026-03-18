@@ -470,7 +470,7 @@ async function doLogin() {
       JWT_TOKEN = data.token;
       safeStorage.set('hrms_jwt', data.token);
       const empIdx = EMPLOYEES.findIndex(e => e.code === id);
-      if (empIdx >= 0) { loginAs(empIdx); return; }
+      if (empIdx >= 0) { await loginAs(empIdx); return; }
     }
   } catch (e) {
     // Backend login unavailable, using local auth
@@ -484,10 +484,10 @@ async function doLogin() {
   // Block inactive employees from logging in
   const emp = EMPLOYEES[cred.idx];
   if (emp && emp.status === 'Inactive') { err.textContent = 'Account deactivated. Contact HR.'; return; }
-  loginAs(cred.idx);
+  await loginAs(cred.idx);
 }
 // demoLogin removed — production mode, no demo access
-function loginAs(empIndex) {
+async function loginAs(empIndex) {
   currentUser = {...EMPLOYEES[empIndex]};
   // Persist session so refresh doesn't log out (24-hour expiry)
   try {
@@ -497,12 +497,22 @@ function loginAs(empIndex) {
       expiry: Date.now() + 24 * 60 * 60 * 1000
     }));
   } catch (e) {}
+  // Show UI immediately (data loads in background)
   document.getElementById('loginScreen').classList.add('hidden');
   document.getElementById('appHeader').style.display = '';
   document.getElementById('appContent').style.display = '';
   document.getElementById('bottomTabs').style.display = '';
   _activeNavId = 'home';
   _navExpandedGroups = {};
+
+  // DB-FIRST: Fetch all shared data from backend
+  var loaded = await loadFromBackend();
+  if (loaded) {
+    // Refresh currentUser from updated EMPLOYEES array
+    var freshIdx = EMPLOYEES.findIndex(function(e) { return e.code === currentUser.code; });
+    if (freshIdx >= 0) currentUser = {...EMPLOYEES[freshIdx]};
+  }
+
   applyRole();
   renderNavigation();
   updateGreeting();
@@ -3602,7 +3612,7 @@ function importAllData() {
 // Login overrides removed — doLogin and demoLogin now handle hashed auth directly
 
 // Auto-login from saved session
-function tryAutoLogin() {
+async function tryAutoLogin() {
   try {
     const raw = safeStorage.get(STORAGE_KEYS.session);
     if (!raw) return false;
@@ -3611,7 +3621,9 @@ function tryAutoLogin() {
       safeStorage.remove(STORAGE_KEYS.session);
       return false;
     }
-    loginAs(session.empIndex);
+    // Restore JWT if session has a token from API login
+    if (session.token && session.token.includes('.')) JWT_TOKEN = session.token;
+    await loginAs(session.empIndex);
     return true;
   } catch (e) { return false; }
 }
@@ -4391,7 +4403,7 @@ async function biometricLogin() {
           rememberMe: true
         };
         safeStorage.set(STORAGE_KEYS.session, JSON.stringify(session));
-        loginAs(cred.idx);
+        await loginAs(cred.idx);
         showToast('Biometric login successful!');
         return true;
       }
@@ -4493,7 +4505,7 @@ async function _handleGoogleRedirect() {
         JWT_TOKEN = data.token;
         safeStorage.set('hrms_jwt', data.token);
         const empIdx = EMPLOYEES.findIndex(e => e.code === data.user.empCode);
-        if (empIdx >= 0) { loginAs(empIdx); showToast('Signed in with Google'); return true; }
+        if (empIdx >= 0) { await loginAs(empIdx); showToast('Signed in with Google'); return true; }
       }
     } catch (_) {}
 
@@ -4571,7 +4583,7 @@ async function _handleGoogleRedirect() {
     safeStorage.set(STORAGE_KEYS.session, JSON.stringify(session));
     // Clear hash only after successful login
     history.replaceState(null, '', location.pathname + location.search);
-    loginAs(empIdx);
+    await loginAs(empIdx);
     showToast('Signed in with Google');
     return true;
   } catch (e) {
@@ -4654,6 +4666,410 @@ async function apiCall(method, path, body) {
   }
 }
 
+// =====================================================
+// DB-FIRST: Entity Mappers (snake_case → camelCase)
+// =====================================================
+function mapEmployee(row) {
+  return {
+    code: row.code, name: row.name, dept: row.dept,
+    designation: row.designation || '', salary: parseFloat(row.salary) || 0,
+    bank: row.bank || '', accNo: row.acc_no || row.accNo || '',
+    role: row.role || 'Employee', phone: row.phone || '',
+    doj: row.doj ? String(row.doj).substring(0, 10) : '',
+    email: row.email || '', address: row.address || '',
+    emergencyContact: row.emergency_contact || '', emergencyPhone: row.emergency_phone || '',
+    photoUrl: row.photo_url || '',
+    status: row.is_active === 0 ? 'Inactive' : 'Active',
+    dob: EMP_DOB_MAP[row.code] || row.dob || ''
+  };
+}
+function mapLeave(row) {
+  return {
+    id: row.id, empCode: row.emp_code || row.empCode, empName: row.emp_name || row.empName || '',
+    dept: row.dept || '', type: row.leave_type || row.type || 'casual',
+    from: row.from_date ? String(row.from_date).substring(0, 10) : (row.from || ''),
+    to: row.to_date ? String(row.to_date).substring(0, 10) : (row.to || ''),
+    days: parseInt(row.days, 10) || 1, reason: row.reason || '',
+    status: row.status || 'pending',
+    reviewedBy: row.reviewed_by || row.reviewedBy || null,
+    reviewDate: row.review_date ? String(row.review_date).substring(0, 10) : (row.reviewDate || null)
+  };
+}
+function mapAdvance(row) {
+  return {
+    id: row.id, type: row.type || 'site',
+    empCode: row.emp_code || row.empCode || '', empName: row.emp_name || row.empName || '',
+    dept: row.dept || '', amount: parseFloat(row.amount) || 0,
+    reason: row.reason || null, details: row.details || null,
+    project: row.project || null, category: row.category || null,
+    travelFrom: row.travel_from || row.travelFrom || null,
+    travelTo: row.travel_to || row.travelTo || null,
+    vehicle: row.vehicle || null, travelKm: row.travel_km ? parseFloat(row.travel_km) : (row.travelKm || null),
+    emiAmount: row.emi_amount ? parseFloat(row.emi_amount) : (row.emiAmount || null),
+    emiMonths: row.emi_months ? parseInt(row.emi_months, 10) : (row.emiMonths || null),
+    urgency: row.urgency || 'normal',
+    status: (row.status || 'Pending').toLowerCase(),
+    appliedDate: row.applied_date ? String(row.applied_date).substring(0, 10) : (row.appliedDate || ''),
+    reviewedBy: row.reviewed_by || row.reviewedBy || null,
+    reviewDate: row.review_date ? String(row.review_date).substring(0, 10) : (row.reviewDate || null),
+    rejectReason: row.reject_reason || row.rejectReason || null
+  };
+}
+function mapAnnouncement(row) {
+  return {
+    id: row.id, title: row.title || '',
+    body: row.content || row.body || '',
+    category: row.category || row.type || 'General',
+    author: row.created_by || row.author || '',
+    date: row.created_at ? String(row.created_at).substring(0, 10) : (row.date || ''),
+    priority: row.priority || 'normal',
+    readBy: row.readBy || []
+  };
+}
+function mapTask(row) {
+  return {
+    id: row.id, title: row.title || '', type: row.type || 'routine',
+    assignedTo: row.assigned_to || row.assignedTo || '',
+    dueDate: row.due_date ? String(row.due_date).substring(0, 10) : (row.dueDate || ''),
+    priority: row.priority || 'medium',
+    done: !!(row.done),
+    note: row.note || row.description || ''
+  };
+}
+function mapExpense(row) {
+  return {
+    id: row.id, empCode: row.emp_code || row.empCode || '',
+    empName: row.emp_name || row.empName || '',
+    category: row.category || '', amount: parseFloat(row.amount) || 0,
+    description: row.description || '', receiptUrl: row.receipt_url || row.receiptUrl || '',
+    status: row.status || 'Pending',
+    reviewedBy: row.reviewed_by || row.reviewedBy || null,
+    reviewDate: row.review_date ? String(row.review_date).substring(0, 10) : (row.reviewDate || null),
+    submittedOn: row.submitted_at ? String(row.submitted_at).substring(0, 10) : (row.submittedOn || '')
+  };
+}
+function mapAsset(row) {
+  return {
+    id: row.id, name: row.asset_name || row.name || '',
+    type: row.asset_type || row.type || '', serialNo: row.serial_no || row.serialNo || '',
+    purchaseDate: row.purchase_date ? String(row.purchase_date).substring(0, 10) : (row.purchaseDate || ''),
+    cost: parseFloat(row.purchase_cost || row.cost) || 0,
+    condition: row.asset_condition || row.condition || 'New',
+    status: row.status || 'Available',
+    assignedTo: row.assigned_to || row.assignedTo || null,
+    assignedDate: row.assigned_date ? String(row.assigned_date).substring(0, 10) : (row.assignedDate || null),
+    assignedBy: row.assigned_by || row.assignedBy || null,
+    notes: row.notes || ''
+  };
+}
+function mapExitRequest(row) {
+  return {
+    id: row.id, empCode: row.emp_code || row.empCode || '',
+    empName: row.emp_name || row.empName || '',
+    reason: row.reason || '', remarks: row.remarks || '',
+    preferredLWD: row.preferred_lwd ? String(row.preferred_lwd).substring(0, 10) : (row.preferredLWD || ''),
+    actualLWD: row.actual_lwd ? String(row.actual_lwd).substring(0, 10) : (row.actualLWD || null),
+    status: row.status || 'Pending',
+    reviewedBy: row.reviewed_by || row.reviewedBy || null,
+    reviewDate: row.review_date ? String(row.review_date).substring(0, 10) : (row.reviewDate || null),
+    clearance: row.clearance || null,
+    fnfAmount: row.fnf_amount ? parseFloat(row.fnf_amount) : (row.fnfAmount || null),
+    fnfDetails: row.fnf_details || row.fnfDetails || null,
+    submittedAt: row.submitted_at ? String(row.submitted_at).substring(0, 10) : (row.submittedAt || '')
+  };
+}
+function mapComplianceFiling(row) {
+  return {
+    id: row.id, type: row.filing_type || row.type || '',
+    period: row.period || '', dueDate: row.due_date ? String(row.due_date).substring(0, 10) : (row.dueDate || ''),
+    filedDate: row.filed_date ? String(row.filed_date).substring(0, 10) : (row.filedDate || null),
+    status: row.status || 'pending',
+    filedBy: row.filed_by || row.filedBy || null,
+    authority: row.authority || '', referenceNo: row.reference_no || row.referenceNo || ''
+  };
+}
+function mapContractWorker(row) {
+  return {
+    id: row.id, name: row.name || '', contractor: row.contractor || '',
+    dept: row.dept || '', dailyWage: parseFloat(row.daily_wage || row.dailyWage) || 0,
+    startDate: row.start_date ? String(row.start_date).substring(0, 10) : (row.startDate || ''),
+    endDate: row.end_date ? String(row.end_date).substring(0, 10) : (row.endDate || null),
+    isActive: row.is_active !== 0
+  };
+}
+function mapJobPosting(row) {
+  return {
+    id: row.id, title: row.title || '', dept: row.dept || '',
+    openings: row.openings || 1,
+    posted: row.posted_date ? String(row.posted_date).substring(0, 10) : (row.posted || ''),
+    status: (row.status || 'Open').toLowerCase(),
+    jd: row.description || row.jd || '',
+    location: row.location || '', type: row.type || 'Full-time',
+    experience: row.experience || '', salaryRange: row.salary_range || row.salaryRange || '',
+    requirements: row.requirements || ''
+  };
+}
+function mapCandidate(row) {
+  return {
+    id: row.id, name: row.name || '', email: row.email || '',
+    phone: row.phone || '', jobId: row.job_id || row.jobId || null,
+    role: row.job_title || row.role || '',
+    stage: row.stage || 'Applied', rating: parseFloat(row.rating) || 0,
+    resumeUrl: row.resume_url || row.resumeUrl || '',
+    notes: row.notes || '', exp: row.exp || '',
+    appliedDate: row.applied_date ? String(row.applied_date).substring(0, 10) : (row.appliedDate || ''),
+    aiScore: row.ai_score || row.aiScore || null,
+    aiSummary: row.ai_summary || row.aiSummary || null,
+    aiStrengths: row.ai_strengths || row.aiStrengths || null
+  };
+}
+function mapNotification(row) {
+  return {
+    id: row.id, empCode: row.emp_code || row.empCode || '',
+    title: row.title || '', body: row.message || row.body || '',
+    category: row.type || row.category || 'system',
+    time: row.created_at || row.time || '',
+    read: !!(row.is_read || row.read)
+  };
+}
+function mapTaxDeclaration(row) {
+  return {
+    empCode: row.emp_code || row.empCode || '',
+    fy: row.fy || '2025-26',
+    section80c: parseFloat(row.section_80c || row.section80c) || 0,
+    section80d: parseFloat(row.section_80d || row.section80d) || 0,
+    hraExemption: parseFloat(row.hra_exemption || row.hraExemption) || 0,
+    homeLoanInterest: parseFloat(row.home_loan_interest || row.homeLoanInterest) || 0,
+    annualIncome: parseFloat(row.annual_income || row.annualIncome) || 0,
+    totalDeductions: parseFloat(row.total_deductions || row.totalDeductions) || 0,
+    taxableIncome: parseFloat(row.taxable_income || row.taxableIncome) || 0,
+    taxLiability: parseFloat(row.tax_liability || row.taxLiability) || 0,
+    monthlyTds: parseFloat(row.monthly_tds || row.monthlyTds) || 0
+  };
+}
+
+// =====================================================
+// DB-FIRST: Load All Shared Data from Backend
+// =====================================================
+async function loadFromBackend() {
+  if (!isOnline || !JWT_TOKEN) return false;
+  try {
+    var isMDorHR = currentUser && (currentUser.role === 'MD' || currentUser.role === 'HR');
+    var headers = apiHeaders();
+    var fetchOpts = { method: 'GET', headers: headers };
+    var base = API_BASE;
+
+    // Build request list — 18 parallel fetches
+    var requests = [
+      { key: 'employees', url: base + '/employees?limit=200' },
+      { key: 'leaves', url: base + '/leaves?limit=500' },
+      { key: 'advances', url: base + '/advances?limit=500' },
+      { key: 'notifications', url: base + '/notifications' },
+      { key: 'notifPrefs', url: base + '/notifications/prefs' },
+      { key: 'announcements', url: base + '/announcements?limit=200' },
+      { key: 'tasks', url: base + '/tasks?limit=200' },
+      { key: 'jobs', url: base + '/recruitment/jobs' },
+      { key: 'candidates', url: base + '/recruitment/candidates' },
+      { key: 'assets', url: base + '/assets?limit=200' },
+      { key: 'exits', url: base + '/exit?limit=200' },
+      { key: 'expenses', url: base + '/expenses?limit=500' },
+      { key: 'shifts', url: base + '/shifts' },
+      { key: 'tax', url: base + '/tax' }
+    ];
+    // MD/HR-only endpoints
+    if (isMDorHR) {
+      requests.push({ key: 'leaveBalanceAll', url: base + '/leaves/balance/all' });
+      requests.push({ key: 'complianceFilings', url: base + '/compliance/filings' });
+      requests.push({ key: 'contractWorkers', url: base + '/compliance/contract-workers' });
+    } else {
+      requests.push({ key: 'leaveBalance', url: base + '/leaves/balance' });
+    }
+
+    var results = await Promise.allSettled(
+      requests.map(function(r) {
+        return fetch(r.url, fetchOpts).then(function(res) {
+          if (!res.ok) return null;
+          return res.json();
+        }).catch(function() { return null; });
+      })
+    );
+
+    // Helper to extract data from result
+    function getData(idx) {
+      var r = results[idx];
+      if (!r || r.status !== 'fulfilled' || !r.value) return null;
+      return r.value;
+    }
+
+    // Helper to unwrap paginated or array responses
+    function unwrap(data) {
+      if (!data) return [];
+      if (Array.isArray(data)) return data;
+      if (data.data && Array.isArray(data.data)) return data.data;
+      return [];
+    }
+
+    // Map request keys to indices
+    var keyIdx = {};
+    requests.forEach(function(r, i) { keyIdx[r.key] = i; });
+
+    // 1. Employees
+    var empData = unwrap(getData(keyIdx.employees));
+    if (empData.length > 0) {
+      var mapped = empData.map(mapEmployee);
+      EMPLOYEES.length = 0;
+      mapped.forEach(function(e) { EMPLOYEES.push(e); });
+      // Re-apply DOB map
+      EMPLOYEES.forEach(function(e) { if (EMP_DOB_MAP[e.code]) e.dob = EMP_DOB_MAP[e.code]; });
+      // Ensure core accounts active
+      EMPLOYEES.forEach(function(e) { if (e.code === 'MD001' || e.code === 'SSC006' || e.code === 'SSC011') e.status = 'Active'; });
+    }
+
+    // 2. Leaves
+    var leaveData = unwrap(getData(keyIdx.leaves));
+    if (leaveData.length > 0) {
+      leaveApplications.length = 0;
+      leaveData.map(mapLeave).forEach(function(l) { leaveApplications.push(l); });
+      leaveNextId = leaveApplications.reduce(function(mx, l) { return Math.max(mx, l.id || 0); }, 0) + 1;
+    }
+
+    // 3. Leave balances
+    if (isMDorHR && keyIdx.leaveBalanceAll !== undefined) {
+      var balData = getData(keyIdx.leaveBalanceAll);
+      if (balData && typeof balData === 'object' && !Array.isArray(balData)) {
+        Object.keys(leaveBalances).forEach(function(k) { delete leaveBalances[k]; });
+        Object.assign(leaveBalances, balData);
+      }
+    } else if (keyIdx.leaveBalance !== undefined) {
+      var myBal = getData(keyIdx.leaveBalance);
+      if (myBal && currentUser) {
+        leaveBalances[currentUser.code] = myBal;
+      }
+    }
+
+    // 4. Advances
+    var advData = unwrap(getData(keyIdx.advances));
+    if (advData.length > 0) {
+      advanceRequests.length = 0;
+      advData.map(mapAdvance).forEach(function(a) { advanceRequests.push(a); });
+      advNextId = advanceRequests.reduce(function(mx, a) { return Math.max(mx, a.id || 0); }, 0) + 1;
+    }
+
+    // 5. Notifications
+    var notifData = getData(keyIdx.notifications);
+    if (notifData && Array.isArray(notifData)) {
+      NOTIF_HISTORY.length = 0;
+      notifData.map(mapNotification).forEach(function(n) { NOTIF_HISTORY.push(n); });
+    }
+
+    // 6. Notification preferences
+    var prefData = getData(keyIdx.notifPrefs);
+    if (prefData && typeof prefData === 'object') {
+      Object.assign(notifPrefs, prefData);
+    }
+
+    // 7. Announcements
+    var annData = unwrap(getData(keyIdx.announcements));
+    if (annData.length > 0) {
+      announcements.length = 0;
+      annData.map(mapAnnouncement).forEach(function(a) { announcements.push(a); });
+      announcementNextId = announcements.reduce(function(mx, a) { return Math.max(mx, a.id || 0); }, 0) + 1;
+    }
+
+    // 8. Tasks
+    var taskData = getData(keyIdx.tasks);
+    if (taskData && Array.isArray(taskData) && taskData.length > 0) {
+      TASK_DATA.length = 0;
+      taskData.map(mapTask).forEach(function(t) { TASK_DATA.push(t); });
+    }
+
+    // 9. Job postings
+    var jobData = getData(keyIdx.jobs);
+    if (jobData && Array.isArray(jobData) && jobData.length > 0) {
+      JOB_POSTINGS.length = 0;
+      jobData.map(mapJobPosting).forEach(function(j) { JOB_POSTINGS.push(j); });
+      jobNextId = JOB_POSTINGS.reduce(function(mx, j) { return Math.max(mx, j.id || 0); }, 0) + 1;
+    }
+
+    // 10. Candidates
+    var candData = getData(keyIdx.candidates);
+    if (candData && Array.isArray(candData) && candData.length > 0) {
+      CANDIDATES.length = 0;
+      candData.map(mapCandidate).forEach(function(c) { CANDIDATES.push(c); });
+      candidateNextId = CANDIDATES.reduce(function(mx, c) { return Math.max(mx, c.id || 0); }, 0) + 1;
+    }
+
+    // 11. Assets
+    var assetData = unwrap(getData(keyIdx.assets));
+    if (assetData.length > 0) {
+      assetInventory.length = 0;
+      assetData.map(mapAsset).forEach(function(a) { assetInventory.push(a); });
+      assetNextId = assetInventory.reduce(function(mx, a) { return Math.max(mx, a.id || 0); }, 0) + 1;
+    }
+
+    // 12. Exit requests
+    var exitData = getData(keyIdx.exits);
+    if (exitData && Array.isArray(exitData) && exitData.length > 0) {
+      exitRequests.length = 0;
+      exitData.map(mapExitRequest).forEach(function(e) { exitRequests.push(e); });
+      exitNextId = exitRequests.reduce(function(mx, e) { return Math.max(mx, e.id || 0); }, 0) + 1;
+    }
+
+    // 13. Expenses
+    var expData = unwrap(getData(keyIdx.expenses));
+    if (expData.length > 0) {
+      expenseReimbursements.length = 0;
+      expData.map(mapExpense).forEach(function(e) { expenseReimbursements.push(e); });
+      expReimbNextId = expenseReimbursements.reduce(function(mx, e) { return Math.max(mx, e.id || 0); }, 0) + 1;
+    }
+
+    // 14. Shifts
+    var shiftData = getData(keyIdx.shifts);
+    if (shiftData && Array.isArray(shiftData) && shiftData.length > 0) {
+      Object.keys(shiftAssignments).forEach(function(k) { delete shiftAssignments[k]; });
+      shiftData.forEach(function(row) {
+        shiftAssignments[row.emp_code || row.empCode] = {
+          code: row.shift_code || row.code || 'GEN',
+          eligible: !!(row.is_eligible !== undefined ? row.is_eligible : true)
+        };
+      });
+    }
+
+    // 15. Tax declaration
+    var taxData = getData(keyIdx.tax);
+    if (taxData && typeof taxData === 'object' && taxData.emp_code) {
+      var mapped = mapTaxDeclaration(taxData);
+      taxDeclarations[mapped.empCode] = mapped;
+    }
+
+    // 16. Compliance filings (MD/HR only)
+    if (isMDorHR && keyIdx.complianceFilings !== undefined) {
+      var compData = getData(keyIdx.complianceFilings);
+      if (compData && Array.isArray(compData) && compData.length > 0) {
+        complianceFilings.length = 0;
+        compData.map(mapComplianceFiling).forEach(function(c) { complianceFilings.push(c); });
+        complianceNextId = complianceFilings.reduce(function(mx, c) { return Math.max(mx, c.id || 0); }, 0) + 1;
+      }
+    }
+
+    // 17. Contract workers (MD/HR only)
+    if (isMDorHR && keyIdx.contractWorkers !== undefined) {
+      var cwData = getData(keyIdx.contractWorkers);
+      if (cwData && Array.isArray(cwData) && cwData.length > 0) {
+        contractWorkers.length = 0;
+        cwData.map(mapContractWorker).forEach(function(w) { contractWorkers.push(w); });
+        contractWorkerNextId = contractWorkers.reduce(function(mx, w) { return Math.max(mx, w.id || 0); }, 0) + 1;
+      }
+    }
+
+    // Cache to localStorage for offline use
+    saveAllData();
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
 // Offline mutation queue
 function queueOfflineMutation(method, path, body) {
   let queue; try { queue = JSON.parse(safeStorage.get('hrms_offline_queue') || '[]'); } catch { queue = []; }
@@ -4705,7 +5121,7 @@ doLogin = async function() {
         if (idx >= 0) {
           const session = { empIndex: idx, token: data.token, expiry: Date.now() + 24*60*60*1000, rememberMe: document.getElementById('rememberMe')?.checked || false };
           safeStorage.set(STORAGE_KEYS.session, JSON.stringify(session));
-          loginAs(idx);
+          await loginAs(idx);
           requestNotificationPermission();
           syncOfflineQueue();
           return;
@@ -4741,67 +5157,7 @@ async function seedBackendData() {
   }
 }
 
-// Wire API calls to mutation functions where the backend is available
-(function wireApiCalls() {
-  // Advance requests — sync to API
-  const _origSubmitAdvance = submitAdvanceRequest;
-  if (typeof _origSubmitAdvance === 'function') {
-    window.submitAdvanceRequest = function() {
-      _origSubmitAdvance.apply(this, arguments);
-      const latest = advanceRequests[advanceRequests.length - 1];
-      if (latest) apiCall('POST', '/advances', latest);
-    };
-  }
-
-  const _origApproveAdv = approveAdvance;
-  if (typeof _origApproveAdv === 'function') {
-    window.approveAdvance = function(id) {
-      _origApproveAdv(id);
-      apiCall('PATCH', '/advances/' + id + '/approve', {});
-    };
-  }
-
-  const _origRejectAdv = rejectAdvance;
-  if (typeof _origRejectAdv === 'function') {
-    window.rejectAdvance = function(id) {
-      _origRejectAdv(id);
-      const req = advanceRequests.find(r => r.id === id);
-      apiCall('PATCH', '/advances/' + id + '/reject', { reason: req ? req.rejectReason : '' });
-    };
-  }
-
-  // Tasks — sync to API
-  const _origToggleTask = toggleTaskStatus;
-  if (typeof _origToggleTask === 'function') {
-    window.toggleTaskStatus = function(idx) {
-      _origToggleTask(idx);
-      const task = TASK_DATA[idx];
-      if (task) apiCall('PATCH', '/tasks/' + (idx + 1) + '/toggle', {});
-    };
-  }
-
-  // GPS check-in — sync to API
-  const _origGpsCheckIn = gpsCheckIn;
-  window.gpsCheckIn = function() {
-    _origGpsCheckIn();
-    // The original already uses geolocation; we additionally POST to API
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(pos => {
-        apiCall('POST', '/attendance/checkin', { lat: pos.coords.latitude, lng: pos.coords.longitude });
-      }, () => {});
-    }
-  };
-
-  const _origGpsCheckOut = gpsCheckOut;
-  window.gpsCheckOut = function() {
-    _origGpsCheckOut();
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(pos => {
-        apiCall('POST', '/attendance/checkout', { lat: pos.coords.latitude, lng: pos.coords.longitude });
-      }, () => {});
-    }
-  };
-})();
+// wireApiCalls IIFE removed — mutation functions already call apiCall() directly
 
 // =====================================================
 // ROLE-SPECIFIC NAVIGATION RENDERER
@@ -7562,7 +7918,7 @@ function editProject(id) {
       if (errEl) errEl.textContent = 'Google Sign-In failed. Please try again.';
       if (btn) { btn.disabled = false; btn.querySelector('span').textContent = 'Sign in with Google'; }
     }
-  } else if (!tryAutoLogin()) {
+  } else if (!(await tryAutoLogin())) {
     // Show login screen (default state)
   } else {
     resetIdleTimer();

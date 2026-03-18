@@ -141,6 +141,21 @@ router.get('/balance', verifyToken, async (req, res) => {
   }
 });
 
+// GET /api/leaves/balance/all — all leave balances (MD/HR only)
+router.get('/balance/all', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM leave_balances');
+    const result = {};
+    rows.forEach(r => {
+      result[r.emp_code] = { casual: r.casual, earned: r.earned, sick: r.sick, comp: r.comp };
+    });
+    res.json(result);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // GET /api/leaves/balance/:code — get leave balance for specific employee (MD/HR)
 router.get('/balance/:code', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
   try {
