@@ -2,8 +2,8 @@ services:
   app:
     build: .
     restart: unless-stopped
-    expose:
-      - "3000"
+    ports:
+      - "3001:3000"
     environment:
       - PORT=3000
       - DB_HOST=mysql
