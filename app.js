@@ -439,14 +439,6 @@ async function sha256(str) {
   }
   return[h0,h1,h2,h3,h4,h5,h6,h7].map(v=>(v>>>0).toString(16).padStart(8,'0')).join('');
 }
-// Pre-computed SHA-256 hashes for demo passwords
-const CREDENTIAL_HASHES = {
-  'MD001': {hash:'240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9', idx:0},   // admin123
-  'SSC006': {hash:'070a3b5e8d4bd5c46acccb91c9c54614c0cd649e78c4c4719e3a64270bae5ddf', idx:6}, // hr123
-  'SSC011': {hash:'e03d3ec8d5035f8721f5dc64546e59ed790dbcb3b7b598fe57057ccd7b683b00', idx:11}  // emp123
-};
-const DEFAULT_HASH = 'e03d3ec8d5035f8721f5dc64546e59ed790dbcb3b7b598fe57057ccd7b683b00'; // emp123
-EMPLOYEES.forEach((e,i) => { if (!CREDENTIAL_HASHES[e.code]) CREDENTIAL_HASHES[e.code] = {hash:DEFAULT_HASH, idx:i}; });
 EMPLOYEES.forEach(e => { if (!e.status) e.status = 'Active'; });
 
 // =====================================================
@@ -457,76 +449,85 @@ async function doLogin() {
   const pass = document.getElementById('loginPass').value;
   const err = document.getElementById('loginError');
   if (!id) { err.textContent = 'Please enter Employee Code'; return; }
+  if (!pass) { err.textContent = 'Please enter Password'; return; }
 
-  // Try backend API login first
+  if (!isOnline) { err.textContent = 'No internet connection. Please check your network and try again.'; return; }
+
   try {
     const res = await fetch(API_BASE + '/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ empCode: id, password: pass })
     });
-    if (res.ok) {
-      const data = await res.json();
-      JWT_TOKEN = data.token;
-      safeStorage.set('hrms_jwt', data.token);
-      const empIdx = EMPLOYEES.findIndex(e => e.code === id);
-      if (empIdx >= 0) { await loginAs(empIdx); return; }
-    }
+    const data = await res.json();
+    if (!res.ok) { err.textContent = data.error || 'Login failed'; return; }
+    JWT_TOKEN = data.token;
+    safeStorage.set('hrms_jwt', data.token);
+    var rememberMe = document.getElementById('rememberMe');
+    var session = { empCode: id, token: data.token, expiry: Date.now() + 24*60*60*1000, rememberMe: rememberMe ? rememberMe.checked : false };
+    safeStorage.set(STORAGE_KEYS.session, JSON.stringify(session));
+    await loginAs(id);
+    requestNotificationPermission();
   } catch (e) {
-    // Backend login unavailable, using local auth
+    err.textContent = 'Cannot reach server. Please try again later.';
   }
-
-  // Fallback to local credentials with hashed comparison
-  const cred = CREDENTIAL_HASHES[id];
-  if (!cred) { err.textContent = 'Invalid Employee Code or Password'; return; }
-  const inputHash = await sha256(pass);
-  if (cred.hash !== inputHash) { err.textContent = 'Invalid Employee Code or Password'; return; }
-  // Block inactive employees from logging in
-  const emp = EMPLOYEES[cred.idx];
-  if (emp && emp.status === 'Inactive') { err.textContent = 'Account deactivated. Contact HR.'; return; }
-  await loginAs(cred.idx);
 }
 // demoLogin removed — production mode, no demo access
-async function loginAs(empIndex) {
-  currentUser = {...EMPLOYEES[empIndex]};
-  // Persist session so refresh doesn't log out (24-hour expiry)
+async function loginAs(empCode) {
+  showLoadingSpinner('Loading your data...');
   try {
-    safeStorage.set(STORAGE_KEYS.session, JSON.stringify({
-      empIndex: empIndex,
-      token: currentUser.code,
-      expiry: Date.now() + 24 * 60 * 60 * 1000
-    }));
-  } catch (e) {}
-  // Show UI immediately (data loads in background)
-  document.getElementById('loginScreen').classList.add('hidden');
-  document.getElementById('appHeader').style.display = '';
-  document.getElementById('appContent').style.display = '';
-  document.getElementById('bottomTabs').style.display = '';
-  _activeNavId = 'home';
-  _navExpandedGroups = {};
-
-  // DB-FIRST: Fetch all shared data from backend
-  var loaded = await loadFromBackend();
-  if (loaded) {
-    // Refresh currentUser from updated EMPLOYEES array
-    var freshIdx = EMPLOYEES.findIndex(function(e) { return e.code === currentUser.code; });
-    if (freshIdx >= 0) currentUser = {...EMPLOYEES[freshIdx]};
-  }
-
-  applyRole();
-  renderNavigation();
-  updateGreeting();
-  buildCalendar();
-  initLeaveTabs();
-  // Set initial history state so back button has a baseline
-  history.replaceState({ tab: 'home' }, '');
-  // MD/HR: check for new employees needing setup (salary=0)
-  if (currentUser.role === 'MD' || currentUser.role === 'HR') {
-    var newEmps = EMPLOYEES.filter(function(e) { return e.salary === 0 && e.code !== currentUser.code; });
-    if (newEmps.length > 0) {
-      var names = newEmps.map(function(e) { return e.name + ' (' + e.code + ')'; }).join(', ');
-      setTimeout(function() { showToast(newEmps.length + ' new employee(s) need setup: ' + names); }, 1000);
+    // Load all shared data from backend
+    var loaded = await loadFromBackend();
+    if (!loaded) {
+      hideLoadingSpinner();
+      showToast('Failed to load data from server. Please try again.');
+      // Force logout
+      JWT_TOKEN = null;
+      safeStorage.remove('hrms_jwt');
+      safeStorage.remove(STORAGE_KEYS.session);
+      return;
     }
+
+    // Load local-only data (Resume Bank, Projects, etc.)
+    loadLocalOnlyData();
+
+    // Find employee in DB-loaded EMPLOYEES array
+    var empIdx = EMPLOYEES.findIndex(function(e) { return e.code === empCode; });
+    if (empIdx < 0) {
+      hideLoadingSpinner();
+      showToast('Employee not found in database. Contact admin.');
+      JWT_TOKEN = null;
+      safeStorage.remove('hrms_jwt');
+      safeStorage.remove(STORAGE_KEYS.session);
+      return;
+    }
+    currentUser = {...EMPLOYEES[empIdx]};
+
+    // Show main UI
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('appHeader').style.display = '';
+    document.getElementById('appContent').style.display = '';
+    document.getElementById('bottomTabs').style.display = '';
+    _activeNavId = 'home';
+    _navExpandedGroups = {};
+
+    applyRole();
+    renderNavigation();
+    updateGreeting();
+    buildCalendar();
+    initLeaveTabs();
+    history.replaceState({ tab: 'home' }, '');
+
+    // MD/HR: check for new employees needing setup (salary=0)
+    if (currentUser.role === 'MD' || currentUser.role === 'HR') {
+      var newEmps = EMPLOYEES.filter(function(e) { return e.salary === 0 && e.code !== currentUser.code; });
+      if (newEmps.length > 0) {
+        var names = newEmps.map(function(e) { return e.name + ' (' + e.code + ')'; }).join(', ');
+        setTimeout(function() { showToast(newEmps.length + ' new employee(s) need setup: ' + names); }, 1000);
+      }
+    }
+  } finally {
+    hideLoadingSpinner();
   }
 }
 function renderProfileOverlay() {
@@ -608,20 +609,23 @@ function showForgotPassword() {
   document.getElementById('forgotSubmitBtn').addEventListener('click', processForgotPassword);
 }
 
-function processForgotPassword() {
-  const code = document.getElementById('forgotCode').value.trim().toUpperCase();
-  const result = document.getElementById('forgotResult');
+async function processForgotPassword() {
+  var code = document.getElementById('forgotCode').value.trim().toUpperCase();
+  var result = document.getElementById('forgotResult');
   if (!code) { result.textContent = 'Please enter your Employee Code'; return; }
-  const emp = EMPLOYEES.find(e => e.code === code);
-  if (!emp) { result.textContent = 'Employee code not found. Contact HR if you need help.'; return; }
-  // Show masked email
-  const email = emp.email || (emp.name.split(' ')[0].toLowerCase() + '@swethastructures.com');
-  const atIdx = email.indexOf('@');
-  const masked = email[0] + '****' + email.substring(atIdx - 1);
-  // Reset to default password
-  CREDENTIAL_HASHES[code] = { hash: DEFAULT_HASH, idx: EMPLOYEES.findIndex(e => e.code === code) };
-  saveAllData();
-  result.innerHTML = 'Password has been reset for <b>' + escapeHTML(code) + '</b>.<br>Email: ' + escapeHTML(masked) + '<br><br>Your new password is the default. Please change it after login.';
+  if (!isOnline) { result.textContent = 'No internet connection. Please try again later.'; return; }
+  try {
+    var res = await fetch(API_BASE + '/auth/forgot-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ empCode: code })
+    });
+    var data = await res.json();
+    if (!res.ok) { result.textContent = data.error || 'Password reset failed'; return; }
+    result.innerHTML = 'Password has been reset for <b>' + escapeHTML(code) + '</b>.<br><br>Your new password is <b>emp123</b>. Please change it after login.';
+  } catch (e) {
+    result.textContent = 'Cannot reach server. Please try again later.';
+  }
 }
 
 function restoreLoginForm() {
@@ -1262,33 +1266,35 @@ function wizardNav(dir) {
   updateWizardUI();
 }
 
-function submitOnboarding() {
-  const name = document.getElementById('obName').value.trim();
-  const code = document.getElementById('obCode').value.trim();
-  const dept = document.getElementById('obDept').value;
-  const designation = document.getElementById('obDesignation').value.trim();
-  const salary = parseInt(document.getElementById('obSalary').value, 10) || 0;
-  const bank = document.getElementById('obBank').value.trim();
-  const accNo = document.getElementById('obAccNo').value.trim();
-  const phone = document.getElementById('obPhone').value.trim();
-  const doj = document.getElementById('obDoj').value;
+async function submitOnboarding() {
+  var name = document.getElementById('obName').value.trim();
+  var code = document.getElementById('obCode').value.trim();
+  var dept = document.getElementById('obDept').value;
+  var designation = document.getElementById('obDesignation').value.trim();
+  var salary = parseInt(document.getElementById('obSalary').value, 10) || 0;
+  var bank = document.getElementById('obBank').value.trim();
+  var accNo = document.getElementById('obAccNo').value.trim();
+  var phone = document.getElementById('obPhone').value.trim();
+  var doj = document.getElementById('obDoj').value;
 
   if (!name || !code || !dept || !designation || !salary) {
     showToast('Please fill all required fields (Name, Code, Dept, Designation, Salary)');
     return;
   }
 
-  // Add to employees array
-  const newEmp = {
-    code, name, dept, designation, salary, bank: bank || 'TBD',
+  var newEmp = {
+    code: code, name: name, dept: dept, designation: designation, salary: salary, bank: bank || 'TBD',
     accNo: accNo || 'TBD', role: 'Employee', phone: phone || '', doj: doj || new Date().toISOString().split('T')[0],
     status: 'Active'
   };
-  EMPLOYEES.push(newEmp);
-  CREDENTIAL_HASHES[code] = {hash:DEFAULT_HASH, idx: EMPLOYEES.length - 1};
-
-  showToast(name + ' added successfully as ' + dept + ' staff!');
-  hideOverlay('onboarding');
+  try {
+    await apiCall('POST', '/employees', newEmp);
+    // Register user account with default password
+    await apiCall('POST', '/auth/register', { empCode: code, password: 'emp123', role: 'Employee' });
+    EMPLOYEES.push(newEmp);
+    showToast(name + ' added successfully as ' + dept + ' staff!');
+    hideOverlay('onboarding');
+  } catch (e) { showToast(e.message || 'Error adding employee'); }
 }
 
 // =====================================================
@@ -1431,42 +1437,43 @@ function renderAllEmpList() {
 // =====================================================
 // EMPLOYEE DEACTIVATE / DELETE / RESET PASSWORD
 // =====================================================
-function deactivateEmployee(code) {
-  const emp = EMPLOYEES.find(e => e.code === code);
+async function deactivateEmployee(code) {
+  var emp = EMPLOYEES.find(function(e) { return e.code === code; });
   if (!emp) return;
-  const newStatus = emp.status === 'Inactive' ? 'Active' : 'Inactive';
+  var newStatus = emp.status === 'Inactive' ? 'Active' : 'Inactive';
   if (!confirm((newStatus === 'Inactive' ? 'Deactivate' : 'Re-activate') + ' ' + emp.name + '?')) return;
-  emp.status = newStatus;
-  apiCall('PUT', '/employees/' + code, { status: newStatus });
-  saveAllData();
-  renderAllEmpList();
-  showToast(emp.name + ' is now ' + newStatus);
+  try {
+    await apiCall('PUT', '/employees/' + code, { status: newStatus });
+    emp.status = newStatus;
+    renderAllEmpList();
+    showToast(emp.name + ' is now ' + newStatus);
+  } catch (e) { showToast(e.message || 'Error updating employee status'); }
 }
 
-function deleteEmployeePermanently(code) {
+async function deleteEmployeePermanently(code) {
   if (!currentUser || currentUser.role !== 'MD') { showToast('Only MD can delete employees'); return; }
   if (code === 'MD001') { showToast('Cannot delete MD account'); return; }
-  const emp = EMPLOYEES.find(e => e.code === code);
+  var emp = EMPLOYEES.find(function(e) { return e.code === code; });
   if (!emp) return;
-  const confirmCode = prompt('To permanently delete ' + emp.name + ', type their employee code (' + code + '):');
+  var confirmCode = prompt('To permanently delete ' + emp.name + ', type their employee code (' + code + '):');
   if (confirmCode !== code) { showToast('Deletion cancelled — code did not match'); return; }
-  const idx = EMPLOYEES.findIndex(e => e.code === code);
-  if (idx >= 0) EMPLOYEES.splice(idx, 1);
-  delete CREDENTIAL_HASHES[code];
-  apiCall('DELETE', '/employees/' + code, {});
-  saveAllData();
-  renderAllEmpList();
-  showToast(emp.name + ' has been permanently deleted');
+  try {
+    await apiCall('DELETE', '/employees/' + code, {});
+    var idx = EMPLOYEES.findIndex(function(e) { return e.code === code; });
+    if (idx >= 0) EMPLOYEES.splice(idx, 1);
+    renderAllEmpList();
+    showToast(emp.name + ' has been permanently deleted');
+  } catch (e) { showToast(e.message || 'Error deleting employee'); }
 }
 
-function resetEmployeePassword(code) {
-  const emp = EMPLOYEES.find(e => e.code === code);
+async function resetEmployeePassword(code) {
+  var emp = EMPLOYEES.find(function(e) { return e.code === code; });
   if (!emp) return;
   if (!confirm('Reset password for ' + emp.name + ' to default (emp123)?')) return;
-  CREDENTIAL_HASHES[code] = { hash: DEFAULT_HASH, idx: EMPLOYEES.findIndex(e => e.code === code) };
-  apiCall('PUT', '/employees/' + code + '/reset-password', {});
-  saveAllData();
-  showToast('Password reset for ' + emp.name);
+  try {
+    await apiCall('PUT', '/employees/' + code + '/reset-password', {});
+    showToast('Password reset for ' + emp.name);
+  } catch (e) { showToast(e.message || 'Error resetting password'); }
 }
 
 // =====================================================
@@ -1477,6 +1484,18 @@ let _toastActive = false;
 function showToast(msg) {
   _toastQueue.push(msg);
   if (!_toastActive) _processToastQueue();
+}
+
+function showLoadingSpinner(msg) {
+  var el = document.getElementById('loadingSpinner');
+  if (!el) return;
+  var msgEl = document.getElementById('loadingMessage');
+  if (msgEl) msgEl.textContent = msg || 'Loading your data...';
+  el.classList.remove('hidden');
+}
+function hideLoadingSpinner() {
+  var el = document.getElementById('loadingSpinner');
+  if (el) el.classList.add('hidden');
 }
 function _processToastQueue() {
   if (_toastQueue.length === 0) { _toastActive = false; return; }
@@ -1863,7 +1882,6 @@ async function submitInlineExpense() {
     hideInlineExpenseForm();
     renderAllMyRequests();
     renderAllPendingBanners();
-    saveAllData();
   } catch (e) {
     showToast('Error submitting request');
   }
@@ -1964,7 +1982,7 @@ async function submitAdvanceRequest() {
     renderAllMyRequests();
     renderAllPendingBanners();
   } catch (e) {
-    showToast('Error submitting advance request');
+    showToast(e.message || 'Error submitting advance request');
   }
 }
 
@@ -2088,7 +2106,7 @@ async function approveAdvance(id) {
     showToast('Approved \u20B9' + req.amount.toLocaleString('en-IN') + ' for ' + req.empName);
     renderAdvanceRequests(advReqActiveTab);
     renderAllPendingBanners();
-  } catch (err) { showToast('Error approving advance'); }
+  } catch (err) { showToast(err.message || 'Error approving advance'); }
 }
 
 async function rejectAdvance(id) {
@@ -2105,7 +2123,7 @@ async function rejectAdvance(id) {
     showToast('Rejected advance for ' + req.empName);
     renderAdvanceRequests(advReqActiveTab);
     renderAllPendingBanners();
-  } catch (err) { showToast('Error rejecting advance'); }
+  } catch (err) { showToast(err.message || 'Error rejecting advance'); }
 }
 
 function formatAdvDate(dateStr) {
@@ -2181,8 +2199,8 @@ function submitSelfRating(empCode) {
   });
   var avg = Math.round(total / inputs.length);
   KPI_DATA[empCode].selfRating = avg;
-  saveAllData();
-  apiCall('POST', '/kpi/self-rate', { period: new Date().getFullYear() + '-Q' + Math.ceil((new Date().getMonth() + 1) / 3), ratings: ratings });
+  saveLocalOnlyData();
+  apiCall('POST', '/kpi/self-rate', { period: new Date().getFullYear() + '-Q' + Math.ceil((new Date().getMonth() + 1) / 3), ratings: ratings }).catch(function(){});
   showToast('Self-rating submitted: ' + avg + '/100');
   renderKpiOverlay();
 }
@@ -2462,58 +2480,63 @@ function openJobPostingForm(editId) {
     '</div></div>';
 }
 
-function saveJobPosting(editId) {
+async function saveJobPosting(editId) {
   var title = document.getElementById('jobTitle').value.trim();
   var dept = document.getElementById('jobDept').value;
   var openings = parseInt(document.getElementById('jobOpenings').value, 10) || 1;
   var jd = document.getElementById('jobJD').value.trim();
   if (!title) { showToast('Job title is required'); return; }
-
-  if (editId) {
-    var job = JOB_POSTINGS.find(function(j){return j.id===editId;});
-    if (job) {
-      job.title = title; job.dept = dept; job.openings = openings; job.jd = jd;
+  try {
+    if (editId) {
+      await apiCall('PUT', '/recruitment/jobs/' + editId, {title:title,dept:dept,openings:openings,jd:jd});
+      var job = JOB_POSTINGS.find(function(j){return j.id===editId;});
+      if (job) { job.title = title; job.dept = dept; job.openings = openings; job.jd = jd; }
       showToast('Opening updated');
+    } else {
+      var res = await apiCall('POST', '/recruitment/jobs', {title:title,dept:dept,openings:openings,jd:jd});
+      JOB_POSTINGS.push({id: res && res.id ? res.id : jobNextId, title:title, dept:dept, openings:openings, posted:new Date().toISOString().split('T')[0], status:'open', jd:jd});
+      jobNextId++;
+      showToast('Opening created');
     }
-  } else {
-    JOB_POSTINGS.push({id:jobNextId, title:title, dept:dept, openings:openings, posted:new Date().toISOString().split('T')[0], status:'open', jd:jd});
-    jobNextId++;
-    showToast('Opening created');
-  }
-  apiCall('POST', '/recruitment/jobs', {title:title,dept:dept,openings:openings,jd:jd}).catch(function(){});
-  saveAllData();
-  renderRecruitmentOverlay();
+    renderRecruitmentOverlay();
+  } catch (e) { showToast(e.message || 'Error saving job posting'); }
 }
 
-function closeJobPosting(id) {
+async function closeJobPosting(id) {
   var job = JOB_POSTINGS.find(function(j){return j.id===id;});
   if (!job) return;
   if (!confirm('Close "' + job.title + '"? This will mark it as closed.')) return;
-  job.status = 'closed';
-  saveAllData();
-  showToast('Opening closed');
-  renderRecruitmentOverlay();
+  try {
+    await apiCall('PATCH', '/recruitment/jobs/' + id + '/close');
+    job.status = 'closed';
+    showToast('Opening closed');
+    renderRecruitmentOverlay();
+  } catch (e) { showToast(e.message || 'Error closing job posting'); }
 }
 
-function reopenJobPosting(id) {
+async function reopenJobPosting(id) {
   var job = JOB_POSTINGS.find(function(j){return j.id===id;});
   if (!job) return;
-  job.status = 'open';
-  saveAllData();
-  showToast('Opening reopened');
-  renderRecruitmentOverlay();
+  try {
+    await apiCall('PATCH', '/recruitment/jobs/' + id + '/reopen');
+    job.status = 'open';
+    showToast('Opening reopened');
+    renderRecruitmentOverlay();
+  } catch (e) { showToast(e.message || 'Error reopening job posting'); }
 }
 
-function deleteJobPosting(id) {
+async function deleteJobPosting(id) {
   var job = JOB_POSTINGS.find(function(j){return j.id===id;});
   if (!job) return;
   var candCount = CANDIDATES.filter(function(c){return c.jobId===id;}).length;
   if (!confirm('Delete "' + job.title + '"?' + (candCount > 0 ? ' This will also remove ' + candCount + ' candidate(s).' : ''))) return;
-  for (var i = JOB_POSTINGS.length - 1; i >= 0; i--) { if (JOB_POSTINGS[i].id === id) JOB_POSTINGS.splice(i, 1); }
-  for (var i = CANDIDATES.length - 1; i >= 0; i--) { if (CANDIDATES[i].jobId === id) CANDIDATES.splice(i, 1); }
-  saveAllData();
-  showToast('Opening deleted');
-  renderRecruitmentOverlay();
+  try {
+    await apiCall('DELETE', '/recruitment/jobs/' + id);
+    for (var i = JOB_POSTINGS.length - 1; i >= 0; i--) { if (JOB_POSTINGS[i].id === id) JOB_POSTINGS.splice(i, 1); }
+    for (var i = CANDIDATES.length - 1; i >= 0; i--) { if (CANDIDATES[i].jobId === id) CANDIDATES.splice(i, 1); }
+    showToast('Opening deleted');
+    renderRecruitmentOverlay();
+  } catch (e) { showToast(e.message || 'Error deleting job posting'); }
 }
 
 function openCandidateForm(jobId) {
@@ -2536,26 +2559,25 @@ function openCandidateForm(jobId) {
     '</div></div>';
 }
 
-function saveCandidate(jobId) {
+async function saveCandidate(jobId) {
   var name = document.getElementById('candName_' + jobId).value.trim();
   if (!name) { showToast('Candidate name is required'); return; }
   var job = JOB_POSTINGS.find(function(j){return j.id===jobId;});
   if (!job) return;
-
-  CANDIDATES.push({
-    id: candidateNextId,
-    name: name,
-    role: job.title,
-    jobId: jobId,
-    stage: 'Applied',
-    rating: parseInt(document.getElementById('candRating_' + jobId).value, 10) || 3,
-    phone: document.getElementById('candPhone_' + jobId).value.trim(),
-    exp: document.getElementById('candExp_' + jobId).value.trim()
-  });
-  candidateNextId++;
-  saveAllData();
-  showToast('Candidate added');
-  renderRecruitmentOverlay();
+  try {
+    var candData = {
+      name: name, role: job.title, jobId: jobId, stage: 'Applied',
+      rating: parseInt(document.getElementById('candRating_' + jobId).value, 10) || 3,
+      phone: document.getElementById('candPhone_' + jobId).value.trim(),
+      exp: document.getElementById('candExp_' + jobId).value.trim()
+    };
+    var res = await apiCall('POST', '/recruitment/candidates', candData);
+    candData.id = res && res.id ? res.id : candidateNextId;
+    CANDIDATES.push(candData);
+    candidateNextId++;
+    showToast('Candidate added');
+    renderRecruitmentOverlay();
+  } catch (e) { showToast(e.message || 'Error adding candidate'); }
 }
 
 // --- AI Resume Screening ---
@@ -2699,7 +2721,7 @@ function handleResumeUpload(files) {
     });
     resumeNextId++;
   }
-  saveAllData();
+  saveLocalOnlyData();
   showToast(files.length + ' resume(s) uploaded');
   renderRecruitmentOverlay();
 }
@@ -2769,7 +2791,7 @@ async function aiScreenResume(resumeId, btn) {
       resume.aiSummary = 'Skills match: ' + resume.skills.join(', ') + '. Experience: ' + resume.exp + '. ' + (mockScore >= 70 ? 'Strong candidate for ' : 'Consider for ') + resume.role + ' role.';
       showToast('AI Score for ' + resume.name + ': ' + mockScore + '/100');
     }
-    saveAllData();
+    saveLocalOnlyData();
     renderRecruitmentOverlay();
   } catch (e) {
     // Mock score on error
@@ -2777,7 +2799,7 @@ async function aiScreenResume(resumeId, btn) {
     resume.aiScore = mockScore;
     resume.aiSummary = 'Skills match: ' + resume.skills.join(', ') + '. Experience: ' + resume.exp + '. ' + (mockScore >= 70 ? 'Strong candidate for ' : 'Consider for ') + resume.role + ' role.';
     showToast('AI Score for ' + resume.name + ': ' + mockScore + '/100');
-    saveAllData();
+    saveLocalOnlyData();
     renderRecruitmentOverlay();
   }
 }
@@ -2794,7 +2816,7 @@ async function aiFilterAllResumes(btn) {
     r.aiSummary = 'Skills match: ' + r.skills.join(', ') + '. Experience: ' + r.exp + '. ' + (mockScore >= 70 ? 'Strong candidate for ' : 'Consider for ') + r.role + ' role.';
     count++;
   }
-  saveAllData();
+  saveLocalOnlyData();
   showToast('Screened ' + count + ' resume(s)');
   renderRecruitmentOverlay();
 }
@@ -2823,7 +2845,7 @@ function addResumeToPipeline(resumeId) {
     aiSummary: resume.aiSummary ? JSON.stringify({summary: resume.aiSummary, score: resume.aiScore, strengths: resume.skills, concerns: [], recommendation: 'Added from Resume Bank'}) : undefined
   });
   candidateNextId++;
-  saveAllData();
+  saveLocalOnlyData();
   showToast(resume.name + ' added to ' + job.title + ' pipeline');
   recruitTab('pipeline');
 }
@@ -3002,7 +3024,7 @@ function toggleTaskStatus(taskId) {
   if (!task) return;
   task.done = !task.done;
   showToast(task.done ? 'Task marked complete!' : 'Task marked pending');
-  apiCall('PATCH', '/tasks/' + taskId + '/toggle');
+  apiCall('PATCH', '/tasks/' + taskId + '/toggle').catch(function(){});
   renderTasksOverlay();
 }
 
@@ -3068,7 +3090,7 @@ function savePersonalVision() {
   var goals = goalsEl.value.trim();
   if (!vision && !goals) { showToast('Please enter your vision or goals'); return; }
   PERSONAL_VISIONS[currentUser.code] = {vision: vision, goals: goals};
-  saveAllData();
+  saveLocalOnlyData();
   showToast('Personal vision saved!');
 }
 
@@ -3365,156 +3387,65 @@ async function initAnalyticsCharts(m) {
 // LOCALSTORAGE PERSISTENCE
 // =====================================================
 const STORAGE_KEYS = {
-  employees: 'hrms_employees',
-  departments: 'hrms_departments',
-  credentials: 'hrms_credentials',
-  advanceRequests: 'hrms_advance_requests',
-  advNextId: 'hrms_adv_next_id',
-  kpiData: 'hrms_kpi_data',
-  jobPostings: 'hrms_job_postings',
-  candidates: 'hrms_candidates',
-  employeeDocuments: 'hrms_employee_documents',
-  taskData: 'hrms_task_data',
-  personalVisions: 'hrms_personal_visions',
-  attendanceLogs: 'hrms_attendance_logs',
+  // Session & preferences (always local)
   session: 'hrms_session',
   notifPref: 'hrms_notif_pref',
   biometricEnabled: 'hrms_biometric_enabled',
-  notifHistory: 'hrms_notif_history',
-  notifPrefs: 'hrms_notif_prefs',
-  leaveApplications: 'hrms_leave_applications',
-  leaveBalances: 'hrms_leave_balances',
-  shiftAssignments: 'hrms_shift_assignments',
-  expenseReimbursements: 'hrms_expense_reimbursements',
-  expReimbNextId: 'hrms_exp_reimb_next_id',
-  employeeSelfData: 'hrms_employee_self_data',
-  taxDeclarations: 'hrms_tax_declarations',
-  complianceFilings: 'hrms_compliance_filings',
-  complianceNextId: 'hrms_compliance_next_id',
-  contractWorkers: 'hrms_contract_workers',
-  contractWorkerNextId: 'hrms_contract_worker_next_id',
-  assetInventory: 'hrms_asset_inventory',
-  assetNextId: 'hrms_asset_next_id',
-  exitRequests: 'hrms_exit_requests',
-  exitNextId: 'hrms_exit_next_id',
-  announcements: 'hrms_announcements',
-  announcementNextId: 'hrms_announcement_next_id',
-  announcementReadStatus: 'hrms_announcement_read_status',
-  siteLocations: 'hrms_site_locations',
-  jobNextId: 'hrms_job_next_id',
-  candidateNextId: 'hrms_candidate_next_id',
+  // Local-only data (no backend endpoints)
   resumeBank: 'hrms_resume_bank',
   resumeNextId: 'hrms_resume_next_id',
+  kpiData: 'hrms_kpi_data',
+  employeeDocuments: 'hrms_employee_documents',
+  personalVisions: 'hrms_personal_visions',
+  employeeSelfData: 'hrms_employee_self_data',
+  siteLocations: 'hrms_site_locations',
   shiftTypes: 'hrms_shift_types',
   projects: 'hrms_projects',
   projectNextId: 'hrms_project_next_id',
-  projectTaskNextIds: 'hrms_project_task_next_ids'
+  projectTaskNextIds: 'hrms_project_task_next_ids',
+  attendanceLogs: 'hrms_attendance_logs'
 };
 
-function saveAllData() {
+function saveLocalOnlyData() {
   try {
-    safeStorage.set(STORAGE_KEYS.employees, JSON.stringify(EMPLOYEES));
-    safeStorage.set(STORAGE_KEYS.departments, JSON.stringify(departments));
-    safeStorage.set(STORAGE_KEYS.credentials, JSON.stringify(CREDENTIAL_HASHES));
-    safeStorage.set(STORAGE_KEYS.advanceRequests, JSON.stringify(advanceRequests));
-    safeStorage.set(STORAGE_KEYS.advNextId, JSON.stringify(advNextId));
-    safeStorage.set(STORAGE_KEYS.kpiData, JSON.stringify(KPI_DATA));
-    safeStorage.set(STORAGE_KEYS.jobPostings, JSON.stringify(JOB_POSTINGS));
-    safeStorage.set(STORAGE_KEYS.candidates, JSON.stringify(CANDIDATES));
-    safeStorage.set(STORAGE_KEYS.jobNextId, JSON.stringify(jobNextId));
-    safeStorage.set(STORAGE_KEYS.candidateNextId, JSON.stringify(candidateNextId));
     safeStorage.set(STORAGE_KEYS.resumeBank, JSON.stringify(RESUME_BANK));
     safeStorage.set(STORAGE_KEYS.resumeNextId, JSON.stringify(resumeNextId));
+    safeStorage.set(STORAGE_KEYS.kpiData, JSON.stringify(KPI_DATA));
     safeStorage.set(STORAGE_KEYS.employeeDocuments, JSON.stringify(EMPLOYEE_DOCUMENTS));
-    safeStorage.set(STORAGE_KEYS.taskData, JSON.stringify(TASK_DATA));
     safeStorage.set(STORAGE_KEYS.personalVisions, JSON.stringify(PERSONAL_VISIONS));
-    safeStorage.set(STORAGE_KEYS.leaveApplications, JSON.stringify(leaveApplications));
-    safeStorage.set(STORAGE_KEYS.leaveBalances, JSON.stringify(leaveBalances));
-    safeStorage.set(STORAGE_KEYS.notifHistory, JSON.stringify(NOTIF_HISTORY));
-    safeStorage.set(STORAGE_KEYS.notifPrefs, JSON.stringify(notifPrefs));
-    safeStorage.set(STORAGE_KEYS.shiftAssignments, JSON.stringify(shiftAssignments));
-    safeStorage.set(STORAGE_KEYS.shiftTypes, JSON.stringify(SHIFT_TYPES));
-    safeStorage.set(STORAGE_KEYS.expenseReimbursements, JSON.stringify(expenseReimbursements));
-    safeStorage.set(STORAGE_KEYS.expReimbNextId, JSON.stringify(expReimbNextId));
     safeStorage.set(STORAGE_KEYS.employeeSelfData, JSON.stringify(employeeSelfData));
-    safeStorage.set(STORAGE_KEYS.taxDeclarations, JSON.stringify(taxDeclarations));
-    safeStorage.set(STORAGE_KEYS.complianceFilings, JSON.stringify(complianceFilings));
-    safeStorage.set(STORAGE_KEYS.complianceNextId, JSON.stringify(complianceNextId));
-    safeStorage.set(STORAGE_KEYS.contractWorkers, JSON.stringify(contractWorkers));
-    safeStorage.set(STORAGE_KEYS.contractWorkerNextId, JSON.stringify(contractWorkerNextId));
-    safeStorage.set(STORAGE_KEYS.assetInventory, JSON.stringify(assetInventory));
-    safeStorage.set(STORAGE_KEYS.assetNextId, JSON.stringify(assetNextId));
-    safeStorage.set(STORAGE_KEYS.exitRequests, JSON.stringify(exitRequests));
-    safeStorage.set(STORAGE_KEYS.exitNextId, JSON.stringify(exitNextId));
-    safeStorage.set(STORAGE_KEYS.announcements, JSON.stringify(announcements));
-    safeStorage.set(STORAGE_KEYS.announcementNextId, JSON.stringify(announcementNextId));
-    safeStorage.set(STORAGE_KEYS.announcementReadStatus, JSON.stringify(announcementReadStatus));
     safeStorage.set(STORAGE_KEYS.siteLocations, JSON.stringify(siteLocations));
+    safeStorage.set(STORAGE_KEYS.shiftTypes, JSON.stringify(SHIFT_TYPES));
     safeStorage.set(STORAGE_KEYS.projects, JSON.stringify(projects));
     safeStorage.set(STORAGE_KEYS.projectNextId, JSON.stringify(projectNextId));
     safeStorage.set(STORAGE_KEYS.projectTaskNextIds, JSON.stringify(projectTaskNextIds));
+    safeStorage.set(STORAGE_KEYS.attendanceLogs, JSON.stringify(typeof attendanceLogs !== 'undefined' ? attendanceLogs : []));
   } catch (e) {
-    // Failed to save data
+    // Failed to save local data
   }
 }
 
-function loadAllData() {
+function loadLocalOnlyData() {
   try {
-    const load = (key, target) => {
-      const raw = safeStorage.get(key);
+    var load = function(key) {
+      var raw = safeStorage.get(key);
       if (raw) return JSON.parse(raw);
       return null;
     };
-
-    let d;
-    d = load(STORAGE_KEYS.employees); if (d) { EMPLOYEES.length = 0; d.forEach(e => EMPLOYEES.push(e)); }
-    d = load(STORAGE_KEYS.departments); if (d) { departments.length = 0; d.forEach(e => departments.push(e)); }
-    d = load(STORAGE_KEYS.credentials); if (d) { Object.keys(CREDENTIAL_HASHES).forEach(k => delete CREDENTIAL_HASHES[k]); Object.assign(CREDENTIAL_HASHES, d); }
-    // Always restore core account credentials & correct idx so they can never be locked out
-    CREDENTIAL_HASHES['MD001'] = {hash:'240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9', idx: EMPLOYEES.findIndex(function(e){return e.code==='MD001';})};
-    CREDENTIAL_HASHES['SSC006'] = {hash:'070a3b5e8d4bd5c46acccb91c9c54614c0cd649e78c4c4719e3a64270bae5ddf', idx: EMPLOYEES.findIndex(function(e){return e.code==='SSC006';})};
-    CREDENTIAL_HASHES['SSC011'] = {hash:'e03d3ec8d5035f8721f5dc64546e59ed790dbcb3b7b598fe57057ccd7b683b00', idx: EMPLOYEES.findIndex(function(e){return e.code==='SSC011';})};
-    // Ensure core accounts are never deactivated
-    EMPLOYEES.forEach(function(e){ if (e.code==='MD001'||e.code==='SSC006'||e.code==='SSC011') e.status='Active'; });
-    d = load(STORAGE_KEYS.advanceRequests); if (d) { advanceRequests.length = 0; d.forEach(e => advanceRequests.push(e)); }
-    d = load(STORAGE_KEYS.advNextId); if (d !== null) advNextId = d;
-    d = load(STORAGE_KEYS.kpiData); if (d) { Object.keys(KPI_DATA).forEach(k => delete KPI_DATA[k]); Object.assign(KPI_DATA, d); }
-    d = load(STORAGE_KEYS.jobPostings); if (d) { JOB_POSTINGS.length = 0; d.forEach(e => JOB_POSTINGS.push(e)); }
-    d = load(STORAGE_KEYS.candidates); if (d) { CANDIDATES.length = 0; d.forEach(e => CANDIDATES.push(e)); }
-    d = load(STORAGE_KEYS.jobNextId); if (d !== null) jobNextId = d;
-    d = load(STORAGE_KEYS.candidateNextId); if (d !== null) candidateNextId = d;
-    d = load(STORAGE_KEYS.resumeBank); if (d) { RESUME_BANK.length = 0; d.forEach(e => RESUME_BANK.push(e)); }
+    var d;
+    d = load(STORAGE_KEYS.resumeBank); if (d) { RESUME_BANK.length = 0; d.forEach(function(e) { RESUME_BANK.push(e); }); }
     d = load(STORAGE_KEYS.resumeNextId); if (d !== null) resumeNextId = d;
-    d = load(STORAGE_KEYS.employeeDocuments); if (d) { EMPLOYEE_DOCUMENTS.length = 0; d.forEach(e => EMPLOYEE_DOCUMENTS.push(e)); }
-    d = load(STORAGE_KEYS.taskData); if (d) { TASK_DATA.length = 0; d.forEach(e => TASK_DATA.push(e)); }
-    d = load(STORAGE_KEYS.personalVisions); if (d) { Object.keys(PERSONAL_VISIONS).forEach(k => delete PERSONAL_VISIONS[k]); Object.assign(PERSONAL_VISIONS, d); }
-    d = load(STORAGE_KEYS.leaveApplications); if (d) { leaveApplications.length = 0; d.forEach(e => leaveApplications.push(e)); }
-    d = load(STORAGE_KEYS.leaveBalances); if (d) { Object.keys(leaveBalances).forEach(k => delete leaveBalances[k]); Object.assign(leaveBalances, d); }
-    d = load(STORAGE_KEYS.notifHistory); if (d) { NOTIF_HISTORY.length = 0; d.forEach(e => NOTIF_HISTORY.push(e)); }
-    d = load(STORAGE_KEYS.notifPrefs); if (d) { Object.assign(notifPrefs, d); }
-    d = load(STORAGE_KEYS.shiftAssignments); if (d) { Object.keys(shiftAssignments).forEach(k => delete shiftAssignments[k]); Object.assign(shiftAssignments, d); }
-    d = load(STORAGE_KEYS.shiftTypes); if (d && Array.isArray(d)) { SHIFT_TYPES.length = 0; d.forEach(e => SHIFT_TYPES.push(e)); }
-    d = load(STORAGE_KEYS.expenseReimbursements); if (d) { expenseReimbursements.length = 0; d.forEach(e => expenseReimbursements.push(e)); }
-    d = load(STORAGE_KEYS.expReimbNextId); if (d !== null) expReimbNextId = d;
-    d = load(STORAGE_KEYS.employeeSelfData); if (d) { Object.keys(employeeSelfData).forEach(k => delete employeeSelfData[k]); Object.assign(employeeSelfData, d); }
-    d = load(STORAGE_KEYS.taxDeclarations); if (d) { Object.keys(taxDeclarations).forEach(k => delete taxDeclarations[k]); Object.assign(taxDeclarations, d); }
-    d = load(STORAGE_KEYS.complianceFilings); if (d) { complianceFilings.length = 0; d.forEach(e => complianceFilings.push(e)); }
-    d = load(STORAGE_KEYS.complianceNextId); if (d !== null) complianceNextId = d;
-    d = load(STORAGE_KEYS.contractWorkers); if (d) { contractWorkers.length = 0; d.forEach(e => contractWorkers.push(e)); }
-    d = load(STORAGE_KEYS.contractWorkerNextId); if (d !== null) contractWorkerNextId = d;
-    d = load(STORAGE_KEYS.assetInventory); if (d) { assetInventory.length = 0; d.forEach(e => assetInventory.push(e)); }
-    d = load(STORAGE_KEYS.assetNextId); if (d !== null) assetNextId = d;
-    d = load(STORAGE_KEYS.exitRequests); if (d) { exitRequests.length = 0; d.forEach(e => exitRequests.push(e)); }
-    d = load(STORAGE_KEYS.exitNextId); if (d !== null) exitNextId = d;
-    d = load(STORAGE_KEYS.announcements); if (d) { announcements.length = 0; d.forEach(e => announcements.push(e)); }
-    d = load(STORAGE_KEYS.announcementNextId); if (d !== null) announcementNextId = d;
-    d = load(STORAGE_KEYS.announcementReadStatus); if (d) { Object.keys(announcementReadStatus).forEach(k => delete announcementReadStatus[k]); Object.assign(announcementReadStatus, d); }
-    d = load(STORAGE_KEYS.siteLocations); if (d && Array.isArray(d)) { siteLocations.length = 0; d.forEach(e => siteLocations.push(e)); }
-    d = load(STORAGE_KEYS.projects); if (d && Array.isArray(d)) { projects.length = 0; d.forEach(e => projects.push(e)); }
+    d = load(STORAGE_KEYS.kpiData); if (d) { Object.keys(KPI_DATA).forEach(function(k) { delete KPI_DATA[k]; }); Object.assign(KPI_DATA, d); }
+    d = load(STORAGE_KEYS.employeeDocuments); if (d) { EMPLOYEE_DOCUMENTS.length = 0; d.forEach(function(e) { EMPLOYEE_DOCUMENTS.push(e); }); }
+    d = load(STORAGE_KEYS.personalVisions); if (d) { Object.keys(PERSONAL_VISIONS).forEach(function(k) { delete PERSONAL_VISIONS[k]; }); Object.assign(PERSONAL_VISIONS, d); }
+    d = load(STORAGE_KEYS.employeeSelfData); if (d) { Object.keys(employeeSelfData).forEach(function(k) { delete employeeSelfData[k]; }); Object.assign(employeeSelfData, d); }
+    d = load(STORAGE_KEYS.siteLocations); if (d && Array.isArray(d)) { siteLocations.length = 0; d.forEach(function(e) { siteLocations.push(e); }); }
+    d = load(STORAGE_KEYS.shiftTypes); if (d && Array.isArray(d)) { SHIFT_TYPES.length = 0; d.forEach(function(e) { SHIFT_TYPES.push(e); }); }
+    d = load(STORAGE_KEYS.projects); if (d && Array.isArray(d)) { projects.length = 0; d.forEach(function(e) { projects.push(e); }); }
     d = load(STORAGE_KEYS.projectNextId); if (d !== null) projectNextId = d;
-    d = load(STORAGE_KEYS.projectTaskNextIds); if (d) { Object.keys(projectTaskNextIds).forEach(k => delete projectTaskNextIds[k]); Object.assign(projectTaskNextIds, d); }
+    d = load(STORAGE_KEYS.projectTaskNextIds); if (d) { Object.keys(projectTaskNextIds).forEach(function(k) { delete projectTaskNextIds[k]; }); Object.assign(projectTaskNextIds, d); }
   } catch (e) {
-    // Failed to load data
+    // Failed to load local data
   }
 }
 
@@ -3575,63 +3506,58 @@ function importAllData() {
   input.click();
 }
 
-// Auto-save wrapper — patches all mutation functions
-(function() {
-  const wrapWithSave = (fnName) => {
-    const original = window[fnName];
-    if (typeof original === 'function') {
-      window[fnName] = function() {
-        const result = original.apply(this, arguments);
-        saveAllData();
-        return result;
-      };
-    }
-  };
-  // Patch all functions that mutate data
-  [
-    'submitOnboarding', 'changeRole', 'addDepartment',
-    'submitAdvanceRequest', 'approveAdvance', 'rejectAdvance',
-    'submitSelfRating', 'moveCandidateStagePrompt', 'aiScreenCandidate', 'aiScreenAllCandidates', 'generateDocument',
-    'toggleTaskStatus', 'assignTask',
-    'savePersonalVision',
-    'handleResumeUpload', 'filterResumeBank', 'aiScreenResume', 'aiFilterAllResumes', 'addResumeToPipeline',
-    'submitLeave', 'approveLeave', 'rejectLeave',
-    'assignShift', 'submitExpenseReimbursement', 'approveExpense', 'rejectExpense',
-    'updatePersonalDetails', 'submitTaxDeclaration', 'markFiled', 'addContractWorker',
-    'saveAsset', 'assignAsset', 'returnAsset',
-    'submitResignation', 'approveExit', 'updateClearance', 'completeExit',
-    'createAnnouncement', 'deleteAnnouncement'
-  ].forEach(wrapWithSave);
-})();
-
 // =====================================================
-// REAL AUTHENTICATION WITH HASHED PASSWORDS
+// AUTHENTICATION (API-only)
 // =====================================================
-// hashPassword removed — credentials now stored as pre-computed SHA-256 hashes
 
 // Login overrides removed — doLogin and demoLogin now handle hashed auth directly
 
-// Auto-login from saved session
+// Auto-login from saved session — validates JWT with backend
 async function tryAutoLogin() {
   try {
-    const raw = safeStorage.get(STORAGE_KEYS.session);
+    var raw = safeStorage.get(STORAGE_KEYS.session);
     if (!raw) return false;
-    const session = JSON.parse(raw);
+    var session = JSON.parse(raw);
     if (!session.token || Date.now() > session.expiry) {
       safeStorage.remove(STORAGE_KEYS.session);
       return false;
     }
-    // Restore JWT if session has a token from API login
-    if (session.token && session.token.includes('.')) JWT_TOKEN = session.token;
-    await loginAs(session.empIndex);
-    return true;
+    // Must be a real JWT (contains dots)
+    if (!session.token.includes('.')) {
+      safeStorage.remove(STORAGE_KEYS.session);
+      return false;
+    }
+    JWT_TOKEN = session.token;
+    // Validate token by making a lightweight API call
+    if (isOnline) {
+      try {
+        var res = await fetch(API_BASE + '/employees?limit=1', { method: 'GET', headers: apiHeaders() });
+        if (res.status === 401) {
+          JWT_TOKEN = null;
+          safeStorage.remove('hrms_jwt');
+          safeStorage.remove(STORAGE_KEYS.session);
+          return false;
+        }
+      } catch (e) {
+        // Network error — allow login attempt anyway
+      }
+    }
+    var empCode = session.empCode || null;
+    if (!empCode) {
+      safeStorage.remove(STORAGE_KEYS.session);
+      return false;
+    }
+    await loginAs(empCode);
+    return !!currentUser;
   } catch (e) { return false; }
 }
 
-// Override logout to clear session
+// Override logout to clear session and JWT
 const _origDoLogout = doLogout;
 doLogout = function() {
   safeStorage.remove(STORAGE_KEYS.session);
+  safeStorage.remove('hrms_jwt');
+  JWT_TOKEN = null;
   if (idleTimer) clearTimeout(idleTimer);
   _origDoLogout();
 };
@@ -3671,37 +3597,23 @@ function resetIdleTimer() {
   document.addEventListener(evt, resetIdleTimer, {passive: true});
 });
 
-// Change password
+// Change password — API-only
 async function changePassword() {
-  const oldPass = document.getElementById('chgOldPass').value;
-  const newPass = document.getElementById('chgNewPass').value;
-  const confirmPass = document.getElementById('chgConfirmPass').value;
+  var oldPass = document.getElementById('chgOldPass').value;
+  var newPass = document.getElementById('chgNewPass').value;
+  var confirmPass = document.getElementById('chgConfirmPass').value;
 
   if (!oldPass || !newPass || !confirmPass) { showToast('Please fill all fields'); return; }
   if (newPass.length < 4) { showToast('Password must be at least 4 characters'); return; }
   if (newPass !== confirmPass) { showToast('Passwords do not match'); return; }
 
-  // Try API first
-  const result = await apiCall('POST', '/auth/change-password', { oldPassword: oldPass, newPassword: newPass });
-  if (result && result.error) { showToast(result.error); return; }
-  if (result && result.message) {
+  try {
+    await apiCall('POST', '/auth/change-password', { oldPassword: oldPass, newPassword: newPass });
     showToast('Password changed successfully!');
     document.getElementById('chgOldPass').value = '';
     document.getElementById('chgNewPass').value = '';
     document.getElementById('chgConfirmPass').value = '';
-    return;
-  }
-
-  // Fallback to localStorage
-  const cred = CREDENTIAL_HASHES[currentUser.code];
-  const oldHash = await sha256(oldPass);
-  if (cred.hash !== oldHash) { showToast('Current password is incorrect'); return; }
-  cred.hash = await sha256(newPass);
-  saveAllData();
-  showToast('Password changed successfully!');
-  document.getElementById('chgOldPass').value = '';
-  document.getElementById('chgNewPass').value = '';
-  document.getElementById('chgConfirmPass').value = '';
+  } catch (e) { showToast(e.message || 'Error changing password'); }
 }
 
 // =====================================================
@@ -4208,7 +4120,6 @@ function gpsCheckIn() {
     };
     attendanceLogs.push(log);
     safeStorage.set(STORAGE_KEYS.attendanceLogs, JSON.stringify(attendanceLogs));
-    saveAllData();
     showToast('Checked in at ' + (geoResult.inside ? geoResult.location : pos.coords.latitude.toFixed(4) + '\u00B0N, ' + pos.coords.longitude.toFixed(4) + '\u00B0E'));
     sendNotification('Check-In Recorded', 'Location: ' + (geoResult.inside ? geoResult.location : pos.coords.latitude.toFixed(4) + '\u00B0N'), 'checkin');
     if (btn) btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/></svg>Checked In';
@@ -4394,18 +4305,25 @@ async function biometricLogin() {
       }
       if (!matchedCode) matchedCode = keys[0].replace('hrms_biometric_', '');
 
-      const cred = CREDENTIAL_HASHES[matchedCode];
-      if (cred) {
-        const session = {
-          empIndex: cred.idx,
-          token: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36),
-          expiry: Date.now() + 24 * 60 * 60 * 1000,
-          rememberMe: true
-        };
-        safeStorage.set(STORAGE_KEYS.session, JSON.stringify(session));
-        await loginAs(cred.idx);
-        showToast('Biometric login successful!');
-        return true;
+      if (matchedCode) {
+        // Biometric verified — need backend JWT. Request a token via stored session
+        var storedJwt = safeStorage.get('hrms_jwt');
+        if (storedJwt) {
+          JWT_TOKEN = storedJwt;
+          var session = {
+            empCode: matchedCode,
+            token: storedJwt,
+            expiry: Date.now() + 24 * 60 * 60 * 1000,
+            rememberMe: true
+          };
+          safeStorage.set(STORAGE_KEYS.session, JSON.stringify(session));
+          await loginAs(matchedCode);
+          showToast('Biometric login successful!');
+          return true;
+        } else {
+          showToast('Biometric verified but no saved session. Please login with password first.');
+          return false;
+        }
       }
     }
   } catch (e) {
@@ -4493,97 +4411,30 @@ async function _handleGoogleRedirect() {
       return false;
     }
 
-    // Try backend first
-    try {
-      const backendRes = await fetch(API_BASE + '/auth/google', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: userInfo.email, name: userInfo.name, picture: userInfo.picture })
-      });
-      const data = await backendRes.json();
-      if (backendRes.ok && data.token) {
-        JWT_TOKEN = data.token;
-        safeStorage.set('hrms_jwt', data.token);
-        const empIdx = EMPLOYEES.findIndex(e => e.code === data.user.empCode);
-        if (empIdx >= 0) { await loginAs(empIdx); showToast('Signed in with Google'); return true; }
-      }
-    } catch (_) {}
-
-    // Local fallback: match email or auto-register
-    const gEmail = userInfo.email.toLowerCase();
-    let empIdx = EMPLOYEES.findIndex(e => e.email && e.email.toLowerCase() === gEmail);
-
-    if (empIdx < 0) {
-      // Find max existing SSC/SSM/SSG code number to avoid collision
-      var maxNum = 0;
-      EMPLOYEES.forEach(function(e) {
-        var m = e.code.match(/^SS[A-Z](\d+)$/);
-        if (m) { var n = parseInt(m[1], 10); if (n > maxNum) maxNum = n; }
-      });
-      const nextNum = maxNum + 1;
-      const newCode = 'SSC' + String(nextNum).padStart(3, '0');
-      const displayName = userInfo.name || userInfo.email.split('@')[0];
-      const newEmp = {
-        code: newCode, name: displayName, dept: 'Office', designation: 'New Employee',
-        salary: 0, bank: 'TBD', accNo: 'TBD', role: 'Employee',
-        phone: '', doj: new Date().toISOString().split('T')[0],
-        email: userInfo.email, picture: userInfo.picture || ''
-      };
-      EMPLOYEES.push(newEmp);
-      CREDENTIAL_HASHES[newCode] = { hash: DEFAULT_HASH, idx: EMPLOYEES.length - 1 };
-      empIdx = EMPLOYEES.length - 1;
-      // Notify MD and HR about new signup via local notifications
-      var notifTime = new Date().toISOString();
-      var notifBody = displayName + ' (' + userInfo.email + ') signed up via Google. Code: ' + newCode + '. Please assign role, department & salary.';
-      EMPLOYEES.forEach(function(e) {
-        if (e.role === 'MD' || e.role === 'HR') {
-          NOTIF_HISTORY.push({
-            id: Date.now() + '_' + e.code,
-            empCode: e.code,
-            title: 'New Employee Registered',
-            body: notifBody,
-            time: notifTime,
-            read: false,
-            category: 'system'
-          });
-        }
-      });
-      // Also create an announcement so MD/HR sees it on any device
-      var newSignupAnnouncement = {
-        id: Date.now(),
-        title: 'New Employee Registered: ' + displayName,
-        body: notifBody,
-        type: 'info',
-        createdBy: 'System',
-        createdAt: notifTime,
-        readBy: []
-      };
-      if (typeof announcements !== 'undefined') announcements.unshift(newSignupAnnouncement);
-      saveAllData();
-      // Post to backend for cross-device sync
-      try { await apiCall('POST', '/employees', newEmp); } catch (_) {}
-      try { await apiCall('POST', '/announcements', newSignupAnnouncement); } catch (_) {}
-      try {
-        await apiCall('POST', '/notifications', {
-          title: 'New Employee Registered',
-          body: notifBody,
-          category: 'system',
-          targetRole: 'MD,HR'
-        });
-      } catch (_) {}
-      showToast('Welcome ' + escapeHTML(displayName) + '! Account created. Contact MD/HR for role assignment.');
+    // Backend-only Google auth
+    var backendRes = await fetch(API_BASE + '/auth/google', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: userInfo.email, name: userInfo.name, picture: userInfo.picture })
+    });
+    var data = await backendRes.json();
+    if (!backendRes.ok) {
+      if (errEl) errEl.textContent = data.error || 'Google Sign-In failed. No linked employee account found.';
+      history.replaceState(null, '', location.pathname + location.search);
+      return false;
     }
-
-    const session = {
-      empIndex: empIdx,
-      token: crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36),
+    JWT_TOKEN = data.token;
+    safeStorage.set('hrms_jwt', data.token);
+    var empCode = data.user.empCode;
+    var session = {
+      empCode: empCode,
+      token: data.token,
       expiry: Date.now() + 24 * 60 * 60 * 1000,
       rememberMe: false
     };
     safeStorage.set(STORAGE_KEYS.session, JSON.stringify(session));
-    // Clear hash only after successful login
     history.replaceState(null, '', location.pathname + location.search);
-    await loginAs(empIdx);
+    await loginAs(empCode);
     showToast('Signed in with Google');
     return true;
   } catch (e) {
@@ -4636,7 +4487,7 @@ function _hideOfflineBanner() {
   const banner = document.getElementById('offlineBanner');
   if (banner) banner.style.display = 'none';
 }
-window.addEventListener('online', () => { isOnline = true; _hideOfflineBanner(); syncOfflineQueue(); });
+window.addEventListener('online', () => { isOnline = true; _hideOfflineBanner(); });
 window.addEventListener('offline', () => { isOnline = false; _showOfflineBanner(); });
 
 function apiHeaders() {
@@ -4646,24 +4497,21 @@ function apiHeaders() {
 }
 
 async function apiCall(method, path, body) {
-  if (!isOnline) {
-    queueOfflineMutation(method, path, body);
-    return null;
+  if (!isOnline) throw new Error('No internet connection');
+  if (!JWT_TOKEN) throw new Error('Not authenticated');
+  var opts = { method: method, headers: apiHeaders() };
+  if (body && method !== 'GET') opts.body = JSON.stringify(body);
+  var res = await fetch(API_BASE + path, opts);
+  if (res.status === 401) {
+    JWT_TOKEN = null;
+    safeStorage.remove('hrms_jwt');
+    safeStorage.remove(STORAGE_KEYS.session);
+    doLogout();
+    throw new Error('Session expired. Please login again.');
   }
-  try {
-    const opts = { method, headers: apiHeaders() };
-    if (body && method !== 'GET') opts.body = JSON.stringify(body);
-    const res = await fetch(API_BASE + path, opts);
-    if (res.status === 401) {
-      JWT_TOKEN = null;
-      safeStorage.remove('hrms_jwt');
-      return null;
-    }
-    return await res.json();
-  } catch (e) {
-    // API call failed, using localStorage fallback
-    return null;
-  }
+  var data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Server error');
+  return data;
 }
 
 // =====================================================
@@ -4852,7 +4700,8 @@ function mapTaxDeclaration(row) {
 // DB-FIRST: Load All Shared Data from Backend
 // =====================================================
 async function loadFromBackend() {
-  if (!isOnline || !JWT_TOKEN) return false;
+  if (!isOnline) throw new Error('No internet connection');
+  if (!JWT_TOKEN) throw new Error('Not authenticated');
   try {
     var isMDorHR = currentUser && (currentUser.role === 'MD' || currentUser.role === 'HR');
     var headers = apiHeaders();
@@ -5062,102 +4911,14 @@ async function loadFromBackend() {
       }
     }
 
-    // Cache to localStorage for offline use
-    saveAllData();
     return true;
   } catch (e) {
     return false;
   }
 }
 
-// Offline mutation queue
-function queueOfflineMutation(method, path, body) {
-  let queue; try { queue = JSON.parse(safeStorage.get('hrms_offline_queue') || '[]'); } catch { queue = []; }
-  queue.push({ method, path, body, timestamp: Date.now() });
-  safeStorage.set('hrms_offline_queue', JSON.stringify(queue));
-}
+// Offline mutation queue removed — DB is the sole source of truth
 
-async function syncOfflineQueue() {
-  let queue; try { queue = JSON.parse(safeStorage.get('hrms_offline_queue') || '[]'); } catch { queue = []; }
-  if (queue.length === 0) return;
-  let synced = 0;
-  for (const item of queue) {
-    try {
-      const opts = { method: item.method, headers: apiHeaders() };
-      if (item.body && item.method !== 'GET') opts.body = JSON.stringify(item.body);
-      await fetch(API_BASE + item.path, opts);
-      synced++;
-    } catch (e) { break; }
-  }
-  if (synced > 0) {
-    const remaining = queue.slice(synced);
-    safeStorage.set('hrms_offline_queue', JSON.stringify(remaining));
-    if (synced > 0) showToast(`Synced ${synced} offline change${synced > 1 ? 's' : ''}`);
-  }
-}
-
-// Enhanced login — try API first, fall back to localStorage
-const _apiDoLogin = doLogin;
-doLogin = async function() {
-  const id = document.getElementById('loginId').value.trim().toUpperCase();
-  const pass = document.getElementById('loginPass').value;
-  const err = document.getElementById('loginError');
-  if (!id) { err.textContent = 'Please enter Employee Code'; return; }
-
-  // Try backend API first
-  if (isOnline) {
-    try {
-      const res = await fetch(API_BASE + '/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ empCode: id, password: pass })
-      });
-      const data = await res.json();
-      if (res.ok && data.token) {
-        JWT_TOKEN = data.token;
-        safeStorage.set('hrms_jwt', data.token);
-        // Find employee index
-        const idx = EMPLOYEES.findIndex(e => e.code === id);
-        if (idx >= 0) {
-          const session = { empIndex: idx, token: data.token, expiry: Date.now() + 24*60*60*1000, rememberMe: document.getElementById('rememberMe')?.checked || false };
-          safeStorage.set(STORAGE_KEYS.session, JSON.stringify(session));
-          await loginAs(idx);
-          requestNotificationPermission();
-          syncOfflineQueue();
-          return;
-        }
-      }
-    } catch (e) {
-      // API login failed, using local auth
-    }
-  }
-  // Fall back to localStorage auth
-  await _apiDoLogin();
-};
-
-// Seed data to backend on first API-connected login
-async function seedBackendData() {
-  if (!isOnline || !JWT_TOKEN) return;
-  const seeded = safeStorage.get('hrms_backend_seeded');
-  if (seeded) return;
-  try {
-    await apiCall('POST', '/auth/seed', { employees: EMPLOYEES, credentials: CREDENTIAL_HASHES });
-    // Seed advance requests
-    for (const adv of advanceRequests) {
-      await apiCall('POST', '/advances', adv);
-    }
-    // Seed tasks
-    for (const t of TASK_DATA) {
-      await apiCall('POST', '/tasks', { title: t.title, type: t.type, assignedTo: t.assignedTo, dueDate: t.dueDate, priority: t.priority, note: t.note });
-    }
-    safeStorage.set('hrms_backend_seeded', 'true');
-    // Backend seeded
-  } catch (e) {
-    // Backend seed failed
-  }
-}
-
-// wireApiCalls IIFE removed — mutation functions already call apiCall() directly
 
 // =====================================================
 // ROLE-SPECIFIC NAVIGATION RENDERER
@@ -5693,7 +5454,7 @@ function addNotification(title, body, category) {
   }
   try { safeStorage.set(STORAGE_KEYS.notifHistory, JSON.stringify(NOTIF_HISTORY)); } catch(e){}
   // Persist to backend
-  apiCall('POST', '/notifications', { title, body, category });
+  apiCall('POST', '/notifications', { title, body, category }).catch(function(){});
 }
 
 function updateNotifBadge() {
@@ -5747,21 +5508,21 @@ function timeAgo(ts) {
 function markNotifRead(id) {
   const n = NOTIF_HISTORY.find(n => n.id === id);
   if (n) { n.read = true; renderNotifications(); updateNotifBadge(); }
-  apiCall('PATCH', '/notifications/' + id + '/read');
+  apiCall('PATCH', '/notifications/' + id + '/read').catch(function(){});
 }
 
 function markAllNotifRead() {
   NOTIF_HISTORY.forEach(n => n.read = true);
   renderNotifications(); updateNotifBadge();
   try { safeStorage.set(STORAGE_KEYS.notifHistory, JSON.stringify(NOTIF_HISTORY)); } catch(e){}
-  apiCall('PATCH', '/notifications/read-all');
+  apiCall('PATCH', '/notifications/read-all').catch(function(){});
 }
 
 function toggleNotifPref(key, btn) {
   btn.classList.toggle('on');
   notifPrefs[key] = btn.classList.contains('on');
   try { safeStorage.set(STORAGE_KEYS.notifPrefs, JSON.stringify(notifPrefs)); } catch(e){}
-  apiCall('PUT', '/notifications/prefs', notifPrefs);
+  apiCall('PUT', '/notifications/prefs', notifPrefs).catch(function(){});
 }
 
 function restoreNotifPrefToggles() {
@@ -5771,86 +5532,6 @@ function restoreNotifPrefToggles() {
   });
 }
 
-// =====================================================
-// FEATURE 6: MOCK BACKEND
-// =====================================================
-const MOCK_BACKEND = {
-  store: {},
-  init() {
-    this.store = {
-      employees: [...EMPLOYEES],
-      advances: [...(typeof advanceRequests !== 'undefined' ? advanceRequests : [])],
-      leaves: [...leaveApplications],
-      attendance: []
-    };
-  },
-  handleRequest(method, path, body) {
-    const route = path.replace(/^\/api/, '');
-    if (route === '/auth/login' && method === 'POST') {
-      const emp = EMPLOYEES.find(e => e.code === (body && body.code));
-      if (emp) return { success: true, token: 'mock-jwt-' + emp.code, employee: emp };
-      return { success: false, error: 'Invalid credentials' };
-    }
-    if (route === '/employees' && method === 'GET') return { employees: this.store.employees };
-    if (route === '/advances' && method === 'GET') return { advances: this.store.advances };
-    if (route === '/advances' && method === 'POST') {
-      const adv = { id: Date.now(), ...body, status: 'pending', date: new Date().toISOString() };
-      this.store.advances.push(adv); return { success: true, advance: adv };
-    }
-    if (route === '/leaves' && method === 'GET') return { leaves: this.store.leaves };
-    if (route === '/leaves' && method === 'POST') {
-      const lv = { id: Date.now(), ...body, status: 'pending', date: new Date().toISOString() };
-      this.store.leaves.push(lv); return { success: true, leave: lv };
-    }
-    if (route === '/attendance/checkin' && method === 'POST') {
-      const log = { ...body, type: 'checkin', timestamp: new Date().toISOString() };
-      this.store.attendance.push(log); return { success: true, log };
-    }
-    if (route === '/attendance/checkout' && method === 'POST') {
-      const log = { ...body, type: 'checkout', timestamp: new Date().toISOString() };
-      this.store.attendance.push(log); return { success: true, log };
-    }
-    if (route === '/auth/seed' && method === 'POST') return { success: true };
-    return { error: 'Not found' };
-  }
-};
-
-// Patch apiCall to fallback to mock backend
-(function() {
-  const _origApiCall = apiCall;
-  apiCall = async function(method, path, body) {
-    const result = await _origApiCall(method, path, body);
-    if (result !== null) return result;
-    // Fallback to mock
-    try { return MOCK_BACKEND.handleRequest(method, path, body); } catch(e) { return null; }
-  };
-})();
-
-// Patch syncOfflineQueue to use mock
-(function() {
-  const _origSync = syncOfflineQueue;
-  syncOfflineQueue = async function() {
-    let queue; try { queue = JSON.parse(safeStorage.get('hrms_offline_queue') || '[]'); } catch { queue = []; }
-    if (queue.length === 0) return;
-    let synced = 0;
-    for (const item of queue) {
-      try {
-        const opts = { method: item.method, headers: apiHeaders() };
-        if (item.body && item.method !== 'GET') opts.body = JSON.stringify(item.body);
-        await fetch(API_BASE + item.path, opts);
-        synced++;
-      } catch(e) {
-        // Try mock backend
-        try { MOCK_BACKEND.handleRequest(item.method, item.path, item.body); synced++; } catch(e2) { break; }
-      }
-    }
-    if (synced > 0) {
-      const remaining = queue.slice(synced);
-      safeStorage.set('hrms_offline_queue', JSON.stringify(remaining));
-      showToast('Synced ' + synced + ' offline change' + (synced > 1 ? 's' : ''));
-    }
-  };
-})();
 
 // =====================================================
 // FEATURE 7: LEAVE MANAGEMENT WORKFLOW
@@ -5896,25 +5577,24 @@ async function submitLeave() {
   const balKey = typeMap[selectedLeaveType];
   if (bal[balKey] < days) { showToast('Insufficient ' + selectedLeaveType + ' leave balance (' + bal[balKey] + ' remaining)'); return; }
 
-  // Try API first
-  const apiRes = await apiCall('POST', '/leaves', { type: selectedLeaveType, from, to, reason });
-
-  const app = {
-    id: (apiRes && apiRes.id) || leaveNextId++,
-    empCode: currentUser.code,
-    empName: currentUser.name,
-    dept: currentUser.dept,
-    type: selectedLeaveType,
-    from, to, days, reason,
-    status: 'pending',
-    date: new Date().toISOString()
-  };
-  leaveApplications.push(app);
-  closeLeaveForm();
-  renderLeaveScreen();
-  saveAllData();
-  showToast('Leave application submitted');
-  addNotification('Leave Applied', currentUser.name + ' applied for ' + days + ' day(s) ' + selectedLeaveType + ' leave', 'leave');
+  try {
+    var apiRes = await apiCall('POST', '/leaves', { type: selectedLeaveType, from: from, to: to, reason: reason });
+    var app = {
+      id: (apiRes && apiRes.id) || leaveNextId++,
+      empCode: currentUser.code,
+      empName: currentUser.name,
+      dept: currentUser.dept,
+      type: selectedLeaveType,
+      from: from, to: to, days: days, reason: reason,
+      status: 'pending',
+      date: new Date().toISOString()
+    };
+    leaveApplications.push(app);
+    closeLeaveForm();
+    renderLeaveScreen();
+    showToast('Leave application submitted');
+    addNotification('Leave Applied', currentUser.name + ' applied for ' + days + ' day(s) ' + selectedLeaveType + ' leave', 'leave');
+  } catch (e) { showToast(e.message || 'Error submitting leave'); }
 }
 
 async function approveLeave(id) {
@@ -5926,10 +5606,9 @@ async function approveLeave(id) {
     const bal = getLeaveBalance(app.empCode);
     bal[app.type] = Math.max(0, bal[app.type] - app.days);
     renderLeaveScreen();
-    saveAllData();
     showToast('Leave approved');
     addNotification('Leave Approved', app.empName + '\'s ' + app.type + ' leave approved (' + app.days + ' days)', 'leave');
-  } catch (err) { showToast('Error approving leave'); }
+  } catch (err) { showToast(err.message || 'Error approving leave'); }
 }
 
 async function rejectLeave(id) {
@@ -5939,10 +5618,9 @@ async function rejectLeave(id) {
     await apiCall('PATCH', '/leaves/' + id + '/reject');
     app.status = 'rejected';
     renderLeaveScreen();
-    saveAllData();
     showToast('Leave rejected');
     addNotification('Leave Rejected', app.empName + '\'s ' + app.type + ' leave rejected', 'leave');
-  } catch (err) { showToast('Error rejecting leave'); }
+  } catch (err) { showToast(err.message || 'Error rejecting leave'); }
 }
 
 function switchLeaveTab(tab, el) {
@@ -6051,12 +5729,13 @@ function getEmployeeShift(empCode) {
 function isShiftEligible(emp) {
   return SHIFT_ELIGIBLE_DEPTS.includes(emp.dept);
 }
-function assignShift(empCode, shiftCode) {
-  shiftAssignments[empCode] = { shiftCode, assignedBy: currentUser.code, assignedDate: new Date().toISOString().split('T')[0] };
-  apiCall('PUT', '/shifts/' + empCode, { shift_code: shiftCode });
-  saveAllData();
-  renderShiftsOverlay();
-  showToast('Shift assigned successfully');
+async function assignShift(empCode, shiftCode) {
+  try {
+    await apiCall('PUT', '/shifts/' + empCode, { shift_code: shiftCode });
+    shiftAssignments[empCode] = { shiftCode: shiftCode, assignedBy: currentUser.code, assignedDate: new Date().toISOString().split('T')[0] };
+    renderShiftsOverlay();
+    showToast('Shift assigned successfully');
+  } catch (e) { showToast(e.message || 'Error assigning shift'); }
 }
 function toggleShiftEligibility(empCode) {
   if (shiftAssignments[empCode] && shiftAssignments[empCode].disabled) {
@@ -6065,7 +5744,6 @@ function toggleShiftEligibility(empCode) {
     if (!shiftAssignments[empCode]) shiftAssignments[empCode] = {};
     shiftAssignments[empCode].disabled = true;
   }
-  saveAllData();
   renderShiftsOverlay();
 }
 function renderMyShiftCard() {
@@ -6171,7 +5849,7 @@ function saveShiftType(editCode) {
     SHIFT_TYPES.push({code:code, name:name, start:start, end:end, color:color});
     showToast('Shift created');
   }
-  saveAllData();
+  saveLocalOnlyData();
   renderShiftsOverlay();
 }
 
@@ -6191,7 +5869,7 @@ function deleteShiftType(code) {
       shiftAssignments[empCode].shiftCode = fallback;
     }
   });
-  saveAllData();
+  saveLocalOnlyData();
   showToast('Shift deleted');
   renderShiftsOverlay();
 }
@@ -6199,31 +5877,42 @@ function deleteShiftType(code) {
 // =====================================================
 // F2: EXPENSE REIMBURSEMENT FUNCTIONS
 // =====================================================
-function submitExpenseReimbursement() {
-  const cat = document.getElementById('expCategory').value;
-  const amount = parseFloat(document.getElementById('expAmount').value);
-  const desc = document.getElementById('expDesc').value.trim();
-  const date = document.getElementById('expDate').value;
+async function submitExpenseReimbursement() {
+  var cat = document.getElementById('expCategory').value;
+  var amount = parseFloat(document.getElementById('expAmount').value);
+  var desc = document.getElementById('expDesc').value.trim();
+  var date = document.getElementById('expDate').value;
   if (!cat || !amount || !date) { showToast('Please fill all required fields'); return; }
-  const exp = {
-    id: expReimbNextId++, empCode: currentUser.code, empName: currentUser.name, dept: currentUser.dept,
-    category: cat, amount, description: desc, date, status: 'Pending',
-    submittedOn: new Date().toISOString().split('T')[0]
-  };
-  expenseReimbursements.push(exp);
-  apiCall('POST', '/expenses', { category: cat, amount, description: desc });
-  saveAllData();
-  addNotification('Expense claim submitted: Rs.' + amount.toLocaleString('en-IN'), 'expense');
-  showToast('Expense claim submitted');
-  renderExpenseOverlay();
+  try {
+    var res = await apiCall('POST', '/expenses', { category: cat, amount: amount, description: desc });
+    var exp = {
+      id: (res && res.id) || expReimbNextId++, empCode: currentUser.code, empName: currentUser.name, dept: currentUser.dept,
+      category: cat, amount: amount, description: desc, date: date, status: 'Pending',
+      submittedOn: new Date().toISOString().split('T')[0]
+    };
+    expenseReimbursements.push(exp);
+    addNotification('Expense claim submitted: Rs.' + amount.toLocaleString('en-IN'), 'expense');
+    showToast('Expense claim submitted');
+    renderExpenseOverlay();
+  } catch (e) { showToast(e.message || 'Error submitting expense'); }
 }
-function approveExpense(id) {
-  const exp = expenseReimbursements.find(e => e.id === id);
-  if (exp) { exp.status = 'Approved'; exp.approvedBy = currentUser.code; exp.approvedOn = new Date().toISOString().split('T')[0]; apiCall('PUT', '/expenses/' + id + '/approve', {}); saveAllData(); renderExpenseOverlay(); showToast('Expense approved'); }
+async function approveExpense(id) {
+  try {
+    var exp = expenseReimbursements.find(function(e) { return e.id === id; });
+    if (!exp) return;
+    await apiCall('PUT', '/expenses/' + id + '/approve', {});
+    exp.status = 'Approved'; exp.approvedBy = currentUser.code; exp.approvedOn = new Date().toISOString().split('T')[0];
+    renderExpenseOverlay(); showToast('Expense approved');
+  } catch (e) { showToast(e.message || 'Error approving expense'); }
 }
-function rejectExpense(id) {
-  const exp = expenseReimbursements.find(e => e.id === id);
-  if (exp) { exp.status = 'Rejected'; exp.rejectedBy = currentUser.code; apiCall('PUT', '/expenses/' + id + '/reject', {}); saveAllData(); renderExpenseOverlay(); showToast('Expense rejected'); }
+async function rejectExpense(id) {
+  try {
+    var exp = expenseReimbursements.find(function(e) { return e.id === id; });
+    if (!exp) return;
+    await apiCall('PUT', '/expenses/' + id + '/reject', {});
+    exp.status = 'Rejected'; exp.rejectedBy = currentUser.code;
+    renderExpenseOverlay(); showToast('Expense rejected');
+  } catch (e) { showToast(e.message || 'Error rejecting expense'); }
 }
 function renderExpenseOverlay() {
   const c = document.getElementById('expensesContent');
@@ -6329,7 +6018,7 @@ function updatePersonalDetails() {
     spouseName: selfData.spouseName, spouseMobile: selfData.spouseMobile,
     bloodGroup: selfData.bloodGroup
   }).catch(function(){});
-  saveAllData();
+  saveLocalOnlyData();
   showToast('Personal details saved successfully');
   var btn = document.querySelector('#selfServiceContent .ss-save-btn');
   if (btn) { btn.textContent = 'Saved ✓'; btn.style.background = 'var(--success)'; setTimeout(function() { btn.textContent = 'Save Changes'; btn.style.background = ''; }, 1500); }
@@ -6425,7 +6114,6 @@ function uploadMandatoryDoc(docKey, docLabel) {
     formData.append('docType', docLabel);
     formData.append('empCode', currentUser.code);
     apiCall('POST', '/documents/upload', formData).catch(function(){});
-    saveAllData();
     showToast(escapeHTML(docLabel) + ' uploaded successfully');
     renderSelfServiceOverlay();
     input.remove();
@@ -6673,7 +6361,6 @@ function addGeofenceSiteFromForm() {
   if (isNaN(radius) || radius < 50 || radius > 5000) { showToast('Radius must be 50–5000 meters'); return; }
   siteLocations.push({ name: name, lat: lat, lng: lng, radius: radius });
   safeStorage.set(STORAGE_KEYS.siteLocations, JSON.stringify(siteLocations));
-  saveAllData();
   showToast('Site "' + name + '" added');
   document.getElementById('geoSiteName').value = '';
   document.getElementById('geoSiteLat').value = '';
@@ -6703,7 +6390,6 @@ function editGeofenceSite(idx) {
   if (isNaN(newRadius) || newRadius < 50 || newRadius > 5000) { showToast('Radius must be 50–5000 meters'); return; }
   siteLocations[idx] = { name: newName, lat: newLat, lng: newLng, radius: newRadius };
   safeStorage.set(STORAGE_KEYS.siteLocations, JSON.stringify(siteLocations));
-  saveAllData();
   showToast('Site updated');
   renderGeofenceSites();
 }
@@ -6714,7 +6400,6 @@ function deleteGeofenceSite(idx) {
   if (!confirm('Delete site "' + site.name + '"?')) return;
   siteLocations.splice(idx, 1);
   safeStorage.set(STORAGE_KEYS.siteLocations, JSON.stringify(siteLocations));
-  saveAllData();
   showToast('Site deleted');
   renderGeofenceSites();
 }
@@ -6766,18 +6451,19 @@ function calculateTaxLiability(empCode) {
     totalTax: Math.round(tax + cess), monthlyTds: Math.round((tax + cess) / 12)
   };
 }
-function submitTaxDeclaration() {
+async function submitTaxDeclaration() {
   if (!currentUser) return;
   const sec80C = parseFloat(document.getElementById('tax80C').value) || 0;
   const sec80D = parseFloat(document.getElementById('tax80D').value) || 0;
   const hra = parseFloat(document.getElementById('taxHRA').value) || 0;
   const homeLoan = parseFloat(document.getElementById('taxHomeLoan').value) || 0;
-  taxDeclarations[currentUser.code] = { sec80C, sec80D, hra, homeLoan, submittedOn: new Date().toISOString().split('T')[0] };
-  const taxCalc = calculateTaxLiability(currentUser.code);
-  apiCall('POST', '/tax', { fy: '2025-26', section_80c: sec80C, section_80d: sec80D, hra_exemption: hra, home_loan_interest: homeLoan, annual_income: taxCalc ? taxCalc.annual : 0, total_deductions: taxCalc ? taxCalc.totalDeductions : 0, taxable_income: taxCalc ? taxCalc.taxable : 0, tax_liability: taxCalc ? taxCalc.taxWithCess : 0, monthly_tds: taxCalc ? taxCalc.monthlyTDS : 0 });
-  saveAllData();
-  showToast('Tax declaration submitted');
-  switchTaxTab('summary');
+  try {
+    const taxCalc = calculateTaxLiability(currentUser.code);
+    await apiCall('POST', '/tax', { fy: '2025-26', section_80c: sec80C, section_80d: sec80D, hra_exemption: hra, home_loan_interest: homeLoan, annual_income: taxCalc ? taxCalc.annualGross : 0, total_deductions: taxCalc ? taxCalc.totalDeductions : 0, taxable_income: taxCalc ? taxCalc.taxableIncome : 0, tax_liability: taxCalc ? taxCalc.totalTax : 0, monthly_tds: taxCalc ? taxCalc.monthlyTds : 0 });
+    taxDeclarations[currentUser.code] = { sec80C, sec80D, hra, homeLoan, submittedOn: new Date().toISOString().split('T')[0] };
+    showToast('Tax declaration submitted');
+    switchTaxTab('summary');
+  } catch (e) { showToast(e.message || 'Error submitting tax declaration'); }
 }
 async function generateForm16PDF(empCode) {
   const emp = EMPLOYEES.find(e => e.code === (empCode || currentUser.code));
@@ -6893,11 +6579,15 @@ function generateComplianceDeadlines() {
       });
     }
   });
-  saveAllData();
 }
-function markFiled(id) {
-  const f = complianceFilings.find(c => c.id === id);
-  if (f) { f.status = 'Filed'; f.filedOn = new Date().toISOString().split('T')[0]; apiCall('PUT', '/compliance/filings/' + id + '/mark-filed', {}); saveAllData(); renderComplianceOverlay(); showToast('Marked as filed'); }
+async function markFiled(id) {
+  try {
+    var f = complianceFilings.find(function(c) { return c.id === id; });
+    if (!f) return;
+    await apiCall('PUT', '/compliance/filings/' + id + '/mark-filed', {});
+    f.status = 'Filed'; f.filedOn = new Date().toISOString().split('T')[0];
+    renderComplianceOverlay(); showToast('Marked as filed');
+  } catch (e) { showToast(e.message || 'Error marking as filed'); }
 }
 function checkMinWageCompliance() {
   const violations = [];
@@ -6910,17 +6600,18 @@ function checkMinWageCompliance() {
   });
   return violations;
 }
-function addContractWorker() {
+async function addContractWorker() {
   const name = prompt('Contract worker name:');
   if (!name) return;
   const contractor = prompt('Contractor name:');
-  contractWorkers.push({
-    id: contractWorkerNextId++, name, contractor: contractor || 'Self',
-    startDate: new Date().toISOString().split('T')[0], status: 'Active', dept: 'Site'
-  });
-  saveAllData();
-  renderComplianceOverlay();
-  showToast('Contract worker added');
+  try {
+    var workerData = { name, contractor: contractor || 'Self', startDate: new Date().toISOString().split('T')[0], status: 'Active', dept: 'Site' };
+    var res = await apiCall('POST', '/compliance/workers', workerData);
+    workerData.id = res && res.id ? res.id : contractWorkerNextId++;
+    contractWorkers.push(workerData);
+    renderComplianceOverlay();
+    showToast('Contract worker added');
+  } catch (e) { showToast(e.message || 'Error adding contract worker'); }
 }
 function renderComplianceOverlay() {
   const c = document.getElementById('complianceContent');
@@ -7042,31 +6733,40 @@ function openAssetForm() {
   html += '<div style="display:flex;gap:8px"><button class="nf-btn nf-btn-primary" onclick="saveAsset()">Save Asset</button><button class="nf-btn nf-btn-outline" onclick="renderAssetsOverlay()">Cancel</button></div></div>';
   c.innerHTML = html;
 }
-function saveAsset() {
-  const name = document.getElementById('assetName').value.trim();
-  const type = document.getElementById('assetType').value;
+async function saveAsset() {
+  var name = document.getElementById('assetName').value.trim();
+  var type = document.getElementById('assetType').value;
   if (!name || !type) { showToast('Name and type are required'); return; }
-  assetInventory.push({
-    id: assetNextId++, name, type,
-    serial: document.getElementById('assetSerial').value.trim(),
-    purchaseDate: document.getElementById('assetDate').value,
-    cost: parseFloat(document.getElementById('assetCost').value) || 0,
-    condition: document.getElementById('assetCondition').value,
-    assignedTo: null, assignedDate: null
-  });
-  apiCall('POST', '/assets', { asset_name: name, asset_type: type, serial_no: document.getElementById('assetSerial').value.trim(), purchase_date: document.getElementById('assetDate').value, purchase_cost: parseFloat(document.getElementById('assetCost').value) || 0, asset_condition: document.getElementById('assetCondition').value });
-  saveAllData();
-  showToast('Asset added');
-  renderAssetsOverlay();
+  try {
+    var res = await apiCall('POST', '/assets', { asset_name: name, asset_type: type, serial_no: document.getElementById('assetSerial').value.trim(), purchase_date: document.getElementById('assetDate').value, purchase_cost: parseFloat(document.getElementById('assetCost').value) || 0, asset_condition: document.getElementById('assetCondition').value });
+    assetInventory.push({
+      id: (res && res.id) || assetNextId++, name: name, type: type,
+      serial: document.getElementById('assetSerial').value.trim(),
+      purchaseDate: document.getElementById('assetDate').value,
+      cost: parseFloat(document.getElementById('assetCost').value) || 0,
+      condition: document.getElementById('assetCondition').value,
+      assignedTo: null, assignedDate: null
+    });
+    showToast('Asset added');
+    renderAssetsOverlay();
+  } catch (e) { showToast(e.message || 'Error adding asset'); }
 }
-function assignAsset(id, empCode) {
+async function assignAsset(id, empCode) {
   if (!empCode) { showToast('Select an employee'); return; }
-  const asset = assetInventory.find(a => a.id === id);
-  if (asset) { asset.assignedTo = empCode; asset.assignedDate = new Date().toISOString().split('T')[0]; apiCall('PUT', '/assets/' + id + '/assign', { emp_code: empCode }); saveAllData(); renderAssetsOverlay(); showToast('Asset assigned'); }
+  try {
+    await apiCall('PUT', '/assets/' + id + '/assign', { emp_code: empCode });
+    var asset = assetInventory.find(function(a) { return a.id === id; });
+    if (asset) { asset.assignedTo = empCode; asset.assignedDate = new Date().toISOString().split('T')[0]; }
+    renderAssetsOverlay(); showToast('Asset assigned');
+  } catch (e) { showToast(e.message || 'Error assigning asset'); }
 }
-function returnAsset(id) {
-  const asset = assetInventory.find(a => a.id === id);
-  if (asset) { asset.assignedTo = null; asset.assignedDate = null; apiCall('PUT', '/assets/' + id + '/return', {}); saveAllData(); renderAssetsOverlay(); showToast('Asset returned'); }
+async function returnAsset(id) {
+  try {
+    await apiCall('PUT', '/assets/' + id + '/return', {});
+    var asset = assetInventory.find(function(a) { return a.id === id; });
+    if (asset) { asset.assignedTo = null; asset.assignedDate = null; }
+    renderAssetsOverlay(); showToast('Asset returned');
+  } catch (e) { showToast(e.message || 'Error returning asset'); }
 }
 
 // =====================================================
@@ -7119,37 +6819,45 @@ function openExitApplyForm() {
   html += '<div style="display:flex;gap:8px"><button class="nf-btn nf-btn-primary" onclick="submitResignation()">Submit</button><button class="nf-btn nf-btn-outline" onclick="renderExitOverlay()">Cancel</button></div></div>';
   c.innerHTML = html;
 }
-function submitResignation() {
-  const reason = document.getElementById('exitReason').value;
+async function submitResignation() {
+  var reason = document.getElementById('exitReason').value;
   if (!reason) { showToast('Please select a reason'); return; }
-  const noticePeriod = NOTICE_PERIODS[currentUser.role] || 30;
-  const lwd = document.getElementById('exitLwd').value || (() => { const d = new Date(); d.setDate(d.getDate() + noticePeriod); return d.toISOString().split('T')[0]; })();
-  exitRequests.push({
-    id: exitNextId++, empCode: currentUser.code, reason, lwd,
-    remarks: document.getElementById('exitRemarks').value.trim(),
-    noticePeriod, appliedOn: new Date().toISOString().split('T')[0],
-    status: 'Pending', clearance: {}
-  });
-  apiCall('POST', '/exit', { reason, remarks: document.getElementById('exitRemarks').value.trim(), preferred_lwd: lwd });
-  saveAllData();
-  addNotification(currentUser.name + ' has submitted resignation', 'exit');
-  showToast('Resignation submitted');
-  renderExitOverlay();
+  var noticePeriod = NOTICE_PERIODS[currentUser.role] || 30;
+  var lwd = document.getElementById('exitLwd').value || (function() { var d = new Date(); d.setDate(d.getDate() + noticePeriod); return d.toISOString().split('T')[0]; })();
+  var remarks = document.getElementById('exitRemarks').value.trim();
+  try {
+    var res = await apiCall('POST', '/exit', { reason: reason, remarks: remarks, preferred_lwd: lwd });
+    exitRequests.push({
+      id: (res && res.id) || exitNextId++, empCode: currentUser.code, reason: reason, lwd: lwd,
+      remarks: remarks, noticePeriod: noticePeriod, appliedOn: new Date().toISOString().split('T')[0],
+      status: 'Pending', clearance: {}
+    });
+    addNotification(currentUser.name + ' has submitted resignation', 'exit');
+    showToast('Resignation submitted');
+    renderExitOverlay();
+  } catch (e) { showToast(e.message || 'Error submitting resignation'); }
 }
-function approveExit(id) {
-  const req = exitRequests.find(e => e.id === id);
-  if (req) { req.status = 'Approved'; req.approvedBy = currentUser.code; req.approvedOn = new Date().toISOString().split('T')[0]; apiCall('PUT', '/exit/' + id + '/approve', {}); saveAllData(); renderExitOverlay(); showToast('Exit approved'); }
+async function approveExit(id) {
+  try {
+    await apiCall('PUT', '/exit/' + id + '/approve', {});
+    var req = exitRequests.find(function(e) { return e.id === id; });
+    if (req) { req.status = 'Approved'; req.approvedBy = currentUser.code; req.approvedOn = new Date().toISOString().split('T')[0]; }
+    renderExitOverlay(); showToast('Exit approved');
+  } catch (e) { showToast(e.message || 'Error approving exit'); }
 }
-function rejectExit(id) {
-  const req = exitRequests.find(e => e.id === id);
-  if (req) { req.status = 'Rejected'; apiCall('PUT', '/exit/' + id + '/reject', {}); saveAllData(); renderExitOverlay(); showToast('Exit rejected'); }
+async function rejectExit(id) {
+  try {
+    await apiCall('PUT', '/exit/' + id + '/reject', {});
+    var req = exitRequests.find(function(e) { return e.id === id; });
+    if (req) { req.status = 'Rejected'; }
+    renderExitOverlay(); showToast('Exit rejected');
+  } catch (e) { showToast(e.message || 'Error rejecting exit'); }
 }
 function updateClearance(exitId, dept) {
-  const req = exitRequests.find(e => e.id === exitId);
+  var req = exitRequests.find(function(e) { return e.id === exitId; });
   if (req) {
     if (!req.clearance) req.clearance = {};
     req.clearance[dept] = !req.clearance[dept];
-    saveAllData();
     renderExitOverlay();
   }
 }
@@ -7236,16 +6944,18 @@ async function generateFnFPDF(exitId) {
   savePdfSafe(doc, `FnF_${fnf.emp.code}_${new Date().toISOString().split('T')[0]}.pdf`);
   showToast('F&F PDF downloaded');
 }
-function completeExit(id) {
+async function completeExit(id) {
   if (!confirm('Mark this exit as completed? This action cannot be undone.')) return;
-  const req = exitRequests.find(e => e.id === id);
-  if (req) {
-    req.status = 'Completed'; req.completedOn = new Date().toISOString().split('T')[0];
-    // Auto-deactivate the employee on exit completion
-    const exitEmp = EMPLOYEES.find(e => e.code === req.empCode);
-    if (exitEmp) exitEmp.status = 'Inactive';
-    apiCall('PUT', '/exit/' + id + '/complete', { fnf_amount: 0 }); saveAllData(); renderExitOverlay(); showToast('Exit completed — employee deactivated');
-  }
+  try {
+    await apiCall('PUT', '/exit/' + id + '/complete', { fnf_amount: 0 });
+    var req = exitRequests.find(function(e) { return e.id === id; });
+    if (req) {
+      req.status = 'Completed'; req.completedOn = new Date().toISOString().split('T')[0];
+      var exitEmp = EMPLOYEES.find(function(e) { return e.code === req.empCode; });
+      if (exitEmp) exitEmp.status = 'Inactive';
+    }
+    renderExitOverlay(); showToast('Exit completed — employee deactivated');
+  } catch (e) { showToast(e.message || 'Error completing exit'); }
 }
 
 // =====================================================
@@ -7315,29 +7025,33 @@ function getUnreadAnnouncementCount() {
 function markAnnouncementRead(id) {
   if (!currentUser) return;
   announcementReadStatus[currentUser.code + '_' + id] = true;
-  apiCall('POST', '/announcements/' + id + '/read', {});
-  saveAllData();
+  apiCall('POST', '/announcements/' + id + '/read', {}).catch(function(){});
 }
-function createAnnouncement() {
-  const title = document.getElementById('annTitle').value.trim();
-  const body = document.getElementById('annBody').value.trim();
-  const category = document.getElementById('annCategory').value;
-  const priority = document.getElementById('annPriority').value;
+async function createAnnouncement() {
+  var title = document.getElementById('annTitle').value.trim();
+  var body = document.getElementById('annBody').value.trim();
+  var category = document.getElementById('annCategory').value;
+  var priority = document.getElementById('annPriority').value;
   if (!title || !body) { showToast('Title and body are required'); return; }
-  announcements.push({
-    id: announcementNextId++, title, body, category, priority,
-    author: currentUser.code, date: new Date().toISOString().split('T')[0]
-  });
-  apiCall('POST', '/announcements', { title, content: body, category, priority });
-  saveAllData();
-  addNotification('New announcement: ' + title, 'announcement');
-  showToast('Announcement published');
-  renderAnnouncementsOverlay();
+  try {
+    var res = await apiCall('POST', '/announcements', { title: title, content: body, category: category, priority: priority });
+    announcements.push({
+      id: (res && res.id) || announcementNextId++, title: title, body: body, category: category, priority: priority,
+      author: currentUser.code, date: new Date().toISOString().split('T')[0]
+    });
+    addNotification('New announcement: ' + title, 'announcement');
+    showToast('Announcement published');
+    renderAnnouncementsOverlay();
+  } catch (e) { showToast(e.message || 'Error creating announcement'); }
 }
-function deleteAnnouncement(id) {
+async function deleteAnnouncement(id) {
   if (!confirm('Delete this announcement?')) return;
-  const idx = announcements.findIndex(a => a.id === id);
-  if (idx >= 0) { announcements.splice(idx, 1); apiCall('DELETE', '/announcements/' + id, {}); saveAllData(); renderAnnouncementsOverlay(); showToast('Announcement deleted'); }
+  try {
+    await apiCall('DELETE', '/announcements/' + id, {});
+    var idx = announcements.findIndex(function(a) { return a.id === id; });
+    if (idx >= 0) announcements.splice(idx, 1);
+    renderAnnouncementsOverlay(); showToast('Announcement deleted');
+  } catch (e) { showToast(e.message || 'Error deleting announcement'); }
 }
 function renderAnnouncementDashboard() {
   const el = document.getElementById('dashboardAnnouncements');
@@ -7615,7 +7329,7 @@ function saveProject(editId) {
     showToast('Project created');
   }
   apiCall('POST', '/projects', data).catch(function(){});
-  saveAllData();
+  saveLocalOnlyData();
   renderProgressScreen();
 }
 
@@ -7624,7 +7338,7 @@ function deleteProject(id) {
   if (!confirm('Delete this project permanently?')) return;
   projects = projects.filter(function(p){return p.id !== id;});
   delete projectTaskNextIds[id];
-  saveAllData();
+  saveLocalOnlyData();
   showToast('Project deleted');
   hideOverlay('project-detail');
   renderProgressScreen();
@@ -7829,7 +7543,7 @@ function saveProjectTask(projectId) {
   };
   proj.tasks.push(task);
   projectTaskNextIds[projectId] = taskId + 1;
-  saveAllData();
+  saveLocalOnlyData();
   showToast('Task added');
   renderProjectDetailContent(proj);
 }
@@ -7842,7 +7556,7 @@ function toggleTaskStatus(projectId, taskId) {
   if (task.status === 'Pending') task.status = 'In Progress';
   else if (task.status === 'In Progress') task.status = 'Done';
   else task.status = 'Pending';
-  saveAllData();
+  saveLocalOnlyData();
   renderProjectDetailContent(proj);
 }
 
@@ -7874,7 +7588,7 @@ function addProjectMember(projectId) {
   if (!proj) return;
   if (proj.team.indexOf(code) !== -1) { showToast('Already in team'); return; }
   proj.team.push(code);
-  saveAllData();
+  saveLocalOnlyData();
   showToast('Member added');
   renderProjectDetailContent(proj);
 }
@@ -7884,7 +7598,7 @@ function removeProjectMember(projectId, empCode) {
   if (!proj) return;
   if (!confirm('Remove this member from the project?')) return;
   proj.team = proj.team.filter(function(c){return c !== empCode;});
-  saveAllData();
+  saveLocalOnlyData();
   showToast('Member removed');
   renderProjectDetailContent(proj);
 }
@@ -7899,18 +7613,16 @@ function editProject(id) {
 // =====================================================
 (async function initApp() {
   initDarkMode();
-  loadAllData();
-  MOCK_BACKEND.init();
   // Restore JWT if available
   JWT_TOKEN = safeStorage.get('hrms_jwt') || null;
 
   // Check for Google OAuth2 redirect (token in sessionStorage or URL hash)
-  const _hasGoogleToken = sessionStorage.getItem('hrms_google_token') || (location.hash && location.hash.includes('access_token'));
+  var _hasGoogleToken = sessionStorage.getItem('hrms_google_token') || (location.hash && location.hash.includes('access_token'));
   if (_hasGoogleToken) {
     // Show loading state while processing Google login
-    const errEl = document.getElementById('loginError');
+    var errEl = document.getElementById('loginError');
     if (errEl) errEl.textContent = 'Signing in with Google...';
-    const btn = document.getElementById('googleSignInBtn');
+    var btn = document.getElementById('googleSignInBtn');
     if (btn) { btn.disabled = true; btn.querySelector('span').textContent = 'Signing in...'; }
     try {
       await _handleGoogleRedirect();
@@ -7925,9 +7637,6 @@ function editProject(id) {
     restoreNotifPrefToggles();
     renderNotifications();
     updateNotifBadge();
-    // Try to seed backend data if online
-    setTimeout(seedBackendData, 2000);
-    syncOfflineQueue();
   }
 
   // Login button event listeners (no inline onclick — CSP safe)

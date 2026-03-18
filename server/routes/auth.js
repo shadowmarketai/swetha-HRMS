@@ -207,4 +207,28 @@ router.post('/seed', bootstrapOrAuth, async (req, res) => {
   }
 });
 
+// POST /api/auth/forgot-password — reset to default password (emp123)
+router.post('/forgot-password', [
+  body('empCode').trim().notEmpty().withMessage('Employee code required')
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
+  try {
+    const { empCode } = req.body;
+    const [rows] = await pool.query(
+      'SELECT u.emp_code FROM users u JOIN employees e ON u.emp_code = e.code WHERE u.emp_code = ? AND u.is_active = 1',
+      [empCode]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Employee code not found or account is inactive' });
+    }
+    const hash = await bcrypt.hash('emp123', 10);
+    await pool.query('UPDATE users SET password_hash = ?, last_password_change = NOW() WHERE emp_code = ?', [hash, empCode]);
+    res.json({ message: 'Password reset to default (emp123)' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 module.exports = router;
