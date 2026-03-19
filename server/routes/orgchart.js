@@ -79,4 +79,47 @@ router.put('/:empCode', verifyToken, requireRole('MD', 'HR'), auditLog('update',
   }
 });
 
+// POST /api/orgchart/bulk — bulk seed/update reporting structure (MD/HR only)
+router.post('/bulk', verifyToken, requireRole('MD', 'HR'), auditLog('bulk-seed', 'reporting_structure'), async (req, res) => {
+  try {
+    const entries = req.body.entries;
+    if (!Array.isArray(entries) || entries.length === 0) {
+      return res.status(400).json({ error: 'entries array required' });
+    }
+
+    // Validate all emp_codes exist
+    const [allEmps] = await pool.query('SELECT code FROM employees');
+    const validCodes = new Set(allEmps.map(e => e.code));
+
+    const values = [];
+    const errors = [];
+    entries.forEach(function(e, i) {
+      const empCode = e.emp_code || e.empCode;
+      const reportsTo = e.reports_to || e.reportsTo || null;
+      if (!empCode) { errors.push('Row ' + i + ': missing emp_code'); return; }
+      if (!validCodes.has(empCode)) { errors.push('Row ' + i + ': employee ' + empCode + ' not found'); return; }
+      if (reportsTo && !validCodes.has(reportsTo)) { errors.push('Row ' + i + ': manager ' + reportsTo + ' not found'); return; }
+      if (reportsTo === empCode) { errors.push('Row ' + i + ': self-report'); return; }
+      values.push([empCode, reportsTo, new Date().toISOString().split('T')[0]]);
+    });
+
+    if (values.length === 0) {
+      return res.status(400).json({ error: 'No valid entries', details: errors });
+    }
+
+    // Bulk upsert
+    await pool.query(
+      `INSERT INTO reporting_structure (emp_code, reports_to, effective_date)
+       VALUES ?
+       ON DUPLICATE KEY UPDATE reports_to = VALUES(reports_to), effective_date = VALUES(effective_date)`,
+      [values]
+    );
+
+    res.json({ success: true, inserted: values.length, errors });
+  } catch (err) {
+    console.error('POST /orgchart/bulk error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 module.exports = router;
