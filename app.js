@@ -195,7 +195,7 @@ const NAV_CONFIG = {
   MD: [
     { id:'home', label:'Home', icon:'home', action:{type:'tab',target:'home'} },
     { id:'md-attendance', label:'Attendance', icon:'attendance', children:[
-      { id:'md-att-report', label:'Employee Attendance Report', action:{type:'tab',target:'attendance'} },
+      { id:'md-att-report', label:'Employee Attendance', action:{type:'tab',target:'attendance'} },
       { id:'md-att-leave', label:'Employee Leave Request', action:{type:'tab',target:'leaves'} }
     ]},
     { id:'md-advance', label:'Advance', icon:'advance', children:[
@@ -205,11 +205,10 @@ const NAV_CONFIG = {
     { id:'md-location', label:'Live Location', icon:'location', action:{type:'overlay',target:'location'} },
     { id:'md-progress', label:'Progress', icon:'progress', action:{type:'tab',target:'progress'} },
     { id:'md-performance', label:'Employee Performance', icon:'performance', children:[
-      { id:'md-perf-kpi', label:'Track History', action:{type:'overlay',target:'hr-kpi'} },
-      { id:'md-perf-docs', label:'Verification', action:{type:'overlay',target:'hr-documents'} },
+      { id:'md-perf-track', label:'Performance Review', action:{type:'overlay',target:'hr-kpi'} },
       { id:'md-perf-onboard', label:'Add Employee', action:{type:'overlay',target:'onboarding'} }
     ]},
-    { id:'md-orgchart', label:'Org Chart', icon:'orgchart', action:{type:'overlay',target:'hr-orgchart'} },
+    { id:'md-orgchart', label:'Org Chart', icon:'orgchart', action:{type:'tab',target:'orgchart'} },
     { id:'md-tax', label:'Form 16 & Tax', icon:'tax', action:{type:'overlay',target:'hr-tax'} },
     { id:'md-salary', label:'Salary', icon:'salary', children:[
       { id:'md-sal-structure', label:'Salary Structure', action:{type:'tab',target:'expenses'} },
@@ -234,15 +233,18 @@ const NAV_CONFIG = {
       { id:'hr-adv-expense', label:'Travel Expense', action:{type:'tab',target:'site'} }
     ]},
     { id:'hr-performance', label:'Employee Performance', icon:'performance', children:[
-      { id:'hr-perf-docs', label:'Verification', action:{type:'overlay',target:'hr-documents'} },
+      { id:'hr-perf-track', label:'Performance Review', action:{type:'overlay',target:'hr-kpi'} },
       { id:'hr-perf-onboard', label:'Add Employee', action:{type:'overlay',target:'onboarding'} }
     ]},
-    { id:'hr-recruit', label:'Interview Process', icon:'recruit', action:{type:'overlay',target:'hr-recruit'} },
-    { id:'hr-orgchart', label:'Org Chart', icon:'orgchart', action:{type:'overlay',target:'hr-orgchart'} },
+    { id:'hr-recruit', label:'Interview Process', icon:'recruit', children:[
+      { id:'hr-rec-positions', label:'Open Positions', action:{type:'overlay',target:'hr-recruit'} },
+      { id:'hr-rec-pipeline', label:'Candidates', action:{type:'overlay',target:'hr-recruit'} }
+    ]},
+    { id:'hr-orgchart', label:'Org Chart', icon:'orgchart', action:{type:'tab',target:'orgchart'} },
     { id:'hr-tax', label:'Form 16 & Tax', icon:'tax', action:{type:'overlay',target:'hr-tax'} },
     { id:'hr-salary', label:'Salary', icon:'salary', children:[
       { id:'hr-sal-self', label:'Self Salary', action:{type:'tab',target:'salary'} },
-      { id:'hr-sal-list', label:'Employee List', action:{type:'tab',target:'expenses'} }
+      { id:'hr-sal-list', label:'Employee List', action:{type:'tab',target:'salary'} }
     ]},
     // Footer
     { id:'hr-profile', label:'Profile', icon:'profile', action:{type:'overlay',target:'profile'}, isFooter:true },
@@ -1111,8 +1113,11 @@ function switchTab(id, el, _fromPopstate) {
     }
   }
   if (id === 'advance' || id === 'site' || id === 'ta') { renderAllMyRequests(); renderAllPendingBanners(); }
-  if (id === 'leaves') renderLeaveScreen();
+  if (id === 'leaves') renderLeaveScreenForMode();
   if (id === 'progress') renderProgressScreen();
+  if (id === 'orgchart') renderInlineOrgChart();
+  if (id === 'attendance') renderAttendanceView();
+  if (id === 'salary') renderSalaryView();
   updateNavActiveState();
 }
 let _overlayPreviousFocus = [];
@@ -1130,6 +1135,14 @@ function showOverlay(id) {
     if (id === 'location') openLocationTracker();
     if (id === 'advance-requests') { advReqActiveTab = 'pending'; advReqTypeFilter = 'all'; renderAdvanceRequests('pending'); document.querySelectorAll('#advReqTabs .tab-pill').forEach((p,i) => p.classList.toggle('active', i===0)); document.querySelectorAll('#advReqTypeFilter .loc-filter-chip').forEach((c,i) => c.classList.toggle('active', i===0)); }
     if (id === 'settings') initSettingsToggles();
+    if (id === 'hr-recruit') {
+      var el = document.getElementById('hrRecruitContent');
+      if (el) {
+        if (_activeNavId === 'hr-rec-pipeline') el.dataset.rtab = 'pipeline';
+        else el.dataset.rtab = 'postings';
+      }
+      renderRecruitmentOverlay();
+    }
   } catch(e) { /* don't block overlay */ }
   // Close any currently active overlays to prevent split-screen stacking
   document.querySelectorAll('.overlay-screen.active').forEach(function(o) {
@@ -1299,7 +1312,7 @@ function resetWizard() {
   updateWizardUI();
   // Clear all form fields
   ['obName','obPhone','obEmail','obDob','obGender','obAddress','obAadhaar','obPan',
-   'obCode','obDept','obDesignation','obSubDept','obDoj','obManager',
+   'obCode','obDept','obDesignation','obSubDept','obDoj','obManager','obPassword','obRole',
    'obSalary','obBank','obAccNo','obIfsc','obPayMode',
    'obEmgName','obEmgRelation','obEmgPhone'].forEach(id => {
     const el = document.getElementById(id);
@@ -1360,15 +1373,20 @@ async function submitOnboarding() {
     return;
   }
 
+  var obPassword = (document.getElementById('obPassword') || {}).value || 'emp123';
+  var obRole = (document.getElementById('obRole') || {}).value || 'Employee';
+  // Only MD can set HR role
+  if (obRole === 'HR' && currentUser.role !== 'MD') obRole = 'Employee';
+
   var newEmp = {
     code: code, name: name, dept: dept, designation: designation, salary: salary, bank: bank || 'TBD',
-    accNo: accNo || 'TBD', role: 'Employee', phone: phone || '', doj: doj || new Date().toISOString().split('T')[0],
+    accNo: accNo || 'TBD', role: obRole, phone: phone || '', doj: doj || new Date().toISOString().split('T')[0],
     status: 'Active'
   };
   try {
     await apiCall('POST', '/employees', newEmp);
-    // Register user account with default password
-    await apiCall('POST', '/auth/register', { empCode: code, password: 'emp123', role: 'Employee' });
+    // Register user account with specified password
+    await apiCall('POST', '/auth/register', { empCode: code, password: obPassword, role: obRole });
     EMPLOYEES.push(newEmp);
     showToast(name + ' added successfully as ' + dept + ' staff!');
     hideOverlay('onboarding');
@@ -2116,11 +2134,16 @@ function renderAllMyRequests() {
 function updateBannerForType(type, bannerId, textId, countId) {
   const banner = document.getElementById(bannerId);
   if (!banner || !currentUser) return;
-  const pending = advanceRequests.filter(r => r.status === 'pending' && r.type === type).length;
-  const allPending = advanceRequests.filter(r => r.status === 'pending').length;
-  document.getElementById(countId).textContent = pending;
-  document.getElementById(textId).textContent = pending + ' Pending ' + ADV_TYPE_LABELS[type] + (pending !== 1 ? 's' : '');
-  banner.style.display = (currentUser.role === 'MD' || currentUser.role === 'HR') && pending > 0 ? 'flex' : 'none';
+  // HR sees 'pending', MD sees 'pending' + 'hr_accepted'
+  var actionable;
+  if (currentUser.role === 'MD') {
+    actionable = advanceRequests.filter(r => (r.status === 'pending' || r.status === 'hr_accepted') && r.type === type).length;
+  } else {
+    actionable = advanceRequests.filter(r => r.status === 'pending' && r.type === type).length;
+  }
+  document.getElementById(countId).textContent = actionable;
+  document.getElementById(textId).textContent = actionable + ' Pending ' + ADV_TYPE_LABELS[type] + (actionable !== 1 ? 's' : '');
+  banner.style.display = (currentUser.role === 'MD' || currentUser.role === 'HR') && actionable > 0 ? 'flex' : 'none';
 }
 
 function renderAllPendingBanners() {
@@ -2158,16 +2181,26 @@ function renderAdvanceRequests(filter) {
     container.innerHTML = '<div style="text-align:center;padding:32px;color:var(--gray-400);font-size:.82rem">No ' + filter + ' requests</div>';
     return;
   }
-  const isMDorHR = currentUser && (currentUser.role === 'MD' || currentUser.role === 'HR');
+  const isMD = currentUser && currentUser.role === 'MD';
+  const isHR = currentUser && currentUser.role === 'HR';
+  const isMDorHR = isMD || isHR;
   container.innerHTML = reqs.map(r => {
-    const badgeClass = r.status === 'approved' ? 'badge-approved' : r.status === 'rejected' ? 'badge-rejected' : 'badge-pending';
-    const statusLabel = r.status.charAt(0).toUpperCase() + r.status.slice(1);
     const initials = r.empName.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
     const typeBadge = `<span class="adv-type-badge ${r.type}">${ADV_TYPE_LABELS[r.type] || r.type}</span>`;
+    var statusBadge = getAdvanceStatusBadge(r.status);
+    var stepHtml = getAdvanceStepIndicator(r.status);
+    // Actions: HR sees Accept on pending, MD sees Confirm on pending & hr_accepted
+    var actionsHtml = '';
+    if (isHR && r.status === 'pending') {
+      actionsHtml = `<div class="adv-actions"><button class="approve-btn" onclick="approveAdvance(${r.id})" aria-label="Accept advance ${r.id}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/></svg> Accept</button><button class="reject-btn" onclick="rejectAdvance(${r.id})" aria-label="Reject advance ${r.id}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Reject</button></div>`;
+    } else if (isMD && (r.status === 'pending' || r.status === 'hr_accepted')) {
+      var btnLabel = r.status === 'hr_accepted' ? 'Confirm' : 'Approve';
+      actionsHtml = `<div class="adv-actions"><button class="approve-btn" onclick="approveAdvance(${r.id})" aria-label="${btnLabel} advance ${r.id}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/></svg> ${btnLabel}</button><button class="reject-btn" onclick="rejectAdvance(${r.id})" aria-label="Reject advance ${r.id}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Reject</button></div>`;
+    }
     return `<div class="adv-request-card ${r.status}">
       <div class="adv-request-header">
         <h4><span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:8px;background:var(--primary-50);color:var(--primary);font-size:.65rem;font-weight:700;margin-right:4px">${escapeHTML(initials)}</span>${escapeHTML(r.empName)}</h4>
-        <span class="badge-status ${badgeClass}">${statusLabel}</span>
+        ${statusBadge}
       </div>
       <div class="adv-request-meta">
         ${typeBadge} <span class="adv-urgency ${r.urgency}">${escapeHTML(r.urgency)}</span> &middot; <strong>\u20B9${r.amount.toLocaleString('en-IN')}</strong> &middot; ${escapeHTML(r.dept)}<br>
@@ -2175,11 +2208,9 @@ function renderAdvanceRequests(filter) {
         Applied: ${formatAdvDate(r.appliedDate)}
         ${r.reviewedBy ? ' &middot; By: ' + escapeHTML(r.reviewedBy) + ' on ' + formatAdvDate(r.reviewDate) : ''}
         ${r.rejectReason ? '<br><span style="color:var(--danger)">Reason: ' + escapeHTML(r.rejectReason) + '</span>' : ''}
+        ${stepHtml}
       </div>
-      ${r.status === 'pending' && isMDorHR ? `<div class="adv-actions">
-        <button class="approve-btn" onclick="approveAdvance(${r.id})" aria-label="Approve advance request ${r.id}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/></svg> Approve</button>
-        <button class="reject-btn" onclick="rejectAdvance(${r.id})" aria-label="Reject advance request ${r.id}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Reject</button>
-      </div>` : ''}
+      ${actionsHtml}
     </div>`;
   }).join('');
 }
@@ -2188,6 +2219,17 @@ async function approveAdvance(id) {
   try {
     const req = advanceRequests.find(r => r.id === id);
     if (!req) return;
+    // HR can only accept (not final approve) — MD does final confirm
+    if (currentUser.role === 'HR' && req.status === 'pending') {
+      await apiCall('PATCH', '/advances/' + id + '/hr-accept');
+      req.status = 'hr_accepted';
+      req.reviewedBy = currentUser.name + ' (HR)';
+      req.reviewDate = new Date().toISOString().split('T')[0];
+      showToast('Accepted \u20B9' + req.amount.toLocaleString('en-IN') + ' — forwarded to MD');
+      renderAdvanceRequests(advReqActiveTab);
+      renderAllPendingBanners();
+      return;
+    }
     await apiCall('PATCH', '/advances/' + id + '/approve');
     req.status = 'approved';
     req.reviewedBy = currentUser.name + ' (' + currentUser.role + ')';
@@ -5809,6 +5851,12 @@ async function approveLeave(id) {
   try {
     const app = leaveApplications.find(a => a.id === id);
     if (!app) return;
+    // HR can only accept (not final approve) — MD does final confirm
+    if (currentUser.role === 'HR' && app.status === 'pending') {
+      await hrAcceptLeave(id);
+      return;
+    }
+    // MD approves (from pending or hr_accepted)
     await apiCall('PATCH', '/leaves/' + id + '/approve');
     app.status = 'approved';
     const bal = getLeaveBalance(app.empCode);
@@ -5843,6 +5891,7 @@ function renderLeaveScreen() {
   if (!currentUser) return;
   const isMDorHR = currentUser.role === 'MD' || currentUser.role === 'HR';
   const isMD = currentUser.role === 'MD';
+  const isHR = currentUser.role === 'HR';
   const bal = getLeaveBalance(currentUser.code);
   const circumference = 163.4;
   // Hide apply button and balance for MD
@@ -5886,10 +5935,12 @@ function renderLeaveScreen() {
       myTab.innerHTML = '<div style="padding:16px;text-align:center;font-size:.78rem;color:var(--gray-400)">No leave applications yet</div>';
     } else {
       myTab.innerHTML = myApps.map(a => {
-        const badgeCls = a.status === 'approved' ? 'badge-approved' : a.status === 'rejected' ? 'badge-rejected' : 'badge-pending';
+        const badgeCls = a.status === 'approved' ? 'badge-approved' : a.status === 'rejected' ? 'badge-rejected' : a.status === 'hr_accepted' ? '' : 'badge-pending';
+        const badgeStyle = a.status === 'hr_accepted' ? ' style="background:#DBEAFE;color:#1D4ED8"' : '';
+        const statusLabel = a.status === 'hr_accepted' ? 'HR Accepted' : a.status.charAt(0).toUpperCase()+a.status.slice(1);
         const fromD = new Date(a.from).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
         const toD = new Date(a.to).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
-        return `<div class="request-item"><div class="req-icon" style="background:#FFF7ED;color:#E85D04"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/></svg></div><div class="req-info"><h4>${a.type.charAt(0).toUpperCase()+a.type.slice(1)} Leave</h4><p>${fromD} — ${toD} &middot; ${a.days} day(s)</p></div><div class="req-meta"><span class="badge-status ${badgeCls}">${a.status.charAt(0).toUpperCase()+a.status.slice(1)}</span></div></div>`;
+        return `<div class="request-item"><div class="req-icon" style="background:#FFF7ED;color:#E85D04"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/></svg></div><div class="req-info"><h4>${a.type.charAt(0).toUpperCase()+a.type.slice(1)} Leave</h4><p>${fromD} — ${toD} &middot; ${a.days} day(s)</p></div><div class="req-meta"><span class="badge-status ${badgeCls}"${badgeStyle}>${statusLabel}</span></div></div>`;
       }).join('');
     }
   }
@@ -5901,13 +5952,30 @@ function renderLeaveScreen() {
       teamTab.innerHTML = '<div style="padding:16px;text-align:center;font-size:.78rem;color:var(--gray-400)">Only MD/HR can view team leaves</div>';
     } else {
       const pending = leaveApplications.filter(a => a.status === 'pending');
-      const others = leaveApplications.filter(a => a.status !== 'pending');
+      const hrAccepted = leaveApplications.filter(a => a.status === 'hr_accepted');
+      const others = leaveApplications.filter(a => a.status !== 'pending' && a.status !== 'hr_accepted');
       let html = '';
       if (pending.length > 0) {
         html += pending.map(a => {
           const fromD = new Date(a.from).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
           const toD = new Date(a.to).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
-          return `<div class="request-item" style="flex-wrap:wrap"><div class="req-icon" style="background:#FCE7F3;color:#DB2777"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><div class="req-info"><h4>${escapeHTML(a.empName)} — ${escapeHTML(a.type)} Leave</h4><p>${escapeHTML(a.dept)} &middot; ${fromD} — ${toD} &middot; ${a.days} day(s)</p><p style="font-size:.65rem;color:var(--gray-500);margin-top:2px">${escapeHTML(a.reason)}</p></div><div class="leave-action-btns" style="width:100%;margin-top:8px"><button style="background:var(--success-light);color:var(--success-dark)" onclick="approveLeave(${a.id})">Approve</button><button style="background:var(--danger-light);color:var(--danger-dark)" onclick="rejectLeave(${a.id})">Reject</button></div></div>`;
+          var btnLabel = isHR ? 'Accept' : 'Approve';
+          return `<div class="request-item" style="flex-wrap:wrap"><div class="req-icon" style="background:#FCE7F3;color:#DB2777"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><div class="req-info"><h4>${escapeHTML(a.empName)} — ${escapeHTML(a.type)} Leave</h4><p>${escapeHTML(a.dept)} &middot; ${fromD} — ${toD} &middot; ${a.days} day(s)</p><p style="font-size:.65rem;color:var(--gray-500);margin-top:2px">${escapeHTML(a.reason)}</p></div><div class="leave-action-btns" style="width:100%;margin-top:8px"><button style="background:${isHR ? '#DBEAFE' : 'var(--success-light)'};color:${isHR ? '#1D4ED8' : 'var(--success-dark)'}" onclick="approveLeave(${a.id})">${btnLabel}</button><button style="background:var(--danger-light);color:var(--danger-dark)" onclick="rejectLeave(${a.id})">Reject</button></div></div>`;
+        }).join('');
+      }
+      if (hrAccepted.length > 0 && isMD) {
+        html += '<div style="font-size:.72rem;font-weight:600;color:#1D4ED8;margin:8px 0 4px">HR Accepted — Awaiting Confirmation</div>';
+        html += hrAccepted.map(a => {
+          const fromD = new Date(a.from).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
+          const toD = new Date(a.to).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
+          return `<div class="request-item" style="flex-wrap:wrap"><div class="req-icon" style="background:#DBEAFE;color:#1D4ED8"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/></svg></div><div class="req-info"><h4>${escapeHTML(a.empName)} — ${escapeHTML(a.type)} Leave</h4><p>${escapeHTML(a.dept)} &middot; ${fromD} — ${toD} &middot; ${a.days} day(s)</p></div><div class="leave-action-btns" style="width:100%;margin-top:8px"><button style="background:var(--success-light);color:var(--success-dark)" onclick="approveLeave(${a.id})">Confirm</button><button style="background:var(--danger-light);color:var(--danger-dark)" onclick="rejectLeave(${a.id})">Reject</button></div></div>`;
+        }).join('');
+      } else if (hrAccepted.length > 0 && isHR) {
+        html += '<div style="font-size:.72rem;font-weight:600;color:#1D4ED8;margin:8px 0 4px">Awaiting MD Confirmation</div>';
+        html += hrAccepted.map(a => {
+          const fromD = new Date(a.from).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
+          const toD = new Date(a.to).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
+          return `<div class="request-item"><div class="req-icon" style="background:#DBEAFE;color:#1D4ED8"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/></svg></div><div class="req-info"><h4>${escapeHTML(a.empName)} — ${escapeHTML(a.type)}</h4><p>${escapeHTML(a.dept)} &middot; ${fromD} — ${toD}</p></div><span class="badge-status" style="background:#DBEAFE;color:#1D4ED8">HR Accepted</span></div>`;
         }).join('');
       }
       if (others.length > 0) {
@@ -6730,12 +6798,7 @@ function useCurrentLocationForGeo() {
 // F5: FORM 16 / TAX FUNCTIONS
 // =====================================================
 let currentTaxTab = 'declaration';
-function switchTaxTab(tab) {
-  currentTaxTab = tab;
-  document.querySelectorAll('#taxTabs .tax-tab').forEach(t => t.classList.remove('active'));
-  document.querySelector(`#taxTabs .tax-tab:nth-child(${tab==='declaration'?1:tab==='summary'?2:3})`).classList.add('active');
-  renderTaxOverlay();
-}
+// switchTaxTab is defined in the CHANGE 8 block below
 function calculateTaxLiability(empCode) {
   const emp = EMPLOYEES.find(e => e.code === empCode);
   if (!emp) return null;
@@ -6824,44 +6887,7 @@ async function generateForm16PDF(empCode) {
   showToast('Form 16 PDF downloaded');
 }
 function renderTaxOverlay() {
-  const c = document.getElementById('taxContent');
-  if (!c || !currentUser) return;
-  const dec = taxDeclarations[currentUser.code] || {};
-  let html = '';
-  if (currentTaxTab === 'declaration') {
-    html = '<div class="card"><div class="nf-section-title">IT Declaration FY 2025-26</div>';
-    html += `<div class="ss-form-group"><label>Section 80C (Max Rs.1,50,000)</label><input type="number" class="tax-input" id="tax80C" value="${dec.sec80C||''}" placeholder="PPF, LIC, ELSS, etc."></div>`;
-    html += `<div class="ss-form-group"><label>Section 80D — Medical Insurance (Max Rs.25,000)</label><input type="number" class="tax-input" id="tax80D" value="${dec.sec80D||''}" placeholder="Health insurance premium"></div>`;
-    html += `<div class="ss-form-group"><label>HRA Exemption</label><input type="number" class="tax-input" id="taxHRA" value="${dec.hra||''}" placeholder="Monthly rent paid"></div>`;
-    html += `<div class="ss-form-group"><label>Home Loan Interest (Sec 24)</label><input type="number" class="tax-input" id="taxHomeLoan" value="${dec.homeLoan||''}" placeholder="Annual interest"></div>`;
-    html += `<button class="nf-btn nf-btn-primary" onclick="submitTaxDeclaration()">Submit Declaration</button>`;
-    if (dec.submittedOn) html += `<div style="font-size:.72rem;color:var(--success);margin-top:8px">Last submitted: ${dec.submittedOn}</div>`;
-    html += '</div>';
-  } else if (currentTaxTab === 'summary') {
-    const tax = calculateTaxLiability(currentUser.code);
-    html = '<div class="card"><div class="nf-section-title">Tax Computation Summary</div>';
-    if (tax) {
-      const rows = [
-        ['Annual Gross Salary', tax.annualGross], ['(-) Standard Deduction', tax.stdDeduction],
-        ['(-) Section 80C', tax.sec80C], ['(-) Section 80D', tax.sec80D], ['(-) HRA Exemption', tax.hra],
-        ['Total Deductions', tax.totalDeductions], ['Taxable Income', tax.taxableIncome],
-        ['Income Tax', tax.tax], ['Cess (4%)', tax.cess]
-      ];
-      rows.forEach(r => {
-        html += `<div class="tax-summary-row"><span>${r[0]}</span><span>Rs.${r[1].toLocaleString('en-IN')}</span></div>`;
-      });
-      html += `<div class="tax-summary-row total"><span>Total Tax Liability</span><span>Rs.${tax.totalTax.toLocaleString('en-IN')}</span></div>`;
-      html += `<div style="margin-top:8px;font-size:.78rem;color:var(--gray-500)">Monthly TDS: Rs.${tax.monthlyTds.toLocaleString('en-IN')}</div>`;
-    } else {
-      html += '<div class="nf-empty">Unable to compute tax</div>';
-    }
-    html += '</div>';
-  } else {
-    html = '<div class="card" style="text-align:center;padding:24px"><div class="nf-section-title">Form 16 — AY 2026-27</div>';
-    html += `<p style="font-size:.82rem;color:var(--gray-500);margin-bottom:12px">Download your Form 16 certificate for Assessment Year 2026-27</p>`;
-    html += `<button class="nf-btn nf-btn-primary" onclick="generateForm16PDF()">📄 Download Form 16 PDF</button></div>`;
-  }
-  c.innerHTML = html;
+  renderTaxOverlayExtended();
 }
 
 // =====================================================
@@ -8305,6 +8331,484 @@ function removeProjectMember(projectId, empCode) {
 function editProject(id) {
   hideOverlay('project-detail');
   setTimeout(function() { openProjectForm(id); }, 200);
+}
+
+// =====================================================
+// CHANGE 1: EMPLOYEE ATTENDANCE VIEW (HR sees all)
+// =====================================================
+var _attendanceOriginalHTML = '';
+function renderAttendanceView() {
+  if (!currentUser) return;
+  var container = document.getElementById('screen-attendance');
+  if (!container) return;
+  // Save original HTML on first call so we can restore it
+  if (!_attendanceOriginalHTML && container.querySelector('#calDays')) {
+    _attendanceOriginalHTML = container.innerHTML;
+  }
+  var isHR = currentUser.role === 'HR';
+  var isMD = currentUser.role === 'MD';
+  // HR "Employee Attendance" mode — show employee selector + their calendar
+  if ((isHR && _activeNavId === 'hr-att-emp') || (isMD && _activeNavId === 'md-att-report')) {
+    renderEmployeeAttendanceView();
+    return;
+  }
+  // Default: self calendar — restore original HTML if it was replaced
+  if (_attendanceOriginalHTML && !container.querySelector('#calDays')) {
+    container.innerHTML = _attendanceOriginalHTML;
+  }
+  buildCalendar();
+}
+
+var _hrAttSelectedEmp = null;
+function renderEmployeeAttendanceView() {
+  var container = document.getElementById('screen-attendance');
+  if (!container) return;
+  var deptFilter = '<select id="attDeptFilter" onchange="filterAttEmpList()" style="padding:6px 10px;border:1px solid var(--gray-200);border-radius:var(--radius);font-size:.78rem;margin-right:8px"><option value="">All Depts</option>';
+  var depts = [];
+  EMPLOYEES.forEach(function(e) { if (depts.indexOf(e.dept) === -1) depts.push(e.dept); });
+  depts.forEach(function(d) { deptFilter += '<option value="' + escapeAttr(d) + '">' + escapeHTML(d) + '</option>'; });
+  deptFilter += '</select>';
+  var html = '<div class="section-title" style="margin-top:4px">Employee Attendance</div>';
+  html += '<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">' + deptFilter;
+  html += '<input type="text" id="attEmpSearch" oninput="filterAttEmpList()" placeholder="Search employee..." style="flex:1;min-width:120px;padding:6px 10px;border:1px solid var(--gray-200);border-radius:var(--radius);font-size:.78rem">';
+  html += '</div>';
+  html += '<div id="attEmpListArea" class="card fade-in" style="max-height:260px;overflow-y:auto"></div>';
+  html += '<div id="attEmpCalendarArea" style="margin-top:12px"></div>';
+  container.innerHTML = html;
+  filterAttEmpList();
+}
+
+function filterAttEmpList() {
+  var dept = (document.getElementById('attDeptFilter') || {}).value || '';
+  var search = ((document.getElementById('attEmpSearch') || {}).value || '').toLowerCase();
+  var filtered = EMPLOYEES.filter(function(e) {
+    if (e.status === 'Inactive') return false;
+    if (dept && e.dept !== dept) return false;
+    if (search && e.name.toLowerCase().indexOf(search) === -1 && e.code.toLowerCase().indexOf(search) === -1) return false;
+    return true;
+  });
+  var area = document.getElementById('attEmpListArea');
+  if (!area) return;
+  if (filtered.length === 0) { area.innerHTML = '<div style="text-align:center;padding:16px;color:var(--gray-400);font-size:.78rem">No employees found</div>'; return; }
+  area.innerHTML = filtered.map(function(e) {
+    var init = e.name.split(' ').map(function(w){return w[0];}).join('').substring(0,2).toUpperCase();
+    var sel = _hrAttSelectedEmp === e.code ? ' style="background:var(--primary-50);border-left:3px solid var(--primary)"' : '';
+    return '<div class="request-item" onclick="selectAttEmployee(\'' + escapeAttr(e.code) + '\')"' + sel + '><div class="req-icon" style="background:var(--primary-50);color:var(--primary);font-size:.65rem;font-weight:700;width:28px;height:28px;min-width:28px;border-radius:8px;display:flex;align-items:center;justify-content:center">' + escapeHTML(init) + '</div><div class="req-info"><h4 style="font-size:.78rem">' + escapeHTML(e.name) + '</h4><p style="font-size:.65rem">' + escapeHTML(e.code) + ' &middot; ' + escapeHTML(e.dept) + '</p></div></div>';
+  }).join('');
+}
+
+function selectAttEmployee(empCode) {
+  _hrAttSelectedEmp = empCode;
+  filterAttEmpList();
+  var emp = EMPLOYEES.find(function(e) { return e.code === empCode; });
+  if (!emp) return;
+  var area = document.getElementById('attEmpCalendarArea');
+  if (!area) return;
+  var now = new Date();
+  var daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  var firstDayOfWeek = new Date(now.getFullYear(), now.getMonth(), 1).getDay();
+  var todayDate = now.getDate();
+  // Seeded attendance for this employee
+  var seed = 0;
+  for (var i = 0; i < empCode.length; i++) seed += empCode.charCodeAt(i);
+  var att = {};
+  var presentCount = 0, absentCount = 0, leaveCount = 0, halfCount = 0;
+  for (var d = 1; d <= Math.min(daysInMonth, todayDate); d++) {
+    var dow = new Date(now.getFullYear(), now.getMonth(), d).getDay();
+    if (dow === 0) { att[d] = 'holiday'; continue; }
+    var h = ((seed * 31 + d * 17) % 100);
+    if (h < 65) { att[d] = 'present'; presentCount++; }
+    else if (h < 75) { att[d] = 'absent'; absentCount++; }
+    else if (h < 85) { att[d] = 'half'; halfCount++; }
+    else if (h < 92) { att[d] = 'leave'; leaveCount++; }
+    else { att[d] = 'holiday'; }
+  }
+  var html = '<div class="card fade-in" style="margin-bottom:10px"><h4 style="font-size:.82rem;margin-bottom:8px">' + escapeHTML(emp.name) + ' — ' + escapeHTML(emp.dept) + '</h4>';
+  html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px">';
+  html += '<div class="summary-card" style="padding:8px;text-align:center"><div style="font-size:1.1rem;font-weight:700;color:var(--success)">' + presentCount + '</div><div style="font-size:.65rem;color:var(--gray-500)">Present</div></div>';
+  html += '<div class="summary-card" style="padding:8px;text-align:center"><div style="font-size:1.1rem;font-weight:700;color:var(--danger)">' + absentCount + '</div><div style="font-size:.65rem;color:var(--gray-500)">Absent</div></div>';
+  html += '<div class="summary-card" style="padding:8px;text-align:center"><div style="font-size:1.1rem;font-weight:700;color:var(--warning)">' + halfCount + '</div><div style="font-size:.65rem;color:var(--gray-500)">Half Day</div></div>';
+  html += '<div class="summary-card" style="padding:8px;text-align:center"><div style="font-size:1.1rem;font-weight:700;color:var(--primary)">' + leaveCount + '</div><div style="font-size:.65rem;color:var(--gray-500)">Leave</div></div>';
+  html += '</div>';
+  // Calendar
+  html += '<div class="cal-days" style="grid-template-columns:repeat(7,1fr);display:grid;gap:2px">';
+  ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(function(dn) { html += '<div class="cal-day-label">' + dn + '</div>'; });
+  for (var e2 = 0; e2 < firstDayOfWeek; e2++) html += '<div class="cal-day"></div>';
+  var badgeMap = {present:{label:'P',cls:'cal-badge-present'},absent:{label:'A',cls:'cal-badge-absent'},holiday:{label:'H',cls:'cal-badge-holiday'},half:{label:'\u00BD',cls:'cal-badge-half'},leave:{label:'L',cls:'cal-badge-leave'}};
+  for (var d2 = 1; d2 <= daysInMonth; d2++) {
+    var isToday = d2 === todayDate;
+    var st = d2 <= todayDate ? att[d2] || '' : '';
+    var badge = st && badgeMap[st] ? '<span class="cal-status-badge ' + badgeMap[st].cls + '">' + badgeMap[st].label + '</span>' : '';
+    html += '<div class="cal-day' + (isToday ? ' today' : '') + '">' + d2 + badge + '</div>';
+  }
+  html += '</div></div>';
+  area.innerHTML = html;
+}
+
+// =====================================================
+// CHANGE 2: EMPLOYEE LEAVE REQUEST — HR→MD DUAL APPROVAL
+// =====================================================
+var _leavesOriginalHTML = '';
+function renderLeaveScreenForMode() {
+  if (!currentUser) return;
+  var container = document.getElementById('screen-leaves');
+  if (!container) return;
+  // Save original HTML on first call
+  if (!_leavesOriginalHTML && container.querySelector('#leaveBalanceGrid')) {
+    _leavesOriginalHTML = container.innerHTML;
+  }
+  // HR "Employee Leave Req" mode
+  if (currentUser.role === 'HR' && _activeNavId === 'hr-att-leavereq') {
+    renderHRLeaveRequests();
+    return;
+  }
+  // Default — restore original HTML if it was replaced
+  if (_leavesOriginalHTML && !container.querySelector('#leaveBalanceGrid')) {
+    container.innerHTML = _leavesOriginalHTML;
+  }
+  renderLeaveScreen();
+}
+
+function renderHRLeaveRequests() {
+  var container = document.getElementById('screen-leaves');
+  if (!container) return;
+  var pending = leaveApplications.filter(function(a) { return a.status === 'pending'; });
+  var hrAccepted = leaveApplications.filter(function(a) { return a.status === 'hr_accepted'; });
+  var others = leaveApplications.filter(function(a) { return a.status !== 'pending' && a.status !== 'hr_accepted'; });
+  var html = '<div class="section-title" style="margin-top:4px">Employee Leave Requests</div>';
+  // 3-step legend
+  html += '<div style="display:flex;gap:4px;margin-bottom:12px;font-size:.7rem;align-items:center;flex-wrap:wrap">';
+  html += '<span style="padding:3px 8px;background:var(--warning-light);color:var(--warning-dark);border-radius:10px">1. Pending</span>';
+  html += '<span style="color:var(--gray-400)">\u2192</span>';
+  html += '<span style="padding:3px 8px;background:#DBEAFE;color:#1D4ED8;border-radius:10px">2. HR Accepted</span>';
+  html += '<span style="color:var(--gray-400)">\u2192</span>';
+  html += '<span style="padding:3px 8px;background:var(--success-light);color:var(--success-dark);border-radius:10px">3. MD Confirmed</span>';
+  html += '</div>';
+  if (pending.length > 0) {
+    html += '<div class="section-title" style="font-size:.75rem;color:var(--warning-dark)">Pending (' + pending.length + ')</div>';
+    pending.forEach(function(a) {
+      var fromD = new Date(a.from).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
+      var toD = new Date(a.to).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
+      html += '<div class="request-item" style="flex-wrap:wrap"><div class="req-icon" style="background:#FCE7F3;color:#DB2777"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><div class="req-info"><h4>' + escapeHTML(a.empName) + ' — ' + escapeHTML(a.type) + ' Leave</h4><p>' + escapeHTML(a.dept) + ' &middot; ' + fromD + ' — ' + toD + ' &middot; ' + a.days + ' day(s)</p><p style="font-size:.65rem;color:var(--gray-500);margin-top:2px">' + escapeHTML(a.reason) + '</p></div><div class="leave-action-btns" style="width:100%;margin-top:8px"><button style="background:#DBEAFE;color:#1D4ED8" onclick="hrAcceptLeave(' + a.id + ')">Accept</button><button style="background:var(--danger-light);color:var(--danger-dark)" onclick="rejectLeave(' + a.id + ')">Reject</button></div></div>';
+    });
+  }
+  if (hrAccepted.length > 0) {
+    html += '<div class="section-title" style="font-size:.75rem;color:#1D4ED8;margin-top:12px">HR Accepted — Awaiting MD (' + hrAccepted.length + ')</div>';
+    hrAccepted.forEach(function(a) {
+      var fromD = new Date(a.from).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
+      var toD = new Date(a.to).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
+      html += '<div class="request-item"><div class="req-icon" style="background:#DBEAFE;color:#1D4ED8"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/></svg></div><div class="req-info"><h4>' + escapeHTML(a.empName) + ' — ' + escapeHTML(a.type) + '</h4><p>' + escapeHTML(a.dept) + ' &middot; ' + fromD + ' — ' + toD + ' &middot; ' + a.days + ' day(s)</p></div><span class="badge-status" style="background:#DBEAFE;color:#1D4ED8">HR Accepted</span></div>';
+    });
+  }
+  if (others.length > 0) {
+    html += '<div class="section-title" style="font-size:.75rem;color:var(--gray-500);margin-top:12px">Resolved</div>';
+    others.slice(0, 15).forEach(function(a) {
+      var badgeCls = a.status === 'approved' ? 'badge-approved' : 'badge-rejected';
+      var fromD = new Date(a.from).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
+      var toD = new Date(a.to).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
+      html += '<div class="request-item"><div class="req-icon" style="background:#D1FAE5;color:#059669"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><div class="req-info"><h4>' + escapeHTML(a.empName) + ' — ' + escapeHTML(a.type) + '</h4><p>' + escapeHTML(a.dept) + ' &middot; ' + fromD + ' — ' + toD + '</p></div><div class="req-meta"><span class="badge-status ' + badgeCls + '">' + escapeHTML(a.status) + '</span></div></div>';
+    });
+  }
+  if (!pending.length && !hrAccepted.length && !others.length) {
+    html += '<div style="text-align:center;padding:24px;color:var(--gray-400);font-size:.78rem">No leave applications</div>';
+  }
+  container.innerHTML = html;
+}
+
+async function hrAcceptLeave(id) {
+  try {
+    var app = leaveApplications.find(function(a) { return a.id === id; });
+    if (!app) return;
+    await apiCall('PATCH', '/leaves/' + id + '/hr-accept');
+    app.status = 'hr_accepted';
+    showToast('Leave accepted — forwarded to MD for confirmation');
+    addNotification('Leave Accepted by HR', app.empName + '\'s ' + app.type + ' leave accepted by HR, awaiting MD', 'leave');
+    renderHRLeaveRequests();
+  } catch (err) { showToast(err.message || 'Error accepting leave'); }
+}
+
+// =====================================================
+// CHANGE 3: ADVANCE DUAL APPROVAL (HR Accept → MD Confirm)
+// =====================================================
+function getAdvanceStatusBadge(status) {
+  if (status === 'hr_accepted') return '<span class="badge-status" style="background:#DBEAFE;color:#1D4ED8">HR Accepted</span>';
+  if (status === 'approved') return '<span class="badge-status badge-approved">Approved</span>';
+  if (status === 'rejected') return '<span class="badge-status badge-rejected">Rejected</span>';
+  return '<span class="badge-status badge-pending">Pending</span>';
+}
+
+function getAdvanceStepIndicator(status) {
+  var steps = [
+    {label:'Pending', active: true, done: status !== 'pending'},
+    {label:'HR Accepted', active: status === 'hr_accepted' || status === 'approved', done: status === 'approved'},
+    {label:'MD Confirmed', active: status === 'approved', done: false}
+  ];
+  if (status === 'rejected') return '<div style="font-size:.65rem;color:var(--danger);margin-top:4px">Rejected</div>';
+  var html = '<div style="display:flex;gap:2px;margin-top:6px;font-size:.6rem;align-items:center">';
+  steps.forEach(function(s, i) {
+    var bg = s.done ? 'var(--success)' : s.active ? 'var(--primary)' : 'var(--gray-200)';
+    var color = s.done || s.active ? '#fff' : 'var(--gray-500)';
+    html += '<span style="padding:2px 6px;border-radius:8px;background:' + bg + ';color:' + color + '">' + s.label + '</span>';
+    if (i < 2) html += '<span style="color:var(--gray-300)">\u2192</span>';
+  });
+  html += '</div>';
+  return html;
+}
+
+// =====================================================
+// CHANGE 6: INLINE ORG CHART
+// =====================================================
+function renderInlineOrgChart() {
+  var container = document.getElementById('screen-orgchart');
+  if (!container) return;
+  var isMDorHR = currentUser && (currentUser.role === 'MD' || currentUser.role === 'HR');
+  if (orgExpandedNodes.size === 0) initOrgExpanded();
+  var roots = getOrgRoots();
+
+  var html = '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px;margin-bottom:12px"><div class="section-title" style="margin:0">Organization Chart</div>';
+  if (isMDorHR) {
+    html += '<button class="nf-btn nf-btn-sm" style="font-size:.72rem" onclick="toggleOrgEditMode();renderInlineOrgChart()">' + (orgEditModeActive ? 'Done Editing' : 'Edit') + '</button>';
+  }
+  html += '</div>';
+  if (roots.length === 0) { html += '<div class="nf-empty">Unable to build org chart</div>'; container.innerHTML = html; return; }
+  if (orgEditModeActive) {
+    html += '<div class="org-edit-banner">Drag employees to reassign reporting. Tap a node for details.</div>';
+  }
+  html += '<div class="org-tree" style="overflow-x:auto">';
+  roots.forEach(function(root) {
+    var tree = buildOrgTree(root);
+    if (tree) html += renderOrgNode(tree, 0);
+  });
+  html += '</div>';
+  container.innerHTML = html;
+  // Re-wire org events for inline version
+  wireOrgEvents();
+}
+
+// =====================================================
+// CHANGE 7: SALARY — EMPLOYEE LIST VIEW
+// =====================================================
+function renderSalaryView() {
+  if (!currentUser) return;
+  var isHR = currentUser.role === 'HR';
+  // HR "Employee List" mode — show all employees salary table
+  if (isHR && _activeNavId === 'hr-sal-list') {
+    renderEmployeeSalaryList();
+    return;
+  }
+  // Default: render own salary (existing behavior)
+  updateSalaryScreen();
+}
+
+function renderEmployeeSalaryList() {
+  var container = document.getElementById('salaryContent');
+  if (!container) return;
+  var html = '<div class="section-title" style="margin-top:4px">Employee Salary Structure</div>';
+  html += '<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">';
+  html += '<select id="salDeptFilter" onchange="renderEmpSalaryTable()" style="padding:6px 10px;border:1px solid var(--gray-200);border-radius:var(--radius);font-size:.78rem"><option value="">All Departments</option>';
+  var depts = [];
+  EMPLOYEES.forEach(function(e) { if (depts.indexOf(e.dept) === -1) depts.push(e.dept); });
+  depts.forEach(function(d) { html += '<option value="' + escapeAttr(d) + '">' + escapeHTML(d) + '</option>'; });
+  html += '</select>';
+  html += '<input type="text" id="salEmpSearch" oninput="renderEmpSalaryTable()" placeholder="Search by name/code..." style="flex:1;min-width:120px;padding:6px 10px;border:1px solid var(--gray-200);border-radius:var(--radius);font-size:.78rem">';
+  html += '</div>';
+  html += '<div id="empSalaryTableArea"></div>';
+  container.innerHTML = html;
+  renderEmpSalaryTable();
+}
+
+function renderEmpSalaryTable() {
+  var dept = (document.getElementById('salDeptFilter') || {}).value || '';
+  var search = ((document.getElementById('salEmpSearch') || {}).value || '').toLowerCase();
+  var filtered = EMPLOYEES.filter(function(e) {
+    if (e.status === 'Inactive') return false;
+    if (dept && e.dept !== dept) return false;
+    if (search && e.name.toLowerCase().indexOf(search) === -1 && e.code.toLowerCase().indexOf(search) === -1) return false;
+    return true;
+  });
+  var area = document.getElementById('empSalaryTableArea');
+  if (!area) return;
+  if (filtered.length === 0) { area.innerHTML = '<div style="text-align:center;padding:16px;color:var(--gray-400);font-size:.78rem">No employees found</div>'; return; }
+  var totalSalary = 0;
+  var html = '<div class="card fade-in" style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.72rem">';
+  html += '<thead><tr style="background:var(--gray-50);text-align:left"><th style="padding:8px 6px">Name</th><th style="padding:8px 6px">Code</th><th style="padding:8px 6px">Dept</th><th style="padding:8px 6px">Designation</th><th style="padding:8px 6px;text-align:right">Salary</th><th style="padding:8px 6px">Bank</th></tr></thead><tbody>';
+  filtered.forEach(function(e) {
+    totalSalary += e.salary;
+    var basic = Math.round(e.salary * 0.5);
+    var hra = Math.round(e.salary * 0.2);
+    var da = Math.round(e.salary * 0.15);
+    var other = e.salary - basic - hra - da;
+    html += '<tr style="border-bottom:1px solid var(--gray-100);cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'table-row\':\'none\'">';
+    html += '<td style="padding:8px 6px;font-weight:600">' + escapeHTML(e.name) + '</td>';
+    html += '<td style="padding:8px 6px;color:var(--gray-500)">' + escapeHTML(e.code) + '</td>';
+    html += '<td style="padding:8px 6px">' + escapeHTML(e.dept) + '</td>';
+    html += '<td style="padding:8px 6px">' + escapeHTML(e.designation) + '</td>';
+    html += '<td style="padding:8px 6px;text-align:right;font-weight:600">Rs.' + e.salary.toLocaleString('en-IN') + '</td>';
+    html += '<td style="padding:8px 6px;font-size:.65rem">' + escapeHTML(e.bank || '') + '</td>';
+    html += '</tr>';
+    // Expandable salary breakdown row
+    html += '<tr style="display:none;background:var(--gray-50)"><td colspan="6" style="padding:6px 12px;font-size:.68rem">';
+    html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px">';
+    html += '<div><strong>Basic:</strong> Rs.' + basic.toLocaleString('en-IN') + '</div>';
+    html += '<div><strong>HRA:</strong> Rs.' + hra.toLocaleString('en-IN') + '</div>';
+    html += '<div><strong>DA:</strong> Rs.' + da.toLocaleString('en-IN') + '</div>';
+    html += '<div><strong>Other:</strong> Rs.' + other.toLocaleString('en-IN') + '</div>';
+    html += '</div>';
+    html += '<div style="margin-top:4px;color:var(--gray-500)">A/c: ' + escapeHTML(e.accNo || 'N/A') + '</div>';
+    html += '</td></tr>';
+  });
+  html += '</tbody></table></div>';
+  html += '<div class="card" style="margin-top:8px;padding:10px;display:flex;justify-content:space-between;font-size:.78rem"><span>Total Employees: <strong>' + filtered.length + '</strong></span><span>Total Monthly Payroll: <strong>Rs.' + totalSalary.toLocaleString('en-IN') + '</strong></span></div>';
+  area.innerHTML = html;
+}
+
+// =====================================================
+// CHANGE 8: TAX — FORM 16B, FORM 12B, TAX CALCULATOR
+// =====================================================
+var currentTaxEmpCode = null;
+function switchTaxTab(tab) {
+  currentTaxTab = tab;
+  document.querySelectorAll('#taxTabs .tax-tab').forEach(function(t) { t.classList.remove('active'); });
+  var tabMap = {declaration:1,summary:2,form16:3,form16b:4,form12b:5,calculator:6};
+  var idx = tabMap[tab] || 1;
+  var tabs = document.querySelectorAll('#taxTabs .tax-tab');
+  if (tabs[idx-1]) tabs[idx-1].classList.add('active');
+  renderTaxOverlayExtended();
+}
+
+function renderTaxOverlayExtended() {
+  var c = document.getElementById('taxContent');
+  if (!c || !currentUser) return;
+  var isMDorHR = currentUser.role === 'MD' || currentUser.role === 'HR';
+  var empCode = (isMDorHR && currentTaxEmpCode) ? currentTaxEmpCode : currentUser.code;
+  var dec = taxDeclarations[empCode] || {};
+  var emp = EMPLOYEES.find(function(e) { return e.code === empCode; }) || currentUser;
+  var html = '';
+
+  // Employee selector for HR/MD
+  if (isMDorHR) {
+    html += '<div style="margin-bottom:12px;display:flex;gap:8px;align-items:center"><label style="font-size:.75rem;font-weight:600;white-space:nowrap">Employee:</label>';
+    html += '<select id="taxEmpSelector" onchange="currentTaxEmpCode=this.value;renderTaxOverlayExtended()" style="flex:1;padding:6px 10px;border:1px solid var(--gray-200);border-radius:var(--radius);font-size:.78rem">';
+    html += '<option value="' + escapeAttr(currentUser.code) + '">Self (' + escapeHTML(currentUser.name) + ')</option>';
+    EMPLOYEES.forEach(function(e) {
+      if (e.code === currentUser.code) return;
+      html += '<option value="' + escapeAttr(e.code) + '"' + (empCode === e.code ? ' selected' : '') + '>' + escapeHTML(e.name) + ' (' + escapeHTML(e.code) + ')</option>';
+    });
+    html += '</select></div>';
+  }
+
+  if (currentTaxTab === 'declaration') {
+    html += '<div class="card"><div class="nf-section-title">IT Declaration FY 2025-26</div>';
+    html += '<div class="ss-form-group"><label>Section 80C (Max Rs.1,50,000)</label><input type="number" class="tax-input" id="tax80C" value="' + (dec.sec80C||'') + '" placeholder="PPF, LIC, ELSS, etc."></div>';
+    html += '<div class="ss-form-group"><label>Section 80D — Medical Insurance (Max Rs.25,000)</label><input type="number" class="tax-input" id="tax80D" value="' + (dec.sec80D||'') + '" placeholder="Health insurance premium"></div>';
+    html += '<div class="ss-form-group"><label>HRA Exemption</label><input type="number" class="tax-input" id="taxHRA" value="' + (dec.hra||'') + '" placeholder="Monthly rent paid"></div>';
+    html += '<div class="ss-form-group"><label>Home Loan Interest (Sec 24)</label><input type="number" class="tax-input" id="taxHomeLoan" value="' + (dec.homeLoan||'') + '" placeholder="Annual interest"></div>';
+    html += '<button class="nf-btn nf-btn-primary" onclick="submitTaxDeclaration()">Submit Declaration</button>';
+    if (dec.submittedOn) html += '<div style="font-size:.72rem;color:var(--success);margin-top:8px">Last submitted: ' + dec.submittedOn + '</div>';
+    html += '</div>';
+  } else if (currentTaxTab === 'summary') {
+    var tax = calculateTaxLiability(empCode);
+    html += '<div class="card"><div class="nf-section-title">Tax Computation Summary</div>';
+    if (tax) {
+      var rows = [['Annual Gross Salary', tax.annualGross],['(-) Standard Deduction', tax.stdDeduction],['(-) Section 80C', tax.sec80C],['(-) Section 80D', tax.sec80D],['(-) HRA Exemption', tax.hra],['Total Deductions', tax.totalDeductions],['Taxable Income', tax.taxableIncome],['Income Tax', tax.tax],['Cess (4%)', tax.cess]];
+      rows.forEach(function(r) { html += '<div class="tax-summary-row"><span>' + r[0] + '</span><span>Rs.' + r[1].toLocaleString('en-IN') + '</span></div>'; });
+      html += '<div class="tax-summary-row total"><span>Total Tax Liability</span><span>Rs.' + tax.totalTax.toLocaleString('en-IN') + '</span></div>';
+      html += '<div style="margin-top:8px;font-size:.78rem;color:var(--gray-500)">Monthly TDS: Rs.' + tax.monthlyTds.toLocaleString('en-IN') + '</div>';
+    } else { html += '<div class="nf-empty">Unable to compute tax</div>'; }
+    html += '</div>';
+  } else if (currentTaxTab === 'form16') {
+    html += '<div class="card" style="text-align:center;padding:24px"><div class="nf-section-title">Form 16 — AY 2026-27</div>';
+    html += '<p style="font-size:.82rem;color:var(--gray-500);margin-bottom:12px">Download Form 16 certificate for Assessment Year 2026-27</p>';
+    html += '<button class="nf-btn nf-btn-primary" onclick="generateForm16PDF()">Download Form 16 PDF</button></div>';
+  } else if (currentTaxTab === 'form16b') {
+    html += '<div class="card"><div class="nf-section-title">Form 16B — TDS on Property (Sec 194-IA)</div>';
+    html += '<p style="font-size:.78rem;color:var(--gray-500);margin-bottom:12px">TDS certificate for property purchase exceeding Rs.50 Lakhs</p>';
+    html += '<div class="ss-form-group"><label>Buyer Name</label><input type="text" id="f16bBuyer" value="' + escapeAttr(emp.name) + '" placeholder="Buyer full name"></div>';
+    html += '<div class="ss-form-group"><label>Buyer PAN</label><input type="text" id="f16bBuyerPan" value="' + escapeAttr(emp.pan || '') + '" placeholder="PAN number" maxlength="10"></div>';
+    html += '<div class="ss-form-group"><label>Seller Name</label><input type="text" id="f16bSeller" placeholder="Seller full name"></div>';
+    html += '<div class="ss-form-group"><label>Seller PAN</label><input type="text" id="f16bSellerPan" placeholder="Seller PAN" maxlength="10"></div>';
+    html += '<div class="ss-form-group"><label>Property Value (Rs.)</label><input type="number" id="f16bPropertyVal" placeholder="e.g. 7500000"></div>';
+    html += '<div id="f16bTdsCalc" style="margin:8px 0;font-size:.78rem;color:var(--primary)"></div>';
+    html += '<button class="nf-btn nf-btn-primary" onclick="calcForm16BTDS()">Calculate TDS</button>';
+    html += '</div>';
+  } else if (currentTaxTab === 'form12b') {
+    html += '<div class="card"><div class="nf-section-title">Form 12B — Previous Employer Declaration</div>';
+    html += '<p style="font-size:.78rem;color:var(--gray-500);margin-bottom:12px">Declare income from previous employer for current FY</p>';
+    html += '<div class="ss-form-group"><label>Previous Employer Name</label><input type="text" id="f12bPrevEmp" value="' + escapeAttr(dec.prevEmployer || '') + '" placeholder="Company name"></div>';
+    html += '<div class="ss-form-group"><label>Period of Employment</label><div style="display:flex;gap:8px"><input type="date" id="f12bFrom" value="' + escapeAttr(dec.prevFrom || '') + '" style="flex:1"><input type="date" id="f12bTo" value="' + escapeAttr(dec.prevTo || '') + '" style="flex:1"></div></div>';
+    html += '<div class="ss-form-group"><label>Gross Salary from Previous Employer (Rs.)</label><input type="number" id="f12bGross" value="' + (dec.prevGross || '') + '" placeholder="Total gross salary"></div>';
+    html += '<div class="ss-form-group"><label>TDS Deducted by Previous Employer (Rs.)</label><input type="number" id="f12bTds" value="' + (dec.prevTds || '') + '" placeholder="TDS amount"></div>';
+    html += '<button class="nf-btn nf-btn-primary" onclick="submitForm12B()">Save Declaration</button>';
+    if (dec.form12bSubmitted) html += '<div style="font-size:.72rem;color:var(--success);margin-top:8px">Saved on: ' + dec.form12bSubmitted + '</div>';
+    html += '</div>';
+  } else if (currentTaxTab === 'calculator') {
+    html += '<div class="card"><div class="nf-section-title">Income Tax Calculator</div>';
+    html += '<div class="ss-form-group"><label>Annual Gross Salary (Rs.)</label><input type="number" id="taxCalcGross" value="' + ((emp.salary || 0) * 12) + '" placeholder="Annual gross salary"></div>';
+    html += '<div class="ss-form-group"><label>80C Deductions (Rs.)</label><input type="number" id="taxCalc80C" value="0" placeholder="PPF, LIC, ELSS, etc."></div>';
+    html += '<div class="ss-form-group"><label>80D Deductions (Rs.)</label><input type="number" id="taxCalc80D" value="0" placeholder="Health insurance"></div>';
+    html += '<button class="nf-btn nf-btn-primary" onclick="runTaxCalculator()" style="margin-bottom:12px">Calculate Tax</button>';
+    html += '<div id="taxCalcResult"></div></div>';
+  }
+  c.innerHTML = html;
+}
+
+function calcForm16BTDS() {
+  var val = parseInt((document.getElementById('f16bPropertyVal') || {}).value, 10) || 0;
+  var el = document.getElementById('f16bTdsCalc');
+  if (!el) return;
+  if (val <= 5000000) { el.innerHTML = '<span style="color:var(--success)">No TDS applicable — property value is Rs.50 Lakhs or below</span>'; return; }
+  var tds = Math.round(val * 0.01);
+  el.innerHTML = '<strong>TDS @1%:</strong> Rs.' + tds.toLocaleString('en-IN') + '<br><span style="font-size:.7rem;color:var(--gray-500)">Applicable under Section 194-IA for property value exceeding Rs.50 Lakhs</span>';
+}
+
+function submitForm12B() {
+  var empCode = (currentUser.role === 'MD' || currentUser.role === 'HR') && currentTaxEmpCode ? currentTaxEmpCode : currentUser.code;
+  var dec = taxDeclarations[empCode] || {};
+  dec.prevEmployer = (document.getElementById('f12bPrevEmp') || {}).value || '';
+  dec.prevFrom = (document.getElementById('f12bFrom') || {}).value || '';
+  dec.prevTo = (document.getElementById('f12bTo') || {}).value || '';
+  dec.prevGross = parseInt((document.getElementById('f12bGross') || {}).value, 10) || 0;
+  dec.prevTds = parseInt((document.getElementById('f12bTds') || {}).value, 10) || 0;
+  dec.form12bSubmitted = new Date().toISOString().split('T')[0];
+  taxDeclarations[empCode] = dec;
+  saveLocalOnlyData();
+  showToast('Form 12B declaration saved');
+  renderTaxOverlayExtended();
+}
+
+function runTaxCalculator() {
+  var gross = parseInt((document.getElementById('taxCalcGross') || {}).value, 10) || 0;
+  var d80c = Math.min(parseInt((document.getElementById('taxCalc80C') || {}).value, 10) || 0, 150000);
+  var d80d = Math.min(parseInt((document.getElementById('taxCalc80D') || {}).value, 10) || 0, 25000);
+  var stdDed = 50000;
+  var totalDed = stdDed + d80c + d80d;
+  var taxable = Math.max(0, gross - totalDed);
+  // Old regime calculation
+  var oldTax = 0;
+  TAX_SLABS_OLD.forEach(function(s) {
+    if (taxable > s.min) { oldTax += Math.min(taxable, s.max === Infinity ? taxable : s.max) * s.rate / 100 - s.min * s.rate / 100; }
+  });
+  var oldCess = Math.round(oldTax * 0.04);
+  var oldTotal = Math.round(oldTax + oldCess);
+  // New regime (simplified)
+  var newSlabs = [{min:0,max:300000,rate:0},{min:300000,max:700000,rate:5},{min:700000,max:1000000,rate:10},{min:1000000,max:1200000,rate:15},{min:1200000,max:1500000,rate:20},{min:1500000,max:Infinity,rate:30}];
+  var newTaxable = Math.max(0, gross - 75000);
+  var newTax = 0;
+  newSlabs.forEach(function(s) {
+    if (newTaxable > s.min) {
+      var upper = s.max === Infinity ? newTaxable : Math.min(newTaxable, s.max);
+      newTax += (upper - s.min) * s.rate / 100;
+    }
+  });
+  var newCess = Math.round(newTax * 0.04);
+  var newTotal = Math.round(newTax + newCess);
+  var el = document.getElementById('taxCalcResult');
+  if (!el) return;
+  var better = oldTotal <= newTotal ? 'Old' : 'New';
+  el.innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
+    '<div class="card" style="padding:12px;text-align:center' + (better === 'Old' ? ';border:2px solid var(--success)' : '') + '"><div style="font-size:.72rem;font-weight:700;margin-bottom:4px">Old Regime</div><div style="font-size:.68rem;color:var(--gray-500)">Taxable: Rs.' + taxable.toLocaleString('en-IN') + '</div><div style="font-size:1rem;font-weight:700;color:var(--primary);margin:4px 0">Rs.' + oldTotal.toLocaleString('en-IN') + '</div><div style="font-size:.6rem;color:var(--gray-400)">Tax: ' + Math.round(oldTax).toLocaleString('en-IN') + ' + Cess: ' + oldCess.toLocaleString('en-IN') + '</div></div>' +
+    '<div class="card" style="padding:12px;text-align:center' + (better === 'New' ? ';border:2px solid var(--success)' : '') + '"><div style="font-size:.72rem;font-weight:700;margin-bottom:4px">New Regime</div><div style="font-size:.68rem;color:var(--gray-500)">Taxable: Rs.' + newTaxable.toLocaleString('en-IN') + '</div><div style="font-size:1rem;font-weight:700;color:var(--primary);margin:4px 0">Rs.' + newTotal.toLocaleString('en-IN') + '</div><div style="font-size:.6rem;color:var(--gray-400)">Tax: ' + Math.round(newTax).toLocaleString('en-IN') + ' + Cess: ' + newCess.toLocaleString('en-IN') + '</div></div>' +
+    '</div><div style="text-align:center;margin-top:8px;font-size:.75rem;color:var(--success);font-weight:600">' + better + ' Regime saves Rs.' + Math.abs(oldTotal - newTotal).toLocaleString('en-IN') + '</div>';
 }
 
 // =====================================================

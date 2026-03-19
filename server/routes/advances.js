@@ -54,12 +54,29 @@ router.post('/', verifyToken, [
   }
 });
 
-// PATCH /api/advances/:id/approve
+// PATCH /api/advances/:id/hr-accept — HR accepts (Pending → HR_Accepted)
+router.patch('/:id/hr-accept', verifyToken, requireRole('HR'), auditLog('hr-accept', 'advance'), async (req, res) => {
+  try {
+    const [existing] = await pool.query('SELECT status FROM advance_requests WHERE id = ?', [req.params.id]);
+    if (existing.length === 0) return res.status(404).json({ error: 'Advance request not found' });
+    if (existing[0].status !== 'Pending') return res.status(400).json({ error: `Cannot accept: status is ${existing[0].status}` });
+    await pool.query(
+      'UPDATE advance_requests SET status = "HR_Accepted", reviewed_by = ?, review_date = CURDATE() WHERE id = ?',
+      [req.user.empCode, req.params.id]
+    );
+    res.json({ message: 'Advance accepted by HR' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PATCH /api/advances/:id/approve — MD approves (from Pending or HR_Accepted)
 router.patch('/:id/approve', verifyToken, requireRole('MD', 'HR'), auditLog('approve', 'advance'), async (req, res) => {
   try {
     const [existing] = await pool.query('SELECT status FROM advance_requests WHERE id = ?', [req.params.id]);
     if (existing.length === 0) return res.status(404).json({ error: 'Advance request not found' });
-    if (existing[0].status !== 'Pending') return res.status(400).json({ error: `Cannot approve: status is ${existing[0].status}` });
+    if (existing[0].status !== 'Pending' && existing[0].status !== 'HR_Accepted') return res.status(400).json({ error: `Cannot approve: status is ${existing[0].status}` });
     await pool.query(
       'UPDATE advance_requests SET status = "Approved", reviewed_by = ?, review_date = CURDATE() WHERE id = ?',
       [req.user.empCode, req.params.id]
@@ -71,12 +88,12 @@ router.patch('/:id/approve', verifyToken, requireRole('MD', 'HR'), auditLog('app
   }
 });
 
-// PATCH /api/advances/:id/reject
+// PATCH /api/advances/:id/reject — can reject Pending or HR_Accepted
 router.patch('/:id/reject', verifyToken, requireRole('MD', 'HR'), auditLog('reject', 'advance'), async (req, res) => {
   try {
     const [existing] = await pool.query('SELECT status FROM advance_requests WHERE id = ?', [req.params.id]);
     if (existing.length === 0) return res.status(404).json({ error: 'Advance request not found' });
-    if (existing[0].status !== 'Pending') return res.status(400).json({ error: `Cannot reject: status is ${existing[0].status}` });
+    if (existing[0].status !== 'Pending' && existing[0].status !== 'HR_Accepted') return res.status(400).json({ error: `Cannot reject: status is ${existing[0].status}` });
     const { reason } = req.body;
     await pool.query(
       'UPDATE advance_requests SET status = "Rejected", reviewed_by = ?, review_date = CURDATE(), reject_reason = ? WHERE id = ?',

@@ -81,7 +81,7 @@ router.patch('/:id/approve', verifyToken, requireRole('MD', 'HR'), auditLog('app
     const [apps] = await pool.query('SELECT * FROM leave_applications WHERE id = ?', [req.params.id]);
     if (apps.length === 0) return res.status(404).json({ error: 'Leave application not found' });
     const app = apps[0];
-    if (app.status !== 'pending') return res.status(400).json({ error: 'Leave already ' + app.status });
+    if (app.status !== 'pending' && app.status !== 'hr_accepted') return res.status(400).json({ error: 'Leave already ' + app.status });
 
     // Update application
     await pool.query(
@@ -106,12 +106,30 @@ router.patch('/:id/approve', verifyToken, requireRole('MD', 'HR'), auditLog('app
   }
 });
 
-// PATCH /api/leaves/:id/reject — reject leave (MD/HR)
-router.patch('/:id/reject', verifyToken, requireRole('MD', 'HR'), auditLog('reject', 'leave'), async (req, res) => {
+// PATCH /api/leaves/:id/hr-accept — HR accepts leave (pending → hr_accepted)
+router.patch('/:id/hr-accept', verifyToken, requireRole('HR'), auditLog('hr-accept', 'leave'), async (req, res) => {
   try {
     const [apps] = await pool.query('SELECT * FROM leave_applications WHERE id = ?', [req.params.id]);
     if (apps.length === 0) return res.status(404).json({ error: 'Leave application not found' });
     if (apps[0].status !== 'pending') return res.status(400).json({ error: 'Leave already ' + apps[0].status });
+
+    await pool.query(
+      'UPDATE leave_applications SET status = "hr_accepted", reviewed_by = ?, review_date = CURDATE() WHERE id = ?',
+      [req.user.empCode, req.params.id]
+    );
+    res.json({ message: 'Leave accepted by HR' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PATCH /api/leaves/:id/reject — reject leave (MD/HR) — can reject pending or hr_accepted
+router.patch('/:id/reject', verifyToken, requireRole('MD', 'HR'), auditLog('reject', 'leave'), async (req, res) => {
+  try {
+    const [apps] = await pool.query('SELECT * FROM leave_applications WHERE id = ?', [req.params.id]);
+    if (apps.length === 0) return res.status(404).json({ error: 'Leave application not found' });
+    if (apps[0].status !== 'pending' && apps[0].status !== 'hr_accepted') return res.status(400).json({ error: 'Leave already ' + apps[0].status });
 
     await pool.query(
       'UPDATE leave_applications SET status = "rejected", reviewed_by = ?, review_date = CURDATE() WHERE id = ?',
