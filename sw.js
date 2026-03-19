@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hrms-v64';
+const CACHE_NAME = 'hrms-v65';
 const PRECACHE_URLS = [
   './',
   './index.html',
@@ -8,6 +8,10 @@ const PRECACHE_URLS = [
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/apple-touch-icon.png',
+  './assets/hero-construction.png',
+  './assets/hero-mobile.png',
+  './assets/construction-scene.png',
+  './assets/bg-road.jpg',
   'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
   'https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js'
 ];

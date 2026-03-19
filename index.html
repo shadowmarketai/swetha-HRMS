@@ -25,22 +25,29 @@
   <!-- LOGIN SCREEN -->
   <div class="login-screen" id="loginScreen">
     <div class="login-left">
-      <div class="login-logo"><img src="swetha_symbol.png" alt="Swetha Structures" style="width:90px;height:auto;object-fit:contain"></div>
-      <div class="login-title">SWETHA STRUCTURES</div>
-      <div class="login-tagline">Steel Building Specialist</div>
-      <div class="login-subtitle">Employee Management System</div>
+      <div class="login-hero-img"><img src="assets/hero-construction.png" alt="Construction Site"></div>
+      <div class="login-brand">
+        <div class="login-logo"><img src="swetha_symbol.png" alt="Swetha Structures" style="width:80px;height:auto;object-fit:contain"></div>
+        <div class="login-title">SWETHA STRUCTURES</div>
+        <div class="login-tagline">Steel Building Specialist</div>
+      </div>
     </div>
     <div class="login-right">
       <div class="login-form">
-        <div class="login-field"><label>Employee Code / Phone</label><input type="text" id="loginId" placeholder="e.g. MD001, SSC006, SSC011" maxlength="50" autocomplete="username"></div>
-        <div class="login-field"><label>Password</label><div class="pwd-wrapper"><input type="password" id="loginPass" placeholder="Enter password" maxlength="128" autocomplete="current-password"><button type="button" class="pwd-toggle" onclick="togglePwdVisibility('loginPass',this)" aria-label="Show password"><svg class="eye-open" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><svg class="eye-closed" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button></div></div>
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-          <input type="checkbox" id="rememberMe" style="accent-color:white;width:16px;height:16px">
-          <label for="rememberMe" style="font-size:.72rem;opacity:.8;cursor:pointer">Remember me</label>
+        <div class="login-form-header">
+          <div class="login-form-logo"><img src="swetha_symbol.png" alt="SS" style="width:48px;height:48px;object-fit:contain"></div>
+          <h2 class="login-welcome">Welcome Back!</h2>
+          <p class="login-welcome-sub">Sign in to your HRMS account</p>
         </div>
-        <button class="login-btn" id="signInBtn">Sign In</button>
-        <div style="text-align:right;margin-top:4px"><a href="#" id="forgotPwdLink" onclick="showForgotPassword();return false" style="font-size:.7rem;color:rgba(255,255,255,.7);text-decoration:none">Forgot Password?</a></div>
-        <button class="login-btn" id="biometricBtn" style="margin-top:8px;background:transparent;color:white;border:1px solid rgba(255,255,255,.3)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><path d="M12 11c0-1.1.9-2 2-2s2 .9 2 2-2 4-2 4"/><path d="M8 11a4 4 0 0 1 8 0c0 2.5-2 5-4 6.5"/><path d="M6 11a6 6 0 0 1 12 0c0 4-3 7-6 9"/></svg>Biometric Login</button>
+        <div class="login-field"><label>Employee Code / Phone</label><div class="login-input-wrap"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><input type="text" id="loginId" placeholder="e.g. MD001, SSC006" maxlength="50" autocomplete="username"></div></div>
+        <div class="login-field"><label>Password</label><div class="login-input-wrap"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><input type="password" id="loginPass" placeholder="Enter password" maxlength="128" autocomplete="current-password"><button type="button" class="pwd-toggle" onclick="togglePwdVisibility('loginPass',this)" aria-label="Show password"><svg class="eye-open" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><svg class="eye-closed" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button></div></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <label style="display:flex;align-items:center;gap:6px;font-size:.75rem;color:var(--gray-500);cursor:pointer"><input type="checkbox" id="rememberMe" style="accent-color:var(--primary);width:15px;height:15px">Remember me</label>
+          <a href="#" id="forgotPwdLink" onclick="showForgotPassword();return false" style="font-size:.75rem;color:var(--primary);text-decoration:none;font-weight:500">Forgot Password?</a>
+        </div>
+        <button class="login-btn" id="signInBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:6px"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>Sign In</button>
+        <div class="login-divider"><span>OR</span></div>
+        <button class="login-btn login-btn-outline" id="biometricBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px"><path d="M12 11c0-1.1.9-2 2-2s2 .9 2 2-2 4-2 4"/><path d="M8 11a4 4 0 0 1 8 0c0 2.5-2 5-4 6.5"/><path d="M6 11a6 6 0 0 1 12 0c0 4-3 7-6 9"/></svg>Biometric Login</button>
         <div class="login-error" id="loginError"></div>
       </div>
     </div>
@@ -73,15 +80,31 @@
         <div class="time-label" id="timeLabel">Good Morning</div>
         <h1 id="greetingName">Welcome <span class="wave">&#128075;</span></h1>
       </div>
-      <div class="checkin-card fade-in">
-        <div class="checkin-status"><span class="dot"></span> Checked In</div>
-        <div class="checkin-time" id="currentTime">09:12 AM</div>
-        <div class="checkin-date" id="currentDate">Friday, 07 March 2026</div>
-        <div class="checkin-actions">
-          <button class="btn btn-solid-white" id="gpsCheckinBtn" onclick="gpsCheckIn()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Check In</button>
-          <button class="btn btn-white" onclick="gpsCheckOut()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Check Out</button>
+      <div class="checkin-hero fade-in">
+        <div class="checkin-hero-content">
+          <div class="checkin-status"><span class="dot"></span> <span id="checkinStatusText">Checked In</span></div>
+          <div class="checkin-time" id="currentTime">09:12 AM</div>
+          <div class="checkin-date" id="currentDate">Friday, 07 March 2026</div>
+          <div class="checkin-actions">
+            <button class="btn btn-golden" id="gpsCheckinBtn" onclick="gpsCheckIn()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Check In</button>
+            <button class="btn btn-white-outline" onclick="gpsCheckOut()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Check Out</button>
+          </div>
         </div>
+        <div class="checkin-hero-img"><img src="assets/construction-scene.png" alt=""></div>
       </div>
+
+      <div class="section-title" style="display:flex;align-items:center;justify-content:space-between">Quick Actions<a href="#" onclick="switchTab('hr',document.querySelector('[data-tab=hr]'));return false" style="font-size:.7rem;color:var(--primary);text-decoration:none;font-weight:500;text-transform:none;letter-spacing:0">View All</a></div>
+      <div class="quick-actions-grid fade-in">
+        <button class="qa-btn" onclick="switchTab('site',document.querySelector('[data-tab=site]'))"><div class="qa-icon" style="background:linear-gradient(135deg,#FFF7ED,#FFEDD5)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E85D04" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div><span>Site Advance</span></button>
+        <button class="qa-btn" onclick="switchTab('site',document.querySelector('[data-tab=site]'))"><div class="qa-icon" style="background:linear-gradient(135deg,#ECFDF5,#D1FAE5)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2"><rect x="2" y="6" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg></div><span>Salary Advance</span></button>
+        <button class="qa-btn" onclick="switchTab('ta',document.querySelector('[data-tab=ta]'))"><div class="qa-icon" style="background:linear-gradient(135deg,#EFF6FF,#DBEAFE)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div><span>TA &amp; Travel</span></button>
+        <button class="qa-btn" onclick="showOverlay('employee-self')"><div class="qa-icon" style="background:linear-gradient(135deg,#F5F3FF,#EDE9FE)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7C3AED" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><span>Self Service</span></button>
+        <button class="qa-btn" onclick="switchTab('progress',document.querySelector('[data-tab=progress]'))"><div class="qa-icon" style="background:linear-gradient(135deg,#FEF3C7,#FDE68A)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#D97706" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><span>Progress</span></button>
+        <button class="qa-btn" onclick="switchTab('salary',document.querySelector('[data-tab=salary]'))"><div class="qa-icon" style="background:linear-gradient(135deg,#FFF1F2,#FFE4E6)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#E11D48" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div><span>Salary Slip</span></button>
+        <button class="qa-btn" onclick="switchTab('attendance',document.querySelector('[data-tab=attendance]'))"><div class="qa-icon" style="background:linear-gradient(135deg,#ECFEFF,#CFFAFE)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0891B2" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></div><span>Attendance</span></button>
+        <button class="qa-btn" id="qaApplyLeave" onclick="switchTab('leaves',document.querySelector('[data-tab=leaves]'))"><div class="qa-icon" style="background:linear-gradient(135deg,#FDF2F8,#FCE7F3)"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#DB2777" stroke-width="2"><path d="M11 19H6.2c-1.1 0-2-.9-2.2-2L2 9.7A2 2 0 0 1 4 7h16a2 2 0 0 1 2 2.7L20 17c-.2 1.1-1.1 2-2.2 2H17"/><path d="M14 16a2 2 0 1 1-4 0"/></svg></div><span>Apply Leave</span></button>
+      </div>
+
       <div class="home-grid">
         <div class="home-grid-col">
           <div id="homeMyTasks"></div>

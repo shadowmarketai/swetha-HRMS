@@ -710,18 +710,14 @@ async function processForgotPassword() {
 
 function restoreLoginForm() {
   const form = document.querySelector('.login-form');
-  form.innerHTML = `
-    <div class="login-field"><label>Employee Code / Phone</label><input type="text" id="loginId" placeholder="e.g. MD001, SSC006, SSC011" maxlength="50" autocomplete="username"></div>
-    <div class="login-field"><label>Password</label><div class="pwd-wrapper"><input type="password" id="loginPass" placeholder="Enter password" maxlength="128" autocomplete="current-password"><button type="button" class="pwd-toggle" onclick="togglePwdVisibility('loginPass',this)" aria-label="Show password"><svg class="eye-open" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><svg class="eye-closed" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button></div></div>
-    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
-      <input type="checkbox" id="rememberMe" style="accent-color:white;width:16px;height:16px">
-      <label for="rememberMe" style="font-size:.72rem;opacity:.8;cursor:pointer">Remember me</label>
-    </div>
-    <button class="login-btn" id="signInBtn">Sign In</button>
-    <div style="text-align:right;margin-top:4px"><a href="#" id="forgotPwdLink" onclick="showForgotPassword();return false" style="font-size:.7rem;color:rgba(255,255,255,.7);text-decoration:none">Forgot Password?</a></div>
-    <button class="login-btn" id="biometricBtn" style="margin-top:8px;background:transparent;color:white;border:1px solid rgba(255,255,255,.3)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><path d="M12 11c0-1.1.9-2 2-2s2 .9 2 2-2 4-2 4"/><path d="M8 11a4 4 0 0 1 8 0c0 2.5-2 5-4 6.5"/><path d="M6 11a6 6 0 0 1 12 0c0 4-3 7-6 9"/></svg>Biometric Login</button>
-    <div class="login-error" id="loginError"></div>
-  `;
+  form.innerHTML = '<div class="login-form-header"><div class="login-form-logo"><img src="swetha_symbol.png" alt="SS" style="width:48px;height:48px;object-fit:contain"></div><h2 class="login-welcome">Welcome Back!</h2><p class="login-welcome-sub">Sign in to your HRMS account</p></div>' +
+    '<div class="login-field"><label>Employee Code / Phone</label><div class="login-input-wrap"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><input type="text" id="loginId" placeholder="e.g. MD001, SSC006" maxlength="50" autocomplete="username"></div></div>' +
+    '<div class="login-field"><label>Password</label><div class="login-input-wrap"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><input type="password" id="loginPass" placeholder="Enter password" maxlength="128" autocomplete="current-password"><button type="button" class="pwd-toggle" onclick="togglePwdVisibility(\'loginPass\',this)" aria-label="Show password"><svg class="eye-open" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><svg class="eye-closed" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button></div></div>' +
+    '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><label style="display:flex;align-items:center;gap:6px;font-size:.75rem;color:var(--gray-500);cursor:pointer"><input type="checkbox" id="rememberMe" style="accent-color:var(--primary);width:15px;height:15px">Remember me</label><a href="#" id="forgotPwdLink" onclick="showForgotPassword();return false" style="font-size:.75rem;color:var(--primary);text-decoration:none;font-weight:500">Forgot Password?</a></div>' +
+    '<button class="login-btn" id="signInBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:6px"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>Sign In</button>' +
+    '<div class="login-divider"><span>OR</span></div>' +
+    '<button class="login-btn login-btn-outline" id="biometricBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px"><path d="M12 11c0-1.1.9-2 2-2s2 .9 2 2-2 4-2 4"/><path d="M8 11a4 4 0 0 1 8 0c0 2.5-2 5-4 6.5"/><path d="M6 11a6 6 0 0 1 12 0c0 4-3 7-6 9"/></svg>Biometric Login</button>' +
+    '<div class="login-error" id="loginError"></div>';
   // Re-attach event listeners
   document.getElementById('signInBtn').addEventListener('click', doLogin);
   document.getElementById('loginPass').addEventListener('keyup', function(e) { if (e.key === 'Enter') doLogin(); });
@@ -4370,7 +4366,7 @@ function gpsCheckOut() {
 }
 
 function updateCheckinCard(coords) {
-  const locBar = document.querySelector('.checkin-card .checkin-date');
+  const locBar = document.querySelector('.checkin-hero .checkin-date') || document.querySelector('.checkin-card .checkin-date');
   if (locBar && coords) {
     locBar.textContent += ` | GPS: ${coords.latitude.toFixed(4)}°N, ${coords.longitude.toFixed(4)}°E`;
   }
