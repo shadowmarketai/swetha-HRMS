@@ -40,16 +40,6 @@ app.use(cors({
   credentials: true
 }));
 
-// Rate limiting on login
-const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5,
-  message: { error: 'Too many login attempts. Please try again after 15 minutes.' },
-  standardHeaders: true,
-  legacyHeaders: false
-});
-app.use('/api/auth/login', loginLimiter);
-app.use('/api/auth/google', loginLimiter);
 
 // Rate limiting on password change (3 attempts per 15 min)
 const passwordChangeLimiter = rateLimit({
