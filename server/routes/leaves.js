@@ -16,10 +16,10 @@ async function notifyUsers(pool, empCodes, title, message, type) {
   } catch (e) { console.error('Notify error:', e.message); }
 }
 
-// Helper: get emp_codes by role
+// Helper: get emp_codes by role (uses users table — authoritative for roles)
 async function getEmpCodesByRole(pool, roles) {
-  const [rows] = await pool.query('SELECT code FROM employees WHERE role IN (?) AND (status IS NULL OR status = "Active")', [roles]);
-  return rows.map(r => r.code);
+  const [rows] = await pool.query('SELECT emp_code FROM users WHERE role IN (?) AND is_active = 1', [roles]);
+  return rows.map(r => r.emp_code);
 }
 
 // GET /api/leaves — list leave applications
@@ -97,13 +97,13 @@ router.post('/', verifyToken, [
   }
 });
 
-// PATCH /api/leaves/:id/approve — approve leave (MD/HR)
-router.patch('/:id/approve', verifyToken, requireRole('MD', 'HR'), auditLog('approve', 'leave'), async (req, res) => {
+// PATCH /api/leaves/:id/approve — final approve (MD only, requires HR acceptance first)
+router.patch('/:id/approve', verifyToken, requireRole('MD'), auditLog('approve', 'leave'), async (req, res) => {
   try {
     const [apps] = await pool.query('SELECT * FROM leave_applications WHERE id = ?', [req.params.id]);
     if (apps.length === 0) return res.status(404).json({ error: 'Leave application not found' });
     const app = apps[0];
-    if (app.status !== 'pending' && app.status !== 'hr_accepted') return res.status(400).json({ error: 'Leave already ' + app.status });
+    if (app.status !== 'hr_accepted') return res.status(400).json({ error: app.status === 'pending' ? 'HR must accept this leave first' : 'Leave already ' + app.status });
 
     // Update application
     await pool.query(

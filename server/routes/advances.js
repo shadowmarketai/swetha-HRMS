@@ -14,10 +14,10 @@ async function notifyUsers(pool, empCodes, title, message, type) {
   } catch (e) { console.error('Notify error:', e.message); }
 }
 
-// Helper: get emp_codes by role
+// Helper: get emp_codes by role (uses users table — authoritative for roles)
 async function getEmpCodesByRole(pool, roles) {
-  const [rows] = await pool.query('SELECT code FROM employees WHERE role IN (?) AND (status IS NULL OR status = "Active")', [roles]);
-  return rows.map(r => r.code);
+  const [rows] = await pool.query('SELECT emp_code FROM users WHERE role IN (?) AND is_active = 1', [roles]);
+  return rows.map(r => r.emp_code);
 }
 
 // GET /api/advances — list advances
@@ -102,12 +102,12 @@ router.patch('/:id/hr-accept', verifyToken, requireRole('HR'), auditLog('hr-acce
   }
 });
 
-// PATCH /api/advances/:id/approve — MD approves (from Pending or HR_Accepted)
-router.patch('/:id/approve', verifyToken, requireRole('MD', 'HR'), auditLog('approve', 'advance'), async (req, res) => {
+// PATCH /api/advances/:id/approve — final approve (MD only, requires HR acceptance first)
+router.patch('/:id/approve', verifyToken, requireRole('MD'), auditLog('approve', 'advance'), async (req, res) => {
   try {
     const [existing] = await pool.query('SELECT * FROM advance_requests WHERE id = ?', [req.params.id]);
     if (existing.length === 0) return res.status(404).json({ error: 'Advance request not found' });
-    if (existing[0].status !== 'Pending' && existing[0].status !== 'HR_Accepted') return res.status(400).json({ error: `Cannot approve: status is ${existing[0].status}` });
+    if (existing[0].status !== 'HR_Accepted') return res.status(400).json({ error: existing[0].status === 'Pending' ? 'HR must accept this advance first' : `Cannot approve: status is ${existing[0].status}` });
     await pool.query(
       'UPDATE advance_requests SET status = "Approved", reviewed_by = ?, review_date = CURDATE() WHERE id = ?',
       [req.user.empCode, req.params.id]

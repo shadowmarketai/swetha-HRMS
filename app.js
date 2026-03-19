@@ -2139,10 +2139,10 @@ function renderAllMyRequests() {
 function updateBannerForType(type, bannerId, textId, countId) {
   const banner = document.getElementById(bannerId);
   if (!banner || !currentUser) return;
-  // HR sees 'pending', MD sees 'pending' + 'hr_accepted'
+  // HR sees 'pending' to accept, MD sees only 'hr_accepted' to confirm
   var actionable;
   if (currentUser.role === 'MD') {
-    actionable = advanceRequests.filter(r => (r.status === 'pending' || r.status === 'hr_accepted') && r.type === type).length;
+    actionable = advanceRequests.filter(r => r.status === 'hr_accepted' && r.type === type).length;
   } else {
     actionable = advanceRequests.filter(r => r.status === 'pending' && r.type === type).length;
   }
@@ -2194,13 +2194,12 @@ function renderAdvanceRequests(filter) {
     const typeBadge = `<span class="adv-type-badge ${r.type}">${ADV_TYPE_LABELS[r.type] || r.type}</span>`;
     var statusBadge = getAdvanceStatusBadge(r.status);
     var stepHtml = getAdvanceStepIndicator(r.status);
-    // Actions: HR sees Accept on pending, MD sees Confirm on pending & hr_accepted
+    // Actions: HR sees Accept/Reject on pending; MD sees Confirm/Reject only on hr_accepted
     var actionsHtml = '';
     if (isHR && r.status === 'pending') {
       actionsHtml = `<div class="adv-actions"><button class="approve-btn" onclick="approveAdvance(${r.id})" aria-label="Accept advance ${r.id}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/></svg> Accept</button><button class="reject-btn" onclick="rejectAdvance(${r.id})" aria-label="Reject advance ${r.id}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Reject</button></div>`;
-    } else if (isMD && (r.status === 'pending' || r.status === 'hr_accepted')) {
-      var btnLabel = r.status === 'hr_accepted' ? 'Confirm' : 'Approve';
-      actionsHtml = `<div class="adv-actions"><button class="approve-btn" onclick="approveAdvance(${r.id})" aria-label="${btnLabel} advance ${r.id}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/></svg> ${btnLabel}</button><button class="reject-btn" onclick="rejectAdvance(${r.id})" aria-label="Reject advance ${r.id}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Reject</button></div>`;
+    } else if (isMD && r.status === 'hr_accepted') {
+      actionsHtml = `<div class="adv-actions"><button class="approve-btn" onclick="approveAdvance(${r.id})" aria-label="Confirm advance ${r.id}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/></svg> Confirm</button><button class="reject-btn" onclick="rejectAdvance(${r.id})" aria-label="Reject advance ${r.id}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Reject</button></div>`;
     }
     return `<div class="adv-request-card ${r.status}">
       <div class="adv-request-header">
@@ -2224,7 +2223,7 @@ async function approveAdvance(id) {
   try {
     const req = advanceRequests.find(r => r.id === id);
     if (!req) return;
-    // HR can only accept (not final approve) — MD does final confirm
+    // HR can only accept (not final approve)
     if (currentUser.role === 'HR' && req.status === 'pending') {
       await apiCall('PATCH', '/advances/' + id + '/hr-accept');
       req.status = 'hr_accepted';
@@ -2236,6 +2235,12 @@ async function approveAdvance(id) {
       refreshNotifications();
       return;
     }
+    // MD can only approve after HR has accepted
+    if (currentUser.role === 'MD' && req.status === 'pending') {
+      showToast('HR must accept this advance first');
+      return;
+    }
+    // MD confirms (from hr_accepted only)
     await apiCall('PATCH', '/advances/' + id + '/approve');
     req.status = 'approved';
     req.reviewedBy = currentUser.name + ' (' + currentUser.role + ')';
@@ -5705,9 +5710,16 @@ function stopNotifPoll() {
 }
 
 function updateNotifBadge() {
-  const badge = document.querySelector('.header-btn .badge');
-  const unread = NOTIF_HISTORY.filter(n => !n.read && (!n.empCode || (currentUser && n.empCode === currentUser.code))).length;
-  if (badge) badge.style.display = unread > 0 ? '' : 'none';
+  var badge = document.querySelector('.header-btn .badge');
+  if (!badge) return;
+  var unread = NOTIF_HISTORY.filter(function(n) { return !n.read; }).length;
+  if (unread > 0) {
+    badge.textContent = unread > 99 ? '99+' : unread;
+    badge.style.display = '';
+  } else {
+    badge.textContent = '';
+    badge.style.display = 'none';
+  }
 }
 
 function renderNotifications() {
@@ -5725,12 +5737,7 @@ function renderNotifications() {
     system: {bg:'var(--danger-light)',color:'var(--danger)',svg:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>'}
   };
   const defaultIcon = iconMap.salary;
-  var myNotifs = NOTIF_HISTORY.filter(function(n) { return !n.empCode || n.empCode === currentUser.code; });
-  if (myNotifs.length === 0) {
-    container.innerHTML = '<div style="padding:40px 16px;text-align:center;color:var(--gray-400);font-size:.82rem">No notifications yet</div>';
-    return;
-  }
-  container.innerHTML = myNotifs.map(n => {
+  container.innerHTML = NOTIF_HISTORY.map(n => {
     const ic = iconMap[n.category] || defaultIcon;
     const ago = timeAgo(n.time);
     return `<div class="notif-item${n.read?'':' unread'}" onclick="markNotifRead(${n.id})">
@@ -5891,12 +5898,17 @@ async function approveLeave(id) {
   try {
     const app = leaveApplications.find(a => a.id === id);
     if (!app) return;
-    // HR can only accept (not final approve) — MD does final confirm
+    // HR can only accept (not final approve)
     if (currentUser.role === 'HR' && app.status === 'pending') {
       await hrAcceptLeave(id);
       return;
     }
-    // MD approves (from pending or hr_accepted)
+    // MD can only approve after HR has accepted
+    if (currentUser.role === 'MD' && app.status === 'pending') {
+      showToast('HR must accept this leave first');
+      return;
+    }
+    // MD confirms (from hr_accepted only)
     await apiCall('PATCH', '/leaves/' + id + '/approve');
     app.status = 'approved';
     const bal = getLeaveBalance(app.empCode);
@@ -5996,11 +6008,18 @@ function renderLeaveScreen() {
       const others = leaveApplications.filter(a => a.status !== 'pending' && a.status !== 'hr_accepted');
       let html = '';
       if (pending.length > 0) {
+        if (isMD) html += '<div style="font-size:.72rem;font-weight:600;color:var(--gray-400);margin:8px 0 4px">Pending — Awaiting HR Acceptance</div>';
         html += pending.map(a => {
           const fromD = new Date(a.from).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
           const toD = new Date(a.to).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
-          var btnLabel = isHR ? 'Accept' : 'Approve';
-          return `<div class="request-item" style="flex-wrap:wrap"><div class="req-icon" style="background:#FCE7F3;color:#DB2777"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><div class="req-info"><h4>${escapeHTML(a.empName)} — ${escapeHTML(a.type)} Leave</h4><p>${escapeHTML(a.dept)} &middot; ${fromD} — ${toD} &middot; ${a.days} day(s)</p><p style="font-size:.65rem;color:var(--gray-500);margin-top:2px">${escapeHTML(a.reason)}</p></div><div class="leave-action-btns" style="width:100%;margin-top:8px"><button style="background:${isHR ? '#DBEAFE' : 'var(--success-light)'};color:${isHR ? '#1D4ED8' : 'var(--success-dark)'}" onclick="approveLeave(${a.id})">${btnLabel}</button><button style="background:var(--danger-light);color:var(--danger-dark)" onclick="rejectLeave(${a.id})">Reject</button></div></div>`;
+          // HR sees Accept/Reject buttons, MD sees "Awaiting HR" badge (cannot act on pending)
+          var actionsHtml = '';
+          if (isHR) {
+            actionsHtml = `<div class="leave-action-btns" style="width:100%;margin-top:8px"><button style="background:#DBEAFE;color:#1D4ED8" onclick="approveLeave(${a.id})">Accept</button><button style="background:var(--danger-light);color:var(--danger-dark)" onclick="rejectLeave(${a.id})">Reject</button></div>`;
+          } else if (isMD) {
+            actionsHtml = `<div style="margin-top:6px"><span class="badge-status badge-pending">Awaiting HR</span></div>`;
+          }
+          return `<div class="request-item" style="flex-wrap:wrap"><div class="req-icon" style="background:#FCE7F3;color:#DB2777"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><div class="req-info"><h4>${escapeHTML(a.empName)} — ${escapeHTML(a.type)} Leave</h4><p>${escapeHTML(a.dept)} &middot; ${fromD} — ${toD} &middot; ${a.days} day(s)</p><p style="font-size:.65rem;color:var(--gray-500);margin-top:2px">${escapeHTML(a.reason)}</p></div>${actionsHtml}</div>`;
         }).join('');
       }
       if (hrAccepted.length > 0 && isMD) {
