@@ -73,8 +73,9 @@ body{font-family:var(--font-body);color:var(--text);background:#E8EAF0;display:f
 /* ===== CHECK-IN HERO CARD ===== */
 .checkin-hero{display:flex;align-items:stretch;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);color:white;border-radius:var(--radius);overflow:hidden;margin-bottom:16px;position:relative;min-height:160px}
 .checkin-hero-content{flex:1;padding:20px;display:flex;flex-direction:column;justify-content:center;position:relative;z-index:2}
-.checkin-hero-img{width:160px;display:flex;align-items:flex-end;justify-content:center;flex-shrink:0;position:relative}
-.checkin-hero-img img{width:200px;max-height:100%;height:auto;object-fit:contain;object-position:bottom center;mix-blend-mode:screen}
+.checkin-hero-img{width:180px;display:flex;align-items:flex-end;justify-content:flex-end;flex-shrink:0;position:relative;overflow:hidden}
+.checkin-hero-img::after{content:'';position:absolute;top:0;left:0;bottom:0;width:50%;background:linear-gradient(to right,#16213e,transparent);z-index:1;pointer-events:none}
+.checkin-hero-img img{width:220px;height:100%;object-fit:cover;object-position:center bottom}
 .checkin-status{display:flex;align-items:center;gap:8px;font-size:.75rem;margin-bottom:10px}
 .checkin-status .dot{width:8px;height:8px;border-radius:50%;background:var(--success);animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
@@ -880,6 +881,7 @@ a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.cal-nav bu
 [data-theme="dark"] .ql-location{background:linear-gradient(135deg,rgba(239,68,68,.15),rgba(239,68,68,.08));color:var(--red)}
 [data-theme="dark"] .checkin-date,[data-theme="dark"] .checkin-time{color:rgba(255,255,255,.9)}
 [data-theme="dark"] .checkin-hero{background:linear-gradient(135deg,#0a0c14 0%,#151825 50%,#1a1a2e 100%)}
+[data-theme="dark"] .checkin-hero-img::after{background:linear-gradient(to right,#151825,transparent)}
 [data-theme="dark"] .qa-btn{background:var(--card-bg);box-shadow:0 1px 3px rgba(0,0,0,.3)}
 [data-theme="dark"] .qa-btn span{color:var(--text)}
 [data-theme="dark"] .new-feature-body{background:var(--bg)}
@@ -1046,8 +1048,8 @@ a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.cal-nav bu
   .login-error { color: var(--danger) !important; }
   /* Checkin hero (tablet) */
   .checkin-hero { min-height: 180px; border-radius: 16px; }
-  .checkin-hero-img { width: 220px; }
-  .checkin-hero-img img { width: 260px; }
+  .checkin-hero-img { width: 260px; }
+  .checkin-hero-img img { width: 300px; }
 }
 
 /* =====================================================
@@ -1373,8 +1375,8 @@ a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.cal-nav bu
   /* Checkin hero (desktop) */
   .checkin-hero { min-height: 200px; border-radius: 18px; }
   .checkin-hero-content { padding: 28px; }
-  .checkin-hero-img { width: 300px; }
-  .checkin-hero-img img { width: 340px; }
+  .checkin-hero-img { width: 340px; }
+  .checkin-hero-img img { width: 380px; }
   .checkin-time { font-size: 2.4rem; }
   .checkin-date { font-size: .82rem; }
   .checkin-actions .btn { padding: 12px 24px; font-size: .88rem; }

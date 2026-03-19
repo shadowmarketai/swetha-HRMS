@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hrms-v68';
+const CACHE_NAME = 'hrms-v69';
 const PRECACHE_URLS = [
   './',
   './index.html',
