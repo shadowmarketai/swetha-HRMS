@@ -542,11 +542,45 @@ function renderProfileOverlay() {
   var perDay = daysInMonth > 0 ? (salary / daysInMonth) : 0;
   var accMasked = emp.accNo ? emp.accNo.substring(0,4) + '***' + emp.accNo.slice(-4) : 'N/A';
 
+  // Check if personal details already submitted
+  var selfData = ensureSelfData(currentUser.code);
+  var personalSubmitted = selfData && selfData.personalSubmitted === true;
+
   var html = '<div class="card profile-card" style="margin:16px;border-radius:var(--radius)">';
   html += '<div class="profile-avatar">' + escapeHTML(initials) + '</div>';
   html += '<h2>' + escapeHTML(emp.name) + '</h2>';
   html += '<div class="designation">' + escapeHTML(emp.designation || emp.dept || '') + '</div>';
   html += '<div class="emp-id">' + escapeHTML(emp.code) + '</div>';
+  html += '</div>';
+
+  // Personal Details section
+  html += '<div class="card profile-section" style="margin:0 16px 12px;border-radius:var(--radius)">';
+  html += '<div style="font-family:var(--font-display);font-weight:600;font-size:.82rem;margin-bottom:8px;color:var(--gray-500)">Personal Details</div>';
+  if (personalSubmitted) {
+    // Read-only view
+    html += '<div class="profile-row"><span class="label">Father\'s Name</span><span class="value">' + escapeHTML(selfData.fatherName || 'N/A') + '</span></div>';
+    html += '<div class="profile-row"><span class="label">Father\'s Mobile</span><span class="value">' + escapeHTML(selfData.fatherMobile || 'N/A') + '</span></div>';
+    html += '<div class="profile-row"><span class="label">Mother\'s Name</span><span class="value">' + escapeHTML(selfData.motherName || 'N/A') + '</span></div>';
+    html += '<div class="profile-row"><span class="label">Mother\'s Mobile</span><span class="value">' + escapeHTML(selfData.motherMobile || 'N/A') + '</span></div>';
+    html += '<div class="profile-row"><span class="label">Blood Group</span><span class="value">' + escapeHTML(selfData.bloodGroup || 'N/A') + '</span></div>';
+    html += '<div class="profile-row"><span class="label">Emergency Contact</span><span class="value">' + escapeHTML(selfData.emergencyContact || 'N/A') + '</span></div>';
+    html += '<div class="profile-row"><span class="label">Address</span><span class="value">' + escapeHTML(selfData.presentAddress || 'N/A') + '</span></div>';
+    html += '<div style="margin-top:8px"><button class="nf-btn nf-btn-outline nf-btn-sm" onclick="requestProfileChange()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Request Changes</button></div>';
+  } else {
+    // Editable form
+    html += '<div class="form-row"><label>Father\'s Name</label><input type="text" id="profFatherName" value="' + escapeHTML(selfData.fatherName || '') + '" placeholder="Enter father\'s name"></div>';
+    html += '<div class="form-row"><label>Father\'s Mobile</label><input type="tel" id="profFatherMobile" value="' + escapeHTML(selfData.fatherMobile || '') + '" placeholder="e.g. 9876543210" maxlength="10"></div>';
+    html += '<div class="form-row"><label>Mother\'s Name</label><input type="text" id="profMotherName" value="' + escapeHTML(selfData.motherName || '') + '" placeholder="Enter mother\'s name"></div>';
+    html += '<div class="form-row"><label>Mother\'s Mobile</label><input type="tel" id="profMotherMobile" value="' + escapeHTML(selfData.motherMobile || '') + '" placeholder="e.g. 9876543210" maxlength="10"></div>';
+    html += '<div class="form-row"><label>Blood Group</label><select id="profBloodGroup"><option value="">Select</option>';
+    ['A+','A-','B+','B-','AB+','AB-','O+','O-'].forEach(function(bg) {
+      html += '<option' + (selfData.bloodGroup === bg ? ' selected' : '') + '>' + bg + '</option>';
+    });
+    html += '</select></div>';
+    html += '<div class="form-row"><label>Emergency Contact</label><input type="tel" id="profEmergency" value="' + escapeHTML(selfData.emergencyContact || '') + '" placeholder="Emergency phone number" maxlength="10"></div>';
+    html += '<div class="form-row"><label>Address</label><textarea id="profAddress" rows="2" placeholder="Enter your address">' + escapeHTML(selfData.presentAddress || '') + '</textarea></div>';
+    html += '<button class="btn btn-primary w-full" style="border-radius:var(--radius-sm);margin-top:8px" onclick="submitProfilePersonalDetails()">Save Personal Details</button>';
+  }
   html += '</div>';
 
   html += '<div class="card profile-section" style="margin:0 16px 12px;border-radius:var(--radius)">';
@@ -568,6 +602,42 @@ function renderProfileOverlay() {
   html += '<div style="padding:0 16px 8px"><button class="payroll-report-btn" onclick="downloadIDCard()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>Download ID Card (PDF)</button></div>';
   html += '<div style="padding:0 16px 24px"><button class="btn btn-outline w-full" style="border-radius:var(--radius);color:var(--danger);border-color:var(--danger-light)" onclick="doLogout()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Log Out</button></div>';
   c.innerHTML = html;
+}
+
+function submitProfilePersonalDetails() {
+  if (!currentUser) return;
+  var selfData = ensureSelfData(currentUser.code);
+  var fatherName = document.getElementById('profFatherName');
+  var fatherMobile = document.getElementById('profFatherMobile');
+  var motherName = document.getElementById('profMotherName');
+  var motherMobile = document.getElementById('profMotherMobile');
+  var bloodGroup = document.getElementById('profBloodGroup');
+  var emergency = document.getElementById('profEmergency');
+  var address = document.getElementById('profAddress');
+
+  if (!fatherName || !fatherName.value.trim()) { showToast('Please enter father\'s name'); return; }
+  if (!bloodGroup || !bloodGroup.value) { showToast('Please select blood group'); return; }
+  if (!emergency || !emergency.value.trim()) { showToast('Please enter emergency contact'); return; }
+
+  Object.assign(selfData, {
+    fatherName: fatherName.value.trim(),
+    fatherMobile: fatherMobile ? fatherMobile.value.trim() : '',
+    motherName: motherName ? motherName.value.trim() : '',
+    motherMobile: motherMobile ? motherMobile.value.trim() : '',
+    bloodGroup: bloodGroup ? bloodGroup.value : '',
+    emergencyContact: emergency ? emergency.value.trim() : '',
+    presentAddress: address ? address.value.trim() : '',
+    personalSubmitted: true
+  });
+  saveLocalOnlyData();
+  showToast('Personal details saved successfully');
+  renderProfileOverlay();
+}
+
+function requestProfileChange() {
+  if (!currentUser) return;
+  addNotification('Profile Change Request', currentUser.name + ' (' + currentUser.code + ') has requested to update personal details', 'general');
+  showToast('Change request sent to MD for approval');
 }
 
 function doLogout() {
@@ -640,8 +710,6 @@ function restoreLoginForm() {
     <button class="login-btn" id="signInBtn">Sign In</button>
     <div style="text-align:right;margin-top:4px"><a href="#" id="forgotPwdLink" onclick="showForgotPassword();return false" style="font-size:.7rem;color:rgba(255,255,255,.7);text-decoration:none">Forgot Password?</a></div>
     <button class="login-btn" id="biometricBtn" style="margin-top:8px;background:transparent;color:white;border:1px solid rgba(255,255,255,.3)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><path d="M12 11c0-1.1.9-2 2-2s2 .9 2 2-2 4-2 4"/><path d="M8 11a4 4 0 0 1 8 0c0 2.5-2 5-4 6.5"/><path d="M6 11a6 6 0 0 1 12 0c0 4-3 7-6 9"/></svg>Biometric Login</button>
-    <div class="login-divider"><span>or</span></div>
-    <button class="google-signin-btn" id="googleSignInBtn" type="button"><svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59a14.5 14.5 0 0 1 0-9.18l-7.98-6.19a24.01 24.01 0 0 0 0 21.56l7.98-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg><span>Sign in with Google</span></button>
     <div class="login-error" id="loginError"></div>
   `;
   // Re-attach event listeners
@@ -697,6 +765,10 @@ function applyRole() {
 
   // Salary screen — role-based content
   updateSalaryScreen();
+
+  // Home: My Tasks & My Projects
+  renderHomeTasks();
+  renderHomeProjects();
 
   // Recent Activity (role-filtered)
   renderRecentActivity();
@@ -1057,6 +1129,7 @@ function showOverlay(id) {
     if (id === 'notifications') renderNotifications();
     if (id === 'location') openLocationTracker();
     if (id === 'advance-requests') { advReqActiveTab = 'pending'; advReqTypeFilter = 'all'; renderAdvanceRequests('pending'); document.querySelectorAll('#advReqTabs .tab-pill').forEach((p,i) => p.classList.toggle('active', i===0)); document.querySelectorAll('#advReqTypeFilter .loc-filter-chip').forEach((c,i) => c.classList.toggle('active', i===0)); }
+    if (id === 'settings') initSettingsToggles();
   } catch(e) { /* don't block overlay */ }
   // Close any currently active overlays to prevent split-screen stacking
   document.querySelectorAll('.overlay-screen.active').forEach(function(o) {
@@ -1192,11 +1265,12 @@ function buildCalendar() {
   const firstDayOfWeek = new Date(now.getFullYear(), now.getMonth(), 1).getDay();
   const att = {1:'present',2:'present',3:'present',4:'present',5:'present',6:'present',7:'present',8:'holiday',9:'present',10:'present',11:'present',12:'present',13:'half',14:'holiday',15:'holiday',16:'present',17:'present',18:'present',19:'present',20:'present',21:'holiday',22:'holiday',23:'present',24:'present',25:'absent',26:'present',27:'present',28:'holiday',29:'holiday',30:'present',31:'present'};
   for (let e = 0; e < firstDayOfWeek; e++) { c.innerHTML += '<div class="cal-day"></div>'; }
+  var badgeMap = {present:{label:'P',cls:'cal-badge-present'},absent:{label:'A',cls:'cal-badge-absent'},holiday:{label:'H',cls:'cal-badge-holiday'},half:{label:'\u00BD',cls:'cal-badge-half'},leave:{label:'L',cls:'cal-badge-leave'}};
   for (let d = 1; d <= daysInMonth; d++) {
     const isToday = d === todayDate;
     const st = d <= todayDate ? att[d] || '' : '';
-    const dot = st ? '<span class="cal-dot '+st+'"></span>' : '';
-    c.innerHTML += '<div class="cal-day'+(isToday?' today':'')+'">'+d+dot+'</div>';
+    const badge = st && badgeMap[st] ? '<span class="cal-status-badge '+badgeMap[st].cls+'">'+badgeMap[st].label+'</span>' : '';
+    c.innerHTML += '<div class="cal-day'+(isToday?' today':'')+'">'+d+badge+'</div>';
   }
   renderAttendanceLogList();
 }
@@ -1892,7 +1966,7 @@ async function submitInlineExpense() {
 }
 
 function openAdvanceApplyForm(type) {
-  type = type || 'site';
+  type = type || 'salary';
   document.getElementById('advAmount').value = '';
   document.getElementById('advDetails').value = '';
   document.getElementById('advReason').value = '';
@@ -1902,6 +1976,12 @@ function openAdvanceApplyForm(type) {
   document.getElementById('advTravelTo').value = '';
   document.getElementById('advTravelVehicle').value = '';
   document.getElementById('advTravelKm').value = '';
+  // Show salary limit
+  var limitInfo = document.getElementById('advSalaryLimitInfo');
+  if (limitInfo && currentUser) {
+    var sal = currentUser.salary || 0;
+    limitInfo.textContent = 'Maximum advance: Rs.' + sal.toLocaleString('en-IN') + ' (your monthly salary)';
+  }
   setAdvUrgency('normal');
   setAdvType(type);
   showOverlay('advance-apply');
@@ -1932,6 +2012,11 @@ async function submitAdvanceRequest() {
   const amount = parseInt(document.getElementById('advAmount').value, 10) || 0;
   const details = document.getElementById('advDetails').value.trim();
   if (!amount) { showToast('Please enter the amount'); return; }
+  // Salary limit validation for salary advance
+  if (advSelectedType === 'salary' && currentUser && currentUser.salary && amount > currentUser.salary) {
+    showToast('Amount cannot exceed your monthly salary (Rs.' + currentUser.salary.toLocaleString('en-IN') + ')');
+    return;
+  }
 
   let reason = null, emiAmount = null, emiMonths = null;
   let project = null, category = null;
@@ -5196,6 +5281,54 @@ function confirmLogout() {
 })();
 
 // =====================================================
+// SETTINGS TOGGLE SYNC
+// =====================================================
+function initSettingsToggles() {
+  // Dark mode toggle
+  var darkToggle = document.getElementById('darkModeToggle');
+  if (darkToggle) {
+    var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    darkToggle.classList.toggle('on', isDark);
+  }
+  // Biometric toggle
+  var bioToggle = document.getElementById('biometricToggle');
+  if (bioToggle) {
+    var bioEnabled = safeStorage.get(STORAGE_KEYS.biometricEnabled) === 'true';
+    bioToggle.classList.toggle('on', bioEnabled);
+  }
+  // Push notifications toggle
+  var pushToggle = document.getElementById('pushNotifToggle');
+  if (pushToggle) {
+    var pushEnabled = safeStorage.get('hrms_push_notif') !== 'off';
+    pushToggle.classList.toggle('on', pushEnabled);
+  }
+  // Notification pref toggles (use existing restoreNotifPrefToggles)
+  if (typeof restoreNotifPrefToggles === 'function') restoreNotifPrefToggles();
+}
+
+function togglePushNotifications(btn) {
+  btn.classList.toggle('on');
+  var isOn = btn.classList.contains('on');
+  safeStorage.set('hrms_push_notif', isOn ? 'on' : 'off');
+  if (isOn) requestNotificationPermission();
+}
+
+function toggleBiometricSetting(btn) {
+  var isCurrentlyOn = btn.classList.contains('on');
+  if (isCurrentlyOn) {
+    btn.classList.remove('on');
+    safeStorage.set(STORAGE_KEYS.biometricEnabled, 'false');
+    showToast('Biometric login disabled');
+  } else {
+    registerBiometric().then(function() {
+      // registerBiometric sets the storage key on success
+      var enabled = safeStorage.get(STORAGE_KEYS.biometricEnabled) === 'true';
+      btn.classList.toggle('on', enabled);
+    });
+  }
+}
+
+// =====================================================
 // DARK MODE
 // =====================================================
 function initDarkMode() {
@@ -5580,9 +5713,47 @@ function openLeaveForm() {
   document.getElementById('leaveFormOverlay').classList.add('active');
   selectedLeaveType = 'casual';
   document.querySelectorAll('#leaveTypePills .lt-pill').forEach((p,i) => p.classList.toggle('active', i===0));
-  document.getElementById('leaveFromDate').value = '';
-  document.getElementById('leaveToDate').value = '';
+  var today = new Date().toISOString().split('T')[0];
+  var fromDate = document.getElementById('leaveFromDate');
+  var toDate = document.getElementById('leaveToDate');
+  fromDate.value = '';
+  fromDate.setAttribute('min', today);
+  toDate.value = '';
+  toDate.setAttribute('min', today);
   document.getElementById('leaveReason').value = '';
+  // Reset half day
+  var halfToggle = document.getElementById('halfDayToggle');
+  if (halfToggle) halfToggle.classList.remove('on');
+  var timeFields = document.getElementById('halfDayTimeFields');
+  if (timeFields) timeFields.style.display = 'none';
+  // Populate time dropdowns
+  var fromTime = document.getElementById('leaveFromTime');
+  var toTime = document.getElementById('leaveToTime');
+  if (fromTime && toTime) {
+    var opts = '';
+    for (var h = 9; h <= 18; h++) {
+      var hh = h < 10 ? '0' + h : '' + h;
+      opts += '<option value="' + hh + ':00">' + hh + ':00</option>';
+      if (h < 18) opts += '<option value="' + hh + ':30">' + hh + ':30</option>';
+    }
+    fromTime.innerHTML = opts;
+    toTime.innerHTML = opts;
+    fromTime.value = '09:00';
+    toTime.value = '13:00';
+  }
+}
+
+function toggleHalfDay() {
+  var toggle = document.getElementById('halfDayToggle');
+  var fields = document.getElementById('halfDayTimeFields');
+  toggle.classList.toggle('on');
+  var isOn = toggle.classList.contains('on');
+  fields.style.display = isOn ? '' : 'none';
+  if (isOn) {
+    var toDate = document.getElementById('leaveToDate');
+    var fromDate = document.getElementById('leaveFromDate');
+    if (fromDate.value) toDate.value = fromDate.value;
+  }
 }
 
 function closeLeaveForm() {
@@ -5602,9 +5773,13 @@ async function submitLeave() {
   const reason = document.getElementById('leaveReason').value.trim();
   if (!from || !to) { showToast('Please select dates'); return; }
   if (new Date(to) < new Date(from)) { showToast('End date must be after start date'); return; }
+  var today = new Date().toISOString().split('T')[0];
+  if (from < today) { showToast('Cannot apply leave for past dates'); return; }
   if (!reason) { showToast('Please enter a reason'); return; }
 
-  const days = Math.ceil((new Date(to) - new Date(from)) / 86400000) + 1;
+  var halfDayToggle = document.getElementById('halfDayToggle');
+  var isHalfDay = halfDayToggle && halfDayToggle.classList.contains('on');
+  const days = isHalfDay ? 0.5 : Math.ceil((new Date(to) - new Date(from)) / 86400000) + 1;
   const bal = getLeaveBalance(currentUser.code);
   const typeMap = { casual: 'casual', comp: 'comp' };
   const balKey = typeMap[selectedLeaveType];
@@ -5681,8 +5856,7 @@ function renderLeaveScreen() {
       balGrid.innerHTML = '';
     } else {
       const leaveTypes = [
-        {key:'casual',label:'Casual Leave',total:12,color:'#E85D04',cls:'casual'},
-        {key:'comp',label:'Comp Off',total:3,color:'#EC4899',cls:'comp'}
+        {key:'casual',label:'Casual Leave',total:12,color:'#E85D04',cls:'casual'}
       ];
       balGrid.innerHTML = '<div class="section-title" style="margin-top:4px">Leave Balance</div><div class="leave-balance-grid fade-in">' +
         leaveTypes.map(lt => {
@@ -5986,15 +6160,53 @@ function renderExpenseOverlay() {
 }
 function openExpenseApplyForm() {
   const c = document.getElementById('expensesContent');
+  // Find approved travel advances for current user
+  var myAdvances = (typeof advanceRequests !== 'undefined' ? advanceRequests : []).filter(function(a) {
+    return a.empCode === currentUser.code && a.type === 'travel' && a.status === 'approved';
+  });
+  var advTotal = myAdvances.reduce(function(s, a) { return s + (a.amount || 0); }, 0);
+
   let html = '<div class="card" style="margin-bottom:12px"><h3 style="font-family:var(--font-display);font-size:.95rem;font-weight:600;margin-bottom:12px">New Expense Claim</h3>';
   html += '<div class="ss-form-group"><label>Category *</label><select class="nf-select" id="expCategory"><option value="">Select</option>';
   EXPENSE_CATEGORIES.forEach(cat => html += `<option>${cat}</option>`);
   html += '</select></div>';
-  html += '<div class="ss-form-group"><label>Amount (Rs.) *</label><input type="number" id="expAmount" placeholder="e.g. 5000"></div>';
+  html += '<div class="ss-form-group"><label>Advance Amount Received (Rs.)</label><input type="number" id="expAdvanceAmt" value="' + advTotal + '" readonly style="background:var(--gray-50);cursor:not-allowed"></div>';
+  html += '<div class="ss-form-group"><label>Total Amount Spent (Rs.) *</label><input type="number" id="expAmount" placeholder="e.g. 5000"></div>';
   html += '<div class="ss-form-group"><label>Date *</label><input type="date" id="expDate" value="' + new Date().toISOString().split('T')[0] + '"></div>';
   html += '<div class="ss-form-group"><label>Description</label><textarea id="expDesc" rows="2" placeholder="Brief description..." style="width:100%;padding:8px;border:1.5px solid var(--gray-200);border-radius:var(--radius-xs);font-family:var(--font-body);font-size:.82rem"></textarea></div>';
+  // Line items
+  html += '<div class="ss-form-group"><label style="font-weight:600;margin-bottom:6px">Expense Line Items</label>';
+  html += '<div id="expLineItems"><div class="exp-line-item" style="display:flex;gap:6px;margin-bottom:6px"><input type="text" class="exp-item-desc" placeholder="Description" style="flex:2;padding:6px 8px;border:1.5px solid var(--gray-200);border-radius:var(--radius-xs);font-size:.78rem"><input type="number" class="exp-item-amt" placeholder="Amount" style="flex:1;padding:6px 8px;border:1.5px solid var(--gray-200);border-radius:var(--radius-xs);font-size:.78rem"></div></div>';
+  html += '<button type="button" class="nf-btn nf-btn-outline nf-btn-sm" onclick="addExpenseLineItem()" style="margin-top:4px;font-size:.72rem">+ Add Item</button></div>';
+  // Mandatory bill
+  html += '<div class="ss-form-group"><label style="font-weight:600;color:var(--danger)">ATTACH BILL (REQUIRED) *</label>';
+  html += '<div class="camera-zone" onclick="document.getElementById(\'expBillInput\').click()" style="padding:12px;margin-top:4px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
+  html += '<p style="font-size:.72rem;margin-top:4px">Tap to upload bill / receipt</p>';
+  html += '<input type="file" id="expBillInput" accept="image/*" style="display:none" onchange="handleExpBillPreview(this)"></div>';
+  html += '<div id="expBillPreview" style="display:none;margin-top:6px"><img style="max-width:100%;border-radius:var(--radius-xs)"></div></div>';
   html += '<div style="display:flex;gap:8px"><button class="nf-btn nf-btn-primary" onclick="submitExpenseReimbursement()">Submit Claim</button><button class="nf-btn nf-btn-outline" onclick="renderExpenseOverlay()">Cancel</button></div></div>';
   c.innerHTML = html;
+}
+
+function addExpenseLineItem() {
+  var container = document.getElementById('expLineItems');
+  if (!container) return;
+  var div = document.createElement('div');
+  div.className = 'exp-line-item';
+  div.style.cssText = 'display:flex;gap:6px;margin-bottom:6px';
+  div.innerHTML = '<input type="text" class="exp-item-desc" placeholder="Description" style="flex:2;padding:6px 8px;border:1.5px solid var(--gray-200);border-radius:var(--radius-xs);font-size:.78rem"><input type="number" class="exp-item-amt" placeholder="Amount" style="flex:1;padding:6px 8px;border:1.5px solid var(--gray-200);border-radius:var(--radius-xs);font-size:.78rem"><button type="button" onclick="this.parentElement.remove()" style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:1rem">&times;</button>';
+  container.appendChild(div);
+}
+
+function handleExpBillPreview(input) {
+  if (input.files && input.files[0]) {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var preview = document.getElementById('expBillPreview');
+      if (preview) { preview.style.display = 'block'; preview.querySelector('img').src = e.target.result; }
+    };
+    reader.readAsDataURL(input.files[0]);
+  }
 }
 
 // =====================================================
@@ -6274,6 +6486,55 @@ function renderAttendanceLogList() {
     html += '</div>';
   });
   html += '</div>';
+  c.innerHTML = html;
+}
+
+// =====================================================
+// HOME: MY TASKS & MY PROJECTS
+// =====================================================
+function renderHomeTasks() {
+  var c = document.getElementById('homeMyTasks');
+  if (!c || !currentUser) return;
+  var myTasks = TASK_DATA.filter(function(t) {
+    if (t.assignedTo === 'ALL') return true;
+    if (t.assignedTo === currentUser.dept) return true;
+    if (t.assignedTo === currentUser.code) return true;
+    return false;
+  });
+  if (myTasks.length === 0) { c.innerHTML = ''; return; }
+  var priorityColors = {urgent:'var(--danger)',high:'var(--warning)',normal:'var(--primary)',low:'var(--gray-400)'};
+  var html = '<div class="section-title">My Tasks</div>';
+  myTasks.slice(0, 5).forEach(function(t) {
+    var pColor = priorityColors[t.priority] || 'var(--primary)';
+    var statusLabel = t.done ? 'Done' : 'Pending';
+    var statusCls = t.done ? 'badge-approved' : 'badge-pending';
+    html += '<div class="home-task-card fade-in" onclick="showOverlay(\'hr-tasks\')">';
+    html += '<div class="home-task-priority" style="background:' + pColor + '"></div>';
+    html += '<div class="home-task-info"><h4>' + escapeHTML(t.title) + '</h4>';
+    html += '<p>' + escapeHTML(t.type) + ' &middot; Due: ' + escapeHTML(t.dueDate) + '</p></div>';
+    html += '<span class="badge-status ' + statusCls + '">' + statusLabel + '</span>';
+    html += '</div>';
+  });
+  c.innerHTML = html;
+}
+
+function renderHomeProjects() {
+  var c = document.getElementById('homeMyProjects');
+  if (!c || !currentUser) return;
+  var myProjects = projects.filter(function(p) {
+    return p.team && p.team.indexOf(currentUser.code) !== -1;
+  });
+  if (myProjects.length === 0) { c.innerHTML = ''; return; }
+  var html = '<div class="section-title">My Projects</div>';
+  myProjects.forEach(function(p) {
+    var pct = getProjectProgress(p);
+    var barColor = p.status === 'Completed' ? 'var(--success)' : p.status === 'Delayed' ? 'var(--warning)' : 'var(--primary)';
+    html += '<div class="home-project-card fade-in" onclick="showProjectDetail(' + p.id + ')">';
+    html += '<div class="home-project-header"><h4>' + escapeHTML(p.name) + '</h4><span class="badge-status ' + (p.status === 'Completed' ? 'badge-approved' : 'badge-open') + '">' + escapeHTML(p.status) + '</span></div>';
+    html += '<div class="progress-bar-bg" style="height:6px;margin:6px 0"><div class="progress-bar-fill" style="width:' + pct + '%;background:' + barColor + '"></div></div>';
+    html += '<div style="font-size:.72rem;color:var(--gray-500)">' + pct + '% &middot; ' + p.tasks.filter(function(t){return t.status==="Done";}).length + '/' + p.tasks.length + ' tasks</div>';
+    html += '</div>';
+  });
   c.innerHTML = html;
 }
 
@@ -7637,13 +7898,12 @@ function renderProgressScreen() {
   const statusBadge = {'Not Started':'badge-pending','In Progress':'badge-open','On Track':'badge-approved','Delayed':'badge-pending','Completed':'badge-approved'};
   const barColors = {'Not Started':'var(--gray-300)','In Progress':'var(--primary)','On Track':'var(--success)','Delayed':'var(--warning)','Completed':'var(--success)'};
 
-  let html = '';
-  projects.forEach(function(p) {
+  var avatarColors = ['#E85D04','#3B82F6','#10B981','#8B5CF6','#EC4899','#F59E0B'];
+  function buildProjectCard(p) {
     const pct = getProjectProgress(p);
     const barColor = barColors[p.status] || 'var(--primary)';
     const badge = statusBadge[p.status] || 'badge-open';
     const target = p.targetDate ? new Date(p.targetDate).toLocaleDateString('en-IN', {month:'short',year:'numeric'}) : '';
-    const avatarColors = ['#E85D04','#3B82F6','#10B981','#8B5CF6','#EC4899','#F59E0B'];
     let teamHtml = '<div class="project-team-stack">';
     const teamSlice = p.team.slice(0, 4);
     teamSlice.forEach(function(code, i) {
@@ -7655,15 +7915,29 @@ function renderProgressScreen() {
       teamHtml += '<div class="team-avatar" style="background:var(--gray-400)">+' + (p.team.length - 4) + '</div>';
     }
     teamHtml += '</div>';
+    var cardHtml = '<div class="project-card fade-in" onclick="showProjectDetail(' + p.id + ')">';
+    cardHtml += '<div class="progress-header"><h4>' + escapeHTML(p.name) + '</h4><span class="badge-status ' + badge + '">' + escapeHTML(p.status) + '</span></div>';
+    cardHtml += '<div style="font-size:.72rem;color:var(--gray-500);margin:4px 0">' + escapeHTML(p.client) + ' &middot; ' + escapeHTML(p.location) + '</div>';
+    cardHtml += '<div class="progress-bar-bg"><div class="progress-bar-fill" style="width:' + pct + '%;background:linear-gradient(90deg,' + barColor + ',' + barColor + ')"></div></div>';
+    cardHtml += '<div class="progress-meta"><span>' + pct + '% Complete (' + p.tasks.filter(function(t){return t.status==='Done';}).length + '/' + p.tasks.length + ' tasks)</span><span>Target: ' + escapeHTML(target) + '</span></div>';
+    cardHtml += teamHtml;
+    cardHtml += '</div>';
+    return cardHtml;
+  }
 
-    html += '<div class="project-card fade-in" onclick="showProjectDetail(' + p.id + ')">';
-    html += '<div class="progress-header"><h4>' + escapeHTML(p.name) + '</h4><span class="badge-status ' + badge + '">' + escapeHTML(p.status) + '</span></div>';
-    html += '<div style="font-size:.72rem;color:var(--gray-500);margin:4px 0">' + escapeHTML(p.client) + ' &middot; ' + escapeHTML(p.location) + '</div>';
-    html += '<div class="progress-bar-bg"><div class="progress-bar-fill" style="width:' + pct + '%;background:linear-gradient(90deg,' + barColor + ',' + barColor + ')"></div></div>';
-    html += '<div class="progress-meta"><span>' + pct + '% Complete (' + p.tasks.filter(function(t){return t.status==='Done';}).length + '/' + p.tasks.length + ' tasks)</span><span>Target: ' + escapeHTML(target) + '</span></div>';
-    html += teamHtml;
-    html += '</div>';
-  });
+  // Split into My Projects and Other Projects
+  var myProjects = projects.filter(function(p) { return currentUser && p.team && p.team.indexOf(currentUser.code) !== -1; });
+  var otherProjects = projects.filter(function(p) { return !currentUser || !p.team || p.team.indexOf(currentUser.code) === -1; });
+
+  let html = '';
+  if (myProjects.length > 0) {
+    html += '<div class="section-title" style="margin-top:8px">My Projects</div>';
+    myProjects.forEach(function(p) { html += buildProjectCard(p); });
+  }
+  if (otherProjects.length > 0) {
+    html += '<div class="section-title" style="margin-top:12px">Other Projects</div>';
+    otherProjects.forEach(function(p) { html += buildProjectCard(p); });
+  }
 
   if (projects.length === 0) {
     html = '<div class="nf-empty" style="margin-top:24px">No projects yet. Click "+ New Project" to get started.</div>';

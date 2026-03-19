@@ -41,8 +41,6 @@
         <button class="login-btn" id="signInBtn">Sign In</button>
         <div style="text-align:right;margin-top:4px"><a href="#" id="forgotPwdLink" onclick="showForgotPassword();return false" style="font-size:.7rem;color:rgba(255,255,255,.7);text-decoration:none">Forgot Password?</a></div>
         <button class="login-btn" id="biometricBtn" style="margin-top:8px;background:transparent;color:white;border:1px solid rgba(255,255,255,.3)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><path d="M12 11c0-1.1.9-2 2-2s2 .9 2 2-2 4-2 4"/><path d="M8 11a4 4 0 0 1 8 0c0 2.5-2 5-4 6.5"/><path d="M6 11a6 6 0 0 1 12 0c0 4-3 7-6 9"/></svg>Biometric Login</button>
-        <div class="login-divider"><span>or</span></div>
-        <button class="google-signin-btn" id="googleSignInBtn" type="button"><svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59a14.5 14.5 0 0 1 0-9.18l-7.98-6.19a24.01 24.01 0 0 0 0 21.56l7.98-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg><span>Sign in with Google</span></button>
         <div class="login-error" id="loginError"></div>
       </div>
     </div>
@@ -84,27 +82,8 @@
           <button class="btn btn-white" onclick="gpsCheckOut()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Check Out</button>
         </div>
       </div>
-      <div class="section-title">Quick Actions</div>
-      <div class="quick-links fade-in">
-        <button class="quick-link" onclick="switchTab('site',document.querySelector('[data-tab=site]'))"><div class="ql-icon ql-site"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 20h20"/><path d="M5 20V8l7-5 7 5v12"/><rect x="9" y="12" width="6" height="8"/></svg></div><span>Advance Expense</span></button>
-        <button class="quick-link" onclick="switchTab('advance',document.querySelector('[data-tab=advance]'))"><div class="ql-icon ql-advance"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div><span>Salary Advance</span></button>
-        <button class="quick-link" onclick="switchTab('ta',document.querySelector('[data-tab=ta]'))"><div class="ql-icon ql-ta"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div><span>TA &amp; Travel</span></button>
-        <button class="quick-link md-only hidden" onclick="showOverlay('location')"><div class="ql-icon ql-location"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div><span>Live Location</span></button>
-        <button class="quick-link md-hr-only hidden" onclick="showOverlay('onboarding')"><div class="ql-icon ql-onboard"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg></div><span>Add Employee</span></button>
-        <button class="quick-link" onclick="showOverlay('self-service')"><div class="ql-icon" style="background:linear-gradient(135deg,#DBEAFE,#BFDBFE);color:#2563EB"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><span>Self Service</span></button>
-      </div>
-      <div class="quick-links fade-in" style="margin-top:0">
-        <button class="quick-link" onclick="switchTab('progress',document.querySelector('[data-tab=progress]'))"><div class="ql-icon ql-progress"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div><span>Progress</span></button>
-        <button class="quick-link" onclick="switchTab('salary',document.querySelector('[data-tab=salary]'))"><div class="ql-icon ql-salary"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></div><span>Salary Slip</span></button>
-        <button class="quick-link" onclick="switchTab('attendance',document.querySelector('[data-tab=attendance]'))"><div class="ql-icon ql-attendance"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg></div><span>Attendance</span></button>
-        <button class="quick-link" id="qlApplyLeave" onclick="switchTab('leaves',document.querySelector('[data-tab=leaves]'))"><div class="ql-icon ql-leave"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/></svg></div><span>Apply Leave</span></button>
-      </div>
-      <div class="quick-links fade-in" style="margin-top:0">
-        <button class="quick-link" onclick="showOverlay('hr-kpi')"><div class="ql-icon" style="background:linear-gradient(135deg,#FFF7ED,#FFEDD5);color:#E85D04"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div><span>My KPI</span></button>
-        <button class="quick-link" onclick="showOverlay('hr-tasks')"><div class="ql-icon" style="background:linear-gradient(135deg,#FFEDD5,#FED7AA);color:#C2410C"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div><span>Tasks</span></button>
-        <button class="quick-link" onclick="showOverlay('hr-announcements')"><div class="ql-icon" style="background:linear-gradient(135deg,#FEF3C7,#FDE68A);color:#D97706"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div><span>Notices</span></button>
-        <button class="quick-link" onclick="switchTab('hr',document.querySelector('[data-tab=hr]'))"><div class="ql-icon" style="background:linear-gradient(135deg,#DBEAFE,#BFDBFE);color:#2563EB"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><span>HR Hub</span></button>
-      </div>
+      <div id="homeMyTasks"></div>
+      <div id="homeMyProjects"></div>
       <div id="dashboardCelebrations"></div>
       <div id="dashboardAnnouncements"></div>
       <div class="section-title">Recent Activity</div>
@@ -255,13 +234,6 @@
         <div class="ta-amount" style="color:var(--success-dark)">&#8377;165</div>
       </div>
       </div>
-      <div class="section-title">Attach Bill / Receipt</div>
-      <div class="camera-zone fade-in" onclick="document.getElementById('taCameraInput').click()">
-        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-        <p>Capture fuel bill / toll receipt</p>
-        <small>Photo will be attached to TA claim</small>
-        <input type="file" id="taCameraInput" accept="image/*" capture="environment" style="display:none" onchange="handleBillCapture(this)">
-      </div>
       <div style="margin-top:12px">
         <button class="btn btn-primary w-full" style="border-radius:var(--radius)" onclick="openAdvanceApplyForm('travel')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New TA Claim</button>
       </div>
@@ -286,16 +258,13 @@
         <div class="cal-header"><h3>Attendance Calendar</h3><div class="cal-nav"><button><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button><button><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg></button></div></div>
         <div class="cal-days" id="calDays"></div>
         <div class="cal-legend">
-          <div class="cal-legend-item"><span class="dot" style="background:var(--success)"></span>Present</div>
-          <div class="cal-legend-item"><span class="dot" style="background:var(--danger)"></span>Absent</div>
-          <div class="cal-legend-item"><span class="dot" style="background:var(--warning)"></span>Half Day</div>
-          <div class="cal-legend-item"><span class="dot" style="background:var(--primary-light)"></span>Leave</div>
-          <div class="cal-legend-item"><span class="dot" style="background:var(--gray-400)"></span>Holiday</div>
+          <div class="cal-legend-item"><span class="cal-status-badge cal-badge-present">P</span>Present</div>
+          <div class="cal-legend-item"><span class="cal-status-badge cal-badge-absent">A</span>Absent</div>
+          <div class="cal-legend-item"><span class="cal-status-badge cal-badge-half">&frac12;</span>Half Day</div>
+          <div class="cal-legend-item"><span class="cal-status-badge cal-badge-leave">L</span>Leave</div>
+          <div class="cal-legend-item"><span class="cal-status-badge cal-badge-holiday">H</span>Holiday</div>
         </div>
       </div>
-      <div class="section-title">Shifts</div>
-      <div class="shift-card fade-in"><div class="shift-icon" style="background:#FFF7ED;color:#E85D04">&#127749;</div><div class="shift-info"><h4>General Shift</h4><p>Today &middot; Swetha Structures</p></div><div class="shift-time">09:00 — 18:00</div></div>
-      <div class="shift-card fade-in"><div class="shift-icon" style="background:#FEF3C7;color:#D97706">&#127780;</div><div class="shift-info"><h4>General Shift</h4><p>Tomorrow &middot; Swetha Structures</p></div><div class="shift-time">09:00 — 18:00</div></div>
       <div class="md-hr-only"><button class="payroll-report-btn" onclick="downloadAttendanceReport()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download Attendance Report (PDF)</button></div>
       <div class="section-title">My Attendance Log</div>
       <div id="attendanceLogList" class="card fade-in"></div>
@@ -470,10 +439,19 @@
       </div>
       <div class="leave-type-pills" id="leaveTypePills">
         <div class="lt-pill active" onclick="selectLeaveType('casual',this)">Casual Leave</div>
-        <div class="lt-pill" onclick="selectLeaveType('comp',this)">Comp Off</div>
       </div>
       <div class="form-row"><label>From Date</label><input type="date" id="leaveFromDate" onclick="this.showPicker&&this.showPicker()"></div>
       <div class="form-row"><label>To Date</label><input type="date" id="leaveToDate" onclick="this.showPicker&&this.showPicker()"></div>
+      <div class="form-row" style="display:flex;align-items:center;gap:10px;margin:8px 0">
+        <label style="margin:0;font-size:.78rem;font-weight:600">Half Day Leave</label>
+        <button class="toggle" id="halfDayToggle" onclick="toggleHalfDay()"></button>
+      </div>
+      <div id="halfDayTimeFields" style="display:none">
+        <div style="display:flex;gap:8px">
+          <div class="form-row" style="flex:1"><label>From Time</label><select id="leaveFromTime"></select></div>
+          <div class="form-row" style="flex:1"><label>To Time</label><select id="leaveToTime"></select></div>
+        </div>
+      </div>
       <div class="form-row"><label>Reason</label><textarea id="leaveReason" placeholder="Enter reason for leave..." rows="3"></textarea></div>
       <button class="btn btn-primary w-full" style="border-radius:var(--radius-sm);margin-top:8px" onclick="submitLeave()">Submit Leave Application</button>
     </div>
@@ -484,10 +462,9 @@
     <div style="padding:16px">
       <div class="section-title" style="margin-top:4px">Preferences</div>
       <div class="setting-row"><div class="setting-info"><h4>Dark Mode</h4><p>Switch to dark color scheme</p></div><button class="toggle" id="darkModeToggle" onclick="toggleDarkMode()"></button></div>
-      <div class="setting-row"><div class="setting-info"><h4>Push Notifications</h4><p>Alerts for approvals, salary, advances</p></div><button class="toggle on" onclick="this.classList.toggle('on');requestNotificationPermission()"></button></div>
+      <div class="setting-row"><div class="setting-info"><h4>Push Notifications</h4><p>Alerts for approvals, salary, advances</p></div><button class="toggle" id="pushNotifToggle" onclick="togglePushNotifications(this)"></button></div>
       <div class="setting-row"><div class="setting-info"><h4>Location Tracking</h4><p>GPS tracking for site expenses &amp; TA</p></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
-      <div class="setting-row"><div class="setting-info"><h4>Camera Auto-attach</h4><p>Auto-prompt camera for bill capture</p></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
-      <div class="setting-row"><div class="setting-info"><h4>Biometric Login</h4><p>Use fingerprint or face ID</p></div><button class="toggle" id="biometricToggle" onclick="this.classList.toggle('on');if(this.classList.contains('on'))registerBiometric()"></button></div>
+      <div class="setting-row"><div class="setting-info"><h4>Biometric Login</h4><p>Use fingerprint or face ID</p></div><button class="toggle" id="biometricToggle" onclick="toggleBiometricSetting(this)"></button></div>
 
       <div class="section-title">Notification Preferences</div>
       <div class="setting-row"><div class="setting-info"><h4>Salary Slip Alerts</h4><p>Notify on salary slip download</p></div><button class="toggle on" id="notifPrefSalary" onclick="toggleNotifPref('salary',this)"></button></div>
@@ -674,25 +651,22 @@
 
   <!-- UNIFIED ADVANCE APPLY OVERLAY -->
   <div class="overlay-screen" id="overlay-advance-apply" role="dialog" aria-modal="true" aria-label="Apply for Advance">
-    <div class="overlay-header"><button class="back-btn" aria-label="Go back" onclick="hideOverlay('advance-apply')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button><h2 id="advApplyTitle">New Advance Request</h2></div>
+    <div class="overlay-header"><button class="back-btn" aria-label="Go back" onclick="hideOverlay('advance-apply')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button><h2 id="advApplyTitle">New Salary Advance Request</h2></div>
     <div style="padding:16px">
-      <!-- Type Selector -->
-      <div class="adv-type-selector">
-        <button class="adv-type-option active" onclick="setAdvType('site')"><div class="type-icon">&#127959;</div>Site Advance</button>
-        <button class="adv-type-option" onclick="setAdvType('salary')"><div class="type-icon">&#128176;</div>Salary Advance</button>
-        <button class="adv-type-option" onclick="setAdvType('travel')"><div class="type-icon">&#128661;</div>Travel Advance</button>
-      </div>
+      <!-- Salary limit info -->
+      <div id="advSalaryLimitInfo" style="font-size:.75rem;color:var(--gray-500);margin-bottom:8px;background:var(--gray-50);padding:8px 10px;border-radius:var(--radius-xs)"></div>
       <!-- Common: Amount -->
       <div class="form-row"><label>Amount (&#8377;) *</label><input type="number" id="advAmount" placeholder="e.g. 25000" oninput="updateEmiCalc()"></div>
-      <!-- Site fields -->
-      <div id="advFieldsSite">
+      <!-- Deduction notice -->
+      <div style="font-size:.78rem;color:#fff;font-weight:600;margin:8px 0 12px;background:var(--primary);padding:10px 12px;border-radius:var(--radius-xs);display:flex;align-items:center;gap:8px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>This amount will be deducted from your next month&#39;s salary</div>
+      <!-- Site fields (hidden) -->
+      <div id="advFieldsSite" style="display:none">
         <div class="form-row"><label>Project / Site *</label><select id="advSiteProject"><option value="">Select project</option><option>Porur Villa Project</option><option>Tambaram Warehouse</option><option>PEB Factory Extension</option><option>Guduvanchery Residence</option><option>Other</option></select></div>
         <div class="form-row"><label>Category *</label><select id="advSiteCategory"><option value="">Select category</option><option>Material</option><option>Labour</option><option>Equipment</option><option>Transport</option><option>Other</option></select></div>
       </div>
-      <!-- Salary fields -->
-      <div id="advFieldsSalary" style="display:none">
+      <!-- Salary fields (shown by default) -->
+      <div id="advFieldsSalary">
         <div class="form-row"><label>Reason *</label><select id="advReason"><option value="">Select reason</option><option>Medical</option><option>Education</option><option>Marriage</option><option>Housing</option><option>Emergency</option><option>Personal</option><option>Other</option></select></div>
-        <div style="font-size:.75rem;color:var(--primary);font-weight:600;margin:4px 0 12px;background:var(--primary-light);padding:8px 10px;border-radius:var(--radius-xs)">Full amount will be deducted from next month&#39;s salary</div>
       </div>
       <!-- Travel fields -->
       <div id="advFieldsTravel" style="display:none">
@@ -703,6 +677,10 @@
         <div class="form-grid">
           <div class="form-row"><label>Vehicle *</label><select id="advTravelVehicle"><option value="">Select</option><option>Bike</option><option>Car</option><option>Auto</option><option>Bus</option><option>Train</option><option>Other</option></select></div>
           <div class="form-row"><label>Distance (km)</label><input type="number" id="advTravelKm" placeholder="e.g. 25"></div>
+        </div>
+        <div class="form-grid">
+          <div class="form-row"><label>Fuel Type</label><select id="advFuelType"><option value="N/A">N/A</option><option>Petrol</option><option>Diesel</option><option>CNG</option><option>Electric</option></select></div>
+          <div class="form-row"><label>Days of Project</label><input type="number" id="advProjectDays" placeholder="e.g. 5" min="1"></div>
         </div>
       </div>
       <!-- Common: Details & Urgency -->
