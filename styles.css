@@ -74,7 +74,7 @@ body{font-family:var(--font-body);color:var(--text);background:#E8EAF0;display:f
 .checkin-hero{display:flex;align-items:stretch;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);color:white;border-radius:var(--radius);overflow:hidden;margin-bottom:16px;position:relative;min-height:160px}
 .checkin-hero-content{flex:1;padding:20px;display:flex;flex-direction:column;justify-content:center;position:relative;z-index:2}
 .checkin-hero-img{width:160px;display:flex;align-items:flex-end;justify-content:center;flex-shrink:0;position:relative}
-.checkin-hero-img img{width:200px;max-height:100%;height:auto;object-fit:contain;object-position:bottom center;filter:drop-shadow(0 8px 20px rgba(0,0,0,.4))}
+.checkin-hero-img img{width:200px;max-height:100%;height:auto;object-fit:contain;object-position:bottom center;mix-blend-mode:screen}
 .checkin-status{display:flex;align-items:center;gap:8px;font-size:.75rem;margin-bottom:10px}
 .checkin-status .dot{width:8px;height:8px;border-radius:50%;background:var(--success);animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
@@ -1018,7 +1018,7 @@ a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.cal-nav bu
   .login-screen.hidden { display: none !important; }
   .login-left { display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; padding: 40px 32px; background: linear-gradient(135deg,#1a1a2e 0%,#16213e 60%,#0f3460 100%); position: relative; overflow: hidden; }
   .login-hero-img { display: block; margin-bottom: 20px; }
-  .login-hero-img img { width: 280px; height: auto; filter: drop-shadow(0 8px 24px rgba(0,0,0,.3)); }
+  .login-hero-img img { width: 280px; height: auto; mix-blend-mode: screen; }
   .login-brand { display: flex; flex-direction: column; align-items: center; text-align: center; color: #fff; }
   .login-brand .login-logo { margin-bottom: 10px; }
   .login-brand .login-logo img { width: 60px !important; filter: brightness(0) invert(1) drop-shadow(0 2px 8px rgba(0,0,0,.2)); }
@@ -1343,7 +1343,7 @@ a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.cal-nav bu
   .login-screen.hidden { display: none !important; }
   .login-left { display: flex; flex: 1.1; flex-direction: column; align-items: center; justify-content: center; padding: 60px 48px; background: linear-gradient(135deg,#1a1a2e 0%,#16213e 60%,#0f3460 100%); position: relative; overflow: hidden; }
   .login-hero-img { display: block; margin-bottom: 28px; }
-  .login-hero-img img { width: 380px; height: auto; filter: drop-shadow(0 12px 32px rgba(0,0,0,.4)); }
+  .login-hero-img img { width: 380px; height: auto; mix-blend-mode: screen; }
   .login-brand { display: flex; flex-direction: column; align-items: center; text-align: center; color: #fff; }
   .login-brand .login-logo { margin-bottom: 14px; }
   .login-brand .login-logo img { width: 72px !important; filter: brightness(0) invert(1) drop-shadow(0 4px 12px rgba(0,0,0,.2)); }
