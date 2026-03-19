@@ -132,7 +132,7 @@ def main():
                         help="HRMS API base URL")
     parser.add_argument("--emp-code", default="MD001",
                         help="Employee code to login as (must be MD)")
-    parser.add_argument("--password", default="emp123",
+    parser.add_argument("--password", default="admin123",
                         help="Login password")
     args = parser.parse_args()
 
@@ -244,14 +244,14 @@ def print_tree(parent_map, roots, level=0, prefix=""):
             children_of.setdefault(mgr, []).append(emp)
 
     def _print(node, indent="", is_last=True):
-        connector = "└── " if is_last else "├── "
+        connector = "+-- " if is_last else "|-- "
         if indent:
             print(f"{indent}{connector}{node}")
         else:
             print(f"  {node}")
         kids = sorted(children_of.get(node, []))
         for i, child in enumerate(kids):
-            extension = "    " if is_last else "│   "
+            extension = "    " if is_last else "|   "
             _print(child, indent + ("  " if not indent else extension), i == len(kids) - 1)
 
     for root in sorted(roots):
