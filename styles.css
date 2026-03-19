@@ -73,8 +73,8 @@ body{font-family:var(--font-body);color:var(--text);background:#E8EAF0;display:f
 /* ===== CHECK-IN HERO CARD ===== */
 .checkin-hero{display:flex;align-items:stretch;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);color:white;border-radius:var(--radius);overflow:hidden;margin-bottom:16px;position:relative;min-height:160px}
 .checkin-hero-content{flex:1;padding:20px;display:flex;flex-direction:column;justify-content:center;position:relative;z-index:2}
-.checkin-hero-img{width:140px;display:flex;align-items:flex-end;justify-content:flex-end;overflow:hidden;flex-shrink:0;position:relative}
-.checkin-hero-img img{width:160px;height:auto;object-fit:contain;object-position:bottom right;filter:drop-shadow(0 4px 12px rgba(0,0,0,.3));transform:translateX(10px)}
+.checkin-hero-img{width:160px;display:flex;align-items:flex-end;justify-content:center;flex-shrink:0;position:relative}
+.checkin-hero-img img{width:200px;max-height:100%;height:auto;object-fit:contain;object-position:bottom center;filter:drop-shadow(0 8px 20px rgba(0,0,0,.4))}
 .checkin-status{display:flex;align-items:center;gap:8px;font-size:.75rem;margin-bottom:10px}
 .checkin-status .dot{width:8px;height:8px;border-radius:50%;background:var(--success);animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
@@ -1045,13 +1045,9 @@ a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.cal-nav bu
   .login-divider span { color: var(--gray-400) !important; }
   .login-error { color: var(--danger) !important; }
   /* Checkin hero (tablet) */
-  .checkin-hero { min-height: 180px; }
-  .checkin-hero-img { width: 200px; }
-  .checkin-hero-img img { width: 220px; }
-  /* Quick actions (tablet) */
-  .quick-actions-grid { grid-template-columns: repeat(4, 1fr); gap: 12px; }
-  .qa-icon { width: 48px; height: 48px; }
-  .qa-btn span { font-size: .72rem; }
+  .checkin-hero { min-height: 180px; border-radius: 16px; }
+  .checkin-hero-img { width: 220px; }
+  .checkin-hero-img img { width: 260px; }
 }
 
 /* =====================================================
@@ -1377,16 +1373,11 @@ a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.cal-nav bu
   /* Checkin hero (desktop) */
   .checkin-hero { min-height: 200px; border-radius: 18px; }
   .checkin-hero-content { padding: 28px; }
-  .checkin-hero-img { width: 260px; }
-  .checkin-hero-img img { width: 280px; }
+  .checkin-hero-img { width: 300px; }
+  .checkin-hero-img img { width: 340px; }
   .checkin-time { font-size: 2.4rem; }
   .checkin-date { font-size: .82rem; }
   .checkin-actions .btn { padding: 12px 24px; font-size: .88rem; }
-  /* Quick actions (desktop) */
-  .quick-actions-grid { grid-template-columns: repeat(8, 1fr); gap: 14px; }
-  .qa-icon { width: 52px; height: 52px; }
-  .qa-btn { padding: 16px 6px; }
-  .qa-btn span { font-size: .75rem; }
   .login-btn { font-size: 1rem; padding: 15px; }
 
   /* ── Step 9: Overlays — full-screen fixed, escape the grid entirely ── */
