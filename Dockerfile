@@ -11,6 +11,7 @@ RUN mkdir -p /app/public
 COPY index.html styles.css app.js sw.js manifest.json /app/public/
 COPY swetha_logo.png swetha_symbol.png swetha_name.png swetha_tagline.png /app/public/
 COPY icons/ /app/public/icons/
+COPY assets/ /app/public/assets/
 
 # Copy server and database
 COPY server/ ./server/
