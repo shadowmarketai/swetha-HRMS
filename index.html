@@ -82,12 +82,18 @@
           <button class="btn btn-white" onclick="gpsCheckOut()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Check Out</button>
         </div>
       </div>
-      <div id="homeMyTasks"></div>
-      <div id="homeMyProjects"></div>
-      <div id="dashboardCelebrations"></div>
-      <div id="dashboardAnnouncements"></div>
-      <div class="section-title">Recent Activity</div>
-      <div id="recentActivityList" class="card fade-in"></div>
+      <div class="home-grid">
+        <div class="home-grid-col">
+          <div id="homeMyTasks"></div>
+          <div id="homeMyProjects"></div>
+          <div id="recentActivityList" class="card fade-in"></div>
+        </div>
+        <div class="home-grid-col">
+          <div id="dashboardAnnouncements"></div>
+          <div id="dashboardCelebrations"></div>
+          <div id="homeQuickStats"></div>
+        </div>
+      </div>
     </div>
 
     <!-- SITE ADVANCE & EXPENSES -->

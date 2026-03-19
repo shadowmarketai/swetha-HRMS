@@ -783,6 +783,9 @@ function applyRole() {
   // Recent Activity (role-filtered)
   renderRecentActivity();
 
+  // Home quick stats
+  renderHomeQuickStats();
+
   // Advance requests
   renderAdvancePendingBanner();
   renderMyAdvanceRequests();
@@ -6811,7 +6814,7 @@ function renderRecentActivity() {
     return 'badge-pending';
   };
 
-  var html = '';
+  var html = '<div class="section-title" style="margin-top:0">Recent Activity</div>';
   items.forEach(function(it) {
     var shortDate = it.date;
     if (shortDate && shortDate.length > 6) {
@@ -6822,6 +6825,41 @@ function renderRecentActivity() {
     html += '<div class="req-meta"><div class="date">' + escapeHTML(shortDate) + '</div><span class="badge-status ' + badgeClass(it.status) + '">' + escapeHTML(it.status) + '</span></div>';
     html += '</div>';
   });
+  c.innerHTML = html;
+}
+
+// =====================================================
+// HOME QUICK STATS (fills right column)
+// =====================================================
+function renderHomeQuickStats() {
+  var c = document.getElementById('homeQuickStats');
+  if (!c || !currentUser) return;
+
+  var myLeaves = (typeof leaveApplications !== 'undefined' ? leaveApplications : []).filter(function(l) { return l.empCode === currentUser.code; });
+  var myAdvances = (typeof advanceRequests !== 'undefined' ? advanceRequests : []).filter(function(r) { return r.empCode === currentUser.code; });
+
+  // Leave balance
+  var bal = (typeof leaveBalances !== 'undefined' && leaveBalances[currentUser.code]) ? leaveBalances[currentUser.code] : {};
+  var casualLeft = bal.casual !== undefined ? bal.casual : 12;
+
+  // Pending items
+  var pendingLeaves = myLeaves.filter(function(l) { return l.status === 'pending' || l.status === 'hr_accepted'; }).length;
+  var pendingAdv = myAdvances.filter(function(r) { var s = (r.status || '').toLowerCase(); return s === 'pending' || s === 'hr_accepted'; }).length;
+
+  // Attendance this month
+  var todayStr = new Date().toISOString().split('T')[0];
+  var monthStr = todayStr.substring(0, 7);
+  var myAttendance = (typeof attendanceLogs !== 'undefined' ? attendanceLogs : []).filter(function(l) {
+    return l.empCode === currentUser.code && l.type === 'checkin' && l.timestamp && l.timestamp.startsWith(monthStr);
+  }).length;
+
+  var html = '<div class="section-title" style="margin-top:4px">Quick Stats</div>';
+  html += '<div class="home-quick-stats">';
+  html += '<div class="home-stat-card stat-leave"><div class="home-stat-value" style="color:var(--blue)">' + casualLeft + '</div><div class="home-stat-label">Leave Balance</div></div>';
+  html += '<div class="home-stat-card stat-attendance"><div class="home-stat-value" style="color:var(--success)">' + myAttendance + '</div><div class="home-stat-label">Days Present</div></div>';
+  html += '<div class="home-stat-card stat-advance"><div class="home-stat-value" style="color:var(--teal)">' + pendingAdv + '</div><div class="home-stat-label">Pending Advances</div></div>';
+  html += '<div class="home-stat-card stat-expense"><div class="home-stat-value" style="color:var(--purple)">' + pendingLeaves + '</div><div class="home-stat-label">Pending Leaves</div></div>';
+  html += '</div>';
   c.innerHTML = html;
 }
 
