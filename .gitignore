@@ -28,6 +28,7 @@ Thumbs.db
 !swetha_tagline.png
 !icons/*.png
 !icons/*.svg
+!assets/*.png
 
 # Build artifacts
 *.pyc
