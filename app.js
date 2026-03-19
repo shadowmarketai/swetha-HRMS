@@ -520,6 +520,9 @@ async function loginAs(empCode) {
     initLeaveTabs();
     history.replaceState({ tab: 'home' }, '');
 
+    // Start periodic notification refresh (every 30 seconds)
+    startNotifPoll();
+
     // MD/HR: check for new employees needing setup (salary=0)
     if (currentUser.role === 'MD' || currentUser.role === 'HR') {
       var newEmps = EMPLOYEES.filter(function(e) { return e.salary === 0 && e.code !== currentUser.code; });
@@ -646,8 +649,9 @@ function doLogout() {
   currentUser = null;
   JWT_TOKEN = null;
   safeStorage.remove('hrms_jwt');
-  // Clean up idle timer
+  // Clean up idle timer and notification poll
   if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
+  stopNotifPoll();
   // Prevent Google auto-login after logout
   try { if (typeof google !== 'undefined' && google.accounts && google.accounts.id) google.accounts.id.disableAutoSelect(); } catch (e) {}
   document.getElementById('loginScreen').classList.remove('hidden');
@@ -2088,6 +2092,7 @@ async function submitAdvanceRequest() {
     hideOverlay('advance-apply');
     renderAllMyRequests();
     renderAllPendingBanners();
+    refreshNotifications();
   } catch (e) {
     showToast(e.message || 'Error submitting advance request');
   }
@@ -2228,6 +2233,7 @@ async function approveAdvance(id) {
       showToast('Accepted \u20B9' + req.amount.toLocaleString('en-IN') + ' — forwarded to MD');
       renderAdvanceRequests(advReqActiveTab);
       renderAllPendingBanners();
+      refreshNotifications();
       return;
     }
     await apiCall('PATCH', '/advances/' + id + '/approve');
@@ -2237,6 +2243,7 @@ async function approveAdvance(id) {
     showToast('Approved \u20B9' + req.amount.toLocaleString('en-IN') + ' for ' + req.empName);
     renderAdvanceRequests(advReqActiveTab);
     renderAllPendingBanners();
+    refreshNotifications();
   } catch (err) { showToast(err.message || 'Error approving advance'); }
 }
 
@@ -2254,6 +2261,7 @@ async function rejectAdvance(id) {
     showToast('Rejected advance for ' + req.empName);
     renderAdvanceRequests(advReqActiveTab);
     renderAllPendingBanners();
+    refreshNotifications();
   } catch (err) { showToast(err.message || 'Error rejecting advance'); }
 }
 
@@ -5664,6 +5672,38 @@ function addNotification(title, body, category) {
   apiCall('POST', '/notifications', { title, body, category }).catch(function(){});
 }
 
+// Refresh notifications from backend (picks up notifications created server-side for this user)
+var _notifPollTimer = null;
+function refreshNotifications() {
+  apiCall('GET', '/notifications').then(function(data) {
+    if (!data || !Array.isArray(data)) return;
+    var hadUnread = NOTIF_HISTORY.filter(function(n) { return !n.read; }).length;
+    NOTIF_HISTORY.length = 0;
+    data.map(mapNotification).forEach(function(n) { NOTIF_HISTORY.push(n); });
+    var nowUnread = NOTIF_HISTORY.filter(function(n) { return !n.read; }).length;
+    updateNotifBadge();
+    // Browser notification for newly arrived notifications
+    if (nowUnread > hadUnread) {
+      var newest = NOTIF_HISTORY.find(function(n) { return !n.read; });
+      if (newest && notifPrefs[newest.category] !== false) {
+        sendNotification(newest.title, newest.body, newest.category + '-' + newest.id);
+      }
+    }
+    try { safeStorage.set(STORAGE_KEYS.notifHistory, JSON.stringify(NOTIF_HISTORY)); } catch(e){}
+    // If notification overlay is open, re-render it
+    var overlay = document.getElementById('overlay-notifications');
+    if (overlay && overlay.classList.contains('active')) renderNotifications();
+  }).catch(function(){});
+}
+function startNotifPoll() {
+  stopNotifPoll();
+  refreshNotifications();
+  _notifPollTimer = setInterval(refreshNotifications, 30000);
+}
+function stopNotifPoll() {
+  if (_notifPollTimer) { clearInterval(_notifPollTimer); _notifPollTimer = null; }
+}
+
 function updateNotifBadge() {
   const badge = document.querySelector('.header-btn .badge');
   const unread = NOTIF_HISTORY.filter(n => !n.read && (!n.empCode || (currentUser && n.empCode === currentUser.code))).length;
@@ -5843,7 +5883,7 @@ async function submitLeave() {
     closeLeaveForm();
     renderLeaveScreen();
     showToast('Leave application submitted');
-    addNotification('Leave Applied', currentUser.name + ' applied for ' + days + ' day(s) ' + selectedLeaveType + ' leave', 'leave');
+    refreshNotifications();
   } catch (e) { showToast(e.message || 'Error submitting leave'); }
 }
 
@@ -5863,7 +5903,7 @@ async function approveLeave(id) {
     bal[app.type] = Math.max(0, bal[app.type] - app.days);
     renderLeaveScreen();
     showToast('Leave approved');
-    addNotification('Leave Approved', app.empName + '\'s ' + app.type + ' leave approved (' + app.days + ' days)', 'leave');
+    refreshNotifications();
   } catch (err) { showToast(err.message || 'Error approving leave'); }
 }
 
@@ -5875,7 +5915,7 @@ async function rejectLeave(id) {
     app.status = 'rejected';
     renderLeaveScreen();
     showToast('Leave rejected');
-    addNotification('Leave Rejected', app.empName + '\'s ' + app.type + ' leave rejected', 'leave');
+    refreshNotifications();
   } catch (err) { showToast(err.message || 'Error rejecting leave'); }
 }
 
@@ -8522,7 +8562,7 @@ async function hrAcceptLeave(id) {
     await apiCall('PATCH', '/leaves/' + id + '/hr-accept');
     app.status = 'hr_accepted';
     showToast('Leave accepted — forwarded to MD for confirmation');
-    addNotification('Leave Accepted by HR', app.empName + '\'s ' + app.type + ' leave accepted by HR, awaiting MD', 'leave');
+    refreshNotifications();
     renderHRLeaveRequests();
   } catch (err) { showToast(err.message || 'Error accepting leave'); }
 }

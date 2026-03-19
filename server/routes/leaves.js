@@ -6,6 +6,22 @@ const { auditLog } = require('../middleware/audit');
 
 const VALID_LEAVE_TYPES = ['casual', 'comp'];
 
+// Helper: create notifications for multiple users
+async function notifyUsers(pool, empCodes, title, message, type) {
+  if (!empCodes || empCodes.length === 0) return;
+  const unique = [...new Set(empCodes)];
+  const values = unique.map(code => [code, title, message, type]);
+  try {
+    await pool.query('INSERT INTO notifications (emp_code, title, message, type) VALUES ?', [values]);
+  } catch (e) { console.error('Notify error:', e.message); }
+}
+
+// Helper: get emp_codes by role
+async function getEmpCodesByRole(pool, roles) {
+  const [rows] = await pool.query('SELECT code FROM employees WHERE role IN (?) AND (status IS NULL OR status = "Active")', [roles]);
+  return rows.map(r => r.code);
+}
+
 // GET /api/leaves — list leave applications
 router.get('/', verifyToken, async (req, res) => {
   try {
@@ -68,6 +84,12 @@ router.post('/', verifyToken, [
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [req.user.empCode, empName, dept, type, from, to, days, reason || '']
     );
+
+    // Notify all HR and MD users about new leave request
+    const managers = await getEmpCodesByRole(pool, ['HR', 'MD']);
+    const targets = managers.filter(c => c !== req.user.empCode);
+    await notifyUsers(pool, targets, 'Leave Request', empName + ' applied for ' + days + ' day(s) ' + type + ' leave', 'leave');
+
     res.status(201).json({ message: 'Leave application submitted', id: result.insertId });
   } catch (err) {
     console.error(err);
@@ -99,6 +121,9 @@ router.patch('/:id/approve', verifyToken, requireRole('MD', 'HR'), auditLog('app
       [app.days, app.emp_code]
     );
 
+    // Notify the employee that their leave was approved
+    await notifyUsers(pool, [app.emp_code], 'Leave Approved', 'Your ' + app.leave_type + ' leave (' + app.days + ' days) has been approved', 'leave');
+
     res.json({ message: 'Leave approved' });
   } catch (err) {
     console.error(err);
@@ -117,6 +142,12 @@ router.patch('/:id/hr-accept', verifyToken, requireRole('HR'), auditLog('hr-acce
       'UPDATE leave_applications SET status = "hr_accepted", reviewed_by = ?, review_date = CURDATE() WHERE id = ?',
       [req.user.empCode, req.params.id]
     );
+
+    // Notify the employee + all MD users
+    const mdUsers = await getEmpCodesByRole(pool, ['MD']);
+    const targets = [apps[0].emp_code, ...mdUsers].filter(c => c !== req.user.empCode);
+    await notifyUsers(pool, targets, 'Leave Accepted by HR', apps[0].emp_name + '\'s ' + apps[0].leave_type + ' leave accepted by HR, awaiting MD confirmation', 'leave');
+
     res.json({ message: 'Leave accepted by HR' });
   } catch (err) {
     console.error(err);
@@ -135,6 +166,10 @@ router.patch('/:id/reject', verifyToken, requireRole('MD', 'HR'), auditLog('reje
       'UPDATE leave_applications SET status = "rejected", reviewed_by = ?, review_date = CURDATE() WHERE id = ?',
       [req.user.empCode, req.params.id]
     );
+
+    // Notify the employee that their leave was rejected
+    await notifyUsers(pool, [apps[0].emp_code], 'Leave Rejected', 'Your ' + apps[0].leave_type + ' leave has been rejected', 'leave');
+
     res.json({ message: 'Leave rejected' });
   } catch (err) {
     console.error(err);

@@ -4,6 +4,22 @@ const { verifyToken, requireRole } = require('../middleware/auth');
 const { body, validationResult } = require('express-validator');
 const { auditLog } = require('../middleware/audit');
 
+// Helper: create notifications for multiple users
+async function notifyUsers(pool, empCodes, title, message, type) {
+  if (!empCodes || empCodes.length === 0) return;
+  const unique = [...new Set(empCodes)];
+  const values = unique.map(code => [code, title, message, type]);
+  try {
+    await pool.query('INSERT INTO notifications (emp_code, title, message, type) VALUES ?', [values]);
+  } catch (e) { console.error('Notify error:', e.message); }
+}
+
+// Helper: get emp_codes by role
+async function getEmpCodesByRole(pool, roles) {
+  const [rows] = await pool.query('SELECT code FROM employees WHERE role IN (?) AND (status IS NULL OR status = "Active")', [roles]);
+  return rows.map(r => r.code);
+}
+
 // GET /api/advances — list advances
 router.get('/', verifyToken, async (req, res) => {
   try {
@@ -47,6 +63,14 @@ router.post('/', verifyToken, [
       [type, req.user.empCode, empName, dept, amount, reason || '', details || '', project || '', category || '',
        travelFrom || '', travelTo || '', vehicle || '', travelKm || 0, emiAmount || 0, emiMonths || 0, urgency || 'medium']
     );
+
+    // Notify all HR and MD users about new advance request
+    const typeLabels = { salary: 'Salary Advance', travel: 'Travel Advance', site: 'Travel Expense' };
+    const typeLabel = typeLabels[type] || type;
+    const managers = await getEmpCodesByRole(pool, ['HR', 'MD']);
+    const targets = managers.filter(c => c !== req.user.empCode);
+    await notifyUsers(pool, targets, 'Advance Request', empName + ' submitted ' + typeLabel + ' for Rs.' + Number(amount).toLocaleString('en-IN'), 'advance');
+
     res.status(201).json({ message: 'Advance request submitted', id: result.insertId });
   } catch (err) {
     console.error(err);
@@ -57,13 +81,20 @@ router.post('/', verifyToken, [
 // PATCH /api/advances/:id/hr-accept — HR accepts (Pending → HR_Accepted)
 router.patch('/:id/hr-accept', verifyToken, requireRole('HR'), auditLog('hr-accept', 'advance'), async (req, res) => {
   try {
-    const [existing] = await pool.query('SELECT status FROM advance_requests WHERE id = ?', [req.params.id]);
+    const [existing] = await pool.query('SELECT * FROM advance_requests WHERE id = ?', [req.params.id]);
     if (existing.length === 0) return res.status(404).json({ error: 'Advance request not found' });
     if (existing[0].status !== 'Pending') return res.status(400).json({ error: `Cannot accept: status is ${existing[0].status}` });
     await pool.query(
       'UPDATE advance_requests SET status = "HR_Accepted", reviewed_by = ?, review_date = CURDATE() WHERE id = ?',
       [req.user.empCode, req.params.id]
     );
+
+    // Notify the employee + all MD users
+    const adv = existing[0];
+    const mdUsers = await getEmpCodesByRole(pool, ['MD']);
+    const targets = [adv.emp_code, ...mdUsers].filter(c => c !== req.user.empCode);
+    await notifyUsers(pool, targets, 'Advance Accepted by HR', adv.emp_name + '\'s ' + adv.type + ' advance (Rs.' + Number(adv.amount).toLocaleString('en-IN') + ') accepted by HR, awaiting MD', 'advance');
+
     res.json({ message: 'Advance accepted by HR' });
   } catch (err) {
     console.error(err);
@@ -74,13 +105,18 @@ router.patch('/:id/hr-accept', verifyToken, requireRole('HR'), auditLog('hr-acce
 // PATCH /api/advances/:id/approve — MD approves (from Pending or HR_Accepted)
 router.patch('/:id/approve', verifyToken, requireRole('MD', 'HR'), auditLog('approve', 'advance'), async (req, res) => {
   try {
-    const [existing] = await pool.query('SELECT status FROM advance_requests WHERE id = ?', [req.params.id]);
+    const [existing] = await pool.query('SELECT * FROM advance_requests WHERE id = ?', [req.params.id]);
     if (existing.length === 0) return res.status(404).json({ error: 'Advance request not found' });
     if (existing[0].status !== 'Pending' && existing[0].status !== 'HR_Accepted') return res.status(400).json({ error: `Cannot approve: status is ${existing[0].status}` });
     await pool.query(
       'UPDATE advance_requests SET status = "Approved", reviewed_by = ?, review_date = CURDATE() WHERE id = ?',
       [req.user.empCode, req.params.id]
     );
+
+    // Notify the employee that their advance was approved
+    const adv = existing[0];
+    await notifyUsers(pool, [adv.emp_code], 'Advance Approved', 'Your ' + adv.type + ' advance (Rs.' + Number(adv.amount).toLocaleString('en-IN') + ') has been approved', 'advance');
+
     res.json({ message: 'Advance approved' });
   } catch (err) {
     console.error(err);
@@ -91,7 +127,7 @@ router.patch('/:id/approve', verifyToken, requireRole('MD', 'HR'), auditLog('app
 // PATCH /api/advances/:id/reject — can reject Pending or HR_Accepted
 router.patch('/:id/reject', verifyToken, requireRole('MD', 'HR'), auditLog('reject', 'advance'), async (req, res) => {
   try {
-    const [existing] = await pool.query('SELECT status FROM advance_requests WHERE id = ?', [req.params.id]);
+    const [existing] = await pool.query('SELECT * FROM advance_requests WHERE id = ?', [req.params.id]);
     if (existing.length === 0) return res.status(404).json({ error: 'Advance request not found' });
     if (existing[0].status !== 'Pending' && existing[0].status !== 'HR_Accepted') return res.status(400).json({ error: `Cannot reject: status is ${existing[0].status}` });
     const { reason } = req.body;
@@ -99,6 +135,11 @@ router.patch('/:id/reject', verifyToken, requireRole('MD', 'HR'), auditLog('reje
       'UPDATE advance_requests SET status = "Rejected", reviewed_by = ?, review_date = CURDATE(), reject_reason = ? WHERE id = ?',
       [req.user.empCode, reason || '', req.params.id]
     );
+
+    // Notify the employee that their advance was rejected
+    const adv = existing[0];
+    await notifyUsers(pool, [adv.emp_code], 'Advance Rejected', 'Your ' + adv.type + ' advance (Rs.' + Number(adv.amount).toLocaleString('en-IN') + ') has been rejected' + (reason ? ': ' + reason : ''), 'advance');
+
     res.json({ message: 'Advance rejected' });
   } catch (err) {
     console.error(err);
