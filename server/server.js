@@ -120,6 +120,18 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(STATIC_DIR, 'index.html'));
 });
 
+// Run DB migrations on startup
+(async function runMigrations() {
+  try {
+    const pool = require('./config/db');
+    // Add hr_accepted to leave_applications status ENUM
+    await pool.query("ALTER TABLE leave_applications MODIFY COLUMN status ENUM('pending','hr_accepted','approved','rejected') DEFAULT 'pending'").catch(() => {});
+    // Add HR_Accepted to advance_requests status ENUM
+    await pool.query("ALTER TABLE advance_requests MODIFY COLUMN status ENUM('Pending','HR_Accepted','Approved','Rejected') DEFAULT 'Pending'").catch(() => {});
+    console.log('DB migrations applied');
+  } catch (e) { console.error('Migration error (non-fatal):', e.message); }
+})();
+
 app.listen(PORT, () => {
   console.log(`HRMS Server running on port ${PORT}`);
   console.log(`Frontend: http://localhost:${PORT}`);

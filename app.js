@@ -446,6 +446,18 @@ EMPLOYEES.forEach(e => { if (!e.status) e.status = 'Active'; });
 // =====================================================
 // LOGIN
 // =====================================================
+function togglePwdVisibility(inputId, btn) {
+  var inp = document.getElementById(inputId);
+  if (!inp) return;
+  var isPassword = inp.type === 'password';
+  inp.type = isPassword ? 'text' : 'password';
+  var openEye = btn.querySelector('.eye-open');
+  var closedEye = btn.querySelector('.eye-closed');
+  if (openEye) openEye.style.display = isPassword ? 'none' : '';
+  if (closedEye) closedEye.style.display = isPassword ? '' : 'none';
+  btn.setAttribute('aria-label', isPassword ? 'Hide password' : 'Show password');
+}
+
 async function doLogin() {
   const id = document.getElementById('loginId').value.trim().toUpperCase();
   const pass = document.getElementById('loginPass').value;
@@ -552,39 +564,31 @@ function renderProfileOverlay() {
   var personalSubmitted = selfData && selfData.personalSubmitted === true;
 
   var html = '<div class="card profile-card" style="margin:16px;border-radius:var(--radius)">';
-  html += '<div class="profile-avatar">' + escapeHTML(initials) + '</div>';
+  // Profile image — show photo if available, otherwise initials
+  var photoUrl = emp.photoUrl || emp.photo_url || null;
+  if (photoUrl) {
+    html += '<div class="profile-avatar" style="background-image:url(\'' + escapeHTML(photoUrl) + '\');background-size:cover;background-position:center"></div>';
+  } else {
+    html += '<div class="profile-avatar">' + escapeHTML(initials) + '</div>';
+  }
   html += '<h2>' + escapeHTML(emp.name) + '</h2>';
   html += '<div class="designation">' + escapeHTML(emp.designation || emp.dept || '') + '</div>';
   html += '<div class="emp-id">' + escapeHTML(emp.code) + '</div>';
   html += '</div>';
 
-  // Personal Details section
+  // Personal Details section — read-only (HR feeds details)
   html += '<div class="card profile-section" style="margin:0 16px 12px;border-radius:var(--radius)">';
   html += '<div style="font-family:var(--font-display);font-weight:600;font-size:.82rem;margin-bottom:8px;color:var(--gray-500)">Personal Details</div>';
-  if (personalSubmitted) {
-    // Read-only view
-    html += '<div class="profile-row"><span class="label">Father\'s Name</span><span class="value">' + escapeHTML(selfData.fatherName || 'N/A') + '</span></div>';
-    html += '<div class="profile-row"><span class="label">Father\'s Mobile</span><span class="value">' + escapeHTML(selfData.fatherMobile || 'N/A') + '</span></div>';
-    html += '<div class="profile-row"><span class="label">Mother\'s Name</span><span class="value">' + escapeHTML(selfData.motherName || 'N/A') + '</span></div>';
-    html += '<div class="profile-row"><span class="label">Mother\'s Mobile</span><span class="value">' + escapeHTML(selfData.motherMobile || 'N/A') + '</span></div>';
-    html += '<div class="profile-row"><span class="label">Blood Group</span><span class="value">' + escapeHTML(selfData.bloodGroup || 'N/A') + '</span></div>';
-    html += '<div class="profile-row"><span class="label">Emergency Contact</span><span class="value">' + escapeHTML(selfData.emergencyContact || 'N/A') + '</span></div>';
-    html += '<div class="profile-row"><span class="label">Address</span><span class="value">' + escapeHTML(selfData.presentAddress || 'N/A') + '</span></div>';
-    html += '<div style="margin-top:8px"><button class="nf-btn nf-btn-outline nf-btn-sm" onclick="requestProfileChange()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Request Changes</button></div>';
-  } else {
-    // Editable form
-    html += '<div class="form-row"><label>Father\'s Name</label><input type="text" id="profFatherName" value="' + escapeHTML(selfData.fatherName || '') + '" placeholder="Enter father\'s name"></div>';
-    html += '<div class="form-row"><label>Father\'s Mobile</label><input type="tel" id="profFatherMobile" value="' + escapeHTML(selfData.fatherMobile || '') + '" placeholder="e.g. 9876543210" maxlength="10"></div>';
-    html += '<div class="form-row"><label>Mother\'s Name</label><input type="text" id="profMotherName" value="' + escapeHTML(selfData.motherName || '') + '" placeholder="Enter mother\'s name"></div>';
-    html += '<div class="form-row"><label>Mother\'s Mobile</label><input type="tel" id="profMotherMobile" value="' + escapeHTML(selfData.motherMobile || '') + '" placeholder="e.g. 9876543210" maxlength="10"></div>';
-    html += '<div class="form-row"><label>Blood Group</label><select id="profBloodGroup"><option value="">Select</option>';
-    ['A+','A-','B+','B-','AB+','AB-','O+','O-'].forEach(function(bg) {
-      html += '<option' + (selfData.bloodGroup === bg ? ' selected' : '') + '>' + bg + '</option>';
-    });
-    html += '</select></div>';
-    html += '<div class="form-row"><label>Emergency Contact</label><input type="tel" id="profEmergency" value="' + escapeHTML(selfData.emergencyContact || '') + '" placeholder="Emergency phone number" maxlength="10"></div>';
-    html += '<div class="form-row"><label>Address</label><textarea id="profAddress" rows="2" placeholder="Enter your address">' + escapeHTML(selfData.presentAddress || '') + '</textarea></div>';
-    html += '<button class="btn btn-primary w-full" style="border-radius:var(--radius-sm);margin-top:8px" onclick="submitProfilePersonalDetails()">Save Personal Details</button>';
+  html += '<div class="profile-row"><span class="label">Phone</span><span class="value">' + escapeHTML(emp.phone || 'N/A') + '</span></div>';
+  html += '<div class="profile-row"><span class="label">Email</span><span class="value">' + escapeHTML(emp.email || 'N/A') + '</span></div>';
+  html += '<div class="profile-row"><span class="label">Date of Joining</span><span class="value">' + escapeHTML(emp.doj || 'N/A') + '</span></div>';
+  if (selfData.fatherName) html += '<div class="profile-row"><span class="label">Father\'s Name</span><span class="value">' + escapeHTML(selfData.fatherName) + '</span></div>';
+  if (selfData.motherName) html += '<div class="profile-row"><span class="label">Mother\'s Name</span><span class="value">' + escapeHTML(selfData.motherName) + '</span></div>';
+  if (selfData.bloodGroup) html += '<div class="profile-row"><span class="label">Blood Group</span><span class="value">' + escapeHTML(selfData.bloodGroup) + '</span></div>';
+  if (selfData.emergencyContact) html += '<div class="profile-row"><span class="label">Emergency Contact</span><span class="value">' + escapeHTML(selfData.emergencyContact) + '</span></div>';
+  if (selfData.presentAddress) html += '<div class="profile-row"><span class="label">Address</span><span class="value">' + escapeHTML(selfData.presentAddress) + '</span></div>';
+  if (!personalSubmitted) {
+    html += '<div style="margin-top:8px;font-size:.7rem;color:var(--gray-400);text-align:center">Contact HR to update your personal details</div>';
   }
   html += '</div>';
 
@@ -708,7 +712,7 @@ function restoreLoginForm() {
   const form = document.querySelector('.login-form');
   form.innerHTML = `
     <div class="login-field"><label>Employee Code / Phone</label><input type="text" id="loginId" placeholder="e.g. MD001, SSC006, SSC011" maxlength="50" autocomplete="username"></div>
-    <div class="login-field"><label>Password</label><input type="password" id="loginPass" placeholder="Enter password" maxlength="128" autocomplete="current-password"></div>
+    <div class="login-field"><label>Password</label><div class="pwd-wrapper"><input type="password" id="loginPass" placeholder="Enter password" maxlength="128" autocomplete="current-password"><button type="button" class="pwd-toggle" onclick="togglePwdVisibility('loginPass',this)" aria-label="Show password"><svg class="eye-open" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><svg class="eye-closed" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button></div></div>
     <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
       <input type="checkbox" id="rememberMe" style="accent-color:white;width:16px;height:16px">
       <label for="rememberMe" style="font-size:.72rem;opacity:.8;cursor:pointer">Remember me</label>
@@ -1311,6 +1315,19 @@ function handleBillCapture(input) {
 // =====================================================
 // ONBOARDING WIZARD
 // =====================================================
+var empPhotoFile = null;
+function previewEmpPhoto(input) {
+  if (!input.files || !input.files[0]) return;
+  empPhotoFile = input.files[0];
+  var box = document.getElementById('photoUploadBox');
+  if (!box) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    box.innerHTML = '<img src="' + e.target.result + '" style="width:100%;height:100%;object-fit:cover;border-radius:inherit">';
+  };
+  reader.readAsDataURL(empPhotoFile);
+}
+
 function resetWizard() {
   wizardStep = 1;
   updateWizardUI();
@@ -1391,8 +1408,19 @@ async function submitOnboarding() {
     await apiCall('POST', '/employees', newEmp);
     // Register user account with specified password
     await apiCall('POST', '/auth/register', { empCode: code, password: obPassword, role: obRole });
+    // Upload photo if provided
+    if (empPhotoFile) {
+      try {
+        var formData = new FormData();
+        formData.append('file', empPhotoFile);
+        formData.append('empCode', code);
+        formData.append('docType', 'photo');
+        await fetch(API_BASE + '/documents/upload', { method: 'POST', headers: { 'Authorization': 'Bearer ' + JWT_TOKEN }, body: formData }).then(function(r) { return r.json(); });
+      } catch (photoErr) { console.error('Photo upload failed:', photoErr); }
+      empPhotoFile = null;
+    }
     EMPLOYEES.push(newEmp);
-    showToast(name + ' added successfully as ' + dept + ' staff!');
+    showToast('Employee Saved Successfully! ' + name + ' (' + code + ') added to ' + dept);
     hideOverlay('onboarding');
   } catch (e) { showToast(e.message || 'Error adding employee'); }
 }
@@ -2028,6 +2056,20 @@ function setAdvUrgency(val) {
 
 function updateEmiCalc() {
   // EMI removed — salary advance deducted from next month salary
+}
+
+var advBillFiles = [];
+function handleBillUpload(input) {
+  var preview = document.getElementById('advBillPreview');
+  if (!preview || !input.files) return;
+  Array.from(input.files).forEach(function(f) {
+    advBillFiles.push(f);
+    var chip = document.createElement('div');
+    chip.style.cssText = 'display:flex;align-items:center;gap:4px;background:var(--primary-50);padding:4px 8px;border-radius:12px;font-size:.68rem;color:var(--primary)';
+    chip.innerHTML = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>' + escapeHTML(f.name.substring(0, 20));
+    preview.appendChild(chip);
+  });
+  input.value = '';
 }
 
 async function submitAdvanceRequest() {
@@ -5679,6 +5721,17 @@ function addNotification(title, body, category) {
 
 // Refresh notifications from backend (picks up notifications created server-side for this user)
 var _notifPollTimer = null;
+function showNotifPopup(title, body) {
+  var existing = document.querySelector('.notif-popup');
+  if (existing) existing.remove();
+  var popup = document.createElement('div');
+  popup.className = 'notif-popup';
+  popup.innerHTML = '<div class="notif-popup-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div><div class="notif-popup-text"><div class="notif-popup-title">' + escapeHTML(title) + '</div><div class="notif-popup-body">' + escapeHTML(body) + '</div></div><button class="notif-popup-close" onclick="this.parentElement.remove()">&times;</button>';
+  document.body.appendChild(popup);
+  requestAnimationFrame(function() { popup.classList.add('show'); });
+  setTimeout(function() { if (popup.parentElement) { popup.classList.remove('show'); setTimeout(function() { if (popup.parentElement) popup.remove(); }, 300); } }, 6000);
+}
+
 function refreshNotifications() {
   apiCall('GET', '/notifications').then(function(data) {
     if (!data || !Array.isArray(data)) return;
@@ -5687,11 +5740,12 @@ function refreshNotifications() {
     data.map(mapNotification).forEach(function(n) { NOTIF_HISTORY.push(n); });
     var nowUnread = NOTIF_HISTORY.filter(function(n) { return !n.read; }).length;
     updateNotifBadge();
-    // Browser notification for newly arrived notifications
+    // In-app popup + browser notification for newly arrived notifications
     if (nowUnread > hadUnread) {
       var newest = NOTIF_HISTORY.find(function(n) { return !n.read; });
       if (newest && notifPrefs[newest.category] !== false) {
         sendNotification(newest.title, newest.body, newest.category + '-' + newest.id);
+        showNotifPopup(newest.title, newest.body);
       }
     }
     try { safeStorage.set(STORAGE_KEYS.notifHistory, JSON.stringify(NOTIF_HISTORY)); } catch(e){}
@@ -5801,6 +5855,13 @@ function openLeaveForm() {
   if (currentUser && currentUser.role === 'MD') { showToast('MD does not apply for leave'); return; }
   document.getElementById('leaveFormOverlay').classList.add('active');
   selectedLeaveType = 'casual';
+  // Update leave balance badge
+  var balText = document.getElementById('leaveBalText');
+  if (balText && currentUser) {
+    var bal = getLeaveBalance(currentUser.code);
+    var rem = bal.casual || 0;
+    balText.textContent = 'Casual Leave: ' + rem + ' days remaining';
+  }
   document.querySelectorAll('#leaveTypePills .lt-pill').forEach((p,i) => p.classList.toggle('active', i===0));
   var today = new Date().toISOString().split('T')[0];
   var fromDate = document.getElementById('leaveFromDate');
@@ -7415,31 +7476,44 @@ function toggleOrgExpand(empCode) {
   renderOrgchartOverlay();
 }
 
+function getOrgNodeColor(emp) {
+  if (emp.role === 'MD') return { bg: 'linear-gradient(135deg,#E85D04,#FF6B35)', text: '#fff', badge: '#FFF7ED' };
+  if (emp.role === 'HR') return { bg: 'linear-gradient(135deg,#7C3AED,#A78BFA)', text: '#fff', badge: '#F5F3FF' };
+  var dept = (emp.dept || '').toLowerCase();
+  if (dept.indexOf('account') !== -1) return { bg: 'linear-gradient(135deg,#0891B2,#22D3EE)', text: '#fff', badge: '#ECFEFF' };
+  if (dept.indexOf('factory') !== -1 || dept.indexOf('peb') !== -1) return { bg: 'linear-gradient(135deg,#059669,#34D399)', text: '#fff', badge: '#ECFDF5' };
+  if (dept.indexOf('site') !== -1 || dept.indexOf('architect') !== -1) return { bg: 'linear-gradient(135deg,#2563EB,#60A5FA)', text: '#fff', badge: '#EFF6FF' };
+  if (dept.indexOf('garden') !== -1 || dept.indexOf('security') !== -1) return { bg: 'linear-gradient(135deg,#65A30D,#A3E635)', text: '#fff', badge: '#F7FEE7' };
+  return { bg: 'linear-gradient(135deg,#6B7280,#9CA3AF)', text: '#fff', badge: '#F9FAFB' };
+}
+
 function renderOrgNode(node, depth) {
   if (!node) return '';
-  var cls = node.emp.role === 'MD' ? ' md' : '';
   var editCls = orgEditModeActive ? ' org-editable' : '';
   var childCount = node.children.length;
   var isExpanded = orgExpandedNodes.has(node.emp.code);
   var code = escapeAttr(node.emp.code);
-  // Always add data-emp-code for click handling; add draggable + drop-target only in edit mode
   var dragAttr = orgEditModeActive ? ' draggable="true"' : '';
   var dropAttr = ' data-drop-target="' + code + '"';
+  var colors = getOrgNodeColor(node.emp);
+  var initials = node.emp.name.split(' ').map(function(w) { return w.charAt(0); }).join('').substring(0, 2).toUpperCase();
+  var deptLabel = node.emp.dept || '';
 
   var html = '<div class="org-branch">';
-  html += '<div class="org-node' + cls + editCls + '" data-emp-code="' + code + '"' + dragAttr + dropAttr + '>';
+  html += '<div class="org-node' + editCls + '" data-emp-code="' + code + '"' + dragAttr + dropAttr + ' style="--node-gradient:' + colors.bg + '">';
   html += '<div class="org-node-inner">';
+  html += '<div class="org-avatar" style="background:' + colors.bg + ';color:' + colors.text + '">' + escapeHTML(initials) + '</div>';
+  html += '<div class="org-info">';
   html += '<div class="org-name">' + escapeHTML(node.emp.name) + '</div>';
-  html += '<div class="org-desg">' + escapeHTML(node.emp.designation) + '</div>';
+  html += '<div class="org-desg">' + escapeHTML(node.emp.designation || '') + '</div>';
+  if (deptLabel) html += '<div class="org-dept-badge" style="background:' + colors.badge + '">' + escapeHTML(deptLabel) + '</div>';
+  html += '</div>';
   html += '</div>';
   if (childCount > 0) {
     html += '<button class="org-expand-toggle" data-expand-code="' + code + '" aria-label="' + (isExpanded ? 'Collapse' : 'Expand') + '">';
     html += '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">';
-    if (isExpanded) {
-      html += '<polyline points="6 9 12 15 18 9"/>';
-    } else {
-      html += '<polyline points="9 6 15 12 9 18"/>';
-    }
+    if (isExpanded) html += '<polyline points="6 9 12 15 18 9"/>';
+    else html += '<polyline points="9 6 15 12 9 18"/>';
     html += '</svg>';
     html += '<span class="org-child-count">' + childCount + '</span>';
     html += '</button>';
@@ -7491,12 +7565,16 @@ function showOrgNodeModal(empCode) {
   modal.className = 'org-detail-modal';
   modal.id = 'orgDetailModal';
   modal.setAttribute('data-modal-emp', empCode);
+  var modalColors = getOrgNodeColor(emp);
+  var modalInitials = emp.name.split(' ').map(function(w) { return w.charAt(0); }).join('').substring(0, 2).toUpperCase();
   modal.innerHTML = '<button class="org-detail-close" aria-label="Close">&times;</button>'
+    + '<div style="text-align:center;margin-bottom:12px"><div style="width:56px;height:56px;border-radius:50%;background:' + modalColors.bg + ';color:#fff;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:1.1rem;font-family:var(--font-display);box-shadow:0 4px 12px rgba(0,0,0,.15)">' + escapeHTML(modalInitials) + '</div></div>'
     + '<div class="org-detail-name">' + escapeHTML(emp.name) + '</div>'
     + '<div class="org-detail-desg">' + escapeHTML(emp.designation) + ' — ' + escapeHTML(emp.dept) + '</div>'
     + '<div class="org-detail-info">'
     + '<div><strong>Code:</strong> ' + escapeHTML(emp.code) + '</div>'
     + '<div><strong>DOJ:</strong> ' + escapeHTML(emp.doj || 'N/A') + '</div>'
+    + '<div><strong>Phone:</strong> ' + escapeHTML(emp.phone || 'N/A') + '</div>'
     + '<div><strong>Reports to:</strong> ' + (manager ? escapeHTML(manager.name) : 'Board / Root') + '</div>'
     + '<div><strong>Direct reports:</strong> ' + reports + '</div>'
     + '</div>'

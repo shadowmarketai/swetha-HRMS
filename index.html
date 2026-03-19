@@ -33,7 +33,7 @@
     <div class="login-right">
       <div class="login-form">
         <div class="login-field"><label>Employee Code / Phone</label><input type="text" id="loginId" placeholder="e.g. MD001, SSC006, SSC011" maxlength="50" autocomplete="username"></div>
-        <div class="login-field"><label>Password</label><input type="password" id="loginPass" placeholder="Enter password" maxlength="128" autocomplete="current-password"></div>
+        <div class="login-field"><label>Password</label><div class="pwd-wrapper"><input type="password" id="loginPass" placeholder="Enter password" maxlength="128" autocomplete="current-password"><button type="button" class="pwd-toggle" onclick="togglePwdVisibility('loginPass',this)" aria-label="Show password"><svg class="eye-open" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><svg class="eye-closed" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button></div></div>
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
           <input type="checkbox" id="rememberMe" style="accent-color:white;width:16px;height:16px">
           <label for="rememberMe" style="font-size:.72rem;opacity:.8;cursor:pointer">Remember me</label>
@@ -440,6 +440,7 @@
         <h3 style="font-family:var(--font-display);font-size:1rem;font-weight:700">Apply for Leave</h3>
         <button style="background:none;border:none;cursor:pointer;font-size:1.2rem;color:var(--gray-400)" onclick="closeLeaveForm()">&times;</button>
       </div>
+      <div id="leaveBalanceBadge" style="display:flex;align-items:center;gap:8px;background:var(--primary-50);padding:10px 14px;border-radius:var(--radius-sm);margin-bottom:10px;border:1px solid var(--primary-100)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><div><div style="font-size:.82rem;font-weight:700;color:var(--primary)" id="leaveBalText">Casual Leave: 12 days remaining</div><div style="font-size:.65rem;color:var(--gray-500)">Balance will be deducted on approval</div></div></div>
       <div class="leave-type-pills" id="leaveTypePills">
         <div class="lt-pill active" onclick="selectLeaveType('casual',this)">Casual Leave</div>
       </div>
@@ -522,8 +523,8 @@
       <!-- Step 1: Personal -->
       <div class="wizard-body" id="wizStep1">
         <div class="section-label">Personal Information</div>
-        <div class="photo-upload" onclick="document.getElementById('empPhotoInput').click()"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg><span>Photo</span></div>
-        <input type="file" id="empPhotoInput" accept="image/*" style="display:none">
+        <div class="photo-upload" id="photoUploadBox" onclick="document.getElementById('empPhotoInput').click()"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg><span>Photo</span></div>
+        <input type="file" id="empPhotoInput" accept="image/*" style="display:none" onchange="previewEmpPhoto(this)">
         <div class="form-row"><label>Full Name *</label><input type="text" id="obName" placeholder="Enter full name"></div>
         <div class="form-grid">
           <div class="form-row"><label>Phone *</label><input type="tel" id="obPhone" placeholder="Mobile number"></div>
@@ -671,7 +672,7 @@
       <!-- Common: Amount -->
       <div class="form-row"><label>Amount (&#8377;) *</label><input type="number" id="advAmount" placeholder="e.g. 25000" oninput="updateEmiCalc()"></div>
       <!-- Deduction notice -->
-      <div style="font-size:.78rem;color:#fff;font-weight:600;margin:8px 0 12px;background:var(--primary);padding:10px 12px;border-radius:var(--radius-xs);display:flex;align-items:center;gap:8px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>This amount will be deducted from your next month&#39;s salary</div>
+      <div style="font-size:.78rem;color:#fff;font-weight:600;margin:8px 0 12px;background:var(--primary);padding:10px 12px;border-radius:var(--radius-xs);display:flex;align-items:center;gap:8px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>Submit the bills to avoid misleads</div>
       <!-- Site fields (hidden) -->
       <div id="advFieldsSite" style="display:none">
         <div class="form-row"><label>Project / Site *</label><select id="advSiteProject"><option value="">Select project</option><option>Porur Villa Project</option><option>Tambaram Warehouse</option><option>PEB Factory Extension</option><option>Guduvanchery Residence</option><option>Other</option></select></div>
@@ -694,6 +695,15 @@
         <div class="form-grid">
           <div class="form-row"><label>Fuel Type</label><select id="advFuelType"><option value="N/A">N/A</option><option>Petrol</option><option>Diesel</option><option>CNG</option><option>Electric</option></select></div>
           <div class="form-row"><label>Days of Project</label><input type="number" id="advProjectDays" placeholder="e.g. 5" min="1"></div>
+        </div>
+        <div class="form-row"><label>Advance Received (Rs.)</label><input type="number" id="advReceivedAmt" placeholder="Amount already received" min="0"></div>
+        <div class="form-row"><label>Upload Bills / Receipts</label>
+          <div class="bill-upload-zone" id="advBillUploadZone" onclick="document.getElementById('advBillInput').click()" style="border:2px dashed var(--gray-300);border-radius:var(--radius-sm);padding:20px;text-align:center;cursor:pointer;background:var(--gray-50);transition:border-color .2s">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" stroke-width="1.5" style="margin-bottom:4px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            <div style="font-size:.72rem;color:var(--gray-500)">Tap to upload bills (images/PDF)</div>
+          </div>
+          <input type="file" id="advBillInput" accept="image/*,.pdf" multiple style="display:none" onchange="handleBillUpload(this)">
+          <div id="advBillPreview" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px"></div>
         </div>
       </div>
       <!-- Common: Details & Urgency -->
