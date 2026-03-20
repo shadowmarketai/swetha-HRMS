@@ -424,38 +424,38 @@ body{font-family:var(--font-body);color:var(--text);background:#E8EAF0;display:f
 .login-screen.hidden{display:none}
 /* Mobile: single column, hero bg */
 .login-left{display:none}
-.login-right{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;background:linear-gradient(135deg,var(--primary-dark) 0%,var(--primary) 50%,var(--primary-light) 100%);position:relative;overflow:hidden;min-height:100%}
-.login-right::before{content:'';position:absolute;top:0;left:0;right:0;bottom:0;background:url('assets/hero-mobile.jpg') center bottom/cover no-repeat;opacity:.35;pointer-events:none}
+.login-right{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;background:url('assets/bg-road.jpg') center center/cover no-repeat;position:relative;overflow:hidden;min-height:100%}
+.login-right::before{display:none}
 .login-hero-img{display:none}
 .login-brand{display:none}
 .login-brand-row{display:flex;align-items:center;gap:12px}
 .login-brand-row .login-logo img{width:220px;height:auto;object-fit:contain}
 .login-right-decor{display:none}
-.login-form{width:100%;max-width:340px;position:relative;z-index:2}
+.login-form{width:100%;max-width:340px;position:relative;z-index:2;background:rgba(255,255,255,.45);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid rgba(255,255,255,.5);border-radius:20px;padding:32px 24px;box-shadow:0 8px 32px rgba(0,0,0,.12),inset 0 1px 0 rgba(255,255,255,.7)}
 .login-form-header{text-align:center;margin-bottom:24px}
 .login-form-logo{margin-bottom:8px}
-.login-form-logo img{width:180px;height:auto;filter:brightness(0) invert(1) drop-shadow(0 2px 8px rgba(0,0,0,.15))}
-.login-welcome{font-family:var(--font-display);font-size:1.5rem;font-weight:700;color:#fff;margin-bottom:4px}
-.login-welcome-sub{font-size:.78rem;color:rgba(255,255,255,.7)}
+.login-form-logo img{width:180px;height:auto;filter:none;drop-shadow(0 2px 8px rgba(0,0,0,.15))}
+.login-welcome{font-family:var(--font-display);font-size:1.5rem;font-weight:700;color:var(--gray-900);margin-bottom:4px}
+.login-welcome-sub{font-size:.78rem;color:var(--gray-500)}
 .login-field{margin-bottom:12px}
-.login-field label{display:block;font-size:.72rem;font-weight:600;color:rgba(255,255,255,.8);margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em}
-.login-input-wrap{display:flex;align-items:center;gap:10px;padding:0 14px;border-radius:var(--radius-sm);border:1.5px solid rgba(255,255,255,.2);background:rgba(255,255,255,.1);backdrop-filter:blur(10px);transition:all .2s}
-.login-input-wrap svg{flex-shrink:0;color:rgba(255,255,255,.5)}
-.login-input-wrap input{flex:1;padding:12px 0;border:none;background:transparent;color:#fff;font-size:.88rem;font-family:var(--font-body);outline:none}
-.login-input-wrap input::placeholder{color:rgba(255,255,255,.4)}
-.login-input-wrap:focus-within{border-color:rgba(255,255,255,.5);background:rgba(255,255,255,.15)}
-.login-input-wrap:focus-within svg{color:rgba(255,255,255,.8)}
-.pwd-toggle{background:none;border:none;cursor:pointer;color:rgba(255,255,255,.5);padding:4px;display:flex;align-items:center;justify-content:center;border-radius:4px;transition:color .2s;flex-shrink:0}
-.pwd-toggle:hover{color:rgba(255,255,255,.9)}
+.login-field label{display:block;font-size:.72rem;font-weight:600;color:var(--gray-600);margin-bottom:5px;text-transform:uppercase;letter-spacing:.05em}
+.login-input-wrap{display:flex;align-items:center;gap:10px;padding:0 14px;border-radius:var(--radius-sm);border:1.5px solid rgba(0,0,0,.1);background:rgba(255,255,255,.7);backdrop-filter:none;transition:all .2s}
+.login-input-wrap svg{flex-shrink:0;color:var(--gray-400)}
+.login-input-wrap input{flex:1;padding:12px 0;border:none;background:transparent;color:var(--text);font-size:.88rem;font-family:var(--font-body);outline:none}
+.login-input-wrap input::placeholder{color:var(--gray-400)}
+.login-input-wrap:focus-within{border-color:var(--primary);background:#fff}
+.login-input-wrap:focus-within svg{color:var(--primary)}
+.pwd-toggle{background:none;border:none;cursor:pointer;color:var(--gray-400);padding:4px;display:flex;align-items:center;justify-content:center;border-radius:4px;transition:color .2s;flex-shrink:0}
+.pwd-toggle:hover{color:var(--gray-700)}
 .login-btn{width:100%;padding:14px;border-radius:var(--radius-sm);border:none;background:linear-gradient(135deg,#F59E0B,#D97706);color:#fff;font-family:var(--font-body);font-size:.9rem;font-weight:700;cursor:pointer;transition:all .25s;margin-top:4px;box-shadow:0 4px 15px rgba(245,158,11,.3);letter-spacing:.02em}
 .login-btn:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(245,158,11,.4)}
 .login-btn:active{transform:translateY(0)}
-.login-btn-outline{background:transparent;color:#fff;border:1.5px solid rgba(255,255,255,.3);box-shadow:none;margin-top:0}
-.login-btn-outline:hover{background:rgba(255,255,255,.1);box-shadow:none;border-color:rgba(255,255,255,.5)}
+.login-btn-outline{background:transparent;color:var(--gray-700);border:1.5px solid rgba(0,0,0,.15);box-shadow:none;margin-top:0}
+.login-btn-outline:hover{background:rgba(0,0,0,.05);box-shadow:none;border-color:rgba(0,0,0,.25)}
 .login-divider{display:flex;align-items:center;gap:10px;margin:12px 0}
-.login-divider::before,.login-divider::after{content:'';flex:1;height:1px;background:rgba(255,255,255,.2)}
-.login-divider span{font-size:.7rem;color:rgba(255,255,255,.5);text-transform:uppercase;letter-spacing:.08em}
-.login-error{font-size:.72rem;color:#FCA5A5;margin-top:8px;text-align:center;min-height:18px}
+.login-divider::before,.login-divider::after{content:'';flex:1;height:1px;background:rgba(0,0,0,.1)}
+.login-divider span{font-size:.7rem;color:var(--gray-400);text-transform:uppercase;letter-spacing:.08em}
+.login-error{font-size:.72rem;color:var(--danger);margin-top:8px;text-align:center;min-height:18px}
 /* Role Badge */
 .role-badge{padding:3px 10px;border-radius:20px;font-size:.6rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
 .role-badge.md{background:linear-gradient(135deg,var(--amber-light),var(--warning));color:#92400E}
@@ -1066,8 +1066,8 @@ a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.cal-nav bu
   .login-brand-row .login-logo img { width: 340px; height: auto; object-fit: contain; }
   .login-brand .login-title { display: none; }
   .login-brand .login-tagline { display: none; }
-  .login-right { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 32px; overflow: hidden; background: #FCE8C8; position: relative; }
-  .login-right::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: url('assets/bg-road.jpg') center center/cover no-repeat; opacity: .4; pointer-events: none; }
+  .login-right { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 32px; overflow: hidden; background: url('assets/bg-road.jpg') center center/cover no-repeat; position: relative; }
+  .login-right::before { display: none; }
   .login-right-decor { display: none; }
   .login-form { max-width: 380px; width: 100%; position: relative; z-index: 1; background: rgba(255,255,255,.55); backdrop-filter: blur(20px) saturate(160%); -webkit-backdrop-filter: blur(20px) saturate(160%); border: 1px solid rgba(255,255,255,.6); border-radius: 20px; padding: 36px 28px; box-shadow: 0 8px 32px rgba(0,0,0,.08), inset 0 1px 0 rgba(255,255,255,.8); }
   .login-form-logo img { filter: none !important; }
@@ -1391,8 +1391,8 @@ a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.cal-nav bu
   .login-brand-row .login-logo img { width: 420px; height: auto; object-fit: contain; }
   .login-brand .login-title { display: none; }
   .login-brand .login-tagline { display: none; }
-  .login-right { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 48px; overflow: hidden; background: #FCE8C8; position: relative; }
-  .login-right::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: url('assets/bg-road.jpg') center center/cover no-repeat; opacity: .4; pointer-events: none; }
+  .login-right { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 48px; overflow: hidden; background: url('assets/bg-road.jpg') center center/cover no-repeat; position: relative; }
+  .login-right::before { display: none; }
   .login-right-decor { display: none; }
   .login-form { max-width: 420px; width: 100%; position: relative; z-index: 1; background: rgba(255,255,255,.55); backdrop-filter: blur(20px) saturate(160%); -webkit-backdrop-filter: blur(20px) saturate(160%); border: 1px solid rgba(255,255,255,.6); border-radius: 20px; padding: 44px 36px; box-shadow: 0 8px 32px rgba(0,0,0,.08), inset 0 1px 0 rgba(255,255,255,.8); }
   .login-form-logo img { filter: none !important; }
