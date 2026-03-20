@@ -964,6 +964,8 @@ a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.cal-nav bu
   .header-btn { width: 40px; height: 40px; color: rgba(255,255,255,.6); }
   .header-btn:hover { background: rgba(255,255,255,.08); color: #fff; }
   .avatar-sm { width: 36px; height: 36px; font-size: .85rem; }
+  /* Hide admin/settings/profile from header — sidebar handles these */
+  #adminBtn, #settingsBtn, .header-actions .avatar-sm { display: none !important; }
   .bottom-tabs {
     grid-column: 1; grid-row: 2;
     position: relative; flex-direction: column; justify-content: flex-start;
@@ -1132,6 +1134,8 @@ a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.cal-nav bu
   .header-btn:hover { background: rgba(255,255,255,.08); color: #fff; }
   .header-btn .badge { border-color: #1C1710; }
   .avatar-sm { width: 40px; height: 40px; font-size: .9rem; }
+  /* Hide admin/settings/profile from header — sidebar handles these */
+  #adminBtn, #settingsBtn, .header-actions .avatar-sm { display: none !important; }
 
   /* ── Step 3: Sidebar — dark theme ── */
   .bottom-tabs {
@@ -1465,6 +1469,10 @@ a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.cal-nav bu
 .more-menu-item{display:flex;align-items:center;gap:14px;width:100%;padding:14px 20px;border:none;background:none;cursor:pointer;font-family:var(--font-body);font-size:.9rem;font-weight:500;color:var(--text);transition:background .15s}
 .more-menu-item:hover{background:var(--gray-50)}
 .more-menu-item svg{width:22px;height:22px;color:var(--gray-500);flex-shrink:0}
+.more-menu-divider{height:1px;background:var(--gray-200);margin:6px 16px}
+.more-menu-danger{color:#ef4444}
+.more-menu-danger svg{color:#ef4444}
+[data-theme="dark"] .more-menu-divider{background:rgba(255,255,255,.08)}
 
 /* ===== F1: SHIFT MANAGEMENT ===== */
 .shift-card{background:var(--card);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);margin-bottom:10px;display:flex;align-items:center;gap:12px}

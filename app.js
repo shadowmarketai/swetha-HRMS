@@ -216,7 +216,8 @@ const NAV_CONFIG = {
     ]},
     // Footer items
     { id:'md-profile', label:'Profile', icon:'profile', action:{type:'overlay',target:'profile'}, isFooter:true },
-    { id:'md-admin', label:'Settings', icon:'admin', action:{type:'overlay',target:'admin'}, isFooter:true },
+    { id:'md-admin', label:'Admin Panel', icon:'admin', action:{type:'overlay',target:'admin'}, isFooter:true },
+    { id:'md-settings', label:'Settings', icon:'settings', action:{type:'overlay',target:'settings'}, isFooter:true },
     { id:'md-logout', label:'Log Out', icon:'logout', action:{type:'logout'}, isFooter:true, isDanger:true }
   ],
   HR: [
@@ -748,8 +749,8 @@ function applyRole() {
 
   // Admin button (MD only)
   document.getElementById('adminBtn').style.display = isMD ? '' : 'none';
-  // Settings button (hide for MD since they have admin)
-  document.getElementById('settingsBtn').style.display = isMD ? 'none' : '';
+  // Settings button (all roles including MD)
+  document.getElementById('settingsBtn').style.display = '';
 
   // Hide "Apply Leave" quick link for MD
   var qlLeave = document.getElementById('qlApplyLeave');
@@ -5557,15 +5558,12 @@ function renderNavigation() {
 
 function renderMobileBottomTabs(config, container) {
   var mainItems = config.filter(function(i) { return !i.isFooter; });
-  var maxVisible = 5;
-  var visibleItems, overflowItems;
-  if (mainItems.length <= maxVisible) {
-    visibleItems = mainItems;
-    overflowItems = [];
-  } else {
-    visibleItems = mainItems.slice(0, maxVisible - 1);
-    overflowItems = mainItems.slice(maxVisible - 1);
-  }
+  var footerItems = config.filter(function(i) { return i.isFooter; });
+  var maxVisible = 4; // Reserve 1 slot for "More" button (total 5 tabs)
+  var visibleItems = mainItems.slice(0, maxVisible);
+  var overflowItems = mainItems.slice(maxVisible);
+  // Always add footer items (Profile, Settings, Logout) to overflow for "More" menu
+  var allOverflow = overflowItems.concat(footerItems);
   visibleItems.forEach(function(item) {
     var btn = document.createElement('button');
     btn.className = 'tab-item' + (_activeNavId === item.id ? ' active' : '');
@@ -5583,11 +5581,12 @@ function renderMobileBottomTabs(config, container) {
     };
     container.appendChild(btn);
   });
-  if (overflowItems.length > 0) {
+  // Always show "More" button on mobile (footer items are always there)
+  if (allOverflow.length > 0) {
     var moreBtn = document.createElement('button');
     moreBtn.className = 'tab-item';
     moreBtn.innerHTML = NAV_ICONS.more + '<span>More</span>';
-    moreBtn.onclick = function() { showMobileMoreMenu(overflowItems); };
+    moreBtn.onclick = function() { showMobileMoreMenu(allOverflow); };
     container.appendChild(moreBtn);
   }
 }
@@ -5736,7 +5735,9 @@ function showMobileMoreMenu(items) {
   title.textContent = 'More';
   sheet.appendChild(title);
 
-  items.forEach(function(item) {
+  var navItems = items.filter(function(i) { return !i.isFooter; });
+  var footerItems = items.filter(function(i) { return i.isFooter; });
+  navItems.forEach(function(item) {
     var menuItem = document.createElement('button');
     menuItem.className = 'more-menu-item';
     menuItem.innerHTML = NAV_ICONS[item.icon] + '<span>' + escapeHTML(item.label) + '</span>';
@@ -5753,6 +5754,21 @@ function showMobileMoreMenu(items) {
     };
     sheet.appendChild(menuItem);
   });
+  if (footerItems.length > 0) {
+    var divider = document.createElement('div');
+    divider.className = 'more-menu-divider';
+    sheet.appendChild(divider);
+    footerItems.forEach(function(item) {
+      var menuItem = document.createElement('button');
+      menuItem.className = 'more-menu-item' + (item.isDanger ? ' more-menu-danger' : '');
+      menuItem.innerHTML = NAV_ICONS[item.icon] + '<span>' + escapeHTML(item.label) + '</span>';
+      menuItem.onclick = function() {
+        overlay.remove();
+        executeNavAction(item, null);
+      };
+      sheet.appendChild(menuItem);
+    });
+  }
 
   overlay.appendChild(backdrop);
   overlay.appendChild(sheet);
