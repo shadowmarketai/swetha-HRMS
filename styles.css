@@ -995,7 +995,7 @@ a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.cal-nav bu
     position: relative; padding: 0 24px;
     overflow-x: hidden !important; overflow-y: auto;
   }
-  .screen { padding: 12px 0 40px; }
+  .screen { padding: 4px 0 40px; }
   /* Tablet grids */
   .quick-links { grid-template-columns: repeat(4, 1fr); gap: 10px; }
   .quick-link { padding: 14px 6px; gap: 8px; }
@@ -1179,7 +1179,7 @@ a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.cal-nav bu
     overflow-x: hidden !important;
     overflow-y: auto;
   }
-  .screen { padding: 16px 0 48px; }
+  .screen { padding: 4px 0 48px; }
 
   /* ── Step 5: Wider grids ── */
   .quick-links { grid-template-columns: repeat(5, 1fr); gap: 14px; }

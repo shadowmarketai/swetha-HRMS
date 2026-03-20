@@ -198,9 +198,9 @@ const NAV_CONFIG = {
       { id:'md-att-report', label:'Employee Attendance', action:{type:'tab',target:'attendance'} },
       { id:'md-att-leave', label:'Employee Leave Request', action:{type:'tab',target:'leaves'} }
     ]},
-    { id:'md-advance', label:'Advance', icon:'advance', children:[
-      { id:'md-adv-history', label:'Advance History', action:{type:'tab',target:'advance'} },
-      { id:'md-adv-requests', label:'Advance Requests', action:{type:'overlay',target:'advance-requests'} }
+    { id:'md-advance', label:'Advance & Expense', icon:'advance', children:[
+      { id:'md-adv-history', label:'All Requests', action:{type:'tab',target:'advance'} },
+      { id:'md-adv-requests', label:'Approve Requests', action:{type:'overlay',target:'advance-requests'} }
     ]},
     { id:'md-location', label:'Live Location', icon:'location', action:{type:'overlay',target:'location'} },
     { id:'md-progress', label:'Progress', icon:'progress', action:{type:'tab',target:'progress'} },
@@ -229,8 +229,7 @@ const NAV_CONFIG = {
     ]},
     { id:'hr-advance', label:'Advance', icon:'advance', children:[
       { id:'hr-adv-salary', label:'Salary Advance', action:{type:'tab',target:'advance'} },
-      { id:'hr-adv-travel', label:'Travel Advance', action:{type:'tab',target:'ta'} },
-      { id:'hr-adv-expense', label:'Travel Expense', action:{type:'tab',target:'site'} }
+      { id:'hr-adv-requests', label:'Approve Requests', action:{type:'overlay',target:'advance-requests'} }
     ]},
     { id:'hr-performance', label:'Employee Performance', icon:'performance', children:[
       { id:'hr-perf-track', label:'Performance Review', action:{type:'overlay',target:'hr-kpi'} },
@@ -257,10 +256,14 @@ const NAV_CONFIG = {
       { id:'emp-att-cal', label:'Calendar', action:{type:'tab',target:'attendance'} },
       { id:'emp-att-leave', label:'Apply Leave', action:{type:'tab',target:'leaves'} }
     ]},
+    { id:'emp-advance', label:'Advance', icon:'advance', children:[
+      { id:'emp-adv-site', label:'Site Advance', action:{type:'tab',target:'site'} },
+      { id:'emp-adv-salary', label:'Salary Advance', action:{type:'tab',target:'advance'} },
+      { id:'emp-adv-travel', label:'Travel Advance', action:{type:'tab',target:'ta'} }
+    ]},
     { id:'emp-expense', label:'Expense', icon:'expense', children:[
-      { id:'emp-exp-travel', label:'Travel Advance', action:{type:'tab',target:'ta'} },
-      { id:'emp-exp-site', label:'Travel Expense', action:{type:'tab',target:'site'} },
-      { id:'emp-exp-salary', label:'Salary Advance', action:{type:'tab',target:'advance'} }
+      { id:'emp-exp-site', label:'Site Expense', action:{type:'tab',target:'site-expense'} },
+      { id:'emp-exp-travel', label:'Travel Expense', action:{type:'tab',target:'travel-expense'} }
     ]},
     { id:'emp-progress', label:'Project Progress', icon:'progress', action:{type:'tab',target:'progress'} },
     { id:'emp-salary', label:'Salary Statement', icon:'salary', action:{type:'tab',target:'salary'} },
@@ -1122,6 +1125,8 @@ function switchTab(id, el, _fromPopstate) {
     }
   }
   if (id === 'advance' || id === 'site' || id === 'ta') { renderAllMyRequests(); renderAllPendingBanners(); }
+  if (id === 'site-expense') renderSiteExpenseScreen();
+  if (id === 'travel-expense') renderTravelExpenseScreen();
   if (id === 'leaves') renderLeaveScreenForMode();
   if (id === 'progress') renderProgressScreen();
   if (id === 'orgchart') renderInlineOrgChart();
@@ -1985,8 +1990,8 @@ function renderMapDotsClickable(emps) {
 // =====================================================
 // UNIFIED ADVANCE APPLICATION & APPROVAL (Site / Salary / Travel)
 // =====================================================
-const ADV_TYPE_LABELS = {site:'Site Expense', salary:'Salary Advance', travel:'Travel Expense'};
-const ADV_TYPE_ICONS = {site:'\u{1F3D7}', salary:'\u{1F4B0}', travel:'\u{1F699}'};
+const ADV_TYPE_LABELS = {site:'Site Advance', salary:'Salary Advance', travel:'Travel Advance', site_expense:'Site Expense', travel_expense:'Travel Expense'};
+const ADV_TYPE_ICONS = {site:'\u{1F3D7}', salary:'\u{1F4B0}', travel:'\u{1F699}', site_expense:'\u{1F9FE}', travel_expense:'\u{1F4CB}'};
 let advanceRequests = [
   {id:1, type:'salary', empCode:'SSC020', empName:'Dhanush.R', dept:'Site', amount:25000, reason:'Medical', details:'Hospital expenses', project:null, category:null, travelFrom:null, travelTo:null, vehicle:null, travelKm:null, emiAmount:25000, emiMonths:1, urgency:'urgent', status:'pending', appliedDate:'2026-03-06', reviewedBy:null, reviewDate:null, rejectReason:null},
   {id:2, type:'site', empCode:'SSC003', empName:'N.Hari Haran', dept:'Site', amount:45000, reason:null, details:'Cement & steel for foundation', project:'Porur Villa Project', category:'Material', travelFrom:null, travelTo:null, vehicle:null, travelKm:null, emiAmount:null, emiMonths:null, urgency:'normal', status:'pending', appliedDate:'2026-03-05', reviewedBy:null, reviewDate:null, rejectReason:null},
@@ -2106,16 +2111,22 @@ async function submitInlineExpense() {
       travelFrom: travelFrom, travelTo: travelTo, vehicle: vehicle, travelKm: travelKm,
       emiAmount: emiAmount, emiMonths: emiMonths, urgency: 'normal'
     });
+    // HR's own salary advance skips HR step
+    var inlineStatus = 'pending';
+    if (currentUser.role === 'HR' && type === 'salary') inlineStatus = 'hr_accepted';
+
     advanceRequests.push({
       id: (apiRes && apiRes.id) || advNextId++,
       type: type, empCode: currentUser.code, empName: currentUser.name, dept: currentUser.dept,
       amount: amount, reason: reason, details: details, project: project, category: category,
       travelFrom: travelFrom, travelTo: travelTo, vehicle: vehicle, travelKm: travelKm,
       emiAmount: emiAmount, emiMonths: emiMonths, urgency: 'normal',
-      status: 'pending', appliedDate: new Date().toISOString().split('T')[0],
-      reviewedBy: null, reviewDate: null, rejectReason: null
+      status: inlineStatus, appliedDate: new Date().toISOString().split('T')[0],
+      reviewedBy: inlineStatus === 'hr_accepted' ? currentUser.name + ' (HR - Self)' : null,
+      reviewDate: inlineStatus === 'hr_accepted' ? new Date().toISOString().split('T')[0] : null,
+      rejectReason: null
     });
-    showToast(ADV_TYPE_LABELS[type] + ' request submitted for Rs.' + amount.toLocaleString('en-IN'));
+    showToast(ADV_TYPE_LABELS[type] + ' request submitted for Rs.' + amount.toLocaleString('en-IN') + (inlineStatus === 'hr_accepted' ? ' — sent to MD' : ''));
     hideInlineExpenseForm();
     renderAllMyRequests();
     renderAllPendingBanners();
@@ -2222,6 +2233,10 @@ async function submitAdvanceRequest() {
       urgency: advSelectedUrgency
     });
 
+    // HR's own salary advance skips HR step — goes directly to MD
+    var initStatus = 'pending';
+    if (currentUser.role === 'HR' && advSelectedType === 'salary') initStatus = 'hr_accepted';
+
     advanceRequests.push({
       id: (apiRes && apiRes.id) || advNextId++,
       type: advSelectedType,
@@ -2233,13 +2248,15 @@ async function submitAdvanceRequest() {
       travelFrom, travelTo, vehicle, travelKm,
       emiAmount, emiMonths,
       urgency: advSelectedUrgency,
-      status: 'pending',
+      status: initStatus,
       appliedDate: new Date().toISOString().split('T')[0],
-      reviewedBy: null, reviewDate: null, rejectReason: null
+      reviewedBy: initStatus === 'hr_accepted' ? currentUser.name + ' (HR - Self)' : null,
+      reviewDate: initStatus === 'hr_accepted' ? new Date().toISOString().split('T')[0] : null,
+      rejectReason: null
     });
 
     const typeLabel = ADV_TYPE_LABELS[advSelectedType];
-    showToast(typeLabel + ' request submitted for \u20B9' + amount.toLocaleString('en-IN'));
+    showToast(typeLabel + ' request submitted for \u20B9' + amount.toLocaleString('en-IN') + (initStatus === 'hr_accepted' ? ' — sent to MD' : ''));
     hideOverlay('advance-apply');
     renderAllMyRequests();
     renderAllPendingBanners();
@@ -2250,9 +2267,11 @@ async function submitAdvanceRequest() {
 }
 
 function getAdvMeta(r) {
-  if (r.type === 'site') return `<strong>${escapeHTML(r.project)}</strong> &middot; ${escapeHTML(r.category)}${r.details ? ' &middot; ' + escapeHTML(r.details) : ''}`;
-  if (r.type === 'salary') return `<strong>${escapeHTML(r.reason)}</strong>${r.details ? ' — ' + escapeHTML(r.details) : ''}<br>Deducted from next month salary`;
-  if (r.type === 'travel') return `<strong>${escapeHTML(r.travelFrom)} \u2192 ${escapeHTML(r.travelTo)}</strong> &middot; ${escapeHTML(r.vehicle)}${r.travelKm ? ' &middot; ' + r.travelKm + ' km' : ''}${r.details ? '<br>' + escapeHTML(r.details) : ''}`;
+  if (r.type === 'site') return `<strong>${escapeHTML(r.project || '')}</strong> &middot; ${escapeHTML(r.category || '')}${r.details ? ' &middot; ' + escapeHTML(r.details) : ''}`;
+  if (r.type === 'salary') return `<strong>${escapeHTML(r.reason || '')}</strong>${r.details ? ' — ' + escapeHTML(r.details) : ''}<br>Deducted from next month salary`;
+  if (r.type === 'travel') return `<strong>${escapeHTML(r.travelFrom || '')} \u2192 ${escapeHTML(r.travelTo || '')}</strong> &middot; ${escapeHTML(r.vehicle || '')}${r.travelKm ? ' &middot; ' + r.travelKm + ' km' : ''}${r.details ? '<br>' + escapeHTML(r.details) : ''}`;
+  if (r.type === 'site_expense') return `<strong>${escapeHTML(r.project || '')}</strong> &middot; ${escapeHTML(r.category || 'Site Bill')}${r.details ? ' &middot; ' + escapeHTML(r.details) : ''}`;
+  if (r.type === 'travel_expense') return `<strong>${escapeHTML(r.travelFrom || '')} \u2192 ${escapeHTML(r.travelTo || '')}</strong> &middot; ${escapeHTML(r.vehicle || '')}${r.travelKm ? ' &middot; ' + r.travelKm + ' km' : ''}${r.details ? '<br>' + escapeHTML(r.details) : ''}`;
   return escapeHTML(r.details) || '';
 }
 
@@ -2330,7 +2349,25 @@ function filterAdvReqByType(type, btn) {
 
 function renderAdvanceRequests(filter) {
   const container = document.getElementById('advReqList');
-  let reqs = filter === 'all' ? [...advanceRequests] : advanceRequests.filter(r => r.status === filter);
+  // Combine advance requests + expense reimbursements (mapped to same shape)
+  var expItems = expenseReimbursements.filter(function(e) {
+    return e.expenseType === 'site_expense' || e.expenseType === 'travel_expense';
+  }).map(function(e) {
+    var mappedStatus = e.status === 'Approved' ? 'approved' : e.status === 'Rejected' ? 'rejected' : e.status === 'hr_accepted' ? 'hr_accepted' : 'pending';
+    return {
+      id: e.id, _isExpense: true, type: e.expenseType || 'site_expense',
+      empCode: e.empCode, empName: e.empName || '', dept: e.dept || '',
+      amount: e.amount || 0, reason: null, details: e.description || '',
+      project: e.project || null, category: e.category || null,
+      travelFrom: e.travelFrom || null, travelTo: e.travelTo || null,
+      vehicle: e.vehicle || null, travelKm: e.travelKm || null,
+      urgency: 'normal', status: mappedStatus,
+      appliedDate: e.date || '', reviewedBy: e.approvedBy || e.rejectedBy || null,
+      reviewDate: e.approvedOn || null, rejectReason: null
+    };
+  });
+  var allItems = advanceRequests.concat(expItems);
+  let reqs = filter === 'all' ? [...allItems] : allItems.filter(r => r.status === filter);
   if (advReqTypeFilter !== 'all') reqs = reqs.filter(r => r.type === advReqTypeFilter);
   reqs.sort((a, b) => b.id - a.id);
   if (reqs.length === 0) {
@@ -2339,18 +2376,26 @@ function renderAdvanceRequests(filter) {
   }
   const isMD = currentUser && currentUser.role === 'MD';
   const isHR = currentUser && currentUser.role === 'HR';
-  const isMDorHR = isMD || isHR;
   container.innerHTML = reqs.map(r => {
-    const initials = r.empName.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
+    const initials = r.empName ? r.empName.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() : '??';
     const typeBadge = `<span class="adv-type-badge ${r.type}">${ADV_TYPE_LABELS[r.type] || r.type}</span>`;
     var statusBadge = getAdvanceStatusBadge(r.status);
     var stepHtml = getAdvanceStepIndicator(r.status);
-    // Actions: HR sees Accept/Reject on pending; MD sees Confirm/Reject only on hr_accepted
     var actionsHtml = '';
-    if (isHR && r.status === 'pending') {
-      actionsHtml = `<div class="adv-actions"><button class="approve-btn" onclick="approveAdvance(${r.id})" aria-label="Accept advance ${r.id}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/></svg> Accept</button><button class="reject-btn" onclick="rejectAdvance(${r.id})" aria-label="Reject advance ${r.id}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Reject</button></div>`;
-    } else if (isMD && r.status === 'hr_accepted') {
-      actionsHtml = `<div class="adv-actions"><button class="approve-btn" onclick="approveAdvance(${r.id})" aria-label="Confirm advance ${r.id}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/></svg> Confirm</button><button class="reject-btn" onclick="rejectAdvance(${r.id})" aria-label="Reject advance ${r.id}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Reject</button></div>`;
+    if (r._isExpense) {
+      // Expense items: HR accept → MD confirm (same dual flow)
+      if (isHR && r.status === 'pending') {
+        actionsHtml = `<div class="adv-actions"><button class="approve-btn" onclick="hrAcceptExpense(${r.id})" aria-label="Accept expense ${r.id}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/></svg> Accept</button><button class="reject-btn" onclick="rejectExpense(${r.id})" aria-label="Reject expense ${r.id}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Reject</button></div>`;
+      } else if (isMD && r.status === 'hr_accepted') {
+        actionsHtml = `<div class="adv-actions"><button class="approve-btn" onclick="approveExpense(${r.id})" aria-label="Confirm expense ${r.id}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/></svg> Confirm</button><button class="reject-btn" onclick="rejectExpense(${r.id})" aria-label="Reject expense ${r.id}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Reject</button></div>`;
+      }
+    } else {
+      // Advance items: existing HR accept → MD confirm flow
+      if (isHR && r.status === 'pending') {
+        actionsHtml = `<div class="adv-actions"><button class="approve-btn" onclick="approveAdvance(${r.id})" aria-label="Accept advance ${r.id}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/></svg> Accept</button><button class="reject-btn" onclick="rejectAdvance(${r.id})" aria-label="Reject advance ${r.id}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Reject</button></div>`;
+      } else if (isMD && r.status === 'hr_accepted') {
+        actionsHtml = `<div class="adv-actions"><button class="approve-btn" onclick="approveAdvance(${r.id})" aria-label="Confirm advance ${r.id}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/></svg> Confirm</button><button class="reject-btn" onclick="rejectAdvance(${r.id})" aria-label="Reject advance ${r.id}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Reject</button></div>`;
+      }
     }
     return `<div class="adv-request-card ${r.status}">
       <div class="adv-request-header">
@@ -2358,7 +2403,7 @@ function renderAdvanceRequests(filter) {
         ${statusBadge}
       </div>
       <div class="adv-request-meta">
-        ${typeBadge} <span class="adv-urgency ${r.urgency}">${escapeHTML(r.urgency)}</span> &middot; <strong>\u20B9${r.amount.toLocaleString('en-IN')}</strong> &middot; ${escapeHTML(r.dept)}<br>
+        ${typeBadge} <span class="adv-urgency ${r.urgency || 'normal'}">${escapeHTML(r.urgency || 'normal')}</span> &middot; <strong>\u20B9${r.amount.toLocaleString('en-IN')}</strong> &middot; ${escapeHTML(r.dept)}<br>
         ${getAdvMeta(r)}<br>
         Applied: ${formatAdvDate(r.appliedDate)}
         ${r.reviewedBy ? ' &middot; By: ' + escapeHTML(r.reviewedBy) + ' on ' + formatAdvDate(r.reviewDate) : ''}
@@ -2426,6 +2471,226 @@ function formatAdvDate(dateStr) {
   const d = new Date(dateStr);
   const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   return d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear();
+}
+
+// =====================================================
+// SITE EXPENSE SCREEN — Tally advance vs bills
+// =====================================================
+function renderSiteExpenseScreen() {
+  var container = document.getElementById('siteExpenseContent');
+  if (!container || !currentUser) return;
+  // Approved site advances for current user
+  var myAdvances = advanceRequests.filter(function(a) {
+    return a.empCode === currentUser.code && a.type === 'site' && a.status === 'approved';
+  });
+  var totalAdvance = myAdvances.reduce(function(s, a) { return s + (a.amount || 0); }, 0);
+  // Site expense bills submitted by current user
+  var myBills = expenseReimbursements.filter(function(e) {
+    return e.empCode === currentUser.code && e.expenseType === 'site_expense';
+  });
+  var totalBills = myBills.reduce(function(s, b) { return s + (b.amount || 0); }, 0);
+  var diff = totalAdvance - totalBills;
+
+  var html = '';
+  // Summary cards
+  html += '<div class="summary-grid fade-in">';
+  html += '<div class="summary-card total"><div class="amount">Rs.' + totalAdvance.toLocaleString('en-IN') + '</div><div class="label">Advance Received</div></div>';
+  html += '<div class="summary-card approved"><div class="amount">Rs.' + totalBills.toLocaleString('en-IN') + '</div><div class="label">Bills Submitted</div></div>';
+  if (diff > 0) {
+    html += '<div class="summary-card pending"><div class="amount">Rs.' + diff.toLocaleString('en-IN') + '</div><div class="label">To Return</div></div>';
+  } else if (diff < 0) {
+    html += '<div class="summary-card approved"><div class="amount">Rs.' + Math.abs(diff).toLocaleString('en-IN') + '</div><div class="label">Claim Extra</div></div>';
+  } else {
+    html += '<div class="summary-card approved"><div class="amount">Rs.0</div><div class="label">Settled</div></div>';
+  }
+  html += '</div>';
+  // Tally message
+  if (diff > 0) {
+    html += '<div style="background:var(--amber-50,#FFF8E1);border:1px solid var(--amber-200,#FFE082);border-radius:var(--radius);padding:10px 12px;margin:10px 0;font-size:.78rem;color:var(--amber-800,#6D4C00)">Return <strong>Rs.' + diff.toLocaleString('en-IN') + '</strong> or it will be deducted from next salary.</div>';
+  } else if (diff < 0) {
+    html += '<div style="background:var(--success-light);border:1px solid var(--success);border-radius:var(--radius);padding:10px 12px;margin:10px 0;font-size:.78rem;color:var(--success-dark)">You spent <strong>Rs.' + Math.abs(diff).toLocaleString('en-IN') + '</strong> more than advance. Submit for reimbursement approval.</div>';
+  }
+  // Previously submitted bills
+  if (myBills.length > 0) {
+    html += '<div class="section-title">Submitted Bills</div>';
+    myBills.sort(function(a, b) { return b.id - a.id; }).forEach(function(b) {
+      var badgeCls = b.status === 'Approved' ? 'badge-approved' : b.status === 'Rejected' ? 'badge-rejected' : b.status === 'hr_accepted' ? 'badge-pending' : 'badge-pending';
+      var statusTxt = b.status === 'hr_accepted' ? 'HR Accepted' : b.status;
+      html += '<div class="expense-item fade-in"><div style="flex:1"><div style="font-weight:600;font-size:.82rem">' + escapeHTML(b.category || 'Site Bill') + '</div>';
+      html += '<div style="font-size:.72rem;color:var(--gray-500)">' + escapeHTML(b.project || '') + ' &middot; ' + (b.date || '') + '</div>';
+      if (b.description) html += '<div style="font-size:.68rem;color:var(--gray-400);margin-top:2px">' + escapeHTML(b.description) + '</div>';
+      html += '</div><div style="text-align:right"><div class="expense-amount">Rs.' + (b.amount || 0).toLocaleString('en-IN') + '</div>';
+      html += '<span class="badge-status ' + badgeCls + '">' + escapeHTML(statusTxt) + '</span></div></div>';
+    });
+  }
+  // New bill form
+  html += '<div style="margin-top:14px"><button class="btn btn-primary w-full" style="border-radius:var(--radius)" onclick="showSiteExpenseBillForm()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New Bill</button></div>';
+  html += '<div id="siteExpenseBillForm" style="display:none"></div>';
+  container.innerHTML = html;
+}
+
+function showSiteExpenseBillForm() {
+  var container = document.getElementById('siteExpenseBillForm');
+  if (!container) return;
+  container.style.display = 'block';
+  var html = '<div class="card fade-in" style="padding:14px;margin-top:10px">';
+  html += '<h3 style="font-family:var(--font-display);font-size:.95rem;font-weight:600;margin-bottom:12px">Submit Site Expense Bill</h3>';
+  html += '<div class="form-row"><label>Project / Site *</label><select id="seBillProject" class="nf-select"><option value="">Select project</option>';
+  if (typeof projects !== 'undefined') { projects.forEach(function(p) { html += '<option>' + escapeHTML(p.name) + '</option>'; }); }
+  html += '<option>Other</option></select></div>';
+  html += '<div class="form-row"><label>Category *</label><select id="seBillCategory" class="nf-select"><option value="">Select</option><option>Material</option><option>Labour</option><option>Equipment</option><option>Transport</option><option>Fuel</option><option>Food</option><option>Other</option></select></div>';
+  html += '<div class="form-row"><label>Amount (Rs.) *</label><input type="number" id="seBillAmount" placeholder="e.g. 5000"></div>';
+  html += '<div class="form-row"><label>Description</label><textarea id="seBillDesc" rows="2" placeholder="Brief explanation..." style="width:100%;padding:8px;border:1.5px solid var(--gray-200);border-radius:var(--radius-xs);font-family:var(--font-body);font-size:.82rem"></textarea></div>';
+  html += '<div class="section-title" style="font-size:.72rem;margin-bottom:6px">Attach Bill Photo *</div>';
+  html += '<div class="camera-zone fade-in" onclick="document.getElementById(\'seBillInput\').click()" style="padding:14px">';
+  html += '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
+  html += '<p style="font-size:.78rem">Tap to capture bill photo</p>';
+  html += '<input type="file" id="seBillInput" accept="image/*" capture="environment" style="display:none"></div>';
+  html += '<div style="display:flex;gap:8px;margin-top:14px">';
+  html += '<button class="nf-btn nf-btn-primary" onclick="submitSiteExpenseBill()" style="flex:1">Submit Bill</button>';
+  html += '<button class="nf-btn nf-btn-outline" onclick="document.getElementById(\'siteExpenseBillForm\').style.display=\'none\'">Cancel</button>';
+  html += '</div></div>';
+  container.innerHTML = html;
+}
+
+async function submitSiteExpenseBill() {
+  var project = (document.getElementById('seBillProject') || {}).value || '';
+  var category = (document.getElementById('seBillCategory') || {}).value || '';
+  var amount = parseInt((document.getElementById('seBillAmount') || {}).value, 10) || 0;
+  var desc = (document.getElementById('seBillDesc') || {}).value || '';
+  if (!project) { showToast('Please select a project/site'); return; }
+  if (!category) { showToast('Please select a category'); return; }
+  if (!amount) { showToast('Please enter the bill amount'); return; }
+  try {
+    var apiRes = await apiCall('POST', '/expenses', {
+      category: category, amount: amount, description: desc, date: new Date().toISOString().split('T')[0],
+      expenseType: 'site_expense', project: project
+    });
+    expenseReimbursements.push({
+      id: (apiRes && apiRes.id) || (expenseReimbursements.length + 1),
+      empCode: currentUser.code, empName: currentUser.name,
+      category: category, amount: amount, description: desc, project: project,
+      date: new Date().toISOString().split('T')[0], status: 'Pending',
+      expenseType: 'site_expense'
+    });
+    showToast('Site expense bill submitted for Rs.' + amount.toLocaleString('en-IN'));
+    renderSiteExpenseScreen();
+  } catch (e) { showToast(e.message || 'Error submitting bill'); }
+}
+
+// =====================================================
+// TRAVEL EXPENSE SCREEN — Tally travel advance vs bills
+// =====================================================
+function renderTravelExpenseScreen() {
+  var container = document.getElementById('travelExpenseContent');
+  if (!container || !currentUser) return;
+  // Approved travel advances for current user
+  var myAdvances = advanceRequests.filter(function(a) {
+    return a.empCode === currentUser.code && a.type === 'travel' && a.status === 'approved';
+  });
+  var totalAdvance = myAdvances.reduce(function(s, a) { return s + (a.amount || 0); }, 0);
+  // Travel expense bills submitted by current user
+  var myBills = expenseReimbursements.filter(function(e) {
+    return e.empCode === currentUser.code && e.expenseType === 'travel_expense';
+  });
+  var totalBills = myBills.reduce(function(s, b) { return s + (b.amount || 0); }, 0);
+  var diff = totalAdvance - totalBills;
+
+  var html = '';
+  // Summary cards
+  html += '<div class="summary-grid fade-in">';
+  html += '<div class="summary-card total"><div class="amount">Rs.' + totalAdvance.toLocaleString('en-IN') + '</div><div class="label">Travel Advance</div></div>';
+  html += '<div class="summary-card approved"><div class="amount">Rs.' + totalBills.toLocaleString('en-IN') + '</div><div class="label">Bills Submitted</div></div>';
+  if (diff > 0) {
+    html += '<div class="summary-card pending"><div class="amount">Rs.' + diff.toLocaleString('en-IN') + '</div><div class="label">To Return</div></div>';
+  } else if (diff < 0) {
+    html += '<div class="summary-card approved"><div class="amount">Rs.' + Math.abs(diff).toLocaleString('en-IN') + '</div><div class="label">Claim Extra</div></div>';
+  } else {
+    html += '<div class="summary-card approved"><div class="amount">Rs.0</div><div class="label">Settled</div></div>';
+  }
+  html += '</div>';
+  // Tally message
+  if (diff > 0) {
+    html += '<div style="background:var(--amber-50,#FFF8E1);border:1px solid var(--amber-200,#FFE082);border-radius:var(--radius);padding:10px 12px;margin:10px 0;font-size:.78rem;color:var(--amber-800,#6D4C00)">Return <strong>Rs.' + diff.toLocaleString('en-IN') + '</strong> or it will be deducted from next salary.</div>';
+  } else if (diff < 0) {
+    html += '<div style="background:var(--success-light);border:1px solid var(--success);border-radius:var(--radius);padding:10px 12px;margin:10px 0;font-size:.78rem;color:var(--success-dark)">You spent <strong>Rs.' + Math.abs(diff).toLocaleString('en-IN') + '</strong> more than advance. Submit for reimbursement approval.</div>';
+  }
+  // Previous bills
+  if (myBills.length > 0) {
+    html += '<div class="section-title">Submitted Bills</div>';
+    myBills.sort(function(a, b) { return b.id - a.id; }).forEach(function(b) {
+      var badgeCls = b.status === 'Approved' ? 'badge-approved' : b.status === 'Rejected' ? 'badge-rejected' : b.status === 'hr_accepted' ? 'badge-pending' : 'badge-pending';
+      var statusTxt = b.status === 'hr_accepted' ? 'HR Accepted' : b.status;
+      html += '<div class="expense-item fade-in"><div style="flex:1"><div style="font-weight:600;font-size:.82rem">' + escapeHTML(b.travelFrom || '') + ' → ' + escapeHTML(b.travelTo || '') + '</div>';
+      html += '<div style="font-size:.72rem;color:var(--gray-500)">' + escapeHTML(b.vehicle || '') + (b.travelKm ? ' &middot; ' + b.travelKm + ' km' : '') + ' &middot; ' + (b.date || '') + '</div>';
+      if (b.description) html += '<div style="font-size:.68rem;color:var(--gray-400);margin-top:2px">' + escapeHTML(b.description) + '</div>';
+      html += '</div><div style="text-align:right"><div class="expense-amount">Rs.' + (b.amount || 0).toLocaleString('en-IN') + '</div>';
+      html += '<span class="badge-status ' + badgeCls + '">' + escapeHTML(statusTxt) + '</span></div></div>';
+    });
+  }
+  // New bill form
+  html += '<div style="margin-top:14px"><button class="btn btn-primary w-full" style="border-radius:var(--radius)" onclick="showTravelExpenseBillForm()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New Bill</button></div>';
+  html += '<div id="travelExpenseBillForm" style="display:none"></div>';
+  container.innerHTML = html;
+}
+
+function showTravelExpenseBillForm() {
+  var container = document.getElementById('travelExpenseBillForm');
+  if (!container) return;
+  container.style.display = 'block';
+  var html = '<div class="card fade-in" style="padding:14px;margin-top:10px">';
+  html += '<h3 style="font-family:var(--font-display);font-size:.95rem;font-weight:600;margin-bottom:12px">Submit Travel Expense Bill</h3>';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+  html += '<div class="form-row"><label>From *</label><input type="text" id="teBillFrom" placeholder="e.g. Coimbatore"></div>';
+  html += '<div class="form-row"><label>To *</label><input type="text" id="teBillTo" placeholder="e.g. Chennai"></div></div>';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+  html += '<div class="form-row"><label>Travel Date *</label><input type="date" id="teBillDate" value="' + new Date().toISOString().split('T')[0] + '"></div>';
+  html += '<div class="form-row"><label>Days</label><input type="number" id="teBillDays" placeholder="1" value="1"></div></div>';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+  html += '<div class="form-row"><label>Mode of Travel *</label><select id="teBillVehicle" class="nf-select"><option value="">Select</option><option>Bike</option><option>Car</option><option>Auto</option><option>Bus</option><option>Train</option><option>Flight</option><option>Other</option></select></div>';
+  html += '<div class="form-row"><label>Distance (km)</label><input type="number" id="teBillKm" placeholder="e.g. 500"></div></div>';
+  html += '<div class="form-row"><label>Bill Amount (Rs.) *</label><input type="number" id="teBillAmount" placeholder="e.g. 2500"></div>';
+  html += '<div class="form-row"><label>Description</label><textarea id="teBillDesc" rows="2" placeholder="Trip details..." style="width:100%;padding:8px;border:1.5px solid var(--gray-200);border-radius:var(--radius-xs);font-family:var(--font-body);font-size:.82rem"></textarea></div>';
+  html += '<div class="section-title" style="font-size:.72rem;margin-bottom:6px">Attach Receipt *</div>';
+  html += '<div class="camera-zone fade-in" onclick="document.getElementById(\'teBillInput\').click()" style="padding:14px">';
+  html += '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
+  html += '<p style="font-size:.78rem">Tap to capture receipt</p>';
+  html += '<input type="file" id="teBillInput" accept="image/*" capture="environment" style="display:none"></div>';
+  html += '<div style="display:flex;gap:8px;margin-top:14px">';
+  html += '<button class="nf-btn nf-btn-primary" onclick="submitTravelExpenseBill()" style="flex:1">Submit Bill</button>';
+  html += '<button class="nf-btn nf-btn-outline" onclick="document.getElementById(\'travelExpenseBillForm\').style.display=\'none\'">Cancel</button>';
+  html += '</div></div>';
+  container.innerHTML = html;
+}
+
+async function submitTravelExpenseBill() {
+  var from = (document.getElementById('teBillFrom') || {}).value || '';
+  var to = (document.getElementById('teBillTo') || {}).value || '';
+  var vehicle = (document.getElementById('teBillVehicle') || {}).value || '';
+  var amount = parseInt((document.getElementById('teBillAmount') || {}).value, 10) || 0;
+  var km = parseInt((document.getElementById('teBillKm') || {}).value, 10) || null;
+  var days = parseInt((document.getElementById('teBillDays') || {}).value, 10) || 1;
+  var desc = (document.getElementById('teBillDesc') || {}).value || '';
+  var travelDate = (document.getElementById('teBillDate') || {}).value || new Date().toISOString().split('T')[0];
+  if (!from || !to) { showToast('Please enter From and To locations'); return; }
+  if (!vehicle) { showToast('Please select mode of travel'); return; }
+  if (!amount) { showToast('Please enter the bill amount'); return; }
+  try {
+    var apiRes = await apiCall('POST', '/expenses', {
+      category: 'Travel', amount: amount, description: desc, date: travelDate,
+      expenseType: 'travel_expense', travelFrom: from, travelTo: to, vehicle: vehicle,
+      travelKm: km, travelDays: days
+    });
+    expenseReimbursements.push({
+      id: (apiRes && apiRes.id) || (expenseReimbursements.length + 1),
+      empCode: currentUser.code, empName: currentUser.name,
+      category: 'Travel', amount: amount, description: desc, date: travelDate,
+      status: 'Pending', expenseType: 'travel_expense',
+      travelFrom: from, travelTo: to, vehicle: vehicle, travelKm: km, travelDays: days
+    });
+    showToast('Travel expense bill submitted for Rs.' + amount.toLocaleString('en-IN'));
+    renderTravelExpenseScreen();
+  } catch (e) { showToast(e.message || 'Error submitting bill'); }
 }
 
 // =====================================================
@@ -6416,13 +6681,27 @@ async function submitExpenseReimbursement() {
     renderExpenseOverlay();
   } catch (e) { showToast(e.message || 'Error submitting expense'); }
 }
+async function hrAcceptExpense(id) {
+  try {
+    var exp = expenseReimbursements.find(function(e) { return e.id === id; });
+    if (!exp) return;
+    await apiCall('PUT', '/expenses/' + id + '/approve', { hrAccept: true });
+    exp.status = 'hr_accepted'; exp.approvedBy = currentUser.name + ' (HR)'; exp.approvedOn = new Date().toISOString().split('T')[0];
+    showToast('Accepted Rs.' + exp.amount.toLocaleString('en-IN') + ' — forwarded to MD');
+    renderAdvanceRequests(advReqActiveTab);
+  } catch (e) { showToast(e.message || 'Error accepting expense'); }
+}
 async function approveExpense(id) {
   try {
     var exp = expenseReimbursements.find(function(e) { return e.id === id; });
     if (!exp) return;
+    // MD can only approve from hr_accepted state
+    if (currentUser.role === 'MD' && exp.status !== 'hr_accepted' && exp.status !== 'Pending') {
+      showToast('HR must accept this expense first'); return;
+    }
     await apiCall('PUT', '/expenses/' + id + '/approve', {});
-    exp.status = 'Approved'; exp.approvedBy = currentUser.code; exp.approvedOn = new Date().toISOString().split('T')[0];
-    renderExpenseOverlay(); showToast('Expense approved');
+    exp.status = 'Approved'; exp.approvedBy = currentUser.name + ' (' + currentUser.role + ')'; exp.approvedOn = new Date().toISOString().split('T')[0];
+    renderExpenseOverlay(); renderAdvanceRequests(advReqActiveTab); showToast('Expense approved');
   } catch (e) { showToast(e.message || 'Error approving expense'); }
 }
 async function rejectExpense(id) {
@@ -6431,7 +6710,7 @@ async function rejectExpense(id) {
     if (!exp) return;
     await apiCall('PUT', '/expenses/' + id + '/reject', {});
     exp.status = 'Rejected'; exp.rejectedBy = currentUser.code;
-    renderExpenseOverlay(); showToast('Expense rejected');
+    renderExpenseOverlay(); renderAdvanceRequests(advReqActiveTab); showToast('Expense rejected');
   } catch (e) { showToast(e.message || 'Error rejecting expense'); }
 }
 function renderExpenseOverlay() {
