@@ -1279,6 +1279,7 @@ function updateGreeting() {
   document.getElementById('timeLabel').textContent = h < 12 ? 'Good Morning' : h < 17 ? 'Good Afternoon' : 'Good Evening';
   document.getElementById('currentTime').textContent = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
   document.getElementById('currentDate').textContent = now.toLocaleDateString('en-US', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+  restoreCheckinStatus();
 }
 setInterval(updateGreeting, 60000);
 
@@ -4684,6 +4685,7 @@ function gpsCheckIn() {
     sendNotification('Check-In Recorded', 'Location: ' + (geoResult.inside ? geoResult.location : pos.coords.latitude.toFixed(4) + '\u00B0N'), 'checkin');
     if (btn) btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/></svg>Checked In';
     updateCheckinCard(pos.coords);
+    updateCheckinStatus('checkin');
     renderAttendanceLogList();
   }
 
@@ -4723,6 +4725,7 @@ function gpsCheckOut() {
     safeStorage.set(STORAGE_KEYS.attendanceLogs, JSON.stringify(attendanceLogs));
     showToast('Checked out successfully');
     sendNotification('Check-Out Recorded', 'Time: ' + new Date().toLocaleTimeString(), 'checkout');
+    updateCheckinStatus('checkout');
     renderAttendanceLogList();
   }
   navigator.geolocation.getCurrentPosition(onSuccess,
@@ -4745,6 +4748,33 @@ function updateCheckinCard(coords) {
   if (locBar && coords) {
     locBar.textContent += ` | GPS: ${coords.latitude.toFixed(4)}°N, ${coords.longitude.toFixed(4)}°E`;
   }
+}
+
+function updateCheckinStatus(type) {
+  var statusText = document.getElementById('checkinStatusText');
+  var dot = document.querySelector('.checkin-status .dot');
+  var checkinBtn = document.getElementById('gpsCheckinBtn');
+  var checkoutBtn = document.getElementById('gpsCheckoutBtn');
+  if (type === 'checkin') {
+    if (statusText) statusText.textContent = 'Checked In';
+    if (dot) { dot.style.background = 'var(--success)'; dot.style.animation = 'pulse 2s infinite'; }
+    if (checkinBtn) { checkinBtn.className = 'btn btn-white-outline'; }
+    if (checkoutBtn) { checkoutBtn.className = 'btn btn-golden'; }
+  } else {
+    if (statusText) statusText.textContent = 'Checked Out';
+    if (dot) { dot.style.background = '#F59E0B'; dot.style.animation = 'none'; }
+    if (checkinBtn) { checkinBtn.className = 'btn btn-golden'; }
+    if (checkoutBtn) { checkoutBtn.className = 'btn btn-white-outline'; }
+  }
+}
+
+function restoreCheckinStatus() {
+  if (!currentUser || typeof attendanceLogs === 'undefined') return;
+  var today = new Date().toISOString().split('T')[0];
+  var todayLogs = attendanceLogs.filter(function(l) { return l.empCode === currentUser.code && l.timestamp && l.timestamp.startsWith(today); });
+  if (todayLogs.length === 0) return;
+  var lastLog = todayLogs[todayLogs.length - 1];
+  updateCheckinStatus(lastLog.type);
 }
 
 // =====================================================
