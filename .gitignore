@@ -24,6 +24,7 @@ Thumbs.db
 *.png
 !swetha_logo.png
 !swetha_symbol.png
+!white_bg_logo.png
 !swetha_name.png
 !swetha_tagline.png
 !icons/*.png

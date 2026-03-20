@@ -28,8 +28,8 @@ body{font-family:var(--font-body);color:var(--text);background:#E8EAF0;display:f
 @media(max-width:500px){.phone-frame{border-radius:0;box-shadow:none;max-height:100vh}}
 .app-header{position:absolute;top:0;left:0;right:0;height:var(--header-h);z-index:var(--z-header);display:flex;align-items:center;justify-content:space-between;padding:0 20px;background:rgba(255,255,255,.82);backdrop-filter:blur(20px) saturate(180%);-webkit-backdrop-filter:blur(20px) saturate(180%);border-bottom:1px solid rgba(0,0,0,.06)}
 .header-logo{display:flex;align-items:center;gap:8px}
-.header-logo svg{width:28px;height:28px}
-.header-logo span{font-family:var(--font-display);font-weight:700;font-size:1rem;background:linear-gradient(135deg,var(--primary),var(--primary-light));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.header-logo img{height:28px;width:auto;object-fit:contain}
+.header-logo span{font-family:var(--font-display);font-weight:700;font-size:1rem;background:linear-gradient(135deg,var(--primary),var(--primary-light));-webkit-background-clip:text;-webkit-text-fill-color:transparent;display:none}
 .header-actions{display:flex;align-items:center;gap:6px}
 .header-btn{width:38px;height:38px;border-radius:12px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--gray-600);transition:all .2s;position:relative}
 .header-btn:hover{background:var(--gray-100)}
@@ -424,12 +424,12 @@ body{font-family:var(--font-body);color:var(--text);background:#E8EAF0;display:f
 .login-hero-img{display:none}
 .login-brand{display:none}
 .login-brand-row{display:flex;align-items:center;gap:12px}
-.login-brand-row .login-logo img{width:48px;height:auto;object-fit:contain}
+.login-brand-row .login-logo img{width:140px;height:auto;object-fit:contain}
 .login-right-decor{display:none}
 .login-form{width:100%;max-width:340px;position:relative;z-index:2}
 .login-form-header{text-align:center;margin-bottom:24px}
 .login-form-logo{margin-bottom:8px}
-.login-form-logo img{filter:brightness(0) invert(1) drop-shadow(0 2px 8px rgba(0,0,0,.15))}
+.login-form-logo img{width:130px;height:auto;filter:brightness(0) invert(1) drop-shadow(0 2px 8px rgba(0,0,0,.15))}
 .login-welcome{font-family:var(--font-display);font-size:1.5rem;font-weight:700;color:#fff;margin-bottom:4px}
 .login-welcome-sub{font-size:.78rem;color:rgba(255,255,255,.7)}
 .login-field{margin-bottom:12px}
@@ -960,8 +960,8 @@ a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.cal-nav bu
     position: relative; height: 60px; padding: 0 24px;
     background: #1C1710; border-bottom: 1px solid rgba(255,255,255,.06); backdrop-filter: none;
   }
-  .header-logo svg { width: 30px; height: 30px; }
-  .header-logo span { font-size: 1.05rem; background: linear-gradient(135deg,#F59E0B,#FBBF24); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .header-logo img { height: 32px; width: auto; }
+  .header-logo span { display: none; }
   .header-btn { width: 40px; height: 40px; color: rgba(255,255,255,.6); }
   .header-btn:hover { background: rgba(255,255,255,.08); color: #fff; }
   .avatar-sm { width: 36px; height: 36px; font-size: .85rem; }
@@ -1055,9 +1055,9 @@ a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.cal-nav bu
   .login-hero-img img { width: 90%; max-width: 380px; height: auto; object-fit: contain; object-position: bottom center; }
   .login-brand { display: flex; flex-direction: column; align-items: flex-start; text-align: left; }
   .login-brand-row { display: flex; align-items: center; gap: 10px; }
-  .login-brand-row .login-logo img { width: 42px; height: auto; object-fit: contain; }
-  .login-brand .login-title { font-family: var(--font-display); font-size: 1.2rem; font-weight: 700; color: var(--gray-900); }
-  .login-brand .login-tagline { font-size: .62rem; letter-spacing: .18em; color: var(--gray-500); text-transform: uppercase; margin-top: 2px; }
+  .login-brand-row .login-logo img { width: 160px; height: auto; object-fit: contain; }
+  .login-brand .login-title { display: none; }
+  .login-brand .login-tagline { display: none; }
   .login-right { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 40px 32px; overflow-y: auto; background: #fff; position: relative; }
   .login-right::before { display: none; }
   .login-right-decor { display: block; position: absolute; bottom: -10px; right: -20px; width: 200px; height: auto; opacity: .5; pointer-events: none; z-index: 0; }
@@ -1128,8 +1128,8 @@ a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.cal-nav bu
     border-bottom: 1px solid rgba(255,255,255,.06);
     backdrop-filter: none;
   }
-  .header-logo svg { width: 34px; height: 34px; }
-  .header-logo span { font-size: 1.15rem; background: linear-gradient(135deg,#F59E0B,#FBBF24); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .header-logo img { height: 36px; width: auto; }
+  .header-logo span { display: none; }
   .header-btn { width: 42px; height: 42px; color: rgba(255,255,255,.6); }
   .header-btn:hover { background: rgba(255,255,255,.08); color: #fff; }
   .header-btn .badge { border-color: #1C1710; }
@@ -1381,9 +1381,9 @@ a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.cal-nav bu
   .login-hero-img img { width: 92%; max-width: 520px; height: auto; object-fit: contain; object-position: bottom center; }
   .login-brand { display: flex; flex-direction: column; align-items: flex-start; text-align: left; }
   .login-brand-row { display: flex; align-items: center; gap: 14px; }
-  .login-brand-row .login-logo img { width: 52px; height: auto; object-fit: contain; }
-  .login-brand .login-title { font-family: var(--font-display); font-size: 1.6rem; font-weight: 700; color: var(--gray-900); }
-  .login-brand .login-tagline { font-size: .7rem; letter-spacing: .2em; color: var(--gray-500); text-transform: uppercase; margin-top: 4px; }
+  .login-brand-row .login-logo img { width: 180px; height: auto; object-fit: contain; }
+  .login-brand .login-title { display: none; }
+  .login-brand .login-tagline { display: none; }
   .login-right { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px 48px; overflow-y: auto; background: #fff; position: relative; }
   .login-right::before { display: none; }
   .login-right-decor { display: block; position: absolute; bottom: -10px; right: -20px; width: 260px; opacity: .4; pointer-events: none; z-index: 0; }
