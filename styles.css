@@ -1048,7 +1048,7 @@ a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.cal-nav bu
   .child-dot { width: 5px; height: 5px; border-radius: 50%; background: rgba(255,255,255,.25); flex-shrink: 0; }
   .sidebar-child.active .child-dot { background: #F59E0B; }
   /* Login — split layout (tablet) */
-  .login-screen { display: flex; flex-direction: row; align-items: stretch; grid-column: 1 / -1; grid-row: 1 / -1; overflow-y: auto; padding: 0; background: #f8f9fb; }
+  .login-screen { display: flex; flex-direction: row; align-items: stretch; grid-column: 1 / -1; grid-row: 1 / -1; overflow-y: auto; padding: 0; background: #FCE8C8; gap: 0; }
   .login-screen.hidden { display: none !important; }
   .login-left { display: flex; flex: 1; flex-direction: column; align-items: flex-start; justify-content: flex-start; padding: 0; background: #FCE8C8; position: relative; overflow: hidden; }
   .login-left::after { content: ''; position: absolute; inset: 0; background: url('assets/hero-mobile.png') center center/cover no-repeat; z-index: 0; }
@@ -1372,7 +1372,7 @@ a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.cal-nav bu
   .login-screen {
     display: flex; flex-direction: row; align-items: stretch;
     grid-column: 1 / -1; grid-row: 1 / -1;
-    overflow-y: auto; padding: 0; background: #f8f9fb;
+    overflow-y: auto; padding: 0; background: #FCE8C8; gap: 0;
   }
   .login-screen.hidden { display: none !important; }
   .login-left { display: flex; flex: 1.1; flex-direction: column; align-items: flex-start; justify-content: flex-start; padding: 0; background: #FCE8C8; position: relative; overflow: hidden; }
