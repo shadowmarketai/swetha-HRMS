@@ -424,8 +424,8 @@ body{font-family:var(--font-body);color:var(--text);background:#E8EAF0;display:f
 .login-screen.hidden{display:none}
 /* Mobile: single column, hero bg */
 .login-left{display:none}
-.login-right{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;background:linear-gradient(135deg,var(--primary-dark) 0%,var(--primary) 50%,var(--primary-light) 100%);position:relative;overflow:hidden;min-height:100%}
-.login-right::before{content:'';position:absolute;top:0;left:0;right:0;bottom:0;background:url('assets/hero-mobile.jpg') center bottom/cover no-repeat;opacity:.12;pointer-events:none}
+.login-right{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;background:url('assets/hero-mobile.jpg') center bottom/cover no-repeat;position:relative;overflow:hidden;min-height:100%}
+.login-right::before{content:'';position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.3);pointer-events:none}
 .login-hero-img{display:none}
 .login-brand{display:none}
 .login-brand-row{display:flex;align-items:center;gap:12px}
