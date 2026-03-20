@@ -534,6 +534,8 @@ async function loginAs(empCode) {
 
     // Start periodic notification refresh (every 30 seconds)
     startNotifPoll();
+    // Ensure badge is updated immediately after data load
+    updateNotifBadge();
 
     // MD/HR: check for new employees needing setup (salary=0)
     if (currentUser.role === 'MD' || currentUser.role === 'HR') {
@@ -1551,14 +1553,122 @@ function renderAllEmpList() {
           ${isMD ? `<button onclick="deleteEmployeePermanently('${e.code}')" style="font-size:.6rem;padding:3px 8px;border:1px solid #EF4444;color:#EF4444;background:transparent;border-radius:6px;cursor:pointer">Delete</button>` : ''}
         </div>`;
       }
-      html += `<div class="emp-list-item" style="${isInactive ? 'opacity:.6' : ''}">
+      html += `<div class="emp-list-item" style="${isInactive ? 'opacity:.6' : ''}" ${isHRorMD ? 'onclick="toggleEmpDetail(\'' + e.code + '\', this)"' : ''}>
         <div class="emp-avatar" style="background:${colors[di % colors.length]}">${init}</div>
         <div class="emp-details"><h4>${escapeHTML(e.name)}${statusBadge}</h4><p>${e.code} &middot; ${escapeHTML(e.designation)} &middot; &#8377;${e.salary.toLocaleString('en-IN')}</p>${actions}</div>
         <span class="role-badge ${e.role.toLowerCase()}">${e.role}</span>
       </div>`;
+      if (isHRorMD) html += `<div class="emp-detail-expanded" id="empDetail-${e.code}" style="display:none"></div>`;
     });
   });
   container.innerHTML = html;
+}
+
+// Extended employee data (dummy fields for existing employees)
+var employeeExtendedData = {};
+function getExtendedData(code) {
+  if (!employeeExtendedData[code]) {
+    var seed = 0;
+    for (var i = 0; i < code.length; i++) seed += code.charCodeAt(i);
+    var bloodTypes = ['A+','A-','B+','B-','O+','O-','AB+','AB-'];
+    employeeExtendedData[code] = {
+      fatherName: 'Mr. ' + (code.charCodeAt(2) > 50 ? 'Kumar' : 'Rajan') + ' ' + String.fromCharCode(65 + (seed % 26)),
+      motherName: 'Mrs. ' + (code.charCodeAt(1) > 50 ? 'Lakshmi' : 'Devi') + ' ' + String.fromCharCode(65 + ((seed+3) % 26)),
+      bloodGroup: bloodTypes[seed % bloodTypes.length],
+      emergencyContact: '98' + String(4200000 + (seed * 137) % 1000000).substring(0,8),
+      address: 'No.' + ((seed % 99) + 1) + ', ' + (seed % 2 === 0 ? 'Anna Nagar' : 'KK Nagar') + ', Coimbatore 6410' + String(10 + seed % 90).substring(0,2),
+      aadhaar: 'XXXX XXXX ' + String(1000 + seed % 9000),
+      pan: 'XXXXX' + String(1000 + (seed * 7) % 9000) + String.fromCharCode(65 + seed % 26),
+      uan: '1013' + String(10000000 + (seed * 31) % 90000000),
+      esiNo: '31-00-' + String(100000 + (seed * 17) % 900000) + '-000-0001'
+    };
+  }
+  return employeeExtendedData[code];
+}
+
+function toggleEmpDetail(code, el) {
+  var detailDiv = document.getElementById('empDetail-' + code);
+  if (!detailDiv) return;
+  if (detailDiv.style.display !== 'none') {
+    detailDiv.style.display = 'none';
+    return;
+  }
+  // Collapse any other open detail
+  document.querySelectorAll('.emp-detail-expanded').forEach(function(d) { d.style.display = 'none'; });
+  renderEmployeeDetailCard(code);
+  detailDiv.style.display = 'block';
+}
+
+function renderEmployeeDetailCard(empCode) {
+  var emp = EMPLOYEES.find(function(e) { return e.code === empCode; });
+  if (!emp) return;
+  var ext = getExtendedData(empCode);
+  var container = document.getElementById('empDetail-' + empCode);
+  if (!container) return;
+
+  var html = '<div class="emp-detail-form">';
+  html += '<div class="emp-detail-grid">';
+  html += empDetailField('Name', emp.name, empCode, 'name');
+  html += empDetailField('Code', emp.code, empCode, 'code', true);
+  html += empDetailField('Department', emp.dept, empCode, 'dept');
+  html += empDetailField('Designation', emp.designation, empCode, 'designation');
+  html += empDetailField('Salary', emp.salary, empCode, 'salary');
+  html += empDetailField('Bank', emp.bank || 'Indian Bank', empCode, 'bank');
+  html += empDetailField('Account No', emp.accNo || 'N/A', empCode, 'accNo');
+  html += empDetailField('Phone', emp.phone || 'N/A', empCode, 'phone');
+  html += empDetailField('DOJ', emp.doj || 'N/A', empCode, 'doj');
+  html += empDetailField('Email', emp.email || 'N/A', empCode, 'email');
+  html += empDetailField('Father\'s Name', ext.fatherName, empCode, 'ext_fatherName');
+  html += empDetailField('Mother\'s Name', ext.motherName, empCode, 'ext_motherName');
+  html += empDetailField('Blood Group', ext.bloodGroup, empCode, 'ext_bloodGroup');
+  html += empDetailField('Emergency Contact', ext.emergencyContact, empCode, 'ext_emergencyContact');
+  html += empDetailField('Address', ext.address, empCode, 'ext_address');
+  html += empDetailField('Aadhaar', ext.aadhaar, empCode, 'ext_aadhaar');
+  html += empDetailField('PAN', ext.pan, empCode, 'ext_pan');
+  html += empDetailField('UAN', ext.uan, empCode, 'ext_uan');
+  html += empDetailField('ESI No', ext.esiNo, empCode, 'ext_esiNo');
+  html += '</div>';
+  html += '<div style="display:flex;gap:8px;margin-top:10px">';
+  html += '<button class="btn btn-primary" style="font-size:.72rem;padding:6px 14px" onclick="saveEmployeeDetails(\'' + empCode + '\')">Save Changes</button>';
+  html += '<button class="btn btn-sm" style="font-size:.72rem;padding:6px 14px" onclick="document.getElementById(\'empDetail-' + empCode + '\').style.display=\'none\'">Close</button>';
+  html += '</div></div>';
+  container.innerHTML = html;
+}
+
+function empDetailField(label, value, empCode, fieldKey, readOnly) {
+  var id = 'empField-' + empCode + '-' + fieldKey;
+  return '<div class="emp-detail-field">' +
+    '<label class="emp-detail-label">' + escapeHTML(label) + '</label>' +
+    '<input class="emp-detail-input" id="' + id + '" value="' + escapeHTML(String(value)) + '"' + (readOnly ? ' readonly style="opacity:.6"' : '') + '>' +
+    '</div>';
+}
+
+async function saveEmployeeDetails(empCode) {
+  var emp = EMPLOYEES.find(function(e) { return e.code === empCode; });
+  if (!emp) return;
+  var fields = ['name','dept','designation','salary','bank','accNo','phone','doj','email'];
+  var updateData = {};
+  fields.forEach(function(f) {
+    var input = document.getElementById('empField-' + empCode + '-' + f);
+    if (input) {
+      var val = input.value.trim();
+      if (f === 'salary') val = parseFloat(val) || 0;
+      updateData[f] = val;
+    }
+  });
+  // Update extended data locally
+  var ext = getExtendedData(empCode);
+  var extFields = ['fatherName','motherName','bloodGroup','emergencyContact','address','aadhaar','pan','uan','esiNo'];
+  extFields.forEach(function(f) {
+    var input = document.getElementById('empField-' + empCode + '-ext_' + f);
+    if (input) ext[f] = input.value.trim();
+  });
+  try {
+    await apiCall('PUT', '/employees/' + empCode, updateData);
+    Object.assign(emp, updateData);
+    showToast('Employee details saved');
+    renderAllEmpList();
+  } catch (e) { showToast(e.message || 'Error saving employee details'); }
 }
 
 // =====================================================
@@ -5714,8 +5824,8 @@ function addNotification(title, body, category) {
     sendNotification(title, body, category + '-' + Date.now());
   }
   try { safeStorage.set(STORAGE_KEYS.notifHistory, JSON.stringify(NOTIF_HISTORY)); } catch(e){}
-  // Persist to backend
-  apiCall('POST', '/notifications', { title, body, category }).catch(function(){});
+  // Persist to backend (include target_emp_code for person-specific notifications)
+  apiCall('POST', '/notifications', { title, body, category, target_emp_code: currentUser ? currentUser.code : null }).catch(function(){});
 }
 
 // Refresh notifications from backend (picks up notifications created server-side for this user)
@@ -5763,7 +5873,7 @@ function stopNotifPoll() {
 }
 
 function updateNotifBadge() {
-  var badge = document.querySelector('.header-btn .badge');
+  var badge = document.querySelector('.header-btn .badge') || document.querySelector('.badge');
   if (!badge) return;
   var unread = NOTIF_HISTORY.filter(function(n) { return !n.read; }).length;
   if (unread > 0) {
@@ -8164,6 +8274,133 @@ function renderProgressScreen() {
     gridHtml += '<div class="dept-card garden"><div class="dept-name">Garden Labour</div><div class="dept-amount">' + (deptCounts['Garden'] || 0) + '</div><div class="dept-count">Security + Gardener</div></div>';
     grid.innerHTML = gridHtml;
   }
+
+  // Render materials tracking section
+  renderMaterialsSection();
+}
+
+// =====================================================
+// MATERIALS TRACKING
+// =====================================================
+var projectMaterials = JSON.parse(safeStorage.get('hrms_projectMaterials') || 'null') || [
+  { projectId: 1, name: 'TMT Steel Bars', unit: 'MT', total: 50, used: 32, remaining: 18 },
+  { projectId: 1, name: 'Cement Bags', unit: 'Bags', total: 500, used: 340, remaining: 160 },
+  { projectId: 1, name: 'Sand', unit: 'Cu.ft', total: 200, used: 145, remaining: 55 },
+  { projectId: 1, name: 'Bricks', unit: 'Nos', total: 10000, used: 7200, remaining: 2800 },
+  { projectId: 2, name: 'TMT Steel Bars', unit: 'MT', total: 80, used: 45, remaining: 35 },
+  { projectId: 2, name: 'Cement Bags', unit: 'Bags', total: 800, used: 520, remaining: 280 },
+  { projectId: 2, name: 'Ready Mix Concrete', unit: 'Cu.m', total: 300, used: 180, remaining: 120 },
+  { projectId: 3, name: 'MS Plates', unit: 'MT', total: 30, used: 18, remaining: 12 },
+  { projectId: 3, name: 'Welding Rods', unit: 'Kg', total: 200, used: 140, remaining: 60 },
+  { projectId: 3, name: 'Paint', unit: 'Ltr', total: 100, used: 35, remaining: 65 },
+  { projectId: 4, name: 'PEB Sections', unit: 'MT', total: 120, used: 75, remaining: 45 },
+  { projectId: 4, name: 'Roofing Sheets', unit: 'Sqm', total: 500, used: 320, remaining: 180 },
+  { projectId: 4, name: 'Bolts & Nuts', unit: 'Sets', total: 2000, used: 1400, remaining: 600 }
+];
+
+function canEditMaterials() {
+  if (!currentUser) return false;
+  if (currentUser.role === 'MD' || currentUser.role === 'HR') return true;
+  var desig = (currentUser.designation || '').toLowerCase();
+  return desig.indexOf('coordinator') !== -1 || desig.indexOf('market agent') !== -1;
+}
+
+function renderMaterialsSection() {
+  var container = document.getElementById('materialsSection');
+  if (!container) return;
+  if (!projects || projects.length === 0) { container.innerHTML = ''; return; }
+
+  var editable = canEditMaterials();
+  var html = '<div class="section-title" style="margin-top:16px">Materials Tracking</div>';
+
+  projects.forEach(function(p) {
+    var mats = projectMaterials.filter(function(m) { return m.projectId === p.id; });
+    if (mats.length === 0) return;
+    html += '<div class="card materials-card fade-in" style="margin-bottom:10px">';
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">';
+    html += '<h4 style="font-family:var(--font-display);font-size:.82rem;font-weight:600;color:var(--gray-800)">' + escapeHTML(p.name) + '</h4>';
+    if (editable) {
+      html += '<button class="btn btn-sm" style="font-size:.65rem;padding:4px 10px" onclick="addMaterialRow(' + p.id + ')">+ Add</button>';
+    }
+    html += '</div>';
+    html += '<div class="materials-table">';
+    html += '<div class="materials-row materials-header' + (editable ? ' materials-editable' : '') + '"><span>Material</span><span>Unit</span><span>Total</span><span>Used</span><span>Remaining</span>';
+    if (editable) html += '<span></span>';
+    html += '</div>';
+    mats.forEach(function(m, idx) {
+      var globalIdx = projectMaterials.indexOf(m);
+      html += '<div class="materials-row' + (editable ? ' materials-editable' : '') + '">';
+      if (editable) {
+        html += '<span><input class="mat-input" value="' + escapeHTML(m.name) + '" data-idx="' + globalIdx + '" data-field="name"></span>';
+        html += '<span><input class="mat-input mat-input-sm" value="' + escapeHTML(m.unit) + '" data-idx="' + globalIdx + '" data-field="unit"></span>';
+        html += '<span><input class="mat-input mat-input-sm" type="number" value="' + m.total + '" data-idx="' + globalIdx + '" data-field="total" onchange="updateMaterialRemaining(this)"></span>';
+        html += '<span><input class="mat-input mat-input-sm" type="number" value="' + m.used + '" data-idx="' + globalIdx + '" data-field="used" onchange="updateMaterialRemaining(this)"></span>';
+        html += '<span class="mat-remaining">' + m.remaining + '</span>';
+        html += '<span><button class="mat-del-btn" onclick="deleteMaterialRow(' + globalIdx + ')">&times;</button></span>';
+      } else {
+        html += '<span>' + escapeHTML(m.name) + '</span>';
+        html += '<span>' + escapeHTML(m.unit) + '</span>';
+        html += '<span>' + m.total + '</span>';
+        html += '<span>' + m.used + '</span>';
+        html += '<span class="mat-remaining">' + m.remaining + '</span>';
+      }
+      html += '</div>';
+    });
+    html += '</div>';
+    if (editable) {
+      html += '<button class="btn btn-primary" style="margin-top:8px;font-size:.72rem;padding:6px 14px" onclick="saveProjectMaterials(' + p.id + ')">Save Materials</button>';
+    }
+    html += '</div>';
+  });
+
+  container.innerHTML = html;
+}
+
+function updateMaterialRemaining(input) {
+  var idx = parseInt(input.getAttribute('data-idx'), 10);
+  var field = input.getAttribute('data-field');
+  projectMaterials[idx][field] = parseFloat(input.value) || 0;
+  projectMaterials[idx].remaining = projectMaterials[idx].total - projectMaterials[idx].used;
+  // Update the remaining display
+  var row = input.closest('.materials-row');
+  if (row) {
+    var rem = row.querySelector('.mat-remaining');
+    if (rem) rem.textContent = projectMaterials[idx].remaining;
+  }
+}
+
+function saveProjectMaterials(projectId) {
+  // Read all editable inputs for this project
+  var container = document.getElementById('materialsSection');
+  var inputs = container.querySelectorAll('.mat-input');
+  inputs.forEach(function(inp) {
+    var idx = parseInt(inp.getAttribute('data-idx'), 10);
+    var field = inp.getAttribute('data-field');
+    if (field === 'total' || field === 'used') {
+      projectMaterials[idx][field] = parseFloat(inp.value) || 0;
+      projectMaterials[idx].remaining = projectMaterials[idx].total - projectMaterials[idx].used;
+    } else {
+      projectMaterials[idx][field] = inp.value.trim();
+    }
+  });
+  saveMaterialsData();
+  showToast('Materials saved');
+  renderMaterialsSection();
+}
+
+function addMaterialRow(projectId) {
+  projectMaterials.push({ projectId: projectId, name: '', unit: '', total: 0, used: 0, remaining: 0 });
+  renderMaterialsSection();
+}
+
+function deleteMaterialRow(idx) {
+  projectMaterials.splice(idx, 1);
+  saveMaterialsData();
+  renderMaterialsSection();
+}
+
+function saveMaterialsData() {
+  try { safeStorage.set('hrms_projectMaterials', JSON.stringify(projectMaterials)); } catch(e) {}
 }
 
 function openProjectForm(editId) {
