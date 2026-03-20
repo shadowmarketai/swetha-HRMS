@@ -71,7 +71,7 @@ body{font-family:var(--font-body);color:var(--text);background:#E8EAF0;display:f
 .greeting h1 .wave{display:inline-block;animation:wave 2.5s ease-in-out infinite;transform-origin:70% 70%}
 @keyframes wave{0%,100%{transform:rotate(0)}10%{transform:rotate(14deg)}20%{transform:rotate(-8deg)}30%{transform:rotate(14deg)}40%{transform:rotate(-4deg)}50%{transform:rotate(10deg)}60%{transform:rotate(0)}}
 /* ===== CHECK-IN HERO CARD ===== */
-.checkin-hero{display:flex;align-items:stretch;background:url('assets/hero-construction.png') center/cover no-repeat;color:white;border-radius:var(--radius);overflow:hidden;margin-bottom:16px;position:relative;min-height:180px}
+.checkin-hero{display:flex;align-items:stretch;background:url('assets/hero-construction.jpg') center/cover no-repeat;color:white;border-radius:var(--radius);overflow:hidden;margin-bottom:16px;position:relative;min-height:180px}
 .checkin-hero::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(28,23,16,.72) 0%,rgba(28,23,16,.45) 50%,rgba(28,23,16,.25) 100%);z-index:1;border-radius:var(--radius)}
 .checkin-hero-content{flex:1;padding:22px 24px;display:flex;flex-direction:column;justify-content:center;position:relative;z-index:2;min-width:0}
 .checkin-hero-img{display:none}
@@ -419,7 +419,7 @@ body{font-family:var(--font-body);color:var(--text);background:#E8EAF0;display:f
 /* Mobile: single column, hero bg */
 .login-left{display:none}
 .login-right{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;background:linear-gradient(135deg,var(--primary-dark) 0%,var(--primary) 50%,var(--primary-light) 100%);position:relative;overflow:hidden;min-height:100%}
-.login-right::before{content:'';position:absolute;top:0;left:0;right:0;bottom:0;background:url('assets/hero-mobile.png') center bottom/cover no-repeat;opacity:.12;pointer-events:none}
+.login-right::before{content:'';position:absolute;top:0;left:0;right:0;bottom:0;background:url('assets/hero-mobile.jpg') center bottom/cover no-repeat;opacity:.12;pointer-events:none}
 .login-hero-img{display:none}
 .login-brand{display:none}
 .login-brand-row{display:flex;align-items:center;gap:12px}
@@ -1051,7 +1051,7 @@ a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.cal-nav bu
   .login-screen { display: flex; flex-direction: row; align-items: stretch; grid-column: 1 / -1; grid-row: 1 / -1; overflow-y: auto; padding: 0; background: #FCE8C8; gap: 0; }
   .login-screen.hidden { display: none !important; }
   .login-left { display: flex; flex: 1; flex-direction: column; align-items: flex-start; justify-content: flex-start; padding: 0; background: #FCE8C8; position: relative; overflow: hidden; }
-  .login-left::after { content: ''; position: absolute; inset: 0; background: url('assets/hero-mobile.png') center center/cover no-repeat; z-index: 0; }
+  .login-left::after { content: ''; position: absolute; inset: 0; background: url('assets/hero-mobile.jpg') center center/cover no-repeat; z-index: 0; }
   .login-hero-img { display: none; }
   .login-brand { display: flex; flex-direction: column; align-items: flex-start; text-align: left; position: relative; z-index: 2; padding: 32px 28px; }
   .login-brand-row { display: flex; align-items: center; gap: 10px; }
@@ -1376,7 +1376,7 @@ a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.cal-nav bu
   }
   .login-screen.hidden { display: none !important; }
   .login-left { display: flex; flex: 1.1; flex-direction: column; align-items: flex-start; justify-content: flex-start; padding: 0; background: #FCE8C8; position: relative; overflow: hidden; }
-  .login-left::after { content: ''; position: absolute; inset: 0; background: url('assets/hero-mobile.png') center center/cover no-repeat; z-index: 0; }
+  .login-left::after { content: ''; position: absolute; inset: 0; background: url('assets/hero-mobile.jpg') center center/cover no-repeat; z-index: 0; }
   .login-hero-img { display: none; }
   .login-brand { display: flex; flex-direction: column; align-items: flex-start; text-align: left; position: relative; z-index: 2; padding: 40px 48px; }
   .login-brand-row { display: flex; align-items: center; gap: 14px; }

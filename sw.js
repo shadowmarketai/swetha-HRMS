@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hrms-v86';
+const CACHE_NAME = 'hrms-v87';
 const PRECACHE_URLS = [
   './',
   './index.html',
@@ -8,8 +8,8 @@ const PRECACHE_URLS = [
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/apple-touch-icon.png',
-  './assets/hero-construction.png',
-  './assets/hero-mobile.png',
+  './assets/hero-construction.jpg',
+  './assets/hero-mobile.jpg',
   './assets/construction-scene.png',
   './swetha_new_logo.png',
   './assets/bg-road.jpg',
