@@ -1093,6 +1093,19 @@ function updateSalaryScreen() {
 // =====================================================
 // CORE UI FUNCTIONS
 // =====================================================
+function _retriggerFadeIn(screen) {
+  // Force re-trigger CSS fade-in animations on screen and its children
+  screen.querySelectorAll('.fade-in').forEach(function(el) {
+    el.style.animation = 'none';
+    el.offsetHeight; // force reflow
+    el.style.animation = '';
+  });
+  // Re-trigger screen's own fadeUp animation
+  screen.style.animation = 'none';
+  screen.offsetHeight;
+  screen.style.animation = '';
+}
+
 function switchTab(id, el, _fromPopstate) {
   // Close all open overlays first — track if any were open
   var hadOverlays = document.querySelectorAll('.overlay-screen.active').length > 0;
@@ -1107,6 +1120,7 @@ function switchTab(id, el, _fromPopstate) {
       current.classList.remove('active', 'fade-out');
       document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
       next.classList.add('active');
+      _retriggerFadeIn(next);
       if(el) el.classList.add('active');
       document.querySelector('.app-content').scrollTop = 0;
     }, 150);
@@ -1114,6 +1128,7 @@ function switchTab(id, el, _fromPopstate) {
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
     next.classList.add('active');
+    _retriggerFadeIn(next);
     if(el) el.classList.add('active');
     document.querySelector('.app-content').scrollTop = 0;
   }
