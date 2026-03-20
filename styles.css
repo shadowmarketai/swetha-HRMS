@@ -65,17 +65,16 @@ body{font-family:var(--font-body);color:var(--text);background:#E8EAF0;display:f
 .badge-rejected{background:var(--danger-light);color:var(--danger-dark)}
 .badge-open{background:var(--primary-50);color:var(--primary)}
 .badge-paid{background:var(--success-light);color:var(--success-dark)}
-.greeting{margin-top:-4px;margin-bottom:12px}
+.greeting{margin-top:10px;margin-bottom:12px}
 .greeting .time-label{font-size:.75rem;color:var(--gray-400);font-weight:500;letter-spacing:.04em;text-transform:uppercase}
 .greeting h1{font-family:var(--font-display);font-size:1.55rem;font-weight:700;color:var(--gray-900);margin-top:2px}
 .greeting h1 .wave{display:inline-block;animation:wave 2.5s ease-in-out infinite;transform-origin:70% 70%}
 @keyframes wave{0%,100%{transform:rotate(0)}10%{transform:rotate(14deg)}20%{transform:rotate(-8deg)}30%{transform:rotate(14deg)}40%{transform:rotate(-4deg)}50%{transform:rotate(10deg)}60%{transform:rotate(0)}}
 /* ===== CHECK-IN HERO CARD ===== */
-.checkin-hero{display:flex;align-items:stretch;background:#1C1710;color:white;border-radius:var(--radius);overflow:visible;margin-bottom:16px;position:relative;min-height:170px}
-.checkin-hero-content{flex:1;padding:20px;display:flex;flex-direction:column;justify-content:center;position:relative;z-index:2;min-width:0}
-.checkin-hero-img{position:absolute;top:-18px;right:-10px;bottom:-10px;width:65%;overflow:visible;pointer-events:none}
-.checkin-hero-img::after{content:'';position:absolute;top:0;left:0;bottom:0;width:60%;background:linear-gradient(to right,#1C1710 0%,rgba(28,23,16,.6) 50%,transparent 100%);z-index:1;pointer-events:none}
-.checkin-hero-img img{width:105%;height:115%;object-fit:cover;object-position:center center;filter:drop-shadow(0 8px 24px rgba(0,0,0,.4))}
+.checkin-hero{display:flex;align-items:stretch;background:url('assets/hero-construction.png') center/cover no-repeat;color:white;border-radius:var(--radius);overflow:hidden;margin-bottom:16px;position:relative;min-height:180px}
+.checkin-hero::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(28,23,16,.72) 0%,rgba(28,23,16,.45) 50%,rgba(28,23,16,.25) 100%);z-index:1;border-radius:var(--radius)}
+.checkin-hero-content{flex:1;padding:22px 24px;display:flex;flex-direction:column;justify-content:center;position:relative;z-index:2;min-width:0}
+.checkin-hero-img{display:none}
 .checkin-status{display:flex;align-items:center;gap:8px;font-size:.75rem;margin-bottom:10px}
 .checkin-status .dot{width:8px;height:8px;border-radius:50%;background:var(--success);animation:pulse 2s infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
