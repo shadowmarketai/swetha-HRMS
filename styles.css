@@ -959,7 +959,7 @@ a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.cal-nav bu
     position: relative; height: 60px; padding: 0 24px;
     background: #1C1710; border-bottom: 1px solid rgba(255,255,255,.06); backdrop-filter: none;
   }
-  .header-logo img { height: 50px; width: auto; filter: brightness(0) invert(1); }
+  .header-logo img { height: auto; width: 180px; filter: brightness(0) invert(1); }
   .header-logo span { display: none; }
   .header-btn { width: 40px; height: 40px; color: rgba(255,255,255,.6); }
   .header-btn:hover { background: rgba(255,255,255,.08); color: #fff; }
@@ -1127,7 +1127,7 @@ a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.cal-nav bu
     border-bottom: 1px solid rgba(255,255,255,.06);
     backdrop-filter: none;
   }
-  .header-logo img { height: 54px; width: auto; filter: brightness(0) invert(1); }
+  .header-logo img { height: auto; width: 220px; filter: brightness(0) invert(1); }
   .header-logo span { display: none; }
   .header-btn { width: 42px; height: 42px; color: rgba(255,255,255,.6); }
   .header-btn:hover { background: rgba(255,255,255,.08); color: #fff; }
