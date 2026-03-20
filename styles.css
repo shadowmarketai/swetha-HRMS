@@ -25,7 +25,12 @@
 html{font-size:15px;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
 body{font-family:var(--font-body);color:var(--text);background:#E8EAF0;display:flex;justify-content:center;align-items:center;min-height:100vh;overflow:hidden;transition:background .3s,color .3s}
 .phone-frame{width:430px;max-width:100vw;height:100vh;max-height:932px;background:var(--bg);position:relative;overflow:hidden;box-shadow:0 0 0 8px #1C1710,0 0 0 10px #2D2318,0 25px 80px rgba(0,0,0,.35);border-radius:40px}
-@media(max-width:500px){.phone-frame{border-radius:0;box-shadow:none;max-height:100vh}}
+@media(max-width:500px){.phone-frame{border-radius:0;box-shadow:none;max-height:100vh}
+  .app-header{position:fixed;left:0;right:0;top:0}
+  .bottom-tabs{position:fixed;left:0;right:0;bottom:0}
+  .app-content{position:fixed;top:var(--header-h);bottom:var(--tab-h);left:0;right:0}
+  .overlay-screen{position:fixed;top:0;left:0;right:0;bottom:0;width:100%;height:100%}
+}
 .app-header{position:absolute;top:0;left:0;right:0;height:var(--header-h);z-index:var(--z-header);display:flex;align-items:center;justify-content:space-between;padding:0 16px;background:#1C1710;border-bottom:1px solid rgba(255,255,255,.06)}
 .header-logo{display:flex;align-items:center;gap:8px}
 .header-logo img{height:auto;width:140px;max-height:44px;object-fit:contain;filter:brightness(0) invert(1)}
