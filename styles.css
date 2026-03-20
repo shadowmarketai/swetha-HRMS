@@ -434,7 +434,7 @@ body{font-family:var(--font-body);color:var(--text);background:#E8EAF0;display:f
 .login-form{width:100%;max-width:340px;position:relative;z-index:2;background:rgba(255,255,255,.45);backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%);border:1px solid rgba(255,255,255,.5);border-radius:20px;padding:32px 24px;box-shadow:0 8px 32px rgba(0,0,0,.12),inset 0 1px 0 rgba(255,255,255,.7)}
 .login-form-header{text-align:center;margin-bottom:24px}
 .login-form-logo{margin-bottom:8px}
-.login-form-logo img{width:180px;height:auto;filter:none;drop-shadow(0 2px 8px rgba(0,0,0,.15))}
+.login-form-logo img{width:280px;height:auto;filter:none}
 .login-welcome{font-family:var(--font-display);font-size:1.5rem;font-weight:700;color:var(--gray-900);margin-bottom:4px}
 .login-welcome-sub{font-size:.78rem;color:var(--gray-500)}
 .login-field{margin-bottom:12px}
