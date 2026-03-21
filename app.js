@@ -1800,32 +1800,67 @@ let locRefreshInterval = null;
 let locActiveFilter = 'All';
 
 function generateEmployeeLocations() {
-  employeeLocations = EMPLOYEES.map(emp => {
-    const rand = Math.random();
-    let status;
-    if (rand < 0.25) status = 'online';
-    else if (rand < 0.40) status = 'on-site';
-    else if (rand < 0.50) status = 'idle';
-    else status = 'offline';
+  var today = new Date().toISOString().split('T')[0];
+  var logs = (typeof attendanceLogs !== 'undefined' ? attendanceLogs : []);
+  employeeLocations = EMPLOYEES.map(function(emp) {
+    // Get today's logs for this employee, sorted by time
+    var empLogs = logs.filter(function(l) {
+      return l.empCode === emp.code && l.timestamp && l.timestamp.startsWith(today);
+    }).sort(function(a, b) { return a.timestamp < b.timestamp ? -1 : 1; });
 
-    let loc;
-    if (emp.dept === 'Office' && Math.random() < 0.7) {
-      loc = CHENNAI_LOCATIONS[12]; // Office - Porur HQ
-    } else if (emp.dept === 'Factory' && Math.random() < 0.7) {
-      loc = CHENNAI_LOCATIONS[13]; // Factory - Kundrathur
-    } else {
-      loc = CHENNAI_LOCATIONS[Math.floor(Math.random() * CHENNAI_LOCATIONS.length)];
+    var lastLog = empLogs.length > 0 ? empLogs[empLogs.length - 1] : null;
+    var firstCheckin = empLogs.find(function(l) { return l.type === 'checkin'; });
+    var status = 'offline';
+    var lat = null, lng = null, area = 'No location', checkInTime = null, checkOutTime = null;
+    var minutesAgo = 0;
+    var remark = '';
+    var geofenceStatus = '';
+
+    if (lastLog) {
+      lat = lastLog.lat || null;
+      lng = lastLog.lng || null;
+      area = lastLog.location || 'Unknown';
+      var logTime = new Date(lastLog.timestamp);
+      minutesAgo = Math.round((Date.now() - logTime.getTime()) / 60000);
+
+      if (lastLog.type === 'checkin') {
+        // Checked in but not checked out — live/online
+        var geoCheck = (lat && lng) ? checkGeofence(lat, lng) : { inside: false };
+        status = geoCheck.inside ? 'on-site' : 'online';
+        geofenceStatus = geoCheck.inside ? 'Inside: ' + geoCheck.location : 'Outside geofence';
+      } else {
+        // Last action is checkout — offline
+        status = 'offline';
+        geofenceStatus = 'Checked out';
+      }
+      remark = lastLog.remark || '';
     }
 
-    const minutesAgo = status === 'offline' ? Math.floor(Math.random() * 120) + 10 : Math.floor(Math.random() * 15);
-    const checkIn = (status === 'online' || status === 'on-site') ? `${8 + Math.floor(Math.random() * 2)}:${String(Math.floor(Math.random() * 60)).padStart(2,'0')} AM` : null;
+    if (firstCheckin) {
+      checkInTime = new Date(firstCheckin.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+    }
+
+    var lastCheckout = null;
+    for (var i = empLogs.length - 1; i >= 0; i--) {
+      if (empLogs[i].type === 'checkout') { lastCheckout = empLogs[i]; break; }
+    }
+    if (lastCheckout) {
+      checkOutTime = new Date(lastCheckout.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+    }
 
     return {
-      ...emp,
-      status,
-      location: {...loc, lat: loc.lat + (Math.random() - 0.5) * 0.005, lng: loc.lng + (Math.random() - 0.5) * 0.005},
-      minutesAgo,
-      checkIn
+      code: emp.code,
+      name: emp.name,
+      dept: emp.dept,
+      designation: emp.designation,
+      status: status,
+      location: { area: area, lat: lat || 0, lng: lng || 0 },
+      minutesAgo: minutesAgo,
+      checkIn: checkInTime,
+      checkOut: checkOutTime,
+      geofenceStatus: geofenceStatus,
+      remark: remark,
+      totalLogs: empLogs.length
     };
   });
 }
@@ -1847,49 +1882,80 @@ function getAvatarColor(dept) {
 }
 
 function renderLocationTracker() {
-  const online = employeeLocations.filter(e => e.status === 'online').length;
-  const onSite = employeeLocations.filter(e => e.status === 'on-site').length;
-  const idle = employeeLocations.filter(e => e.status === 'idle').length;
-  const offline = employeeLocations.filter(e => e.status === 'offline').length;
+  var online = employeeLocations.filter(function(e) { return e.status === 'online'; }).length;
+  var onSite = employeeLocations.filter(function(e) { return e.status === 'on-site'; }).length;
+  var offline = employeeLocations.filter(function(e) { return e.status === 'offline'; }).length;
+  var noLog = employeeLocations.filter(function(e) { return e.totalLogs === 0; }).length;
 
   // Summary bar
   document.getElementById('locSummary').innerHTML =
-    `<div class="loc-stat"><span class="dot green"></span>${online} Online</div>` +
-    `<div class="loc-stat"><span class="dot blue"></span>${onSite} On-Site</div>` +
-    `<div class="loc-stat"><span class="dot orange"></span>${idle} Idle</div>` +
-    `<div class="loc-stat"><span class="dot gray"></span>${offline} Offline</div>`;
+    '<div class="loc-stat"><span class="dot green"></span>' + (online + onSite) + ' Live</div>' +
+    '<div class="loc-stat"><span class="dot blue"></span>' + onSite + ' On-Site</div>' +
+    '<div class="loc-stat"><span class="dot gray"></span>' + offline + ' Checked Out</div>' +
+    '<div class="loc-stat"><span class="dot orange"></span>' + noLog + ' Not Logged</div>';
 
   // Filter chips
-  const depts = ['All', ...departments];
-  document.getElementById('locFilters').innerHTML = depts.map(d =>
-    `<button class="loc-filter-chip${locActiveFilter === d ? ' active' : ''}" onclick="filterLocationByDept('${escapeAttr(d)}')">${escapeHTML(d)}</button>`
-  ).join('');
+  var depts = ['All', 'Live Only'].concat(departments);
+  document.getElementById('locFilters').innerHTML = depts.map(function(d) {
+    return '<button class="loc-filter-chip' + (locActiveFilter === d ? ' active' : '') + '" onclick="filterLocationByDept(\'' + escapeAttr(d) + '\')">' + escapeHTML(d) + '</button>';
+  }).join('');
 
   // Filter employees
-  let filtered = locActiveFilter === 'All' ? employeeLocations : employeeLocations.filter(e => e.dept === locActiveFilter);
-  // Sort: online first, then on-site, idle, offline
-  const order = {online:0, 'on-site':1, idle:2, offline:3};
-  filtered.sort((a, b) => order[a.status] - order[b.status]);
+  var filtered;
+  if (locActiveFilter === 'All') {
+    filtered = employeeLocations.slice();
+  } else if (locActiveFilter === 'Live Only') {
+    filtered = employeeLocations.filter(function(e) { return e.status === 'online' || e.status === 'on-site'; });
+  } else {
+    filtered = employeeLocations.filter(function(e) { return e.dept === locActiveFilter; });
+  }
+  // Sort: on-site first, then online, offline with logs, then no logs
+  var order = {'on-site': 0, online: 1, offline: 2};
+  filtered.sort(function(a, b) {
+    var oa = order[a.status] !== undefined ? order[a.status] : 3;
+    var ob = order[b.status] !== undefined ? order[b.status] : 3;
+    if (oa !== ob) return oa - ob;
+    // Within same status, employees with logs first
+    return b.totalLogs - a.totalLogs;
+  });
 
   document.getElementById('locEmpCount').textContent = filtered.length + ' employee' + (filtered.length !== 1 ? 's' : '');
 
   // Employee cards
-  document.getElementById('locEmpList').innerHTML = filtered.map(emp => {
-    const init = (emp.name || '').split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
-    const statusLabel = emp.status === 'on-site' ? 'On-Site' : emp.status.charAt(0).toUpperCase() + emp.status.slice(1);
-    return `<div class="loc-emp-card" onclick="openEmployeeOnMap('${escapeAttr(emp.name)}',${emp.location.lat},${emp.location.lng},'${escapeAttr(emp.location.area)}','${escapeAttr(emp.status)}')">
-      <div class="loc-avatar" style="background:${getAvatarColor(emp.dept)}">${init}</div>
-      <div class="loc-info">
-        <h4>${emp.name}</h4>
-        <p>${emp.designation} &middot; ${emp.dept}</p>
-        <div class="loc-coords">${emp.location.area} &middot; ${emp.location.lat.toFixed(4)}&deg;N, ${emp.location.lng.toFixed(4)}&deg;E</div>
-      </div>
-      <div class="loc-right">
-        <div class="loc-status-badge ${emp.status}"><span class="dot"></span>${statusLabel}</div>
-        <div class="loc-timestamp">${emp.status === 'offline' ? getTimeSince(emp.minutesAgo) : (emp.checkIn ? 'In: ' + emp.checkIn : 'Active')}</div>
-      </div>
-      <div class="loc-map-link" title="Open in Google Maps"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
-    </div>`;
+  document.getElementById('locEmpList').innerHTML = filtered.map(function(emp) {
+    var init = (emp.name || '').split(' ').map(function(w) { return w[0]; }).join('').substring(0, 2).toUpperCase();
+    var statusLabel = emp.status === 'on-site' ? 'On-Site' : emp.status.charAt(0).toUpperCase() + emp.status.slice(1);
+    var hasLocation = emp.location.lat !== 0 && emp.location.lng !== 0;
+    var coordsHtml = hasLocation
+      ? escapeHTML(emp.location.area) + ' &middot; ' + emp.location.lat.toFixed(4) + '&deg;N, ' + emp.location.lng.toFixed(4) + '&deg;E'
+      : '<span style="color:var(--gray-400)">No GPS data today</span>';
+
+    var timeHtml = '';
+    if (emp.checkIn) timeHtml += '<span style="color:var(--success)">In: ' + escapeHTML(emp.checkIn) + '</span>';
+    if (emp.checkOut) timeHtml += (timeHtml ? ' &middot; ' : '') + '<span style="color:var(--danger)">Out: ' + escapeHTML(emp.checkOut) + '</span>';
+    if (!timeHtml && emp.totalLogs === 0) timeHtml = '<span style="color:var(--gray-400)">Not logged in today</span>';
+
+    var remarkHtml = '';
+    if (emp.remark) remarkHtml = '<div style="font-size:.62rem;color:var(--warning);margin-top:2px">Remark: ' + escapeHTML(emp.remark) + '</div>';
+    var geoHtml = '';
+    if (emp.geofenceStatus && emp.totalLogs > 0) geoHtml = '<div style="font-size:.62rem;color:' + (emp.geofenceStatus.startsWith('Inside') ? 'var(--success)' : 'var(--danger)') + ';margin-top:1px">' + escapeHTML(emp.geofenceStatus) + '</div>';
+
+    var cardClick = hasLocation ? 'onclick="openEmployeeOnMap(\'' + escapeAttr(emp.name) + '\',' + emp.location.lat + ',' + emp.location.lng + ',\'' + escapeAttr(emp.location.area) + '\',\'' + escapeAttr(emp.status) + '\')"' : '';
+
+    return '<div class="loc-emp-card" ' + cardClick + '>' +
+      '<div class="loc-avatar" style="background:' + getAvatarColor(emp.dept) + '">' + init + '</div>' +
+      '<div class="loc-info">' +
+        '<h4>' + escapeHTML(emp.name) + ' <span style="font-size:.62rem;color:var(--gray-400);font-weight:400">' + escapeHTML(emp.code) + '</span></h4>' +
+        '<p>' + escapeHTML(emp.designation) + ' &middot; ' + escapeHTML(emp.dept) + '</p>' +
+        '<div class="loc-coords">' + coordsHtml + '</div>' +
+        geoHtml + remarkHtml +
+      '</div>' +
+      '<div class="loc-right">' +
+        '<div class="loc-status-badge ' + emp.status + '"><span class="dot"></span>' + statusLabel + '</div>' +
+        '<div class="loc-timestamp">' + timeHtml + '</div>' +
+      '</div>' +
+      (hasLocation ? '<div class="loc-map-link" title="Open in Google Maps"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>' : '') +
+    '</div>';
   }).join('');
 
   // Map dots (clickable — opens Google Maps)
@@ -1931,25 +1997,14 @@ function openLocationTracker() {
   locActiveFilter = 'All';
   renderLocationTracker();
   document.getElementById('locLastUpdated').textContent = 'Just now';
-  let elapsed = 0;
+  var elapsed = 0;
   if (locRefreshInterval) clearInterval(locRefreshInterval);
-  locRefreshInterval = setInterval(() => {
-    elapsed += 30;
-    // Slightly shift a few random employees
-    employeeLocations.forEach(emp => {
-      if (Math.random() < 0.15) {
-        emp.location.lat += (Math.random() - 0.5) * 0.002;
-        emp.location.lng += (Math.random() - 0.5) * 0.002;
-        emp.minutesAgo = Math.max(0, emp.minutesAgo - 1);
-      }
-      if (Math.random() < 0.05) {
-        const statuses = ['online','on-site','idle','offline'];
-        emp.status = statuses[Math.floor(Math.random() * statuses.length)];
-      }
-    });
+  locRefreshInterval = setInterval(function() {
+    elapsed += 15;
+    generateEmployeeLocations();
     renderLocationTracker();
     document.getElementById('locLastUpdated').textContent = elapsed < 60 ? elapsed + 's ago' : Math.floor(elapsed / 60) + 'm ago';
-  }, 30000);
+  }, 15000);
 }
 
 function closeLocationTracker() {
@@ -1989,21 +2044,37 @@ function viewAllOnGoogleMaps() {
 
 // Also allow clicking map dots
 function renderMapDotsClickable(emps) {
-  const mapArea = document.getElementById('locMapArea');
-  mapArea.querySelectorAll('.loc-map-dot').forEach(d => d.remove());
-  const activeLocs = emps.filter(e => e.status !== 'offline');
-  const minLat = 12.88, maxLat = 13.13, minLng = 80.08, maxLng = 80.25;
-  activeLocs.forEach(emp => {
-    const dot = document.createElement('div');
+  var mapArea = document.getElementById('locMapArea');
+  mapArea.querySelectorAll('.loc-map-dot').forEach(function(d) { d.remove(); });
+  var activeLocs = emps.filter(function(e) { return e.location.lat !== 0 && e.location.lng !== 0 && e.status !== 'offline'; });
+  if (activeLocs.length === 0) {
+    var label = mapArea.querySelector('.map-label');
+    if (label) label.textContent = 'No active locations';
+    return;
+  }
+  // Dynamic bounds from actual coordinates
+  var lats = activeLocs.map(function(e) { return e.location.lat; });
+  var lngs = activeLocs.map(function(e) { return e.location.lng; });
+  var minLat = Math.min.apply(null, lats) - 0.01;
+  var maxLat = Math.max.apply(null, lats) + 0.01;
+  var minLng = Math.min.apply(null, lngs) - 0.01;
+  var maxLng = Math.max.apply(null, lngs) + 0.01;
+  // Ensure minimum range
+  if (maxLat - minLat < 0.02) { minLat -= 0.01; maxLat += 0.01; }
+  if (maxLng - minLng < 0.02) { minLng -= 0.01; maxLng += 0.01; }
+  var label = mapArea.querySelector('.map-label');
+  if (label) label.textContent = activeLocs.length + ' active on map';
+  activeLocs.forEach(function(emp) {
+    var dot = document.createElement('div');
     dot.className = 'loc-map-dot' + (emp.status === 'online' || emp.status === 'on-site' ? ' pulse' : '');
     dot.style.background = getStatusColor(emp.status);
     dot.style.cursor = 'pointer';
-    const top = 100 - ((emp.location.lat - minLat) / (maxLat - minLat)) * 80 - 10;
-    const left = ((emp.location.lng - minLng) / (maxLng - minLng)) * 80 + 10;
+    var top = 100 - ((emp.location.lat - minLat) / (maxLat - minLat)) * 80 - 10;
+    var left = ((emp.location.lng - minLng) / (maxLng - minLng)) * 80 + 10;
     dot.style.top = Math.max(5, Math.min(90, top)) + '%';
     dot.style.left = Math.max(5, Math.min(95, left)) + '%';
     dot.title = emp.name + ' — ' + emp.location.area + ' (Click to open on Google Maps)';
-    dot.onclick = () => openEmployeeOnMap(emp.name, emp.location.lat, emp.location.lng, emp.location.area, emp.status);
+    dot.onclick = function() { openEmployeeOnMap(emp.name, emp.location.lat, emp.location.lng, emp.location.area, emp.status); };
     mapArea.appendChild(dot);
   });
 }
@@ -4690,6 +4761,10 @@ function gpsCheckIn() {
 
   function onSuccess(pos) {
     var geoResult = checkGeofence(pos.coords.latitude, pos.coords.longitude);
+    var remark = '';
+    if (!geoResult.inside) {
+      remark = prompt('You are outside the geofenced area. Please provide a reason:') || '';
+    }
     var log = {
       empCode: currentUser.code,
       type: 'checkin',
@@ -4697,12 +4772,22 @@ function gpsCheckIn() {
       lng: pos.coords.longitude,
       accuracy: pos.coords.accuracy,
       timestamp: new Date().toISOString(),
-      location: geoResult.inside ? geoResult.location : 'Outside geofence'
+      location: geoResult.inside ? geoResult.location : 'Outside geofence',
+      remark: remark
     };
     attendanceLogs.push(log);
     safeStorage.set(STORAGE_KEYS.attendanceLogs, JSON.stringify(attendanceLogs));
     showToast('Checked in at ' + (geoResult.inside ? geoResult.location : pos.coords.latitude.toFixed(4) + '\u00B0N, ' + pos.coords.longitude.toFixed(4) + '\u00B0E'));
     addNotification('Check-In Recorded', 'Location: ' + (geoResult.inside ? geoResult.location : pos.coords.latitude.toFixed(4) + '\u00B0N'), 'checkin');
+    // Notify MD & HR if outside geofence
+    if (!geoResult.inside) {
+      var alertMsg = currentUser.name + ' (' + currentUser.code + ') checked in OUTSIDE geofence at ' + pos.coords.latitude.toFixed(4) + '\u00B0N, ' + pos.coords.longitude.toFixed(4) + '\u00B0E' + (remark ? '. Reason: ' + remark : '');
+      apiCall('POST', '/notifications', { title: 'Outside Geofence Check-In', body: alertMsg, category: 'checkin', target_emp_code: 'MD001' }).catch(function(){});
+      // Also notify all HR
+      EMPLOYEES.filter(function(e) { return e.role === 'HR'; }).forEach(function(hr) {
+        apiCall('POST', '/notifications', { title: 'Outside Geofence Check-In', body: alertMsg, category: 'checkin', target_emp_code: hr.code }).catch(function(){});
+      });
+    }
     if (btn) btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Check In';
     updateCheckinCard(pos.coords);
     updateCheckinStatus('checkin');
@@ -4735,16 +4820,29 @@ function gpsCheckOut() {
   if (!navigator.geolocation) { showToast('Geolocation not supported'); return; }
   function onSuccess(pos) {
     var geoResult = checkGeofence(pos.coords.latitude, pos.coords.longitude);
+    var remark = '';
+    if (!geoResult.inside) {
+      remark = prompt('You are outside the geofenced area. Please provide a reason:') || '';
+    }
     var log = {
       empCode: currentUser.code, type: 'checkout',
       lat: pos.coords.latitude, lng: pos.coords.longitude,
       accuracy: pos.coords.accuracy, timestamp: new Date().toISOString(),
-      location: geoResult.inside ? geoResult.location : 'Outside geofence'
+      location: geoResult.inside ? geoResult.location : 'Outside geofence',
+      remark: remark
     };
     attendanceLogs.push(log);
     safeStorage.set(STORAGE_KEYS.attendanceLogs, JSON.stringify(attendanceLogs));
-    showToast('Checked out successfully');
-    addNotification('Check-Out Recorded', 'Time: ' + new Date().toLocaleTimeString(), 'checkout');
+    showToast('Checked out at ' + (geoResult.inside ? geoResult.location : pos.coords.latitude.toFixed(4) + '\u00B0N, ' + pos.coords.longitude.toFixed(4) + '\u00B0E'));
+    addNotification('Check-Out Recorded', 'Location: ' + (geoResult.inside ? geoResult.location : pos.coords.latitude.toFixed(4) + '\u00B0N'), 'checkout');
+    // Notify MD & HR if outside geofence
+    if (!geoResult.inside) {
+      var alertMsg = currentUser.name + ' (' + currentUser.code + ') checked out OUTSIDE geofence at ' + pos.coords.latitude.toFixed(4) + '\u00B0N, ' + pos.coords.longitude.toFixed(4) + '\u00B0E' + (remark ? '. Reason: ' + remark : '');
+      apiCall('POST', '/notifications', { title: 'Outside Geofence Check-Out', body: alertMsg, category: 'checkout', target_emp_code: 'MD001' }).catch(function(){});
+      EMPLOYEES.filter(function(e) { return e.role === 'HR'; }).forEach(function(hr) {
+        apiCall('POST', '/notifications', { title: 'Outside Geofence Check-Out', body: alertMsg, category: 'checkout', target_emp_code: hr.code }).catch(function(){});
+      });
+    }
     updateCheckinStatus('checkout');
     renderAttendanceLogList();
   }
