@@ -536,7 +536,11 @@ async function loginAs(empCode) {
     initLeaveTabs();
     history.replaceState({ tab: 'home' }, '');
 
-    // Start periodic notification refresh (every 30 seconds)
+    // Request browser notification permission
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+    // Start periodic notification refresh (every 10 seconds)
     startNotifPoll();
     // Ensure badge is updated immediately after data load
     updateNotifBadge();
@@ -4698,7 +4702,7 @@ function gpsCheckIn() {
     attendanceLogs.push(log);
     safeStorage.set(STORAGE_KEYS.attendanceLogs, JSON.stringify(attendanceLogs));
     showToast('Checked in at ' + (geoResult.inside ? geoResult.location : pos.coords.latitude.toFixed(4) + '\u00B0N, ' + pos.coords.longitude.toFixed(4) + '\u00B0E'));
-    sendNotification('Check-In Recorded', 'Location: ' + (geoResult.inside ? geoResult.location : pos.coords.latitude.toFixed(4) + '\u00B0N'), 'checkin');
+    addNotification('Check-In Recorded', 'Location: ' + (geoResult.inside ? geoResult.location : pos.coords.latitude.toFixed(4) + '\u00B0N'), 'checkin');
     if (btn) btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Check In';
     updateCheckinCard(pos.coords);
     updateCheckinStatus('checkin');
@@ -4740,7 +4744,7 @@ function gpsCheckOut() {
     attendanceLogs.push(log);
     safeStorage.set(STORAGE_KEYS.attendanceLogs, JSON.stringify(attendanceLogs));
     showToast('Checked out successfully');
-    sendNotification('Check-Out Recorded', 'Time: ' + new Date().toLocaleTimeString(), 'checkout');
+    addNotification('Check-Out Recorded', 'Time: ' + new Date().toLocaleTimeString(), 'checkout');
     updateCheckinStatus('checkout');
     renderAttendanceLogList();
   }
@@ -6193,9 +6197,10 @@ function addNotification(title, body, category) {
   NOTIF_HISTORY.unshift({ id: Date.now(), title, body, category, time: new Date().toISOString(), read: false });
   if (NOTIF_HISTORY.length > 50) NOTIF_HISTORY.length = 50;
   updateNotifBadge();
-  // Fire browser notification if pref allows
+  // Fire browser notification + in-app popup if pref allows
   if (notifPrefs[category] !== false) {
     sendNotification(title, body, category + '-' + Date.now());
+    showNotifPopup(title, body);
   }
   try { safeStorage.set(STORAGE_KEYS.notifHistory, JSON.stringify(NOTIF_HISTORY)); } catch(e){}
   // Persist to backend (include target_emp_code for person-specific notifications)
@@ -6240,7 +6245,7 @@ function refreshNotifications() {
 function startNotifPoll() {
   stopNotifPoll();
   refreshNotifications();
-  _notifPollTimer = setInterval(refreshNotifications, 30000);
+  _notifPollTimer = setInterval(refreshNotifications, 10000);
 }
 function stopNotifPoll() {
   if (_notifPollTimer) { clearInterval(_notifPollTimer); _notifPollTimer = null; }
