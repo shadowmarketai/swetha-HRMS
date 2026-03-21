@@ -4777,7 +4777,7 @@ function updateCheckinStatus(type) {
     if (checkinBtn) { checkinBtn.className = 'btn btn-white-outline'; }
     if (checkoutBtn) { checkoutBtn.className = 'btn btn-golden'; }
   } else {
-    if (statusText) statusText.textContent = 'Checked Out';
+    if (statusText) statusText.textContent = 'Check In';
     if (dot) { dot.style.background = '#F59E0B'; dot.style.animation = 'none'; }
     if (checkinBtn) { checkinBtn.className = 'btn btn-golden'; }
     if (checkoutBtn) { checkoutBtn.className = 'btn btn-white-outline'; }
