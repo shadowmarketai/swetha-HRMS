@@ -4699,7 +4699,7 @@ function gpsCheckIn() {
     safeStorage.set(STORAGE_KEYS.attendanceLogs, JSON.stringify(attendanceLogs));
     showToast('Checked in at ' + (geoResult.inside ? geoResult.location : pos.coords.latitude.toFixed(4) + '\u00B0N, ' + pos.coords.longitude.toFixed(4) + '\u00B0E'));
     sendNotification('Check-In Recorded', 'Location: ' + (geoResult.inside ? geoResult.location : pos.coords.latitude.toFixed(4) + '\u00B0N'), 'checkin');
-    if (btn) btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/></svg>Checked In';
+    if (btn) btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Check In';
     updateCheckinCard(pos.coords);
     updateCheckinStatus('checkin');
     renderAttendanceLogList();
@@ -4777,7 +4777,7 @@ function updateCheckinStatus(type) {
     if (checkinBtn) { checkinBtn.className = 'btn btn-white-outline'; }
     if (checkoutBtn) { checkoutBtn.className = 'btn btn-golden'; }
   } else {
-    if (statusText) statusText.textContent = 'Check In';
+    if (statusText) statusText.textContent = 'Checked Out';
     if (dot) { dot.style.background = '#F59E0B'; dot.style.animation = 'none'; }
     if (checkinBtn) { checkinBtn.className = 'btn btn-golden'; }
     if (checkoutBtn) { checkoutBtn.className = 'btn btn-white-outline'; }
