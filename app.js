@@ -5581,18 +5581,21 @@ function renderMobileBottomTabs(config, container) {
   var allOverflow = overflowItems.concat(footerItems);
   visibleItems.forEach(function(item) {
     var btn = document.createElement('button');
-    btn.className = 'tab-item' + (_activeNavId === item.id ? ' active' : '');
+    var isParentActive = _activeNavId === item.id;
+    if (!isParentActive && item.children) {
+      item.children.forEach(function(c) { if (c.id === _activeNavId) isParentActive = true; });
+    }
+    btn.className = 'tab-item' + (isParentActive ? ' active' : '');
     btn.setAttribute('data-nav-id', item.id);
     btn.innerHTML = NAV_ICONS[item.icon] + '<span>' + escapeHTML(item.label) + '</span>';
     btn.onclick = function() {
       if (item.children && item.children.length) {
-        executeNavAction(item.children[0], btn);
-        _activeNavId = item.children[0].id;
+        showMobileSubMenu(item);
       } else {
         executeNavAction(item, btn);
         _activeNavId = item.id;
+        updateNavActiveState();
       }
-      updateNavActiveState();
     };
     container.appendChild(btn);
   });
@@ -5755,17 +5758,17 @@ function showMobileMoreMenu(items) {
   navItems.forEach(function(item) {
     var menuItem = document.createElement('button');
     menuItem.className = 'more-menu-item';
-    menuItem.innerHTML = NAV_ICONS[item.icon] + '<span>' + escapeHTML(item.label) + '</span>';
+    menuItem.innerHTML = NAV_ICONS[item.icon] + '<span>' + escapeHTML(item.label) + '</span>' +
+      (item.children && item.children.length ? '<svg style="margin-left:auto" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg>' : '');
     menuItem.onclick = function() {
       overlay.remove();
       if (item.children && item.children.length) {
-        executeNavAction(item.children[0], null);
-        _activeNavId = item.children[0].id;
+        showMobileSubMenu(item);
       } else {
         executeNavAction(item, null);
         _activeNavId = item.id;
+        updateNavActiveState();
       }
-      updateNavActiveState();
     };
     sheet.appendChild(menuItem);
   });
@@ -5790,6 +5793,51 @@ function showMobileMoreMenu(items) {
   document.body.appendChild(overlay);
 
   // Close on Escape
+  var escHandler = function(e) {
+    if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', escHandler); }
+  };
+  document.addEventListener('keydown', escHandler);
+}
+
+function showMobileSubMenu(parentItem) {
+  var existing = document.querySelector('.more-menu-overlay');
+  if (existing) existing.remove();
+
+  var overlay = document.createElement('div');
+  overlay.className = 'more-menu-overlay';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-label', escapeHTML(parentItem.label));
+
+  var backdrop = document.createElement('div');
+  backdrop.className = 'more-menu-backdrop';
+  backdrop.onclick = function() { overlay.remove(); };
+
+  var sheet = document.createElement('div');
+  sheet.className = 'more-menu-sheet';
+
+  var title = document.createElement('div');
+  title.className = 'more-menu-title';
+  title.textContent = parentItem.label;
+  sheet.appendChild(title);
+
+  parentItem.children.forEach(function(child) {
+    var menuItem = document.createElement('button');
+    menuItem.className = 'more-menu-item' + (_activeNavId === child.id ? ' active' : '');
+    menuItem.innerHTML = '<span class="child-dot" style="width:8px;height:8px;border-radius:50%;background:var(--gray-300);flex-shrink:0"></span><span>' + escapeHTML(child.label) + '</span>';
+    menuItem.onclick = function() {
+      overlay.remove();
+      _activeNavId = child.id;
+      executeNavAction(child, null);
+      updateNavActiveState();
+    };
+    sheet.appendChild(menuItem);
+  });
+
+  overlay.appendChild(backdrop);
+  overlay.appendChild(sheet);
+  document.body.appendChild(overlay);
+
   var escHandler = function(e) {
     if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', escHandler); }
   };
