@@ -16,27 +16,34 @@ const pool = mysql.createPool({
   keepAliveInitialDelay: 0
 });
 
-// Run idempotent migrations on existing databases
+// Run idempotent migrations on existing databases (with retry for deadlocks)
 async function runMigrations(conn) {
   const migrations = [
     {
-      name: 'add_manager_role_to_employees',
-      sql: "ALTER TABLE employees MODIFY COLUMN role ENUM('MD','HR','Manager','Employee') DEFAULT 'Employee'"
-    },
-    {
       name: 'add_manager_role_to_users',
       sql: "ALTER TABLE users MODIFY COLUMN role ENUM('MD','HR','Manager','Employee') DEFAULT 'Employee'"
+    },
+    {
+      name: 'add_manager_role_to_employees',
+      sql: "ALTER TABLE employees MODIFY COLUMN role ENUM('MD','HR','Manager','Employee') DEFAULT 'Employee'"
     }
   ];
   let applied = 0;
   for (const m of migrations) {
-    try {
-      await conn.query(m.sql);
-      applied++;
-    } catch (err) {
-      // Ignore if already applied or table doesn't exist yet
-      if (err.errno !== 1146) {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        await conn.query(m.sql);
+        applied++;
+        break;
+      } catch (err) {
+        if (err.errno === 1146) break; // table doesn't exist yet
+        if (err.errno === 1213 && attempt < 3) {
+          // Deadlock — wait and retry
+          await new Promise(r => setTimeout(r, 1000 * attempt));
+          continue;
+        }
         console.error('Migration "' + m.name + '" error:', err.message);
+        break;
       }
     }
   }
