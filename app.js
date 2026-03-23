@@ -8907,8 +8907,6 @@ function renderProgressScreen() {
     grid.innerHTML = gridHtml;
   }
 
-  // Render materials tracking section
-  renderMaterialsSection();
 }
 
 // =====================================================
@@ -8937,29 +8935,23 @@ function canEditMaterials() {
   return desig.indexOf('coordinator') !== -1 || desig.indexOf('market agent') !== -1;
 }
 
-function renderMaterialsSection() {
-  var container = document.getElementById('materialsSection');
-  if (!container) return;
-  if (!projects || projects.length === 0) { container.innerHTML = ''; return; }
-
+function renderProjectMaterials(proj) {
   var editable = canEditMaterials();
-  var html = '<div class="section-title" style="margin-top:16px">Materials Tracking</div>';
+  var mats = projectMaterials.filter(function(m) { return m.projectId === proj.id; });
+  var html = '<div style="padding:0 16px">';
 
-  projects.forEach(function(p) {
-    var mats = projectMaterials.filter(function(m) { return m.projectId === p.id; });
-    if (mats.length === 0) return;
-    html += '<div class="card materials-card fade-in" style="margin-bottom:10px">';
-    html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">';
-    html += '<h4 style="font-family:var(--font-display);font-size:.82rem;font-weight:600;color:var(--gray-800)">' + escapeHTML(p.name) + '</h4>';
-    if (editable) {
-      html += '<button class="btn btn-sm" style="font-size:.65rem;padding:4px 10px" onclick="addMaterialRow(' + p.id + ')">+ Add</button>';
-    }
-    html += '</div>';
+  if (editable) {
+    html += '<div style="margin-top:10px;margin-bottom:8px"><button class="nf-btn nf-btn-primary nf-btn-sm" onclick="addMaterialRow(' + proj.id + ')">+ Add Item</button></div>';
+  }
+
+  if (mats.length === 0) {
+    html += '<div class="nf-empty" style="margin-top:16px">No materials tracked for this project</div>';
+  } else {
     html += '<div class="materials-table">';
     html += '<div class="materials-row materials-header' + (editable ? ' materials-editable' : '') + '"><span>Material</span><span>Unit</span><span>Total</span><span>Used</span><span>Remaining</span>';
     if (editable) html += '<span></span>';
     html += '</div>';
-    mats.forEach(function(m, idx) {
+    mats.forEach(function(m) {
       var globalIdx = projectMaterials.indexOf(m);
       html += '<div class="materials-row' + (editable ? ' materials-editable' : '') + '">';
       if (editable) {
@@ -8968,7 +8960,7 @@ function renderMaterialsSection() {
         html += '<span><input class="mat-input mat-input-sm" type="number" value="' + m.total + '" data-idx="' + globalIdx + '" data-field="total" onchange="updateMaterialRemaining(this)"></span>';
         html += '<span><input class="mat-input mat-input-sm" type="number" value="' + m.used + '" data-idx="' + globalIdx + '" data-field="used" onchange="updateMaterialRemaining(this)"></span>';
         html += '<span class="mat-remaining">' + m.remaining + '</span>';
-        html += '<span><button class="mat-del-btn" onclick="deleteMaterialRow(' + globalIdx + ')">&times;</button></span>';
+        html += '<span><button class="mat-del-btn" onclick="deleteMaterialRow(' + globalIdx + ',' + proj.id + ')">&times;</button></span>';
       } else {
         html += '<span>' + escapeHTML(m.name) + '</span>';
         html += '<span>' + escapeHTML(m.unit) + '</span>';
@@ -8980,12 +8972,11 @@ function renderMaterialsSection() {
     });
     html += '</div>';
     if (editable) {
-      html += '<button class="btn btn-primary" style="margin-top:8px;font-size:.72rem;padding:6px 14px" onclick="saveProjectMaterials(' + p.id + ')">Save Materials</button>';
+      html += '<button class="nf-btn nf-btn-primary" style="margin-top:10px" onclick="saveProjectMaterials(' + proj.id + ')">Save Materials</button>';
     }
-    html += '</div>';
-  });
-
-  container.innerHTML = html;
+  }
+  html += '</div>';
+  return html;
 }
 
 function updateMaterialRemaining(input) {
@@ -9002,8 +8993,8 @@ function updateMaterialRemaining(input) {
 }
 
 function saveProjectMaterials(projectId) {
-  // Read all editable inputs for this project
-  var container = document.getElementById('materialsSection');
+  var container = document.getElementById('projectDetailContent');
+  if (!container) return;
   var inputs = container.querySelectorAll('.mat-input');
   inputs.forEach(function(inp) {
     var idx = parseInt(inp.getAttribute('data-idx'), 10);
@@ -9017,18 +9008,21 @@ function saveProjectMaterials(projectId) {
   });
   saveMaterialsData();
   showToast('Materials saved');
-  renderMaterialsSection();
+  var proj = projects.find(function(p){return p.id===projectId;});
+  if (proj) renderProjectDetailContent(proj);
 }
 
 function addMaterialRow(projectId) {
   projectMaterials.push({ projectId: projectId, name: '', unit: '', total: 0, used: 0, remaining: 0 });
-  renderMaterialsSection();
+  var proj = projects.find(function(p){return p.id===projectId;});
+  if (proj) renderProjectDetailContent(proj);
 }
 
-function deleteMaterialRow(idx) {
+function deleteMaterialRow(idx, projectId) {
   projectMaterials.splice(idx, 1);
   saveMaterialsData();
-  renderMaterialsSection();
+  var proj = projects.find(function(p){return p.id===projectId;});
+  if (proj) renderProjectDetailContent(proj);
 }
 
 function saveMaterialsData() {
@@ -9131,6 +9125,8 @@ function renderProjectDetailContent(proj) {
   html += '<button class="proj-detail-tab' + (currentProjectTab==='overview'?' active':'') + '" onclick="currentProjectTab=\'overview\';renderProjectDetailContent(projects.find(function(p){return p.id===' + proj.id + ';}))">Overview</button>';
   html += '<button class="proj-detail-tab' + (currentProjectTab==='tasks'?' active':'') + '" onclick="currentProjectTab=\'tasks\';renderProjectDetailContent(projects.find(function(p){return p.id===' + proj.id + ';}))">Tasks (' + proj.tasks.length + ')</button>';
   html += '<button class="proj-detail-tab' + (currentProjectTab==='team'?' active':'') + '" onclick="currentProjectTab=\'team\';renderProjectDetailContent(projects.find(function(p){return p.id===' + proj.id + ';}))">Team (' + proj.team.length + ')</button>';
+  var matCount = projectMaterials.filter(function(m){return m.projectId===proj.id;}).length;
+  html += '<button class="proj-detail-tab' + (currentProjectTab==='materials'?' active':'') + '" onclick="currentProjectTab=\'materials\';renderProjectDetailContent(projects.find(function(p){return p.id===' + proj.id + ';}))">Materials (' + matCount + ')</button>';
   html += '</div>';
 
   if (currentProjectTab === 'overview') {
@@ -9139,6 +9135,8 @@ function renderProjectDetailContent(proj) {
     html += renderProjectTasks(proj, isMDorHR);
   } else if (currentProjectTab === 'team') {
     html += renderProjectTeam(proj, isMDorHR);
+  } else if (currentProjectTab === 'materials') {
+    html += renderProjectMaterials(proj);
   }
 
   c.innerHTML = html;

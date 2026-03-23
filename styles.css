@@ -1745,8 +1745,8 @@ textarea.form-control{resize:vertical}
 .project-task-item .task-info h4{font-size:.78rem;font-weight:600}
 .project-task-item .task-info p{font-size:.65rem;color:var(--gray-400)}
 .project-task-item .task-info h4.task-done{text-decoration:line-through;opacity:.5}
-.proj-detail-tabs{display:flex;gap:4px;padding:8px 16px;background:var(--bg)}
-.proj-detail-tab{padding:6px 14px;border-radius:20px;border:none;background:var(--gray-100);font-size:.75rem;font-weight:600;cursor:pointer;font-family:var(--font-body);transition:all .2s}
+.proj-detail-tabs{display:flex;gap:4px;padding:8px 16px;background:var(--bg);overflow-x:auto;-webkit-overflow-scrolling:touch}
+.proj-detail-tab{padding:6px 12px;border-radius:20px;border:none;background:var(--gray-100);font-size:.72rem;font-weight:600;cursor:pointer;font-family:var(--font-body);transition:all .2s;white-space:nowrap;flex-shrink:0}
 .proj-detail-tab.active{background:var(--primary);color:#fff}
 [data-theme="dark"] .project-card{background:var(--card)}
 [data-theme="dark"] .project-task-item{background:var(--card)}
