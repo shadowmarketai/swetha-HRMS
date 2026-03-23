@@ -99,8 +99,6 @@ app.use('/api/compliance', require('./routes/compliance'));
 app.use('/api/assets', require('./routes/assets'));
 app.use('/api/exit', require('./routes/exit'));
 app.use('/api/announcements', require('./routes/announcements'));
-app.use('/api/orgchart', require('./routes/orgchart'));
-
 // Health check — verifies app + DB connectivity
 app.get('/api/health', async (req, res) => {
   const health = { status: 'ok', timestamp: new Date().toISOString(), db: 'ok', uptime: process.uptime() };

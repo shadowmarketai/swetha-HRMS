@@ -178,7 +178,7 @@ const NAV_ICONS = {
   location: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>',
   progress: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>',
   performance:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
-  orgchart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="8" y="2" width="8" height="6" rx="1"/><rect x="1" y="16" width="8" height="6" rx="1"/><rect x="15" y="16" width="8" height="6" rx="1"/><line x1="12" y1="8" x2="12" y2="13"/><line x1="5" y1="13" x2="19" y2="13"/><line x1="5" y1="13" x2="5" y2="16"/><line x1="19" y1="13" x2="19" y2="16"/></svg>',
+
   tax:      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>',
   salary:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>',
   expense:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 20h20"/><path d="M5 20V8l7-5 7 5v12"/><rect x="9" y="12" width="6" height="8"/></svg>',
@@ -208,7 +208,6 @@ const NAV_CONFIG = {
       { id:'md-perf-track', label:'Performance Review', action:{type:'overlay',target:'hr-kpi'} },
       { id:'md-perf-onboard', label:'Add Employee', action:{type:'overlay',target:'onboarding'} }
     ]},
-    { id:'md-orgchart', label:'Org Chart', icon:'orgchart', action:{type:'tab',target:'orgchart'} },
     { id:'md-tax', label:'Form 16 & Tax', icon:'tax', action:{type:'overlay',target:'hr-tax'} },
     { id:'md-salary', label:'Salary', icon:'salary', children:[
       { id:'md-sal-structure', label:'Salary Structure', action:{type:'tab',target:'expenses'} },
@@ -240,7 +239,6 @@ const NAV_CONFIG = {
       { id:'hr-rec-positions', label:'Open Positions', action:{type:'overlay',target:'hr-recruit'} },
       { id:'hr-rec-pipeline', label:'Candidates', action:{type:'overlay',target:'hr-recruit'} }
     ]},
-    { id:'hr-orgchart', label:'Org Chart', icon:'orgchart', action:{type:'tab',target:'orgchart'} },
     { id:'hr-tax', label:'Form 16 & Tax', icon:'tax', action:{type:'overlay',target:'hr-tax'} },
     { id:'hr-salary', label:'Salary', icon:'salary', children:[
       { id:'hr-sal-self', label:'Self Salary', action:{type:'tab',target:'salary'} },
@@ -288,7 +286,6 @@ const NAV_CONFIG = {
     { id:'mgr-performance', label:'Employee Performance', icon:'performance', children:[
       { id:'mgr-perf-track', label:'Performance Review', action:{type:'overlay',target:'hr-kpi'} }
     ]},
-    { id:'mgr-orgchart', label:'Org Chart', icon:'orgchart', action:{type:'tab',target:'orgchart'} },
     { id:'mgr-salary', label:'Salary', icon:'salary', children:[
       { id:'mgr-sal-self', label:'Self Salary', action:{type:'tab',target:'salary'} },
       { id:'mgr-sal-list', label:'Employee List', action:{type:'tab',target:'salary'} }
@@ -364,21 +361,6 @@ let exitRequests = [];
 let exitNextId = 1;
 const NOTICE_PERIODS = {'MD':90,'HR':60,'Employee':30};
 const CLEARANCE_DEPTS = ['IT & Systems','Finance','HR','Admin','Reporting Manager','Security'];
-
-// F9: Org Chart
-let REPORTING_MAP = {
-  'MD001': { reports: ['SSC006','SSC001','SSC002','SSC009','SSC023'] },
-  'SSC006': { reports: ['SSC005','SSC015','SSC016'] },
-  'SSC001': { reports: ['SSC007','SSC008','SSC004'] },
-  'SSC002': { reports: ['SSC012','SSC014','SSC013'] },
-  'SSC003': { reports: ['SSC017','SSC019','SSC010'] },
-  'SSC009': { reports: ['SSC003','SSM001'] },
-  'SSC017': { reports: ['SSC018','SSC020','SSC021','SSC024','SSC025','SSC026','SSC027','SSC028','SSC029','SSC030','SSC022'] },
-  'SSM001': { reports: ['SSM002','SSM003','SSM004','SSM005','SSM006','SSM007','SSM008','SSM009','SSM010','SSM011'] },
-  'SSM011': { reports: ['SSM012','SSM013','SSM014'] },
-  'SSC023': { reports: ['SSC011'] },
-  'SSG003': { reports: ['SSG001','SSG002','SSG004','SSG005'] }
-};
 
 // F10: Announcements
 const ANNOUNCE_CATEGORIES = ['General','Policy Update','Event','Achievement'];
@@ -1177,7 +1159,6 @@ function switchTab(id, el, _fromPopstate) {
   if (id === 'travel-expense') renderTravelExpenseScreen();
   if (id === 'leaves') renderLeaveScreenForMode();
   if (id === 'progress') renderProgressScreen();
-  if (id === 'orgchart') renderInlineOrgChart();
   if (id === 'attendance') renderAttendanceView();
   if (id === 'salary') renderSalaryView();
   updateNavActiveState();
@@ -4160,7 +4141,6 @@ async function initAnalyticsCharts(m) {
     if (id === 'hr-compliance') { currentComplianceTab = 'filing'; renderComplianceOverlay(); }
     if (id === 'hr-assets') renderAssetsOverlay();
     if (id === 'hr-exit') renderExitOverlay();
-    if (id === 'hr-orgchart') renderOrgchartOverlay();
     if (id === 'hr-announcements') renderAnnouncementsOverlay();
     if (id === 'hr-celebrations') renderCelebrationsOverlay();
 
@@ -5564,25 +5544,6 @@ function mapTaxDeclaration(row) {
   };
 }
 
-function buildReportingMapFromDB(rows) {
-  var map = {};
-  rows.forEach(function(r) {
-    var parent = r.reports_to || r.reportsTo;
-    var child = r.emp_code || r.empCode;
-    if (!child) return;
-    // Ensure the child's entry exists (even if it has no reports)
-    if (!map[child]) map[child] = { reports: [] };
-    // If there is a parent, add child to parent's reports list
-    if (parent) {
-      if (!map[parent]) map[parent] = { reports: [] };
-      if (map[parent].reports.indexOf(child) === -1) {
-        map[parent].reports.push(child);
-      }
-    }
-  });
-  return map;
-}
-
 // =====================================================
 // DB-FIRST: Load All Shared Data from Backend
 // =====================================================
@@ -5610,8 +5571,7 @@ async function loadFromBackend() {
       { key: 'exits', url: base + '/exit?limit=200' },
       { key: 'expenses', url: base + '/expenses?limit=500' },
       { key: 'shifts', url: base + '/shifts' },
-      { key: 'tax', url: base + '/tax' },
-      { key: 'orgchart', url: base + '/orgchart' }
+      { key: 'tax', url: base + '/tax' }
     ];
     // MD/HR-only endpoints
     if (isMDorHR) {
@@ -5796,14 +5756,6 @@ async function loadFromBackend() {
         contractWorkers.length = 0;
         cwData.map(mapContractWorker).forEach(function(w) { contractWorkers.push(w); });
         contractWorkerNextId = contractWorkers.reduce(function(mx, w) { return Math.max(mx, w.id || 0); }, 0) + 1;
-      }
-    }
-
-    // 18. Org chart (reporting structure)
-    if (keyIdx.orgchart !== undefined) {
-      var orgData = getData(keyIdx.orgchart);
-      if (orgData && Array.isArray(orgData) && orgData.length > 0) {
-        REPORTING_MAP = buildReportingMapFromDB(orgData);
       }
     }
 
@@ -8287,454 +8239,7 @@ async function completeExit(id) {
 }
 
 // =====================================================
-// F9: ORG CHART FUNCTIONS (Editable Drag-and-Drop)
-// =====================================================
-var orgExpandedNodes = new Set();
-var orgEditModeActive = false;
-var orgDragEmpCode = null;
-var orgDragDidDrop = false;
-var orgTouchTimer = null;
-var orgTouchGhost = null;
-var orgTouchDragging = false;
-var orgTouchStartX = 0;
-var orgTouchStartY = 0;
 
-function buildOrgTree(empCode, visited) {
-  if (!visited) visited = {};
-  if (visited[empCode]) return null;
-  visited[empCode] = true;
-  var emp = EMPLOYEES.find(function(e) { return e.code === empCode; });
-  if (!emp) return null;
-  var node = { emp: emp, children: [] };
-  var map = REPORTING_MAP[empCode];
-  if (map && map.reports) {
-    map.reports.forEach(function(childCode) {
-      var child = buildOrgTree(childCode, visited);
-      if (child) node.children.push(child);
-    });
-  }
-  return node;
-}
-
-function getOrgRoots() {
-  var allChildren = {};
-  Object.keys(REPORTING_MAP).forEach(function(k) {
-    if (REPORTING_MAP[k].reports) {
-      REPORTING_MAP[k].reports.forEach(function(c) { allChildren[c] = true; });
-    }
-  });
-  var roots = Object.keys(REPORTING_MAP).filter(function(k) { return !allChildren[k]; });
-  roots.sort(function(a, b) { return a === 'MD001' ? -1 : b === 'MD001' ? 1 : 0; });
-  return roots;
-}
-
-function initOrgExpanded() {
-  orgExpandedNodes.clear();
-  var roots = getOrgRoots();
-  roots.forEach(function(r) {
-    orgExpandedNodes.add(r);
-    if (REPORTING_MAP[r] && REPORTING_MAP[r].reports) {
-      REPORTING_MAP[r].reports.forEach(function(c) { orgExpandedNodes.add(c); });
-    }
-  });
-}
-
-function toggleOrgExpand(empCode) {
-  if (orgExpandedNodes.has(empCode)) {
-    orgExpandedNodes.delete(empCode);
-  } else {
-    orgExpandedNodes.add(empCode);
-  }
-  renderOrgchartOverlay();
-}
-
-function getOrgNodeColor(emp) {
-  if (emp.role === 'MD') return { bg: 'linear-gradient(135deg,#E85D04,#FF6B35)', text: '#fff', badge: '#FFF7ED' };
-  if (emp.role === 'HR') return { bg: 'linear-gradient(135deg,#7C3AED,#A78BFA)', text: '#fff', badge: '#F5F3FF' };
-  var dept = (emp.dept || '').toLowerCase();
-  if (dept.indexOf('account') !== -1) return { bg: 'linear-gradient(135deg,#0891B2,#22D3EE)', text: '#fff', badge: '#ECFEFF' };
-  if (dept.indexOf('factory') !== -1 || dept.indexOf('peb') !== -1) return { bg: 'linear-gradient(135deg,#059669,#34D399)', text: '#fff', badge: '#ECFDF5' };
-  if (dept.indexOf('site') !== -1 || dept.indexOf('architect') !== -1) return { bg: 'linear-gradient(135deg,#2563EB,#60A5FA)', text: '#fff', badge: '#EFF6FF' };
-  if (dept.indexOf('garden') !== -1 || dept.indexOf('security') !== -1) return { bg: 'linear-gradient(135deg,#65A30D,#A3E635)', text: '#fff', badge: '#F7FEE7' };
-  return { bg: 'linear-gradient(135deg,#6B7280,#9CA3AF)', text: '#fff', badge: '#F9FAFB' };
-}
-
-function renderOrgNode(node, depth) {
-  if (!node) return '';
-  var editCls = orgEditModeActive ? ' org-editable' : '';
-  var childCount = node.children.length;
-  var isExpanded = orgExpandedNodes.has(node.emp.code);
-  var code = escapeAttr(node.emp.code);
-  var dragAttr = orgEditModeActive ? ' draggable="true"' : '';
-  var dropAttr = ' data-drop-target="' + code + '"';
-  var colors = getOrgNodeColor(node.emp);
-  var initials = node.emp.name.split(' ').map(function(w) { return w.charAt(0); }).join('').substring(0, 2).toUpperCase();
-  var deptLabel = node.emp.dept || '';
-
-  var html = '<div class="org-branch">';
-  html += '<div class="org-node' + editCls + '" data-emp-code="' + code + '"' + dragAttr + dropAttr + ' style="--node-gradient:' + colors.bg + '">';
-  html += '<div class="org-node-inner">';
-  html += '<div class="org-avatar" style="background:' + colors.bg + ';color:' + colors.text + '">' + escapeHTML(initials) + '</div>';
-  html += '<div class="org-info">';
-  html += '<div class="org-name">' + escapeHTML(node.emp.name) + '</div>';
-  html += '<div class="org-desg">' + escapeHTML(node.emp.designation || '') + '</div>';
-  if (deptLabel) html += '<div class="org-dept-badge" style="background:' + colors.badge + '">' + escapeHTML(deptLabel) + '</div>';
-  html += '</div>';
-  html += '</div>';
-  if (childCount > 0) {
-    html += '<button class="org-expand-toggle" data-expand-code="' + code + '" aria-label="' + (isExpanded ? 'Collapse' : 'Expand') + '">';
-    html += '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">';
-    if (isExpanded) html += '<polyline points="6 9 12 15 18 9"/>';
-    else html += '<polyline points="9 6 15 12 9 18"/>';
-    html += '</svg>';
-    html += '<span class="org-child-count">' + childCount + '</span>';
-    html += '</button>';
-  }
-  html += '</div>';
-
-  if (childCount > 0 && isExpanded) {
-    html += '<div class="org-connector"></div><div class="org-children">';
-    node.children.forEach(function(child) { html += renderOrgNode(child, depth + 1); });
-    html += '</div>';
-  }
-  html += '</div>';
-  return html;
-}
-
-function showOrgNodeModal(empCode) {
-  var emp = EMPLOYEES.find(function(e) { return e.code === empCode; });
-  if (!emp) return;
-  var reports = REPORTING_MAP[empCode] ? REPORTING_MAP[empCode].reports.length : 0;
-  var reportsTo = Object.keys(REPORTING_MAP).find(function(k) {
-    return REPORTING_MAP[k].reports && REPORTING_MAP[k].reports.indexOf(empCode) !== -1;
-  });
-  var manager = reportsTo ? EMPLOYEES.find(function(e) { return e.code === reportsTo; }) : null;
-  var isMDorHR = currentUser && (currentUser.role === 'MD' || currentUser.role === 'HR');
-
-  var changeManagerHTML = '';
-  if (orgEditModeActive && isMDorHR) {
-    changeManagerHTML = '<div class="org-detail-change-mgr"><label>Change Manager:</label><select id="orgChangeMgrSelect">';
-    changeManagerHTML += '<option value="">-- Select new manager --</option>';
-    changeManagerHTML += '<option value="__root__">(Root / No Manager)</option>';
-    EMPLOYEES.filter(function(e) { return e.code !== empCode && e.status === 'Active'; }).forEach(function(e) {
-      var sel = (reportsTo === e.code) ? ' selected' : '';
-      changeManagerHTML += '<option value="' + escapeAttr(e.code) + '"' + sel + '>' + escapeHTML(e.name) + ' (' + escapeHTML(e.code) + ')</option>';
-    });
-    changeManagerHTML += '</select>';
-    changeManagerHTML += '<button class="org-change-mgr-btn" id="orgChangeMgrBtn">Reassign</button>';
-    changeManagerHTML += '</div>';
-  }
-
-  // Remove any existing modal
-  closeOrgNodeModal();
-
-  var backdrop = document.createElement('div');
-  backdrop.className = 'org-detail-backdrop';
-  backdrop.id = 'orgDetailBackdrop';
-  backdrop.onclick = function() { closeOrgNodeModal(); };
-
-  var modal = document.createElement('div');
-  modal.className = 'org-detail-modal';
-  modal.id = 'orgDetailModal';
-  modal.setAttribute('data-modal-emp', empCode);
-  var modalColors = getOrgNodeColor(emp);
-  var modalInitials = emp.name.split(' ').map(function(w) { return w.charAt(0); }).join('').substring(0, 2).toUpperCase();
-  modal.innerHTML = '<button class="org-detail-close" aria-label="Close">&times;</button>'
-    + '<div style="text-align:center;margin-bottom:12px"><div style="width:56px;height:56px;border-radius:50%;background:' + modalColors.bg + ';color:#fff;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:1.1rem;font-family:var(--font-display);box-shadow:0 4px 12px rgba(0,0,0,.15)">' + escapeHTML(modalInitials) + '</div></div>'
-    + '<div class="org-detail-name">' + escapeHTML(emp.name) + '</div>'
-    + '<div class="org-detail-desg">' + escapeHTML(emp.designation) + ' — ' + escapeHTML(emp.dept) + '</div>'
-    + '<div class="org-detail-info">'
-    + '<div><strong>Code:</strong> ' + escapeHTML(emp.code) + '</div>'
-    + '<div><strong>DOJ:</strong> ' + escapeHTML(emp.doj || 'N/A') + '</div>'
-    + '<div><strong>Phone:</strong> ' + escapeHTML(emp.phone || 'N/A') + '</div>'
-    + '<div><strong>Reports to:</strong> ' + (manager ? escapeHTML(manager.name) : 'Board / Root') + '</div>'
-    + '<div><strong>Direct reports:</strong> ' + reports + '</div>'
-    + '</div>'
-    + changeManagerHTML;
-
-  // Wire close button
-  modal.querySelector('.org-detail-close').onclick = function() { closeOrgNodeModal(); };
-
-  // Wire reassign button
-  var reassignBtn = modal.querySelector('#orgChangeMgrBtn');
-  if (reassignBtn) {
-    reassignBtn.onclick = function() {
-      var sel = modal.querySelector('#orgChangeMgrSelect');
-      if (!sel || !sel.value) { showToast('Select a new manager first'); return; }
-      var newMgr = sel.value === '__root__' ? null : sel.value;
-      closeOrgNodeModal();
-      confirmOrgReassign(empCode, newMgr);
-    };
-  }
-
-  document.body.appendChild(backdrop);
-  document.body.appendChild(modal);
-  requestAnimationFrame(function() {
-    backdrop.classList.add('active');
-    modal.classList.add('active');
-  });
-}
-
-function closeOrgNodeModal() {
-  var backdrop = document.getElementById('orgDetailBackdrop');
-  var modal = document.getElementById('orgDetailModal');
-  if (backdrop) backdrop.remove();
-  if (modal) modal.remove();
-}
-
-function toggleOrgEditMode() {
-  orgEditModeActive = !orgEditModeActive;
-  var btn = document.getElementById('orgEditToggleBtn');
-  if (btn) {
-    btn.textContent = orgEditModeActive ? 'Done' : 'Edit';
-    btn.classList.toggle('active', orgEditModeActive);
-  }
-  renderOrgchartOverlay();
-}
-
-function confirmOrgReassign(empCode, newManager) {
-  var emp = EMPLOYEES.find(function(e) { return e.code === empCode; });
-  var mgr = newManager ? EMPLOYEES.find(function(e) { return e.code === newManager; }) : null;
-  if (!emp) return;
-  var mgrName = mgr ? mgr.name + ' (' + mgr.code + ')' : 'Root (no manager)';
-  if (!confirm('Reassign ' + emp.name + ' to report to ' + mgrName + '?')) return;
-  saveOrgReassign(empCode, newManager);
-}
-
-function saveOrgReassign(empCode, newManager) {
-  // 1. Remove from old parent locally
-  Object.keys(REPORTING_MAP).forEach(function(k) {
-    if (REPORTING_MAP[k].reports) {
-      var idx = REPORTING_MAP[k].reports.indexOf(empCode);
-      if (idx !== -1) REPORTING_MAP[k].reports.splice(idx, 1);
-    }
-  });
-  // 2. Add to new parent (or mark as root)
-  if (newManager) {
-    if (!REPORTING_MAP[newManager]) REPORTING_MAP[newManager] = { reports: [] };
-    if (REPORTING_MAP[newManager].reports.indexOf(empCode) === -1) {
-      REPORTING_MAP[newManager].reports.push(empCode);
-    }
-  }
-  // Ensure empCode has an entry
-  if (!REPORTING_MAP[empCode]) REPORTING_MAP[empCode] = { reports: [] };
-
-  // 3. Re-render immediately
-  renderOrgchartOverlay();
-
-  // 4. Save to backend
-  apiCall('PUT', '/orgchart/' + empCode, { reports_to: newManager }).then(function() {
-    showToast('Reporting updated successfully');
-  }).catch(function(err) {
-    showToast('Failed to save: ' + (err.message || 'Unknown error'));
-  });
-}
-
-function wireOrgEvents() {
-  var container = document.getElementById('orgchartContent');
-  if (!container) return;
-
-  // --- Delegated CLICK handler (handles node click + expand toggle) ---
-  container.addEventListener('click', function(e) {
-    // If a drag just completed, ignore the click
-    if (orgDragDidDrop) { orgDragDidDrop = false; return; }
-    if (orgTouchDragging) return;
-
-    // Check expand toggle first
-    var expandBtn = e.target.closest('[data-expand-code]');
-    if (expandBtn) {
-      e.stopPropagation();
-      e.preventDefault();
-      toggleOrgExpand(expandBtn.getAttribute('data-expand-code'));
-      return;
-    }
-
-    // Node click — open detail modal
-    var node = e.target.closest('[data-emp-code]');
-    if (node) {
-      showOrgNodeModal(node.getAttribute('data-emp-code'));
-    }
-  });
-
-  // --- HTML5 DRAG AND DROP (desktop) ---
-  container.addEventListener('dragstart', function(e) {
-    var node = e.target.closest('[data-emp-code]');
-    if (!node || !orgEditModeActive) { e.preventDefault(); return; }
-    orgDragEmpCode = node.getAttribute('data-emp-code');
-    orgDragDidDrop = false;
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', orgDragEmpCode);
-    // Apply dragging style after a frame so browser captures the ghost image first
-    setTimeout(function() { node.classList.add('org-dragging'); }, 0);
-  });
-
-  container.addEventListener('dragend', function() {
-    orgDragEmpCode = null;
-    container.querySelectorAll('.org-dragging').forEach(function(el) { el.classList.remove('org-dragging'); });
-    container.querySelectorAll('.org-drop-hover').forEach(function(el) { el.classList.remove('org-drop-hover'); });
-  });
-
-  container.addEventListener('dragover', function(e) {
-    if (!orgEditModeActive || !orgDragEmpCode) return;
-    var target = e.target.closest('[data-drop-target]');
-    if (!target) return;
-    var targetCode = target.getAttribute('data-drop-target');
-    if (targetCode === orgDragEmpCode) return;
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-    container.querySelectorAll('.org-drop-hover').forEach(function(el) { el.classList.remove('org-drop-hover'); });
-    target.classList.add('org-drop-hover');
-  });
-
-  container.addEventListener('dragleave', function(e) {
-    var target = e.target.closest('[data-drop-target]');
-    if (target && !target.contains(e.relatedTarget)) {
-      target.classList.remove('org-drop-hover');
-    }
-  });
-
-  container.addEventListener('drop', function(e) {
-    e.preventDefault();
-    e.stopPropagation();
-    container.querySelectorAll('.org-drop-hover').forEach(function(el) { el.classList.remove('org-drop-hover'); });
-    container.querySelectorAll('.org-dragging').forEach(function(el) { el.classList.remove('org-dragging'); });
-    if (!orgEditModeActive || !orgDragEmpCode) return;
-    var target = e.target.closest('[data-drop-target]');
-    if (!target) return;
-    var targetCode = target.getAttribute('data-drop-target');
-    if (targetCode === orgDragEmpCode) return;
-    var draggedCode = orgDragEmpCode;
-    orgDragEmpCode = null;
-    orgDragDidDrop = true;
-    confirmOrgReassign(draggedCode, targetCode);
-  });
-
-  // --- TOUCH DRAG (mobile) ---
-  container.addEventListener('touchstart', function(e) {
-    if (!orgEditModeActive) return;
-    var node = e.target.closest('[data-emp-code]');
-    if (!node) return;
-    // Don't initiate drag on expand toggle
-    if (e.target.closest('[data-expand-code]')) return;
-    var code = node.getAttribute('data-emp-code');
-    var touch = e.touches[0];
-    orgTouchStartX = touch.clientX;
-    orgTouchStartY = touch.clientY;
-    orgTouchDragging = false;
-    orgTouchTimer = setTimeout(function() {
-      orgTouchDragging = true;
-      orgDragEmpCode = code;
-      node.classList.add('org-dragging');
-      // Create floating ghost
-      orgTouchGhost = document.createElement('div');
-      orgTouchGhost.className = 'org-node org-drag-ghost';
-      var emp = EMPLOYEES.find(function(e2) { return e2.code === code; });
-      orgTouchGhost.innerHTML = '<div class="org-name">' + escapeHTML(emp ? emp.name : code) + '</div>';
-      document.body.appendChild(orgTouchGhost);
-      orgTouchGhost.style.left = (orgTouchStartX - 50) + 'px';
-      orgTouchGhost.style.top = (orgTouchStartY - 20) + 'px';
-      // Vibrate feedback if available
-      if (navigator.vibrate) navigator.vibrate(30);
-    }, 400);
-  }, { passive: true });
-
-  container.addEventListener('touchmove', function(e) {
-    if (!orgTouchDragging || !orgTouchGhost) {
-      if (orgTouchTimer) {
-        // Cancel long-press if finger moved too far (it's a scroll)
-        var t = e.touches[0];
-        var dx = Math.abs(t.clientX - orgTouchStartX);
-        var dy = Math.abs(t.clientY - orgTouchStartY);
-        if (dx > 10 || dy > 10) { clearTimeout(orgTouchTimer); orgTouchTimer = null; }
-      }
-      return;
-    }
-    e.preventDefault();
-    var touch = e.touches[0];
-    orgTouchGhost.style.left = (touch.clientX - 50) + 'px';
-    orgTouchGhost.style.top = (touch.clientY - 20) + 'px';
-    // Highlight drop target under finger (hide ghost temporarily for elementFromPoint)
-    orgTouchGhost.style.display = 'none';
-    container.querySelectorAll('.org-drop-hover').forEach(function(el) { el.classList.remove('org-drop-hover'); });
-    var el = document.elementFromPoint(touch.clientX, touch.clientY);
-    orgTouchGhost.style.display = '';
-    if (el) {
-      var target = el.closest('[data-drop-target]');
-      if (target && target.getAttribute('data-drop-target') !== orgDragEmpCode) {
-        target.classList.add('org-drop-hover');
-      }
-    }
-  }, { passive: false });
-
-  container.addEventListener('touchend', function(e) {
-    if (orgTouchTimer) { clearTimeout(orgTouchTimer); orgTouchTimer = null; }
-    if (!orgTouchDragging) return;
-    container.querySelectorAll('.org-dragging').forEach(function(el) { el.classList.remove('org-dragging'); });
-    container.querySelectorAll('.org-drop-hover').forEach(function(el) { el.classList.remove('org-drop-hover'); });
-    if (orgTouchGhost) { orgTouchGhost.remove(); orgTouchGhost = null; }
-    if (orgDragEmpCode && e.changedTouches.length > 0) {
-      var touch = e.changedTouches[0];
-      var el = document.elementFromPoint(touch.clientX, touch.clientY);
-      if (el) {
-        var target = el.closest('[data-drop-target]');
-        if (target) {
-          var targetCode = target.getAttribute('data-drop-target');
-          if (targetCode !== orgDragEmpCode) {
-            var draggedCode = orgDragEmpCode;
-            orgDragEmpCode = null;
-            orgTouchDragging = false;
-            confirmOrgReassign(draggedCode, targetCode);
-            return;
-          }
-        }
-      }
-    }
-    orgDragEmpCode = null;
-    setTimeout(function() { orgTouchDragging = false; }, 50);
-  });
-
-  container.addEventListener('touchcancel', function() {
-    if (orgTouchTimer) { clearTimeout(orgTouchTimer); orgTouchTimer = null; }
-    container.querySelectorAll('.org-dragging').forEach(function(el) { el.classList.remove('org-dragging'); });
-    if (orgTouchGhost) { orgTouchGhost.remove(); orgTouchGhost = null; }
-    orgDragEmpCode = null;
-    orgTouchDragging = false;
-  });
-}
-
-var orgEventsWired = false;
-function renderOrgchartOverlay() {
-  var c = document.getElementById('orgchartContent');
-  if (!c) return;
-
-  // Show/hide edit button based on role
-  var editBtn = document.getElementById('orgEditToggleBtn');
-  var isMDorHR = currentUser && (currentUser.role === 'MD' || currentUser.role === 'HR');
-  if (editBtn) editBtn.style.display = isMDorHR ? '' : 'none';
-
-  if (orgExpandedNodes.size === 0) initOrgExpanded();
-
-  var roots = getOrgRoots();
-  if (roots.length === 0) { c.innerHTML = '<div class="nf-empty">Unable to build org chart</div>'; return; }
-
-  var html = '';
-  if (orgEditModeActive) {
-    html += '<div class="org-edit-banner">Drag employees to reassign reporting. Tap a node for details.</div>';
-  }
-  html += '<div class="org-tree">';
-  roots.forEach(function(root) {
-    var tree = buildOrgTree(root);
-    if (tree) html += renderOrgNode(tree, 0);
-  });
-  html += '</div>';
-  c.innerHTML = html;
-
-  // Wire all events once (delegation — survives innerHTML replacement)
-  if (!orgEventsWired) {
-    wireOrgEvents();
-    orgEventsWired = true;
-  }
-}
 
 // =====================================================
 // F10: ANNOUNCEMENTS FUNCTIONS
@@ -9689,36 +9194,6 @@ function getAdvanceStepIndicator(status) {
   });
   html += '</div>';
   return html;
-}
-
-// =====================================================
-// CHANGE 6: INLINE ORG CHART
-// =====================================================
-function renderInlineOrgChart() {
-  var container = document.getElementById('screen-orgchart');
-  if (!container) return;
-  var isMDorHR = currentUser && (currentUser.role === 'MD' || currentUser.role === 'HR');
-  if (orgExpandedNodes.size === 0) initOrgExpanded();
-  var roots = getOrgRoots();
-
-  var html = '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px;margin-bottom:12px"><div class="section-title" style="margin:0">Organization Chart</div>';
-  if (isMDorHR) {
-    html += '<button class="nf-btn nf-btn-sm" style="font-size:.72rem" onclick="toggleOrgEditMode();renderInlineOrgChart()">' + (orgEditModeActive ? 'Done Editing' : 'Edit') + '</button>';
-  }
-  html += '</div>';
-  if (roots.length === 0) { html += '<div class="nf-empty">Unable to build org chart</div>'; container.innerHTML = html; return; }
-  if (orgEditModeActive) {
-    html += '<div class="org-edit-banner">Drag employees to reassign reporting. Tap a node for details.</div>';
-  }
-  html += '<div class="org-tree" style="overflow-x:auto">';
-  roots.forEach(function(root) {
-    var tree = buildOrgTree(root);
-    if (tree) html += renderOrgNode(tree, 0);
-  });
-  html += '</div>';
-  container.innerHTML = html;
-  // Re-wire org events for inline version
-  wireOrgEvents();
 }
 
 // =====================================================

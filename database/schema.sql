@@ -484,18 +484,6 @@ CREATE TABLE IF NOT EXISTS exit_requests (
   FOREIGN KEY (emp_code) REFERENCES employees(code) ON DELETE CASCADE
 );
 
--- F9: Org Chart (Reporting structure)
-CREATE TABLE IF NOT EXISTS reporting_structure (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  emp_code VARCHAR(20) NOT NULL,
-  reports_to VARCHAR(20),
-  effective_date DATE,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (emp_code) REFERENCES employees(code) ON DELETE CASCADE,
-  FOREIGN KEY (reports_to) REFERENCES employees(code) ON DELETE SET NULL,
-  UNIQUE KEY unique_report (emp_code)
-);
-
 -- F10: Announcements
 CREATE TABLE IF NOT EXISTS announcements (
   id INT AUTO_INCREMENT PRIMARY KEY,
@@ -565,7 +553,6 @@ CREATE INDEX idx_asset_status ON asset_inventory(status);
 CREATE INDEX idx_asset_assigned ON asset_inventory(assigned_to);
 CREATE INDEX idx_exit_emp ON exit_requests(emp_code);
 CREATE INDEX idx_exit_status ON exit_requests(status);
-CREATE INDEX idx_report_to ON reporting_structure(reports_to);
 CREATE INDEX idx_announce_active ON announcements(is_active);
 CREATE INDEX idx_announce_read_emp ON announcement_reads(emp_code);
 
