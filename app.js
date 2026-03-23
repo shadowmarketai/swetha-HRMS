@@ -2597,15 +2597,27 @@ function renderAdvanceRequests(filter) {
     };
   });
   var allItems = advanceRequests.concat(expItems);
-  let reqs = filter === 'all' ? [...allItems] : allItems.filter(r => r.status === filter);
+  var isMD = currentUser && currentUser.role === 'MD';
+  var isHR = currentUser && currentUser.role === 'HR';
+  let reqs;
+  if (filter === 'all') {
+    reqs = [...allItems];
+  } else if (filter === 'pending') {
+    // MD sees hr_accepted (awaiting MD confirm) + pending; HR sees pending only
+    if (isMD) {
+      reqs = allItems.filter(r => r.status === 'pending' || r.status === 'hr_accepted');
+    } else {
+      reqs = allItems.filter(r => r.status === 'pending');
+    }
+  } else {
+    reqs = allItems.filter(r => r.status === filter);
+  }
   if (advReqTypeFilter !== 'all') reqs = reqs.filter(r => r.type === advReqTypeFilter);
   reqs.sort((a, b) => b.id - a.id);
   if (reqs.length === 0) {
     container.innerHTML = '<div style="text-align:center;padding:32px;color:var(--gray-400);font-size:.82rem">No ' + filter + ' requests</div>';
     return;
   }
-  const isMD = currentUser && currentUser.role === 'MD';
-  const isHR = currentUser && currentUser.role === 'HR';
   container.innerHTML = reqs.map(r => {
     const initials = r.empName ? r.empName.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() : '??';
     const typeBadge = `<span class="adv-type-badge ${r.type}">${ADV_TYPE_LABELS[r.type] || r.type}</span>`;
@@ -3895,7 +3907,7 @@ function getHRMetrics() {
   var avgSalary = Math.round(totalPayroll / totalHeadcount);
   var openPositions = JOB_POSTINGS.filter(function(j) { return j.status === 'open'; }).length;
   var openings = JOB_POSTINGS.filter(function(j) { return j.status === 'open'; }).reduce(function(s, j) { return s + j.openings; }, 0);
-  var pendingApprovals = (typeof advanceRequests !== 'undefined') ? advanceRequests.filter(function(r) { return r.status === 'pending'; }).length : 0;
+  var pendingApprovals = (typeof advanceRequests !== 'undefined') ? advanceRequests.filter(function(r) { return r.status === 'pending' || r.status === 'hr_accepted'; }).length : 0;
   var allScores = EMPLOYEES.map(function(e) { return getKpiScore(e.code); });
   var avgKpi = Math.round(allScores.reduce(function(a, b) { return a + b; }, 0) / allScores.length);
   var deptDist = {};
