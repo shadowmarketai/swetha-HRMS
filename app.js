@@ -671,8 +671,9 @@ function doLogout() {
   currentUser = null;
   JWT_TOKEN = null;
   safeStorage.remove('hrms_jwt');
-  // Clean up idle timer and notification poll
+  // Clean up idle timer, warning timer, and notification poll
   if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
+  if (idleWarningTimer) { clearTimeout(idleWarningTimer); idleWarningTimer = null; }
   stopNotifPoll();
   // Prevent Google auto-login after logout
   try { if (typeof google !== 'undefined' && google.accounts && google.accounts.id) google.accounts.id.disableAutoSelect(); } catch (e) {}
@@ -5726,7 +5727,7 @@ async function loadFromBackend() {
       Object.keys(shiftAssignments).forEach(function(k) { delete shiftAssignments[k]; });
       shiftData.forEach(function(row) {
         shiftAssignments[row.emp_code || row.empCode] = {
-          code: row.shift_code || row.code || 'GEN',
+          shiftCode: row.shift_code || row.code || 'GEN',
           eligible: !!(row.is_eligible !== undefined ? row.is_eligible : true)
         };
       });

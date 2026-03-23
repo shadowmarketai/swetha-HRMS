@@ -22,8 +22,8 @@
   --safe-bottom:env(safe-area-inset-bottom,0px);
   --z-tabs:90;--z-header:100;--z-overlay:200;--z-login:500;--z-toast:9999;
 }
-html{font-size:15px;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
-body{font-family:var(--font-body);color:var(--text);background:#E8EAF0;display:flex;justify-content:center;align-items:center;min-height:100vh;overflow:hidden;transition:background .3s,color .3s}
+html{font-size:15px;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;overflow-x:hidden;width:100%}
+body{font-family:var(--font-body);color:var(--text);background:#E8EAF0;display:flex;justify-content:center;align-items:center;min-height:100vh;overflow:hidden;transition:background .3s,color .3s;width:100%;max-width:100%}
 .phone-frame{width:430px;max-width:100vw;height:100vh;max-height:932px;background:var(--bg);position:relative;overflow:hidden;box-shadow:0 0 0 8px #1C1710,0 0 0 10px #2D2318,0 25px 80px rgba(0,0,0,.35);border-radius:40px}
 @media(max-width:767px){
   .phone-frame{border-radius:0;box-shadow:none;max-height:100vh;height:100vh;overflow:hidden}
@@ -34,7 +34,7 @@ body{font-family:var(--font-body);color:var(--text);background:#E8EAF0;display:f
 }
 .app-header{position:absolute;top:0;left:0;right:0;height:var(--header-h);z-index:var(--z-header);display:flex;align-items:center;justify-content:space-between;padding:0 16px;background:#1C1710;border-bottom:1px solid rgba(255,255,255,.06)}
 .header-logo{display:flex;align-items:center;min-width:0}
-.header-logo-img{height:44px;object-fit:contain;border-radius:6px;flex-shrink:0}
+.header-logo-img{height:40px;object-fit:contain;border-radius:4px;flex-shrink:0;background:#fff;padding:2px 8px}
 .header-actions{display:flex;align-items:center;gap:6px}
 .header-btn{width:38px;height:38px;border-radius:12px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.6);transition:all .2s;position:relative}
 .header-btn:hover{background:rgba(255,255,255,.08);color:#fff}
@@ -974,10 +974,10 @@ a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.cal-nav bu
    ===================================================== */
 @media (min-width: 768px) and (max-width: 1024px) {
   html { font-size: 16px; }
-  html { overflow-x: hidden !important; }
-  body { align-items: stretch; overflow-x: hidden !important; overflow-y: auto; background: var(--bg); max-width: 100vw; }
+  html { overflow-x: hidden !important; width: 100%; }
+  body { align-items: stretch; overflow-x: hidden !important; overflow-y: auto; background: var(--bg); width: 100%; max-width: 100%; }
   .phone-frame {
-    width: 100%; max-width: 100vw; height: 100vh; max-height: 100vh;
+    width: 100%; max-width: 100%; height: 100vh; max-height: 100vh;
     border-radius: 0; box-shadow: none;
     display: grid;
     grid-template-columns: 200px 1fr;
@@ -989,7 +989,7 @@ a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.cal-nav bu
     position: relative; height: 70px; padding: 0 24px;
     background: #1C1710; border-bottom: 1px solid rgba(255,255,255,.06); backdrop-filter: none;
   }
-  .header-logo-img { height: 50px; border-radius: 6px; }
+  .header-logo-img { height: 46px; border-radius: 5px; padding: 3px 10px; }
   .header-actions { gap: 8px; }
   .header-btn { width: 38px; height: 38px; color: rgba(255,255,255,.6); }
   .header-btn:hover { background: rgba(255,255,255,.08); color: #fff; }
@@ -1044,8 +1044,8 @@ a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.cal-nav bu
   .card { padding: 18px; border-radius: 15px; }
   /* Overlays — full-screen fixed, escape the grid entirely */
   .overlay-screen {
-    position: fixed !important; top: 0 !important; left: 0 !important;
-    width: 100vw !important; height: 100vh !important;
+    position: fixed !important; top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
+    width: 100% !important; height: 100% !important;
     max-width: none !important; max-height: none !important;
     transform: none !important; transition: none !important;
     display: none !important;
@@ -1133,10 +1133,10 @@ a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.cal-nav bu
   html { font-size: 17px; }
 
   /* ── Step 1: Remove phone frame, full-screen grid ── */
-  html { overflow-x: hidden !important; }
-  body { align-items: stretch; overflow-x: hidden !important; overflow-y: auto; background: var(--bg); max-width: 100vw; }
+  html { overflow-x: hidden !important; width: 100%; }
+  body { align-items: stretch; overflow-x: hidden !important; overflow-y: auto; background: var(--bg); width: 100%; max-width: 100%; }
   .phone-frame {
-    width: 100%; max-width: 100vw; height: 100vh; max-height: 100vh;
+    width: 100%; max-width: 100%; height: 100vh; max-height: 100vh;
     border-radius: 0; box-shadow: none;
     display: grid;
     grid-template-columns: 260px 1fr;
@@ -1154,7 +1154,7 @@ a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.cal-nav bu
     border-bottom: 1px solid rgba(255,255,255,.06);
     backdrop-filter: none;
   }
-  .header-logo-img { height: 60px; border-radius: 8px; }
+  .header-logo-img { height: 54px; border-radius: 6px; padding: 3px 12px; }
   .header-actions { gap: 10px; }
   .header-btn { width: 42px; height: 42px; color: rgba(255,255,255,.6); border-radius: 12px; }
   .header-btn:hover { background: rgba(255,255,255,.08); color: #fff; }
@@ -1443,8 +1443,8 @@ a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.cal-nav bu
 
   /* ── Step 9: Overlays — full-screen fixed, escape the grid entirely ── */
   .overlay-screen {
-    position: fixed !important; top: 0 !important; left: 0 !important;
-    width: 100vw !important; height: 100vh !important;
+    position: fixed !important; top: 0 !important; left: 0 !important; right: 0 !important; bottom: 0 !important;
+    width: 100% !important; height: 100% !important;
     max-width: none !important; max-height: none !important;
     transform: none !important;
     transition: none !important;
@@ -1705,7 +1705,7 @@ textarea.form-control{resize:vertical}
 
 /* ===== HOME GRID — responsive breakpoint ===== */
 @media(max-width:430px){
-  .header-logo-img{height:32px}
+  .header-logo-img{height:32px;padding:2px 6px}
   .checkin-hero{min-height:160px}
   .checkin-hero-content{padding:18px 16px}
   .checkin-time{font-size:1.7rem}
@@ -1715,7 +1715,7 @@ textarea.form-control{resize:vertical}
 @media(max-width:320px){
   .home-grid{grid-template-columns:1fr}
   .home-quick-stats{grid-template-columns:1fr 1fr}
-  .header-logo-img{height:26px}
+  .header-logo-img{height:24px;padding:1px 4px}
   .checkin-hero{min-height:140px}
   .checkin-time{font-size:1.5rem}
   .greeting h1{font-size:1.3rem}
