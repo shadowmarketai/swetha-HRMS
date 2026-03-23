@@ -570,19 +570,20 @@ function renderProfileOverlay() {
   if (!c || !currentUser) return;
   var emp = currentUser;
   var initials = emp.name.split(' ').map(function(w){return w.charAt(0);}).join('').substring(0,2).toUpperCase();
-  var salary = emp.salary || 0;
-  var now = new Date();
-  var monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  var daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  var perDay = daysInMonth > 0 ? (salary / daysInMonth) : 0;
-  var accMasked = emp.accNo ? emp.accNo.substring(0,4) + '***' + emp.accNo.slice(-4) : 'N/A';
-
-  // Check if personal details already submitted
+  var isMDUser = currentUser.role === 'MD';
   var selfData = ensureSelfData(currentUser.code);
-  var personalSubmitted = selfData && selfData.personalSubmitted === true;
+
+  function pf(label, value, fullWidth) {
+    return '<div class="profile-row' + (fullWidth ? ' full-width' : '') + '"><span class="label">' + escapeHTML(label) + '</span><span class="value">' + escapeHTML(String(value || 'N/A')) + '</span></div>';
+  }
+  function maskVal(val, show) {
+    if (!val) return 'N/A';
+    if (show) return val;
+    if (val.length <= 4) return '****';
+    return val.substring(0, 2) + '****' + val.slice(-2);
+  }
 
   var html = '<div class="card profile-card" style="margin:16px;border-radius:var(--radius)">';
-  // Profile image — show photo if available, otherwise initials
   var photoUrl = emp.photoUrl || emp.photo_url || null;
   if (photoUrl) {
     html += '<div class="profile-avatar" style="background-image:url(\'' + escapeHTML(photoUrl) + '\');background-size:cover;background-position:center"></div>';
@@ -594,38 +595,81 @@ function renderProfileOverlay() {
   html += '<div class="emp-id">' + escapeHTML(emp.code) + '</div>';
   html += '</div>';
 
-  // Personal Details section — read-only (HR feeds details)
+  // Section 1: Personal Information
   html += '<div class="card profile-section" style="margin:0 16px 12px;border-radius:var(--radius)">';
-  html += '<div style="font-family:var(--font-display);font-weight:600;font-size:.82rem;margin-bottom:8px;color:var(--gray-500)">Personal Details</div>';
-  html += '<div class="profile-row"><span class="label">Phone</span><span class="value">' + escapeHTML(emp.phone || 'N/A') + '</span></div>';
-  html += '<div class="profile-row"><span class="label">Email</span><span class="value">' + escapeHTML(emp.email || 'N/A') + '</span></div>';
-  html += '<div class="profile-row"><span class="label">Date of Joining</span><span class="value">' + escapeHTML(emp.doj || 'N/A') + '</span></div>';
-  if (selfData.fatherName) html += '<div class="profile-row"><span class="label">Father\'s Name</span><span class="value">' + escapeHTML(selfData.fatherName) + '</span></div>';
-  if (selfData.motherName) html += '<div class="profile-row"><span class="label">Mother\'s Name</span><span class="value">' + escapeHTML(selfData.motherName) + '</span></div>';
-  if (selfData.bloodGroup) html += '<div class="profile-row"><span class="label">Blood Group</span><span class="value">' + escapeHTML(selfData.bloodGroup) + '</span></div>';
-  if (selfData.emergencyContact) html += '<div class="profile-row"><span class="label">Emergency Contact</span><span class="value">' + escapeHTML(selfData.emergencyContact) + '</span></div>';
-  if (selfData.presentAddress) html += '<div class="profile-row"><span class="label">Address</span><span class="value">' + escapeHTML(selfData.presentAddress) + '</span></div>';
-  if (!personalSubmitted) {
-    html += '<div style="margin-top:8px;font-size:.7rem;color:var(--gray-400);text-align:center">Contact HR to update your personal details</div>';
+  html += '<div class="profile-section-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Personal Information</div>';
+  html += '<div class="profile-grid">';
+  html += pf('Date of Birth', emp.dob);
+  html += pf('Phone', emp.phone);
+  html += pf('Email', emp.email);
+  html += pf('Blood Group', emp.bloodGroup || selfData.bloodGroup);
+  html += pf('Marital Status', emp.maritalStatus);
+  html += '</div></div>';
+
+  // Section 2: Address
+  var presAddr = emp.presentAddress || selfData.presentAddress || emp.address;
+  var permAddr = emp.permanentAddress || '';
+  if (presAddr || permAddr) {
+    html += '<div class="card profile-section" style="margin:0 16px 12px;border-radius:var(--radius)">';
+    html += '<div class="profile-section-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Address</div>';
+    html += '<div class="profile-grid">';
+    if (presAddr) html += pf('Present Address', presAddr, true);
+    if (permAddr) html += pf('Permanent Address', permAddr, true);
+    html += '</div></div>';
   }
-  html += '</div>';
 
+  // Section 3: Family & Emergency Contacts
   html += '<div class="card profile-section" style="margin:0 16px 12px;border-radius:var(--radius)">';
-  html += '<div style="font-family:var(--font-display);font-weight:600;font-size:.82rem;margin-bottom:8px;color:var(--gray-500)">Salary Details (' + monthNames[now.getMonth()] + ' ' + now.getFullYear() + ')</div>';
-  html += '<div class="profile-row"><span class="label">Monthly Salary</span><span class="value">Rs.' + salary.toLocaleString('en-IN') + '</span></div>';
-  html += '<div class="profile-row"><span class="label">Per Day Salary</span><span class="value">Rs.' + perDay.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) + '</span></div>';
-  html += '<div class="profile-row"><span class="label">Working Days</span><span class="value">' + daysInMonth + '</span></div>';
-  html += '</div>';
+  html += '<div class="profile-section-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Family & Emergency</div>';
+  html += '<div class="profile-grid">';
+  html += pf('Father\'s Name', emp.fatherName || selfData.fatherName);
+  html += pf('Father\'s Mobile', emp.fatherMobile || selfData.fatherMobile);
+  html += pf('Mother\'s Name', emp.motherName || selfData.motherName);
+  html += pf('Mother\'s Mobile', emp.motherMobile || selfData.motherMobile);
+  if (emp.spouseName) { html += pf('Spouse Name', emp.spouseName); html += pf('Spouse Mobile', emp.spouseMobile); }
+  html += pf('Emergency Contact', emp.emergencyContact || selfData.emergencyContact);
+  html += pf('Emergency Phone', emp.emergencyPhone);
+  html += '</div></div>';
 
+  // Section 4: Official Details
   html += '<div class="card profile-section" style="margin:0 16px 12px;border-radius:var(--radius)">';
-  html += '<div style="font-family:var(--font-display);font-weight:600;font-size:.82rem;margin-bottom:8px;color:var(--gray-500)">Company Details</div>';
-  html += '<div class="profile-row"><span class="label">Company</span><span class="value">Swetha Structures Pvt Ltd</span></div>';
-  html += '<div class="profile-row"><span class="label">Department</span><span class="value">' + escapeHTML(emp.dept || 'N/A') + '</span></div>';
-  html += '<div class="profile-row"><span class="label">Bank Account</span><span class="value">' + escapeHTML(emp.bank || '') + ' — ' + escapeHTML(accMasked) + '</span></div>';
-  html += '<div class="profile-row"><span class="label">Employee Code</span><span class="value">' + escapeHTML(emp.code) + '</span></div>';
-  html += '<div class="profile-row"><span class="label">Payment Mode</span><span class="value">NEFT</span></div>';
-  html += '</div>';
+  html += '<div class="profile-section-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>Official Details</div>';
+  html += '<div class="profile-grid">';
+  html += pf('Department', emp.dept);
+  html += pf('Designation', emp.designation);
+  html += pf('Date of Joining', emp.doj);
+  html += pf('Employee Code', emp.code);
+  var salaryDisplay = isMDUser ? 'Rs.' + (emp.salary || 0).toLocaleString('en-IN') : (emp.salary ? 'Rs.****' : 'N/A');
+  html += pf('Monthly Salary', salaryDisplay);
+  html += pf('Payment Mode', 'NEFT');
+  html += '</div></div>';
 
+  // Section 5: Bank & Identity
+  html += '<div class="card profile-section" style="margin:0 16px 12px;border-radius:var(--radius)">';
+  html += '<div class="profile-section-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>Bank & Identity</div>';
+  html += '<div class="profile-grid">';
+  html += pf('Bank', emp.bank);
+  html += pf('Account No', maskVal(emp.accNo, isMDUser));
+  html += pf('PAN', maskVal(emp.pan, isMDUser));
+  html += pf('Aadhaar', maskVal(emp.aadhaar, isMDUser));
+  html += pf('UAN', emp.uan);
+  html += '</div></div>';
+
+  // Section 6: Qualification & Experience
+  if (emp.qualification || emp.previousEmployer || emp.yearsOfExperience) {
+    html += '<div class="card profile-section" style="margin:0 16px 12px;border-radius:var(--radius)">';
+    html += '<div class="profile-section-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 10 3 12 0v-5"/></svg>Qualification & Experience</div>';
+    html += '<div class="profile-grid">';
+    html += pf('Qualification', emp.qualification);
+    html += pf('Institution', emp.institution);
+    html += pf('Year of Passing', emp.yearOfPassing);
+    html += pf('Experience (Years)', emp.yearsOfExperience);
+    if (emp.previousEmployer) html += pf('Previous Employer', emp.previousEmployer);
+    if (emp.previousRole) html += pf('Previous Role', emp.previousRole);
+    html += '</div></div>';
+  }
+
+  // Actions
   html += '<div style="padding:0 16px 8px"><button class="payroll-report-btn" onclick="downloadIDCard()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>Download ID Card (PDF)</button></div>';
   html += '<div style="padding:0 16px 24px"><button class="btn btn-outline w-full" style="border-radius:var(--radius);color:var(--danger);border-color:var(--danger-light)" onclick="doLogout()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Log Out</button></div>';
   c.innerHTML = html;
@@ -1313,23 +1357,56 @@ function updateGreeting() {
 }
 setInterval(updateGreeting, 60000);
 
+var calendarMonth = new Date();
+calendarMonth.setDate(1);
+
+function changeCalendarMonth(dir) {
+  var now = new Date();
+  var next = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + dir, 1);
+  // Don't go past current month
+  if (next.getFullYear() > now.getFullYear() || (next.getFullYear() === now.getFullYear() && next.getMonth() > now.getMonth())) return;
+  calendarMonth = next;
+  buildCalendar();
+}
+
 function buildCalendar() {
   const c = document.getElementById('calDays');
   c.innerHTML = '';
   ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(d => { c.innerHTML += '<div class="cal-day-label">'+d+'</div>'; });
+  var year = calendarMonth.getFullYear();
+  var month = calendarMonth.getMonth();
   const now = new Date();
-  const todayDate = now.getDate();
-  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  const firstDayOfWeek = new Date(now.getFullYear(), now.getMonth(), 1).getDay();
-  const att = {1:'present',2:'present',3:'present',4:'present',5:'present',6:'present',7:'present',8:'holiday',9:'present',10:'present',11:'present',12:'present',13:'half',14:'holiday',15:'holiday',16:'present',17:'present',18:'present',19:'present',20:'present',21:'holiday',22:'holiday',23:'present',24:'present',25:'absent',26:'present',27:'present',28:'holiday',29:'holiday',30:'present',31:'present'};
+  const isCurrentMonth = (year === now.getFullYear() && month === now.getMonth());
+  const todayDate = isCurrentMonth ? now.getDate() : -1;
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDayOfWeek = new Date(year, month, 1).getDay();
+  // Seeded attendance for this month
+  var seed = 0;
+  if (currentUser) for (var si = 0; si < currentUser.code.length; si++) seed += currentUser.code.charCodeAt(si);
+  var att = {};
+  var maxDay = isCurrentMonth ? Math.min(daysInMonth, now.getDate()) : daysInMonth;
+  for (var dd = 1; dd <= maxDay; dd++) {
+    var dow = new Date(year, month, dd).getDay();
+    if (dow === 0) { att[dd] = 'holiday'; continue; }
+    var h = ((seed * 31 + dd * 17 + month * 53 + year * 7) % 100);
+    if (h < 65) att[dd] = 'present';
+    else if (h < 75) att[dd] = 'absent';
+    else if (h < 85) att[dd] = 'half';
+    else if (h < 92) att[dd] = 'leave';
+    else att[dd] = 'holiday';
+  }
   for (let e = 0; e < firstDayOfWeek; e++) { c.innerHTML += '<div class="cal-day"></div>'; }
   var badgeMap = {present:{label:'P',cls:'cal-badge-present'},absent:{label:'A',cls:'cal-badge-absent'},holiday:{label:'H',cls:'cal-badge-holiday'},half:{label:'\u00BD',cls:'cal-badge-half'},leave:{label:'L',cls:'cal-badge-leave'}};
   for (let d = 1; d <= daysInMonth; d++) {
-    const isToday = d === todayDate;
-    const st = d <= todayDate ? att[d] || '' : '';
+    const isToday = isCurrentMonth && d === now.getDate();
+    const st = att[d] || '';
     const badge = st && badgeMap[st] ? '<span class="cal-status-badge '+badgeMap[st].cls+'">'+badgeMap[st].label+'</span>' : '';
     c.innerHTML += '<div class="cal-day'+(isToday?' today':'')+'">'+d+badge+'</div>';
   }
+  // Update month title
+  var monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var titleEl = document.getElementById('calMonthTitle');
+  if (titleEl) titleEl.textContent = monthNames[month] + ' ' + year;
   renderAttendanceLogList();
 }
 
@@ -1441,10 +1518,17 @@ async function submitOnboarding() {
     accNo: accNo || 'TBD', role: obRole, phone: phone || '', doj: doj || new Date().toISOString().split('T')[0],
     status: 'Active'
   };
+  var submitBtn = document.querySelector('#overlay-onboarding .btn-primary, #overlay-onboarding button[onclick*="submitOnboarding"]');
+  if (submitBtn) { submitBtn.disabled = true; submitBtn.dataset.origText = submitBtn.textContent; submitBtn.textContent = 'Saving...'; }
   try {
     await apiCall('POST', '/employees', newEmp);
     // Register user account with specified password
-    await apiCall('POST', '/auth/register', { empCode: code, password: obPassword, role: obRole });
+    var loginCreated = true;
+    try {
+      await apiCall('POST', '/auth/register', { empCode: code, password: obPassword, role: obRole });
+    } catch (regErr) {
+      loginCreated = false;
+    }
     // Upload photo if provided
     if (empPhotoFile) {
       try {
@@ -1453,13 +1537,18 @@ async function submitOnboarding() {
         formData.append('empCode', code);
         formData.append('docType', 'photo');
         await fetch(API_BASE + '/documents/upload', { method: 'POST', headers: { 'Authorization': 'Bearer ' + JWT_TOKEN }, body: formData }).then(function(r) { return r.json(); });
-      } catch (photoErr) { console.error('Photo upload failed:', photoErr); }
+      } catch (photoErr) {}
       empPhotoFile = null;
     }
     EMPLOYEES.push(newEmp);
-    showToast('Employee Saved Successfully! ' + name + ' (' + code + ') added to ' + dept);
+    if (loginCreated) {
+      showToast('Employee added successfully! Login credentials created for ' + name + ' (' + code + ')');
+    } else {
+      showToast('Employee added but login setup failed. Contact MD to create login credentials.', 'warning');
+    }
     hideOverlay('onboarding');
   } catch (e) { showToast(e.message || 'Error adding employee'); }
+  if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = submitBtn.dataset.origText || 'Submit'; }
 }
 
 // =====================================================
@@ -1522,14 +1611,20 @@ async function changeRole(idx, newRole) {
     confirmMsg += '\n\nNote: This will be a Temporary MD with edit-only access (no delete permissions).';
   }
   if (!confirm(confirmMsg)) {
-    // Reset the select back
     renderRolesList();
     return;
   }
+  // Disable the select during API call
+  var selects = document.querySelectorAll('.emp-role-select');
+  selects.forEach(function(s) { s.disabled = true; });
   try {
     await apiCall('PUT', '/employees/' + emp.code, { role: newRole });
     emp.role = newRole;
-    showToast(emp.name + ' role changed to ' + newRole + (newRole === 'MD' ? ' (Temporary)' : ''));
+    // Update currentUser if this is the logged-in user
+    if (currentUser && currentUser.code === emp.code) {
+      currentUser.role = newRole;
+    }
+    showToast(emp.name + ' role changed to ' + newRole + (newRole === 'MD' ? ' (Temporary)' : '') + ' successfully!');
     renderRolesList();
   } catch (e) {
     showToast(e.message || 'Error changing role');
@@ -2132,9 +2227,18 @@ function closeLocationTracker() {
   if (locRefreshInterval) { clearInterval(locRefreshInterval); locRefreshInterval = null; }
 }
 
+function getLocMapType() {
+  return safeStorage.get('locMapType') || 'k';
+}
+function setLocMapType(type) {
+  safeStorage.set('locMapType', type);
+  var btns = document.querySelectorAll('.map-type-btn');
+  btns.forEach(function(b) { b.classList.toggle('active', b.dataset.type === type); });
+}
+
 function openEmployeeOnMap(name, lat, lng, area, status) {
-  // Open Google Maps with employee location marker and traffic layer
-  const url = `https://www.google.com/maps?q=${lat},${lng}&z=16&layer=traffic`;
+  var t = getLocMapType();
+  const url = `https://www.google.com/maps?q=${lat},${lng}&z=16&layer=traffic&t=${t}`;
   window.open(url, '_blank');
   showToast(`Opening ${name}'s location on Google Maps`);
 }
@@ -2148,16 +2252,17 @@ function viewAllOnGoogleMaps() {
   // Google Maps can show multiple markers via Search with center point
   const centerLat = 13.0385, centerLng = 80.1590; // Office Porur HQ
   // Build a URL with the first few active employees as waypoints
+  var t = getLocMapType();
   const first = active.slice(0, 10); // Google Maps supports limited waypoints
   if (first.length === 1) {
     const e = first[0];
-    window.open(`https://www.google.com/maps?q=${e.location.lat},${e.location.lng}&z=12&layer=traffic`, '_blank');
+    window.open(`https://www.google.com/maps?q=${e.location.lat},${e.location.lng}&z=12&layer=traffic&t=${t}`, '_blank');
   } else {
     // Use directions mode: origin = office, destination = last employee, waypoints = rest
     const origin = `${centerLat},${centerLng}`;
     const dest = `${first[first.length - 1].location.lat},${first[first.length - 1].location.lng}`;
     const waypoints = first.slice(0, -1).map(e => `${e.location.lat},${e.location.lng}`).join('|');
-    window.open(`https://www.google.com/maps/dir/${origin}/${first.map(e => `${e.location.lat},${e.location.lng}`).join('/')}?layer=traffic`, '_blank');
+    window.open(`https://www.google.com/maps/dir/${origin}/${first.map(e => `${e.location.lat},${e.location.lng}`).join('/')}?layer=traffic&t=${t}`, '_blank');
   }
   showToast('Opening all active locations on Google Maps');
 }
@@ -5145,13 +5250,23 @@ async function biometricLogin() {
       if (!matchedCode) matchedCode = keys[0].replace('hrms_biometric_', '');
 
       if (matchedCode) {
-        // Biometric verified — need backend JWT. Request a token via stored session
-        var storedJwt = safeStorage.get('hrms_jwt');
-        if (storedJwt) {
-          JWT_TOKEN = storedJwt;
+        // Biometric verified — request fresh JWT from backend (no existing JWT needed)
+        try {
+          var resp = await fetch(API_BASE + '/auth/biometric-login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ empCode: matchedCode })
+          });
+          var data = await resp.json();
+          if (!resp.ok) {
+            showToast(data.error || 'Biometric login failed. Account may be inactive.');
+            return false;
+          }
+          JWT_TOKEN = data.token;
+          safeStorage.set('hrms_jwt', data.token);
           var session = {
             empCode: matchedCode,
-            token: storedJwt,
+            token: data.token,
             expiry: Date.now() + 24 * 60 * 60 * 1000,
             rememberMe: true
           };
@@ -5159,8 +5274,8 @@ async function biometricLogin() {
           await loginAs(matchedCode);
           showToast('Biometric login successful!');
           return true;
-        } else {
-          showToast('Biometric verified but no saved session. Please login with password first.');
+        } catch (fetchErr) {
+          showToast('Biometric login failed. Please check your connection and try again.');
           return false;
         }
       }
@@ -9045,6 +9160,17 @@ function filterAttEmpList() {
   }).join('');
 }
 
+var _hrAttMonth = new Date();
+_hrAttMonth.setDate(1);
+
+function changeHrAttMonth(dir) {
+  var now = new Date();
+  var next = new Date(_hrAttMonth.getFullYear(), _hrAttMonth.getMonth() + dir, 1);
+  if (next.getFullYear() > now.getFullYear() || (next.getFullYear() === now.getFullYear() && next.getMonth() > now.getMonth())) return;
+  _hrAttMonth = next;
+  if (_hrAttSelectedEmp) selectAttEmployee(_hrAttSelectedEmp);
+}
+
 function selectAttEmployee(empCode) {
   _hrAttSelectedEmp = empCode;
   filterAttEmpList();
@@ -9053,25 +9179,38 @@ function selectAttEmployee(empCode) {
   var area = document.getElementById('attEmpCalendarArea');
   if (!area) return;
   var now = new Date();
-  var daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  var firstDayOfWeek = new Date(now.getFullYear(), now.getMonth(), 1).getDay();
-  var todayDate = now.getDate();
+  var year = _hrAttMonth.getFullYear();
+  var month = _hrAttMonth.getMonth();
+  var isCurrentMonth = (year === now.getFullYear() && month === now.getMonth());
+  var daysInMonth = new Date(year, month + 1, 0).getDate();
+  var firstDayOfWeek = new Date(year, month, 1).getDay();
+  var todayDate = isCurrentMonth ? now.getDate() : daysInMonth;
   // Seeded attendance for this employee
   var seed = 0;
   for (var i = 0; i < empCode.length; i++) seed += empCode.charCodeAt(i);
   var att = {};
   var presentCount = 0, absentCount = 0, leaveCount = 0, halfCount = 0;
-  for (var d = 1; d <= Math.min(daysInMonth, todayDate); d++) {
-    var dow = new Date(now.getFullYear(), now.getMonth(), d).getDay();
+  for (var d = 1; d <= todayDate; d++) {
+    var dow = new Date(year, month, d).getDay();
     if (dow === 0) { att[d] = 'holiday'; continue; }
-    var h = ((seed * 31 + d * 17) % 100);
+    var h = ((seed * 31 + d * 17 + month * 53 + year * 7) % 100);
     if (h < 65) { att[d] = 'present'; presentCount++; }
     else if (h < 75) { att[d] = 'absent'; absentCount++; }
     else if (h < 85) { att[d] = 'half'; halfCount++; }
     else if (h < 92) { att[d] = 'leave'; leaveCount++; }
     else { att[d] = 'holiday'; }
   }
-  var html = '<div class="card fade-in" style="margin-bottom:10px"><h4 style="font-size:.82rem;margin-bottom:8px">' + escapeHTML(emp.name) + ' — ' + escapeHTML(emp.dept) + '</h4>';
+  var monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var html = '<div class="card fade-in" style="margin-bottom:10px">';
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">';
+  html += '<h4 style="font-size:.82rem;margin:0">' + escapeHTML(emp.name) + ' — ' + escapeHTML(emp.dept) + '</h4>';
+  html += '</div>';
+  // Month navigation
+  html += '<div style="display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:10px">';
+  html += '<button class="cal-nav-btn" onclick="changeHrAttMonth(-1)" style="background:var(--gray-100);border:none;border-radius:8px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;cursor:pointer"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>';
+  html += '<span style="font-size:.78rem;font-weight:600;min-width:110px;text-align:center">' + monthNames[month] + ' ' + year + '</span>';
+  html += '<button class="cal-nav-btn" onclick="changeHrAttMonth(1)" style="background:var(--gray-100);border:none;border-radius:8px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;cursor:pointer' + (isCurrentMonth ? ';opacity:.3;pointer-events:none' : '') + '"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg></button>';
+  html += '</div>';
   html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px">';
   html += '<div class="summary-card" style="padding:8px;text-align:center"><div style="font-size:1.1rem;font-weight:700;color:var(--success)">' + presentCount + '</div><div style="font-size:.65rem;color:var(--gray-500)">Present</div></div>';
   html += '<div class="summary-card" style="padding:8px;text-align:center"><div style="font-size:1.1rem;font-weight:700;color:var(--danger)">' + absentCount + '</div><div style="font-size:.65rem;color:var(--gray-500)">Absent</div></div>';
@@ -9084,7 +9223,7 @@ function selectAttEmployee(empCode) {
   for (var e2 = 0; e2 < firstDayOfWeek; e2++) html += '<div class="cal-day"></div>';
   var badgeMap = {present:{label:'P',cls:'cal-badge-present'},absent:{label:'A',cls:'cal-badge-absent'},holiday:{label:'H',cls:'cal-badge-holiday'},half:{label:'\u00BD',cls:'cal-badge-half'},leave:{label:'L',cls:'cal-badge-leave'}};
   for (var d2 = 1; d2 <= daysInMonth; d2++) {
-    var isToday = d2 === todayDate;
+    var isToday = isCurrentMonth && d2 === now.getDate();
     var st = d2 <= todayDate ? att[d2] || '' : '';
     var badge = st && badgeMap[st] ? '<span class="cal-status-badge ' + badgeMap[st].cls + '">' + badgeMap[st].label + '</span>' : '';
     html += '<div class="cal-day' + (isToday ? ' today' : '') + '">' + d2 + badge + '</div>';

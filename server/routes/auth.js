@@ -109,8 +109,8 @@ router.post('/google', [
   }
 });
 
-// POST /api/auth/register (MD only — create new users)
-router.post('/register', verifyToken, requireRole('MD'), async (req, res) => {
+// POST /api/auth/register (MD or HR — create new users)
+router.post('/register', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
   try {
     const { empCode, password, role } = req.body;
     if (!empCode || !password) {
@@ -201,6 +201,36 @@ router.post('/seed', bootstrapOrAuth, async (req, res) => {
       await pool.query('INSERT IGNORE INTO departments (name) VALUES (?)', [d]);
     }
     res.json({ message: `Seeded ${employees.length} employees, ${Object.keys(credentials).length} users, ${depts.length} departments` });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/auth/biometric-login — issue fresh JWT after WebAuthn verification
+router.post('/biometric-login', [
+  body('empCode').trim().notEmpty().withMessage('Employee code required')
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
+  try {
+    const { empCode } = req.body;
+    // Verify employee exists, is active, and has a users record
+    const [rows] = await pool.query(
+      `SELECT u.emp_code, u.role, e.name, e.dept, e.designation
+       FROM users u JOIN employees e ON u.emp_code = e.code
+       WHERE u.emp_code = ? AND u.is_active = 1 AND e.is_active = 1`,
+      [empCode]
+    );
+    if (rows.length === 0) {
+      return res.status(404).json({ error: 'Employee not found or account inactive' });
+    }
+    const user = rows[0];
+    const token = generateToken({ empCode: user.emp_code, role: user.role });
+    res.json({
+      token,
+      user: { empCode: user.emp_code, name: user.name, role: user.role, dept: user.dept, designation: user.designation }
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });

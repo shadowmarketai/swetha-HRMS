@@ -54,6 +54,16 @@ const passwordChangeLimiter = rateLimit({
 });
 app.use('/api/auth/change-password', passwordChangeLimiter);
 
+// Rate limiting on biometric login (5 attempts per 15 min)
+const biometricLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { error: 'Too many biometric login attempts. Please try again after 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+app.use('/api/auth/biometric-login', biometricLimiter);
+
 // General mutation rate limiter (30 req/min on POST/PUT/PATCH/DELETE)
 const mutationLimiter = rateLimit({
   windowMs: 60 * 1000,

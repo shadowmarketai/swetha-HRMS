@@ -135,9 +135,12 @@ router.put('/:code', verifyToken, requireRole('MD', 'HR'), auditLog('update', 'e
         req.params.code
       ]
     );
-    // Sync role to users table if role changed
+    // Sync role to users table if role changed (upsert in case no users record exists)
     if (b.role && b.role !== cur.role) {
-      await pool.query('UPDATE users SET role = ? WHERE emp_code = ?', [newRole, req.params.code]);
+      await pool.query(
+        'INSERT INTO users (emp_code, role) VALUES (?, ?) ON DUPLICATE KEY UPDATE role = VALUES(role)',
+        [req.params.code, newRole]
+      );
     }
     res.json({ message: 'Employee updated' });
   } catch (err) {
