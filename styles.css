@@ -33,9 +33,11 @@ body{font-family:var(--font-body);color:var(--text);background:#E8EAF0;display:f
   .overlay-screen{position:fixed;top:0;left:0;right:0;bottom:0;width:100%;height:100%}
 }
 .app-header{position:absolute;top:0;left:0;right:0;height:var(--header-h);z-index:var(--z-header);display:flex;align-items:center;justify-content:space-between;padding:0 16px;background:#1C1710;border-bottom:1px solid rgba(255,255,255,.06)}
-.header-logo{display:flex;align-items:center;gap:8px}
-.header-logo img{height:auto;width:180px;object-fit:contain;filter:brightness(0) invert(1)}
-.header-logo span{font-family:var(--font-display);font-weight:700;font-size:1rem;background:linear-gradient(135deg,var(--primary),var(--primary-light));-webkit-background-clip:text;-webkit-text-fill-color:transparent;display:none}
+.header-logo{display:flex;align-items:center;gap:10px;min-width:0}
+.header-logo-icon{height:36px;width:36px;object-fit:contain;filter:brightness(0) invert(1);flex-shrink:0}
+.header-logo-text{display:none;flex-direction:column;line-height:1.15}
+.header-company-name{font-family:var(--font-display);font-weight:700;font-size:.82rem;color:rgba(255,255,255,.92);letter-spacing:.03em;white-space:nowrap}
+.header-company-tagline{font-size:.6rem;font-weight:400;color:rgba(255,255,255,.45);letter-spacing:.06em;text-transform:uppercase}
 .header-actions{display:flex;align-items:center;gap:6px}
 .header-btn{width:38px;height:38px;border-radius:12px;border:none;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.6);transition:all .2s;position:relative}
 .header-btn:hover{background:rgba(255,255,255,.08);color:#fff}
@@ -993,9 +995,11 @@ a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.cal-nav bu
     position: relative; height: 60px; padding: 0 24px;
     background: #1C1710; border-bottom: 1px solid rgba(255,255,255,.06); backdrop-filter: none;
   }
-  .header-logo img { height: auto; width: 180px; filter: brightness(0) invert(1); }
-  .header-logo span { display: none; }
-  .header-btn { width: 40px; height: 40px; color: rgba(255,255,255,.6); }
+  .header-logo-icon { height: 32px; width: 32px; }
+  .header-logo-text { display: flex; }
+  .header-company-name { font-size: .75rem; }
+  .header-company-tagline { font-size: .55rem; }
+  .header-btn { width: 38px; height: 38px; color: rgba(255,255,255,.6); }
   .header-btn:hover { background: rgba(255,255,255,.08); color: #fff; }
   .avatar-sm { width: 36px; height: 36px; font-size: .85rem; }
   /* Hide admin/settings/profile from header — sidebar handles these */
@@ -1160,12 +1164,14 @@ a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.cal-nav bu
     border-bottom: 1px solid rgba(255,255,255,.06);
     backdrop-filter: none;
   }
-  .header-logo img { height: auto; width: 320px; filter: brightness(0) invert(1); }
-  .header-logo span { display: none; }
-  .header-btn { width: 42px; height: 42px; color: rgba(255,255,255,.6); }
+  .header-logo-icon { height: 38px; width: 38px; }
+  .header-logo-text { display: flex; }
+  .header-company-name { font-size: .85rem; }
+  .header-company-tagline { font-size: .62rem; }
+  .header-btn { width: 40px; height: 40px; color: rgba(255,255,255,.6); }
   .header-btn:hover { background: rgba(255,255,255,.08); color: #fff; }
   .header-btn .badge { border-color: #1C1710; }
-  .avatar-sm { width: 40px; height: 40px; font-size: .9rem; }
+  .avatar-sm { width: 38px; height: 38px; font-size: .9rem; }
   /* Hide admin/settings/profile from header — sidebar handles these */
   #adminBtn, #settingsBtn, .header-actions .avatar-sm { display: none !important; }
 
@@ -1802,7 +1808,7 @@ textarea.form-control{resize:vertical}
 
 /* ===== HOME GRID — responsive breakpoint ===== */
 @media(max-width:430px){
-  .header-logo img{width:160px}
+  .header-logo-icon{height:30px;width:30px}
   .checkin-hero{min-height:160px}
   .checkin-hero-content{padding:18px 16px}
   .checkin-time{font-size:1.7rem}
@@ -1812,7 +1818,7 @@ textarea.form-control{resize:vertical}
 @media(max-width:320px){
   .home-grid{grid-template-columns:1fr}
   .home-quick-stats{grid-template-columns:1fr 1fr}
-  .header-logo img{width:130px}
+  .header-logo-icon{height:26px;width:26px}
   .checkin-hero{min-height:140px}
   .checkin-time{font-size:1.5rem}
   .greeting h1{font-size:1.3rem}
