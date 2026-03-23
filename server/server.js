@@ -9,6 +9,9 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Trust reverse proxy (Traefik/Nginx) for rate limiting + IP detection
+app.set('trust proxy', 1);
+
 // Security headers with CSP
 app.use(helmet({
   contentSecurityPolicy: {
