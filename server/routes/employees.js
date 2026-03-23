@@ -65,7 +65,44 @@ router.post('/', verifyToken, requireRole('MD', 'HR'), [
   }
 });
 
-// PUT /api/employees/:code — update (partial updates supported)
+// PUT /api/employees/:code/self — employee self-update (personal fields only)
+router.put('/:code/self', verifyToken, auditLog('update', 'employee'), async (req, res) => {
+  try {
+    if (req.user.empCode !== req.params.code) {
+      return res.status(403).json({ error: 'You can only update your own record' });
+    }
+    const [existing] = await pool.query('SELECT * FROM employees WHERE code = ?', [req.params.code]);
+    if (existing.length === 0) return res.status(404).json({ error: 'Employee not found' });
+    const cur = existing[0];
+    const b = req.body;
+    // Only allow personal fields
+    await pool.query(
+      `UPDATE employees SET phone=?, dob=?, present_address=?, permanent_address=?,
+       father_name=?, father_mobile=?, mother_name=?, mother_mobile=?,
+       spouse_name=?, spouse_mobile=?, blood_group=?, marital_status=?,
+       qualification=?, institution=?, year_of_passing=?,
+       previous_employer=?, previous_role=?, years_of_experience=? WHERE code=?`,
+      [
+        b.phone ?? cur.phone, b.dob ?? cur.dob,
+        b.presentAddress ?? cur.present_address, b.permanentAddress ?? cur.permanent_address,
+        b.fatherName ?? cur.father_name, b.fatherMobile ?? cur.father_mobile,
+        b.motherName ?? cur.mother_name, b.motherMobile ?? cur.mother_mobile,
+        b.spouseName ?? cur.spouse_name, b.spouseMobile ?? cur.spouse_mobile,
+        b.bloodGroup ?? cur.blood_group, b.maritalStatus ?? cur.marital_status,
+        b.qualification ?? cur.qualification, b.institution ?? cur.institution,
+        b.yearOfPassing ?? cur.year_of_passing,
+        b.previousEmployer ?? cur.previous_employer, b.previousRole ?? cur.previous_role,
+        b.yearsOfExperience ?? cur.years_of_experience, req.params.code
+      ]
+    );
+    res.json({ message: 'Personal details updated' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PUT /api/employees/:code — update (partial updates supported, MD/HR only)
 router.put('/:code', verifyToken, requireRole('MD', 'HR'), auditLog('update', 'employee'), async (req, res) => {
   try {
     // Fetch existing record to merge with partial updates
@@ -75,12 +112,27 @@ router.put('/:code', verifyToken, requireRole('MD', 'HR'), auditLog('update', 'e
     const b = req.body;
     const newRole = b.role ?? cur.role;
     const [result] = await pool.query(
-      `UPDATE employees SET name=?, dept=?, designation=?, salary=?, bank=?, acc_no=?, role=?, phone=?, doj=?, email=?, address=? WHERE code=?`,
+      `UPDATE employees SET name=?, dept=?, designation=?, salary=?, bank=?, acc_no=?, role=?, phone=?, doj=?, email=?, address=?,
+       dob=?, present_address=?, permanent_address=?, father_name=?, father_mobile=?,
+       mother_name=?, mother_mobile=?, spouse_name=?, spouse_mobile=?, blood_group=?,
+       pan=?, aadhaar=?, uan=?, qualification=?, institution=?, year_of_passing=?,
+       previous_employer=?, previous_role=?, years_of_experience=?, marital_status=? WHERE code=?`,
       [
         b.name ?? cur.name, b.dept ?? cur.dept, b.designation ?? cur.designation,
         b.salary ?? cur.salary, b.bank ?? cur.bank, b.accNo ?? cur.acc_no,
         newRole, b.phone ?? cur.phone, b.doj ?? cur.doj,
-        b.email ?? cur.email, b.address ?? cur.address, req.params.code
+        b.email ?? cur.email, b.address ?? cur.address,
+        b.dob ?? cur.dob, b.presentAddress ?? cur.present_address,
+        b.permanentAddress ?? cur.permanent_address,
+        b.fatherName ?? cur.father_name, b.fatherMobile ?? cur.father_mobile,
+        b.motherName ?? cur.mother_name, b.motherMobile ?? cur.mother_mobile,
+        b.spouseName ?? cur.spouse_name, b.spouseMobile ?? cur.spouse_mobile,
+        b.bloodGroup ?? cur.blood_group, b.pan ?? cur.pan, b.aadhaar ?? cur.aadhaar,
+        b.uan ?? cur.uan, b.qualification ?? cur.qualification,
+        b.institution ?? cur.institution, b.yearOfPassing ?? cur.year_of_passing,
+        b.previousEmployer ?? cur.previous_employer, b.previousRole ?? cur.previous_role,
+        b.yearsOfExperience ?? cur.years_of_experience, b.maritalStatus ?? cur.marital_status,
+        req.params.code
       ]
     );
     // Sync role to users table if role changed

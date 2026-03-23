@@ -573,3 +573,25 @@ CREATE INDEX idx_announce_read_emp ON announcement_reads(emp_code);
 CREATE INDEX idx_employees_dept ON employees(dept);
 CREATE INDEX idx_leave_app_emp_status ON leave_applications(emp_code, status);
 CREATE INDEX idx_notif_emp_read ON notifications(emp_code, is_read);
+
+-- Employee profile extended columns
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS dob DATE;
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS present_address TEXT;
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS permanent_address TEXT;
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS father_name VARCHAR(100);
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS father_mobile VARCHAR(20);
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS mother_name VARCHAR(100);
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS mother_mobile VARCHAR(20);
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS spouse_name VARCHAR(100);
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS spouse_mobile VARCHAR(20);
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS blood_group VARCHAR(5);
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS pan VARCHAR(20);
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS aadhaar VARCHAR(20);
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS uan VARCHAR(30);
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS qualification VARCHAR(200);
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS institution VARCHAR(200);
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS year_of_passing VARCHAR(10);
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS previous_employer VARCHAR(200);
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS previous_role VARCHAR(100);
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS years_of_experience DECIMAL(4,1);
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS marital_status VARCHAR(20);

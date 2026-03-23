@@ -5374,7 +5374,17 @@ function mapEmployee(row) {
     emergencyContact: row.emergency_contact || '', emergencyPhone: row.emergency_phone || '',
     photoUrl: row.photo_url || '',
     status: row.is_active === 0 ? 'Inactive' : 'Active',
-    dob: EMP_DOB_MAP[row.code] || row.dob || ''
+    dob: row.dob ? String(row.dob).substring(0, 10) : (EMP_DOB_MAP[row.code] || ''),
+    presentAddress: row.present_address || '', permanentAddress: row.permanent_address || '',
+    fatherName: row.father_name || '', fatherMobile: row.father_mobile || '',
+    motherName: row.mother_name || '', motherMobile: row.mother_mobile || '',
+    spouseName: row.spouse_name || '', spouseMobile: row.spouse_mobile || '',
+    bloodGroup: row.blood_group || '', pan: row.pan || '', aadhaar: row.aadhaar || '',
+    uan: row.uan || '', qualification: row.qualification || '',
+    institution: row.institution || '', yearOfPassing: row.year_of_passing || '',
+    previousEmployer: row.previous_employer || '', previousRole: row.previous_role || '',
+    yearsOfExperience: row.years_of_experience != null ? parseFloat(row.years_of_experience) : '',
+    maritalStatus: row.marital_status || ''
   };
 }
 function mapLeave(row) {
@@ -7171,6 +7181,7 @@ function ensureSelfData(code) {
 }
 function updatePersonalDetails() {
   var phoneEl = document.getElementById('ssPhone');
+  var dobEl = document.getElementById('ssDob');
   var presentAddrEl = document.getElementById('ssPresentAddress');
   var permanentAddrEl = document.getElementById('ssPermanentAddress');
   var sameAddrEl = document.getElementById('ssSameAddress');
@@ -7181,31 +7192,45 @@ function updatePersonalDetails() {
   var spouseNameEl = document.getElementById('ssSpouseName');
   var spouseMobileEl = document.getElementById('ssSpouseMobile');
   var bloodGroupEl = document.getElementById('ssBloodGroup');
-  if (!phoneEl || !presentAddrEl) { showToast('Error: form not found'); return; }
-  var selfData = ensureSelfData(currentUser.code);
-  Object.assign(selfData, {
+  var maritalEl = document.getElementById('ssMaritalStatus');
+  var qualEl = document.getElementById('ssQualification');
+  var instEl = document.getElementById('ssInstitution');
+  var yopEl = document.getElementById('ssYearOfPassing');
+  var prevEmpEl = document.getElementById('ssPrevEmployer');
+  var prevRoleEl = document.getElementById('ssPrevRole');
+  var yoeEl = document.getElementById('ssYearsExp');
+  if (!phoneEl) { showToast('Error: form not found'); return; }
+  var payload = {
     phone: phoneEl.value.trim(),
-    presentAddress: presentAddrEl.value.trim(),
+    dob: dobEl ? dobEl.value : '',
+    presentAddress: presentAddrEl ? presentAddrEl.value.trim() : '',
     permanentAddress: permanentAddrEl ? permanentAddrEl.value.trim() : '',
-    sameAddress: sameAddrEl ? sameAddrEl.checked : false,
     fatherName: fatherNameEl ? fatherNameEl.value.trim() : '',
     fatherMobile: fatherMobileEl ? fatherMobileEl.value.trim() : '',
     motherName: motherNameEl ? motherNameEl.value.trim() : '',
     motherMobile: motherMobileEl ? motherMobileEl.value.trim() : '',
     spouseName: spouseNameEl ? spouseNameEl.value.trim() : '',
     spouseMobile: spouseMobileEl ? spouseMobileEl.value.trim() : '',
-    bloodGroup: bloodGroupEl ? bloodGroupEl.value : ''
-  });
-  // Also update employee record if phone changed
+    bloodGroup: bloodGroupEl ? bloodGroupEl.value : '',
+    maritalStatus: maritalEl ? maritalEl.value : '',
+    qualification: qualEl ? qualEl.value.trim() : '',
+    institution: instEl ? instEl.value.trim() : '',
+    yearOfPassing: yopEl ? yopEl.value.trim() : '',
+    previousEmployer: prevEmpEl ? prevEmpEl.value.trim() : '',
+    previousRole: prevRoleEl ? prevRoleEl.value.trim() : '',
+    yearsOfExperience: yoeEl ? yoeEl.value : ''
+  };
+  // Update local employee record
   var emp = EMPLOYEES.find(function(e) { return e.code === currentUser.code; });
-  if (emp && selfData.phone) emp.phone = selfData.phone;
-  apiCall('PUT', '/employees/' + currentUser.code, {
-    phone: selfData.phone, presentAddress: selfData.presentAddress, permanentAddress: selfData.permanentAddress,
-    fatherName: selfData.fatherName, fatherMobile: selfData.fatherMobile,
-    motherName: selfData.motherName, motherMobile: selfData.motherMobile,
-    spouseName: selfData.spouseName, spouseMobile: selfData.spouseMobile,
-    bloodGroup: selfData.bloodGroup
-  }).catch(function(){});
+  if (emp) {
+    Object.keys(payload).forEach(function(k) { emp[k] = payload[k]; });
+    currentUser = Object.assign({}, currentUser, payload);
+  }
+  // Also keep selfData in sync for sameAddress checkbox
+  var selfData = ensureSelfData(currentUser.code);
+  selfData.sameAddress = sameAddrEl ? sameAddrEl.checked : false;
+  // Call self-update endpoint
+  apiCall('PUT', '/employees/' + currentUser.code + '/self', payload).catch(function(){});
   saveLocalOnlyData();
   showToast('Personal details saved successfully');
   var btn = document.querySelector('#selfServiceContent .ss-save-btn');
@@ -7228,31 +7253,91 @@ function renderSelfServiceOverlay() {
   var c = document.getElementById('selfServiceContent');
   if (!c || !currentUser) return;
   var selfData = ensureSelfData(currentUser.code);
+  var emp = EMPLOYEES.find(function(e) { return e.code === currentUser.code; }) || currentUser;
+  var isHrMd = currentUser.role === 'MD' || currentUser.role === 'HR';
   var html = '';
-  // Section A: Personal Information
-  html += '<div class="card" style="margin-bottom:12px"><div class="nf-section-title">Personal Information</div>';
-  html += '<div style="display:flex;gap:10px;align-items:center;margin-bottom:14px"><div class="avatar-sm" style="width:48px;height:48px;font-size:1rem">' + escapeHTML(currentUser.name.charAt(0)) + '</div><div><div style="font-weight:600">' + escapeHTML(currentUser.name) + '</div><div style="font-size:.75rem;color:var(--gray-500)">' + escapeHTML(currentUser.code) + ' &middot; ' + escapeHTML(currentUser.designation) + '</div></div></div>';
-  html += '<div class="ss-form-group"><label>Phone</label><input type="tel" id="ssPhone" value="' + escapeHTML(selfData.phone || currentUser.phone || '') + '" placeholder="Mobile number"></div>';
-  html += '<div class="ss-form-group"><label>Present Address</label><textarea id="ssPresentAddress" rows="2" placeholder="Current residential address">' + escapeHTML(selfData.presentAddress || selfData.address || '') + '</textarea></div>';
-  html += '<div class="ss-form-group"><label style="display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;font-size:.78rem"><input type="checkbox" id="ssSameAddress" onchange="handleSameAddress()"' + (selfData.sameAddress ? ' checked' : '') + '> Same as present address</label></div>';
-  html += '<div class="ss-form-group"><label>Permanent Address</label><textarea id="ssPermanentAddress" rows="2" placeholder="Permanent address"' + (selfData.sameAddress ? ' disabled' : '') + '>' + escapeHTML(selfData.permanentAddress || '') + '</textarea></div>';
-  // Emergency Contacts
-  html += '<div class="nf-section-title" style="margin-top:8px;font-size:.78rem">Emergency Contacts</div>';
-  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
-  html += '<div class="ss-form-group"><label>Father Name</label><input type="text" id="ssFatherName" value="' + escapeHTML(selfData.fatherName || '') + '" placeholder="Father name"></div>';
-  html += '<div class="ss-form-group"><label>Father Mobile</label><input type="tel" id="ssFatherMobile" value="' + escapeHTML(selfData.fatherMobile || '') + '" placeholder="Mobile"></div>';
-  html += '<div class="ss-form-group"><label>Mother Name</label><input type="text" id="ssMotherName" value="' + escapeHTML(selfData.motherName || '') + '" placeholder="Mother name"></div>';
-  html += '<div class="ss-form-group"><label>Mother Mobile</label><input type="tel" id="ssMotherMobile" value="' + escapeHTML(selfData.motherMobile || '') + '" placeholder="Mobile"></div>';
-  html += '<div class="ss-form-group"><label>Spouse Name</label><input type="text" id="ssSpouseName" value="' + escapeHTML(selfData.spouseName || '') + '" placeholder="Spouse name (optional)"></div>';
-  html += '<div class="ss-form-group"><label>Spouse Mobile</label><input type="tel" id="ssSpouseMobile" value="' + escapeHTML(selfData.spouseMobile || '') + '" placeholder="Mobile (optional)"></div>';
+
+  // Section 1: Profile Header Card
+  var statusClass = emp.status === 'Active' ? 'badge-approved' : 'badge-rejected';
+  html += '<div class="card" style="margin-bottom:12px">';
+  html += '<div style="display:flex;gap:14px;align-items:center">';
+  html += '<div class="avatar-sm" style="width:56px;height:56px;font-size:1.2rem;flex-shrink:0">' + escapeHTML(emp.name.charAt(0)) + '</div>';
+  html += '<div style="flex:1"><div style="font-weight:700;font-size:1rem">' + escapeHTML(emp.name) + '</div>';
+  html += '<div style="font-size:.78rem;color:var(--gray-500)">' + escapeHTML(emp.code) + ' &middot; ' + escapeHTML(emp.designation || 'Employee') + '</div>';
+  html += '<div style="font-size:.72rem;color:var(--gray-400);margin-top:2px">' + escapeHTML(emp.dept) + (emp.doj ? ' &middot; Joined ' + escapeHTML(emp.doj) : '') + '</div>';
   html += '</div>';
-  // Blood Group
+  html += '<span class="badge-status ' + statusClass + '" style="align-self:flex-start">' + escapeHTML(emp.status || 'Active') + '</span>';
+  html += '</div></div>';
+
+  // Section 2: Personal Information (editable)
+  html += '<div class="card" style="margin-bottom:12px"><div class="nf-section-title">Personal Information</div>';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+  html += '<div class="ss-form-group"><label>Date of Birth</label><input type="date" id="ssDob" value="' + escapeHTML(emp.dob || '') + '"></div>';
+  html += '<div class="ss-form-group"><label>Phone</label><input type="tel" id="ssPhone" value="' + escapeHTML(emp.phone || '') + '" placeholder="Mobile number"></div>';
+  html += '<div class="ss-form-group"><label>Email</label><div class="ss-readonly">' + escapeHTML(emp.email || 'Not set') + '</div></div>';
   html += '<div class="ss-form-group"><label>Blood Group</label><select class="nf-select" id="ssBloodGroup">';
   var bgs = ['', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
-  bgs.forEach(function(bg) { html += '<option value="' + bg + '"' + (selfData.bloodGroup === bg ? ' selected' : '') + '>' + (bg || 'Select blood group') + '</option>'; });
+  bgs.forEach(function(bg) { html += '<option value="' + bg + '"' + (emp.bloodGroup === bg ? ' selected' : '') + '>' + (bg || 'Select') + '</option>'; });
   html += '</select></div>';
-  html += '<button class="nf-btn nf-btn-primary ss-save-btn" onclick="updatePersonalDetails()">Save Changes</button></div>';
-  // Section B: Mandatory Documents
+  html += '<div class="ss-form-group"><label>Marital Status</label><select class="nf-select" id="ssMaritalStatus">';
+  var ms = ['', 'Single', 'Married', 'Divorced', 'Widowed'];
+  ms.forEach(function(s) { html += '<option value="' + s + '"' + (emp.maritalStatus === s ? ' selected' : '') + '>' + (s || 'Select') + '</option>'; });
+  html += '</select></div>';
+  html += '</div></div>';
+
+  // Section 3: Address (editable)
+  html += '<div class="card" style="margin-bottom:12px"><div class="nf-section-title">Address</div>';
+  html += '<div class="ss-form-group"><label>Present Address</label><textarea id="ssPresentAddress" rows="2" placeholder="Current residential address">' + escapeHTML(emp.presentAddress || selfData.presentAddress || '') + '</textarea></div>';
+  html += '<div class="ss-form-group"><label style="display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;font-size:.78rem"><input type="checkbox" id="ssSameAddress" onchange="handleSameAddress()"' + (selfData.sameAddress ? ' checked' : '') + '> Same as present address</label></div>';
+  html += '<div class="ss-form-group"><label>Permanent Address</label><textarea id="ssPermanentAddress" rows="2" placeholder="Permanent address"' + (selfData.sameAddress ? ' disabled' : '') + '>' + escapeHTML(emp.permanentAddress || selfData.permanentAddress || '') + '</textarea></div>';
+  html += '</div>';
+
+  // Section 4: Emergency Contacts (editable)
+  html += '<div class="card" style="margin-bottom:12px"><div class="nf-section-title">Emergency Contacts</div>';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+  html += '<div class="ss-form-group"><label>Father Name</label><input type="text" id="ssFatherName" value="' + escapeHTML(emp.fatherName || '') + '" placeholder="Father name"></div>';
+  html += '<div class="ss-form-group"><label>Father Mobile</label><input type="tel" id="ssFatherMobile" value="' + escapeHTML(emp.fatherMobile || '') + '" placeholder="Mobile"></div>';
+  html += '<div class="ss-form-group"><label>Mother Name</label><input type="text" id="ssMotherName" value="' + escapeHTML(emp.motherName || '') + '" placeholder="Mother name"></div>';
+  html += '<div class="ss-form-group"><label>Mother Mobile</label><input type="tel" id="ssMotherMobile" value="' + escapeHTML(emp.motherMobile || '') + '" placeholder="Mobile"></div>';
+  html += '<div class="ss-form-group"><label>Spouse Name</label><input type="text" id="ssSpouseName" value="' + escapeHTML(emp.spouseName || '') + '" placeholder="Spouse name (optional)"></div>';
+  html += '<div class="ss-form-group"><label>Spouse Mobile</label><input type="tel" id="ssSpouseMobile" value="' + escapeHTML(emp.spouseMobile || '') + '" placeholder="Mobile (optional)"></div>';
+  html += '</div></div>';
+
+  // Section 5: Official Details (read-only)
+  html += '<div class="card" style="margin-bottom:12px"><div class="nf-section-title">Official Details <span class="ss-info-badge">Contact HR to update</span></div>';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+  html += '<div class="ss-form-group"><label>Designation</label><div class="ss-readonly">' + escapeHTML(emp.designation || '-') + '</div></div>';
+  html += '<div class="ss-form-group"><label>Department</label><div class="ss-readonly">' + escapeHTML(emp.dept || '-') + '</div></div>';
+  html += '<div class="ss-form-group"><label>Date of Joining</label><div class="ss-readonly">' + escapeHTML(emp.doj || '-') + '</div></div>';
+  var salaryDisplay = isHrMd ? ('Rs.' + (emp.salary || 0).toLocaleString('en-IN')) : 'Rs.XX,XXX';
+  html += '<div class="ss-form-group"><label>Salary</label><div class="ss-readonly">' + escapeHTML(salaryDisplay) + '</div></div>';
+  html += '</div></div>';
+
+  // Section 6: Bank & Financial (read-only)
+  html += '<div class="card" style="margin-bottom:12px"><div class="nf-section-title">Bank & Financial <span class="ss-info-badge">Contact HR to update</span></div>';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+  html += '<div class="ss-form-group"><label>Bank Name</label><div class="ss-readonly">' + escapeHTML(emp.bank || '-') + '</div></div>';
+  var accDisplay = emp.accNo ? (isHrMd ? emp.accNo : emp.accNo.replace(/.(?=.{4})/g, 'X')) : '-';
+  html += '<div class="ss-form-group"><label>Account Number</label><div class="ss-readonly">' + escapeHTML(accDisplay) + '</div></div>';
+  html += '<div class="ss-form-group"><label>PAN</label><div class="ss-readonly">' + escapeHTML(emp.pan || '-') + '</div></div>';
+  html += '<div class="ss-form-group"><label>UAN</label><div class="ss-readonly">' + escapeHTML(emp.uan || '-') + '</div></div>';
+  var aadhaarDisplay = emp.aadhaar ? (isHrMd ? emp.aadhaar : emp.aadhaar.replace(/.(?=.{4})/g, 'X')) : '-';
+  html += '<div class="ss-form-group"><label>Aadhaar</label><div class="ss-readonly">' + escapeHTML(aadhaarDisplay) + '</div></div>';
+  html += '</div></div>';
+
+  // Section 7: Qualification & Experience (editable)
+  html += '<div class="card" style="margin-bottom:12px"><div class="nf-section-title">Qualification & Experience</div>';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+  html += '<div class="ss-form-group"><label>Qualification</label><input type="text" id="ssQualification" value="' + escapeHTML(emp.qualification || '') + '" placeholder="e.g. B.E Civil"></div>';
+  html += '<div class="ss-form-group"><label>Institution</label><input type="text" id="ssInstitution" value="' + escapeHTML(emp.institution || '') + '" placeholder="College / University"></div>';
+  html += '<div class="ss-form-group"><label>Year of Passing</label><input type="text" id="ssYearOfPassing" value="' + escapeHTML(emp.yearOfPassing || '') + '" placeholder="e.g. 2020"></div>';
+  html += '<div class="ss-form-group"><label>Years of Experience</label><input type="number" id="ssYearsExp" value="' + escapeHTML(String(emp.yearsOfExperience || '')) + '" placeholder="e.g. 5" step="0.5" min="0"></div>';
+  html += '<div class="ss-form-group"><label>Previous Employer</label><input type="text" id="ssPrevEmployer" value="' + escapeHTML(emp.previousEmployer || '') + '" placeholder="Last company name"></div>';
+  html += '<div class="ss-form-group"><label>Previous Role</label><input type="text" id="ssPrevRole" value="' + escapeHTML(emp.previousRole || '') + '" placeholder="Last designation"></div>';
+  html += '</div>';
+  html += '<button class="nf-btn nf-btn-primary ss-save-btn" style="margin-top:8px" onclick="updatePersonalDetails()">Save Changes</button></div>';
+
+  // Section 8: Mandatory Documents (existing)
   var docs = selfData.documents || {};
   var uploadedCount = MANDATORY_DOCS.filter(function(d) { return docs[d.key]; }).length;
   html += '<div class="card" style="margin-bottom:12px"><div class="nf-section-title">Mandatory Documents</div>';
@@ -7270,7 +7355,7 @@ function renderSelfServiceOverlay() {
     }
     html += '</div><div style="display:flex;align-items:center;gap:8px">';
     if (uploaded) {
-      html += '<span class="ss-doc-uploaded">Uploaded ✓</span>';
+      html += '<span class="ss-doc-uploaded">Uploaded &#10003;</span>';
       html += '<button class="nf-btn nf-btn-outline nf-btn-sm" onclick="uploadMandatoryDoc(\'' + doc.key + '\',\'' + escapeHTML(doc.label) + '\')">Re-upload</button>';
     } else {
       html += '<span class="ss-doc-required">Required</span>';

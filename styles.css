@@ -912,6 +912,8 @@ a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.cal-nav bu
 [data-theme="dark"] .ss-doc-row{border-bottom-color:rgba(255,255,255,.06)}
 [data-theme="dark"] .ss-completion-bar{background:var(--gray-200)}
 [data-theme="dark"] .ss-form-group select{background:var(--gray-100);border-color:var(--gray-200);color:var(--text)}
+[data-theme="dark"] .ss-readonly{background:var(--gray-100);border-color:var(--gray-200);color:var(--gray-400)}
+[data-theme="dark"] .ss-info-badge{background:var(--gray-200);color:var(--gray-400)}
 [data-theme="dark"] .tax-tab{background:var(--gray-100);color:var(--gray-400)}
 [data-theme="dark"] .tax-tab.active{background:var(--card);color:var(--primary)}
 [data-theme="dark"] .google-signin-btn{background:#2D2318;color:#e8eaed;border:1px solid rgba(255,255,255,.15);box-shadow:0 1px 3px rgba(0,0,0,.3)}
@@ -1551,6 +1553,8 @@ textarea.form-control{resize:vertical}
 .ss-completion-fill{height:100%;border-radius:2px;background:var(--success);transition:width .3s}
 .ss-form-group select{width:100%;padding:10px 12px;border:1.5px solid var(--gray-200);border-radius:var(--radius-xs);font-family:var(--font-body);font-size:.82rem;background:white;transition:border-color .2s}
 .ss-form-group select:focus{outline:none;border-color:var(--primary)}
+.ss-readonly{background:var(--gray-50);border:1px solid var(--gray-100);padding:10px 12px;border-radius:var(--radius-xs);font-size:.82rem;color:var(--gray-600);cursor:default;min-height:20px}
+.ss-info-badge{display:inline-block;font-size:.6rem;padding:2px 8px;border-radius:10px;background:var(--gray-100);color:var(--gray-500);margin-left:6px;vertical-align:middle;font-weight:400;text-transform:none;letter-spacing:0}
 
 /* ===== F4: GEO-FENCED ATTENDANCE ===== */
 .geofence-status{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:16px;font-size:.7rem;font-weight:600}
@@ -1803,6 +1807,7 @@ textarea.form-control{resize:vertical}
   .checkin-hero-content{padding:18px 16px}
   .checkin-time{font-size:1.7rem}
   .checkin-actions .btn{padding:9px 14px;font-size:.78rem}
+  #selfServiceContent .card div[style*="grid-template-columns"]{grid-template-columns:1fr !important}
 }
 @media(max-width:320px){
   .home-grid{grid-template-columns:1fr}
