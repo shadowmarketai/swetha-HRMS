@@ -16,6 +16,33 @@ const pool = mysql.createPool({
   keepAliveInitialDelay: 0
 });
 
+// Run idempotent migrations on existing databases
+async function runMigrations(conn) {
+  const migrations = [
+    {
+      name: 'add_manager_role_to_employees',
+      sql: "ALTER TABLE employees MODIFY COLUMN role ENUM('MD','HR','Manager','Employee') DEFAULT 'Employee'"
+    },
+    {
+      name: 'add_manager_role_to_users',
+      sql: "ALTER TABLE users MODIFY COLUMN role ENUM('MD','HR','Manager','Employee') DEFAULT 'Employee'"
+    }
+  ];
+  let applied = 0;
+  for (const m of migrations) {
+    try {
+      await conn.query(m.sql);
+      applied++;
+    } catch (err) {
+      // Ignore if already applied or table doesn't exist yet
+      if (err.errno !== 1146) {
+        console.error('Migration "' + m.name + '" error:', err.message);
+      }
+    }
+  }
+  if (applied > 0) console.log('Migrations: ' + applied + ' applied');
+}
+
 // Auto-initialize schema if tables are missing
 async function initSchema() {
   let conn;
@@ -63,6 +90,9 @@ async function initSchema() {
     } else {
       console.log('Database has', tables.length, 'tables — schema OK');
     }
+
+    // Run pending migrations (idempotent)
+    await runMigrations(conn);
   } catch (err) {
     console.error('MySQL connection/init failed:', err.message);
     console.log('Server will continue without database — localStorage fallback active');

@@ -521,6 +521,32 @@ body{font-family:var(--font-body);color:var(--text);background:#E8EAF0;display:f
 [data-theme="dark"] .emp-detail-expanded{background:var(--gray-800);border-color:var(--gray-700)}
 [data-theme="dark"] .emp-detail-input{background:var(--gray-900);border-color:var(--gray-700);color:var(--gray-200)}
 @media(max-width:430px){.emp-detail-grid{grid-template-columns:1fr}}
+/* Employee Detail Modal */
+.edm-header{display:flex;flex-direction:column;align-items:center;padding:20px 16px 16px;gap:8px}
+.edm-avatar{width:64px;height:64px;border-radius:18px;display:flex;align-items:center;justify-content:center;color:white;font-weight:700;font-size:1.4rem}
+.edm-name{font-size:1.1rem;font-weight:700;color:var(--gray-900);font-family:var(--font-display);text-align:center}
+.edm-subtitle{font-size:.75rem;color:var(--gray-500);text-align:center}
+.edm-badges{display:flex;gap:6px;margin-top:4px}
+.edm-section{padding:0 16px 16px}
+.edm-section-title{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--primary);margin-bottom:8px;padding-bottom:4px;border-bottom:1.5px solid var(--gray-100)}
+.edm-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.edm-field{padding:6px 8px;background:var(--gray-50);border-radius:var(--radius-xs)}
+.edm-field-label{font-size:.58rem;font-weight:600;color:var(--gray-400);text-transform:uppercase;letter-spacing:.04em}
+.edm-field-value{font-size:.78rem;color:var(--gray-800);font-weight:500;margin-top:1px;word-break:break-word}
+.edm-field.full{grid-column:1 / -1}
+[data-theme="dark"] .edm-name{color:var(--gray-100)}
+[data-theme="dark"] .edm-section-title{color:var(--primary-light,#F59E0B);border-color:var(--gray-700)}
+[data-theme="dark"] .edm-field{background:var(--gray-800)}
+[data-theme="dark"] .edm-field-label{color:var(--gray-500)}
+[data-theme="dark"] .edm-field-value{color:var(--gray-200)}
+@media(max-width:430px){.edm-grid{grid-template-columns:1fr}}
+/* Roles tab clickable name */
+.emp-name-link{cursor:pointer;color:var(--gray-900);transition:color .2s}
+.emp-name-link:hover{color:var(--primary);text-decoration:underline}
+[data-theme="dark"] .emp-name-link{color:var(--gray-100)}
+[data-theme="dark"] .emp-name-link:hover{color:var(--primary-light,#F59E0B)}
+/* Temporary MD badge */
+.role-badge.temp-md{background:linear-gradient(135deg,#F59E0B,#D97706);color:white;font-size:.58rem;padding:2px 6px;border-radius:8px}
 /* Admin Panel */
 .admin-section{padding:16px}
 .admin-section .section-title{margin-top:8px}

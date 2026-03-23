@@ -30,7 +30,12 @@ function verifyToken(req, res, next) {
 
 function requireRole(...roles) {
   return (req, res, next) => {
-    if (!req.user || !roles.includes(req.user.role)) {
+    if (!req.user) {
+      return res.status(403).json({ error: 'Insufficient permissions' });
+    }
+    // Manager has same backend access as HR
+    const effectiveRole = req.user.role === 'Manager' && roles.includes('HR') ? 'HR' : req.user.role;
+    if (!roles.includes(effectiveRole)) {
       return res.status(403).json({ error: 'Insufficient permissions' });
     }
     next();

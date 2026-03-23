@@ -272,6 +272,32 @@ const NAV_CONFIG = {
     { id:'emp-profile', label:'Profile', icon:'profile', action:{type:'overlay',target:'profile'}, isFooter:true },
     { id:'emp-settings', label:'Settings', icon:'settings', action:{type:'overlay',target:'settings'}, isFooter:true },
     { id:'emp-logout', label:'Log Out', icon:'logout', action:{type:'logout'}, isFooter:true, isDanger:true }
+  ],
+  Manager: [
+    { id:'home', label:'Home', icon:'home', action:{type:'tab',target:'home'} },
+    { id:'mgr-attendance', label:'Attendance', icon:'attendance', children:[
+      { id:'mgr-att-self', label:'Self Calendar', action:{type:'tab',target:'attendance'} },
+      { id:'mgr-att-leave', label:'Apply Leave', action:{type:'tab',target:'leaves'} },
+      { id:'mgr-att-emp', label:'Employee Attendance', action:{type:'tab',target:'attendance'} },
+      { id:'mgr-att-leavereq', label:'Employee Leave Req', action:{type:'tab',target:'leaves'} }
+    ]},
+    { id:'mgr-advance', label:'Advance', icon:'advance', children:[
+      { id:'mgr-adv-salary', label:'Salary Advance', action:{type:'tab',target:'advance'} },
+      { id:'mgr-adv-requests', label:'Approve Requests', action:{type:'overlay',target:'advance-requests'} }
+    ]},
+    { id:'mgr-performance', label:'Employee Performance', icon:'performance', children:[
+      { id:'mgr-perf-track', label:'Performance Review', action:{type:'overlay',target:'hr-kpi'} }
+    ]},
+    { id:'mgr-orgchart', label:'Org Chart', icon:'orgchart', action:{type:'tab',target:'orgchart'} },
+    { id:'mgr-salary', label:'Salary', icon:'salary', children:[
+      { id:'mgr-sal-self', label:'Self Salary', action:{type:'tab',target:'salary'} },
+      { id:'mgr-sal-list', label:'Employee List', action:{type:'tab',target:'salary'} }
+    ]},
+    { id:'mgr-progress', label:'Progress', icon:'progress', action:{type:'tab',target:'progress'} },
+    // Footer
+    { id:'mgr-profile', label:'Profile', icon:'profile', action:{type:'overlay',target:'profile'}, isFooter:true },
+    { id:'mgr-settings', label:'Settings', icon:'settings', action:{type:'overlay',target:'settings'}, isFooter:true },
+    { id:'mgr-logout', label:'Log Out', icon:'logout', action:{type:'logout'}, isFooter:true, isDanger:true }
   ]
 };
 
@@ -740,18 +766,20 @@ function applyRole() {
   const role = currentUser.role;
   const isMD = role === 'MD';
   const isHR = role === 'HR';
-  const isMDorHR = isMD || isHR;
+  const isManager = role === 'Manager';
+  const isMDorHR = isMD || isHR || isManager;
+  const isTempMD = isTemporaryMD();
 
   // Role badge
   const badge = document.getElementById('roleBadge');
-  badge.textContent = role;
+  badge.textContent = isTempMD ? 'Temp MD' : role;
   badge.className = 'role-badge ' + role.toLowerCase();
 
   // Header avatar
   const initials = currentUser.name.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
   document.getElementById('headerAvatar').textContent = initials;
 
-  // Admin button (MD only)
+  // Admin button (MD only — primary MD always, temp MD gets view/edit but no delete)
   document.getElementById('adminBtn').style.display = isMD ? '' : 'none';
   // Settings button (all roles including MD)
   document.getElementById('settingsBtn').style.display = '';
@@ -1158,8 +1186,8 @@ let _overlayPreviousFocus = [];
 function showOverlay(id) {
   if (id === 'admin' && currentUser.role !== 'MD') return;
   if (id === 'location' && currentUser.role !== 'MD') return;
-  if (id === 'onboarding' && currentUser.role !== 'MD' && currentUser.role !== 'HR') return;
-  if (id === 'advance-requests' && currentUser.role !== 'MD' && currentUser.role !== 'HR') return;
+  if (id === 'onboarding' && currentUser.role !== 'MD' && currentUser.role !== 'HR' && currentUser.role !== 'Manager') return;
+  if (id === 'advance-requests' && currentUser.role !== 'MD' && currentUser.role !== 'HR' && currentUser.role !== 'Manager') return;
   // Render content (wrapped in try-catch so errors don't block overlay display)
   try {
     if (id === 'profile') renderProfileOverlay();
@@ -1471,28 +1499,136 @@ function renderAdminPanel() {
   renderAllEmpList();
 }
 
+// Check if current user is a temporary MD (not the original MD001)
+function isTemporaryMD(user) {
+  if (!user) user = currentUser;
+  return user && user.role === 'MD' && user.code !== 'MD001';
+}
+
 function renderRolesList() {
   const container = document.getElementById('rolesList');
   const colors = ['#E85D04','#22C55E','#F59E0B','#EF4444','#14B8A6','#EC4899','#D62828'];
   container.innerHTML = EMPLOYEES.map((e,i) => {
     const c = colors[i % colors.length];
     const init = e.name.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
+    const isMD001 = e.code === 'MD001';
+    const tempBadge = (e.role === 'MD' && !isMD001) ? ' <span class="role-badge temp-md">Temp</span>' : '';
     return `<div class="emp-list-item">
       <div class="emp-avatar" style="background:${c}">${init}</div>
-      <div class="emp-details"><h4>${e.name}</h4><p>${e.code} &middot; ${e.dept}</p></div>
-      <select class="emp-role-select" onchange="changeRole(${i},this.value)">
+      <div class="emp-details">
+        <h4><span class="emp-name-link" onclick="event.stopPropagation();showEmployeeDetailModal('${e.code}')">${escapeHTML(e.name)}</span>${tempBadge}</h4>
+        <p>${e.code} &middot; ${escapeHTML(e.dept)} &middot; ${escapeHTML(e.designation)}</p>
+      </div>
+      ${isMD001 ? '<span class="role-badge md" style="font-size:.65rem">Primary MD</span>' :
+        `<select class="emp-role-select" onclick="event.stopPropagation()" onchange="changeRole(${i},this.value)">
         <option value="Employee"${e.role==='Employee'?' selected':''}>Employee</option>
         <option value="HR"${e.role==='HR'?' selected':''}>HR</option>
         <option value="Manager"${e.role==='Manager'?' selected':''}>Manager</option>
         <option value="MD"${e.role==='MD'?' selected':''}>MD</option>
-      </select>
+      </select>`}
     </div>`;
   }).join('');
 }
 
-function changeRole(idx, newRole) {
-  EMPLOYEES[idx].role = newRole;
-  showToast(EMPLOYEES[idx].name + ' role changed to ' + newRole);
+async function changeRole(idx, newRole) {
+  var emp = EMPLOYEES[idx];
+  if (!emp) return;
+  if (emp.code === 'MD001') { showToast('Cannot change the primary MD role'); return; }
+  var oldRole = emp.role;
+  var confirmMsg = 'Change ' + emp.name + ' role from ' + oldRole + ' to ' + newRole + '?';
+  if (newRole === 'MD') {
+    confirmMsg += '\n\nNote: This will be a Temporary MD with edit-only access (no delete permissions).';
+  }
+  if (!confirm(confirmMsg)) {
+    // Reset the select back
+    renderRolesList();
+    return;
+  }
+  try {
+    await apiCall('PUT', '/employees/' + emp.code, { role: newRole });
+    emp.role = newRole;
+    showToast(emp.name + ' role changed to ' + newRole + (newRole === 'MD' ? ' (Temporary)' : ''));
+    renderRolesList();
+  } catch (e) {
+    showToast(e.message || 'Error changing role');
+    renderRolesList();
+  }
+}
+
+// Employee Detail Modal — shows full personal details
+function showEmployeeDetailModal(empCode) {
+  var emp = EMPLOYEES.find(function(e) { return e.code === empCode; });
+  if (!emp) return;
+  var ext = getExtendedData(empCode);
+  var container = document.getElementById('empDetailModalContent');
+  if (!container) return;
+
+  var colors = ['#E85D04','#22C55E','#F59E0B','#EF4444','#14B8A6','#EC4899','#D62828'];
+  var idx = EMPLOYEES.indexOf(emp);
+  var avatarColor = colors[(idx >= 0 ? idx : 0) % colors.length];
+  var init = emp.name.split(' ').map(function(w){return w[0];}).join('').substring(0,2).toUpperCase();
+
+  var statusBadge = emp.status === 'Inactive'
+    ? '<span style="font-size:.6rem;padding:2px 8px;border-radius:8px;background:#EF4444;color:#fff">Inactive</span>'
+    : '<span style="font-size:.6rem;padding:2px 8px;border-radius:8px;background:#22C55E;color:#fff">Active</span>';
+
+  var roleBadge = '<span class="role-badge ' + (emp.role || 'employee').toLowerCase() + '">' + escapeHTML(emp.role) + '</span>';
+  if (emp.role === 'MD' && emp.code !== 'MD001') {
+    roleBadge += ' <span class="role-badge temp-md">Temporary</span>';
+  }
+
+  function field(label, value, full) {
+    return '<div class="edm-field' + (full ? ' full' : '') + '"><div class="edm-field-label">' + escapeHTML(label) + '</div><div class="edm-field-value">' + escapeHTML(String(value || 'N/A')) + '</div></div>';
+  }
+
+  var html = '<div class="edm-header">';
+  html += '<div class="edm-avatar" style="background:' + avatarColor + '">' + init + '</div>';
+  html += '<div class="edm-name">' + escapeHTML(emp.name) + '</div>';
+  html += '<div class="edm-subtitle">' + escapeHTML(emp.designation) + ' &middot; ' + escapeHTML(emp.dept) + '</div>';
+  html += '<div class="edm-badges">' + roleBadge + statusBadge + '</div>';
+  html += '</div>';
+
+  // Basic Info
+  html += '<div class="edm-section"><div class="edm-section-title">Basic Information</div><div class="edm-grid">';
+  html += field('Employee Code', emp.code);
+  html += field('Department', emp.dept);
+  html += field('Designation', emp.designation);
+  html += field('Date of Joining', emp.doj);
+  html += field('Salary', emp.salary ? 'Rs.' + Number(emp.salary).toLocaleString('en-IN') : 'N/A');
+  html += field('Role', emp.role);
+  html += '</div></div>';
+
+  // Contact Info
+  html += '<div class="edm-section"><div class="edm-section-title">Contact Information</div><div class="edm-grid">';
+  html += field('Phone', emp.phone);
+  html += field('Email', emp.email);
+  html += field('Emergency Contact', ext.emergencyContact);
+  html += field('Address', ext.address, true);
+  html += '</div></div>';
+
+  // Family Info
+  html += '<div class="edm-section"><div class="edm-section-title">Family Details</div><div class="edm-grid">';
+  html += field('Father\'s Name', ext.fatherName);
+  html += field('Mother\'s Name', ext.motherName);
+  html += field('Blood Group', ext.bloodGroup);
+  html += '</div></div>';
+
+  // Identity Documents
+  html += '<div class="edm-section"><div class="edm-section-title">Identity & Statutory</div><div class="edm-grid">';
+  html += field('Aadhaar', ext.aadhaar);
+  html += field('PAN', ext.pan);
+  html += field('UAN (PF)', ext.uan);
+  html += field('ESI No', ext.esiNo);
+  html += '</div></div>';
+
+  // Bank Details
+  html += '<div class="edm-section"><div class="edm-section-title">Bank Details</div><div class="edm-grid">';
+  html += field('Bank', emp.bank || 'Indian Bank');
+  html += field('Account No', emp.accNo || 'N/A');
+  html += '</div></div>';
+
+  container.innerHTML = html;
+  showOverlay('emp-detail');
 }
 
 function renderDeptsList() {
@@ -1557,7 +1693,8 @@ function renderAllEmpList() {
   const container = document.getElementById('allEmpList');
   const colors = ['#E85D04','#D62828','#14B8A6','#22C55E','#EC4899'];
   const isMD = currentUser && currentUser.role === 'MD';
-  const isHRorMD = currentUser && (currentUser.role === 'MD' || currentUser.role === 'HR');
+  const canDelete = isMD && !isTemporaryMD();
+  const isHRorMD = currentUser && (currentUser.role === 'MD' || currentUser.role === 'HR' || currentUser.role === 'Manager');
   let html = '';
   departments.forEach((dept, di) => {
     const emps = EMPLOYEES.filter(e => e.dept === dept);
@@ -1576,7 +1713,7 @@ function renderAllEmpList() {
         actions = `<div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">
           <button onclick="deactivateEmployee('${e.code}')" style="font-size:.6rem;padding:3px 8px;border:1px solid ${toggleColor};color:${toggleColor};background:transparent;border-radius:6px;cursor:pointer">${toggleLabel}</button>
           <button onclick="resetEmployeePassword('${e.code}')" style="font-size:.6rem;padding:3px 8px;border:1px solid #3B82F6;color:#3B82F6;background:transparent;border-radius:6px;cursor:pointer">Reset Pwd</button>
-          ${isMD ? `<button onclick="deleteEmployeePermanently('${e.code}')" style="font-size:.6rem;padding:3px 8px;border:1px solid #EF4444;color:#EF4444;background:transparent;border-radius:6px;cursor:pointer">Delete</button>` : ''}
+          ${canDelete ? `<button onclick="deleteEmployeePermanently('${e.code}')" style="font-size:.6rem;padding:3px 8px;border:1px solid #EF4444;color:#EF4444;background:transparent;border-radius:6px;cursor:pointer">Delete</button>` : ''}
         </div>`;
       }
       html += `<div class="emp-list-item" style="${isInactive ? 'opacity:.6' : ''}" ${isHRorMD ? 'onclick="toggleEmpDetail(\'' + e.code + '\', this)"' : ''}>
@@ -1715,6 +1852,7 @@ async function deactivateEmployee(code) {
 
 async function deleteEmployeePermanently(code) {
   if (!currentUser || currentUser.role !== 'MD') { showToast('Only MD can delete employees'); return; }
+  if (isTemporaryMD()) { showToast('Temporary MD does not have delete permissions'); return; }
   if (code === 'MD001') { showToast('Cannot delete MD account'); return; }
   var emp = EMPLOYEES.find(function(e) { return e.code === code; });
   if (!emp) return;
@@ -3178,6 +3316,7 @@ async function reopenJobPosting(id) {
 }
 
 async function deleteJobPosting(id) {
+  if (isTemporaryMD()) { showToast('Temporary MD does not have delete permissions'); return; }
   var job = JOB_POSTINGS.find(function(j){return j.id===id;});
   if (!job) return;
   var candCount = CANDIDATES.filter(function(c){return c.jobId===id;}).length;
@@ -3973,13 +4112,12 @@ async function initAnalyticsCharts(m) {
 (function() {
   var _originalShowOverlay = showOverlay;
   showOverlay = function(id) {
-    if (id === 'hr-recruit' && currentUser && currentUser.role !== 'MD' && currentUser.role !== 'HR') {
-      showToast('Access restricted to MD and HR');
-      return;
+    var _isManagement = currentUser && (currentUser.role === 'MD' || currentUser.role === 'HR' || currentUser.role === 'Manager');
+    if (id === 'hr-recruit' && currentUser && !_isManagement) {
+      showToast('Access restricted to Management'); return;
     }
-    if (id === 'hr-analytics' && currentUser && currentUser.role !== 'MD' && currentUser.role !== 'HR') {
-      showToast('Access restricted to MD and HR');
-      return;
+    if (id === 'hr-analytics' && currentUser && !_isManagement) {
+      showToast('Access restricted to Management'); return;
     }
 
     if (id === 'hr-kpi') renderKpiOverlay();
@@ -3990,17 +4128,17 @@ async function initAnalyticsCharts(m) {
     if (id === 'hr-analytics') renderAnalyticsOverlay();
 
     // New feature overlays (F1-F11)
-    if (id === 'hr-shifts' && currentUser && currentUser.role !== 'MD' && currentUser.role !== 'HR') {
-      showToast('Access restricted to MD and HR'); return;
+    if (id === 'hr-shifts' && currentUser && !_isManagement) {
+      showToast('Access restricted to Management'); return;
     }
-    if (id === 'hr-compliance' && currentUser && currentUser.role !== 'MD' && currentUser.role !== 'HR') {
-      showToast('Access restricted to MD and HR'); return;
+    if (id === 'hr-compliance' && currentUser && !_isManagement) {
+      showToast('Access restricted to Management'); return;
     }
-    if (id === 'hr-assets' && currentUser && currentUser.role !== 'MD' && currentUser.role !== 'HR') {
-      showToast('Access restricted to MD and HR'); return;
+    if (id === 'hr-assets' && currentUser && !_isManagement) {
+      showToast('Access restricted to Management'); return;
     }
-    if (id === 'hr-exit' && currentUser && currentUser.role !== 'MD' && currentUser.role !== 'HR') {
-      showToast('Access restricted to MD and HR'); return;
+    if (id === 'hr-exit' && currentUser && !_isManagement) {
+      showToast('Access restricted to Management'); return;
     }
     if (id === 'hr-shifts') renderShiftsOverlay();
     if (id === 'hr-expenses') renderExpenseOverlay();
@@ -6855,6 +6993,7 @@ function editShiftType(code) {
 }
 
 function deleteShiftType(code) {
+  if (isTemporaryMD()) { showToast('Temporary MD does not have delete permissions'); return; }
   if (SHIFT_TYPES.length <= 1) { showToast('Cannot delete the last shift type'); return; }
   var shift = SHIFT_TYPES.find(function(s){return s.code===code;});
   if (!shift) return;
@@ -7528,6 +7667,7 @@ function editGeofenceSite(idx) {
 }
 
 function deleteGeofenceSite(idx) {
+  if (isTemporaryMD()) { showToast('Temporary MD does not have delete permissions'); return; }
   var site = siteLocations[idx];
   if (!site) return;
   if (!confirm('Delete site "' + site.name + '"?')) return;
@@ -8529,6 +8669,7 @@ async function createAnnouncement() {
   } catch (e) { showToast(e.message || 'Error creating announcement'); }
 }
 async function deleteAnnouncement(id) {
+  if (isTemporaryMD()) { showToast('Temporary MD does not have delete permissions'); return; }
   if (!confirm('Delete this announcement?')) return;
   try {
     await apiCall('DELETE', '/announcements/' + id, {});
@@ -8959,6 +9100,7 @@ function saveProject(editId) {
 
 function deleteProject(id) {
   if (!currentUser || currentUser.role !== 'MD') { showToast('Only MD can delete projects'); return; }
+  if (isTemporaryMD()) { showToast('Temporary MD does not have delete permissions'); return; }
   if (!confirm('Delete this project permanently?')) return;
   projects = projects.filter(function(p){return p.id !== id;});
   delete projectTaskNextIds[id];

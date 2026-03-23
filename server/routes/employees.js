@@ -73,15 +73,20 @@ router.put('/:code', verifyToken, requireRole('MD', 'HR'), auditLog('update', 'e
     if (existing.length === 0) return res.status(404).json({ error: 'Employee not found' });
     const cur = existing[0];
     const b = req.body;
+    const newRole = b.role ?? cur.role;
     const [result] = await pool.query(
       `UPDATE employees SET name=?, dept=?, designation=?, salary=?, bank=?, acc_no=?, role=?, phone=?, doj=?, email=?, address=? WHERE code=?`,
       [
         b.name ?? cur.name, b.dept ?? cur.dept, b.designation ?? cur.designation,
         b.salary ?? cur.salary, b.bank ?? cur.bank, b.accNo ?? cur.acc_no,
-        b.role ?? cur.role, b.phone ?? cur.phone, b.doj ?? cur.doj,
+        newRole, b.phone ?? cur.phone, b.doj ?? cur.doj,
         b.email ?? cur.email, b.address ?? cur.address, req.params.code
       ]
     );
+    // Sync role to users table if role changed
+    if (b.role && b.role !== cur.role) {
+      await pool.query('UPDATE users SET role = ? WHERE emp_code = ?', [newRole, req.params.code]);
+    }
     res.json({ message: 'Employee updated' });
   } catch (err) {
     console.error(err);
