@@ -648,3 +648,88 @@ CREATE TABLE IF NOT EXISTS project_materials (
   remaining DECIMAL(12,2) DEFAULT 0,
   FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
 );
+
+-- SiteTrack: Add new columns to projects
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS contractor_name VARCHAR(255) DEFAULT 'Swetha Structures Pvt Ltd';
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS site_location VARCHAR(500);
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS project_lead VARCHAR(100);
+
+-- SiteTrack: WBS Tasks (hierarchical work breakdown structure)
+CREATE TABLE IF NOT EXISTS wbs_tasks (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  project_id INT NOT NULL,
+  wbs_code VARCHAR(50) NOT NULL,
+  level INT DEFAULT 1,
+  task_name VARCHAR(500) NOT NULL,
+  lead VARCHAR(255),
+  predecessor VARCHAR(50),
+  start_date DATE, end_date DATE,
+  actual_start DATE, actual_end DATE,
+  planned_days INT, work_days INT,
+  progress_pct FLOAT DEFAULT 0,
+  status ENUM('pending','in_progress','completed') DEFAULT 'pending',
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  INDEX ix_wbs_proj_code (project_id, wbs_code)
+);
+
+-- SiteTrack: BOQ Sheets (civil, peb, mezzanine_civil, mezzanine_peb)
+CREATE TABLE IF NOT EXISTS boq_sheets (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  project_id INT NOT NULL,
+  sheet_type VARCHAR(30) NOT NULL,
+  title VARCHAR(500) NOT NULL,
+  area_sqft FLOAT, quoted_rate_per_sqft FLOAT,
+  total_planned_amount FLOAT DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  INDEX ix_boq_proj (project_id)
+);
+
+-- SiteTrack: BOQ Items (line items within sheets)
+CREATE TABLE IF NOT EXISTS boq_items (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  boq_sheet_id INT NOT NULL,
+  project_id INT NOT NULL,
+  item_no VARCHAR(50), is_category TINYINT(1) DEFAULT 0,
+  description VARCHAR(2000), unit VARCHAR(50),
+  planned_qty FLOAT DEFAULT 0, rate FLOAT DEFAULT 0,
+  planned_amount FLOAT DEFAULT 0,
+  actual_qty_used FLOAT DEFAULT 0,
+  is_pending TINYINT(1) DEFAULT 0,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (boq_sheet_id) REFERENCES boq_sheets(id) ON DELETE CASCADE,
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  INDEX ix_boqi_sheet (boq_sheet_id), INDEX ix_boqi_proj (project_id)
+);
+
+-- SiteTrack: Usage Logs (material usage per BOQ item)
+CREATE TABLE IF NOT EXISTS usage_logs (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  boq_item_id INT NOT NULL,
+  project_id INT NOT NULL,
+  qty_used FLOAT NOT NULL,
+  note VARCHAR(1000),
+  logged_by VARCHAR(20),
+  logged_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (boq_item_id) REFERENCES boq_items(id) ON DELETE CASCADE,
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  INDEX ix_usage_item (boq_item_id)
+);
+
+-- SiteTrack: Daily Work Logs
+CREATE TABLE IF NOT EXISTS daily_work_logs (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  project_id INT NOT NULL,
+  task_id INT,
+  log_date DATE NOT NULL,
+  logged_by VARCHAR(100) NOT NULL,
+  workers_count INT, weather VARCHAR(50),
+  work_description TEXT NOT NULL,
+  materials_note TEXT, progress_update FLOAT, remarks TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  FOREIGN KEY (task_id) REFERENCES wbs_tasks(id) ON DELETE SET NULL,
+  INDEX ix_dl_proj_date (project_id, log_date)
+);

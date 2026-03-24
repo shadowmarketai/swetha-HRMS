@@ -1730,3 +1730,89 @@ textarea.form-control{resize:vertical}
   .checkin-time{font-size:1.5rem}
   .greeting h1{font-size:1.3rem}
 }
+
+/* =====================================================
+   SITETRACK: Gantt Chart
+   ===================================================== */
+.gantt-container{overflow-x:auto;margin:10px 0;font-size:.72rem}
+.gantt-header-row,.gantt-task-row{display:flex;align-items:stretch;min-height:28px}
+.gantt-name-col{width:180px;min-width:180px;padding:4px 8px;border-right:1px solid var(--gray-200);display:flex;align-items:center;font-size:.7rem}
+.gantt-weeks-col{flex:1;display:flex;position:relative;min-width:300px}
+.gantt-week-label{flex:1;text-align:center;font-size:.6rem;color:var(--gray-400);padding:2px 0;border-right:1px solid var(--gray-100)}
+.gantt-task-row{border-bottom:1px solid var(--gray-100)}
+.gantt-task-row:hover{background:var(--bg)}
+.gantt-task-label{font-size:.68rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gantt-timeline{flex:1;position:relative;min-height:22px}
+.gantt-bar-planned{position:absolute;top:4px;height:14px;border-radius:7px;background:var(--gray-200);overflow:hidden}
+.gantt-bar-fill{height:100%;border-radius:7px;transition:width .3s ease}
+.gantt-bar-pct{position:absolute;right:4px;top:1px;font-size:.55rem;color:#fff;font-weight:600}
+.gantt-today-line{position:absolute;top:-200px;bottom:0;width:2px;background:var(--danger);z-index:5}
+.gantt-today-tip{position:absolute;top:-2px;left:4px;font-size:.55rem;color:var(--danger);font-weight:600;white-space:nowrap}
+.gantt-legend{display:flex;gap:12px;padding:8px 0;font-size:.65rem;color:var(--gray-500);flex-wrap:wrap}
+
+/* =====================================================
+   SITETRACK: WBS Table
+   ===================================================== */
+.wbs-level-1 td:first-child,.wbs-level-1 .gantt-task-label{padding-left:8px;font-weight:700}
+.wbs-level-2 td:first-child,.wbs-level-2 .gantt-task-label{padding-left:24px}
+.wbs-level-3 td:first-child,.wbs-level-3 .gantt-task-label{padding-left:40px}
+
+/* =====================================================
+   SITETRACK: BOQ Styles
+   ===================================================== */
+.boq-table{border-collapse:collapse;width:100%}
+.boq-table th,.boq-table td{padding:6px 8px;border-bottom:1px solid var(--gray-100);text-align:left}
+.boq-table th{background:var(--bg);font-weight:600;font-size:.68rem;color:var(--gray-500);position:sticky;top:0}
+.boq-table tr:hover{background:var(--bg)}
+.boq-category td{font-weight:700;background:var(--bg) !important;font-size:.72rem}
+.boq-overuse td{background:rgba(239,68,68,0.06)}
+.boq-pending-row td{border-left:3px solid var(--warning)}
+.delta-over{color:var(--danger);font-weight:600;font-size:.68rem}
+.delta-under{color:var(--success);font-weight:600;font-size:.68rem}
+.delta-exact{color:var(--gray-400);font-size:.68rem}
+.boq-sheet-pill{padding:5px 14px;border-radius:16px;border:1px solid var(--gray-200);background:var(--card);font-size:.72rem;cursor:pointer;transition:all .2s}
+.boq-sheet-pill.active,.boq-sheet-pill:hover{background:var(--primary);color:#fff;border-color:var(--primary)}
+
+/* =====================================================
+   SITETRACK: Daily Log
+   ===================================================== */
+.log-entry{padding:12px;border-left:3px solid var(--primary);background:var(--card);border-radius:0 8px 8px 0;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,0.06)}
+.log-header{display:flex;align-items:center;gap:6px;margin-bottom:6px;flex-wrap:wrap}
+.log-date{font-weight:700;font-size:.78rem;color:var(--primary)}
+.log-desc{font-size:.78rem;color:var(--text);margin-bottom:4px}
+.log-meta{font-size:.7rem;color:var(--gray-500);margin-top:2px}
+.log-by{font-size:.65rem;color:var(--gray-400);margin-top:4px;text-align:right}
+
+/* =====================================================
+   SITETRACK: Excel Upload Drop Zone
+   ===================================================== */
+.excel-drop-zone{border:2px dashed var(--gray-300);border-radius:12px;padding:24px;text-align:center;cursor:pointer;transition:all .2s;color:var(--gray-500)}
+.excel-drop-zone:hover,.excel-drop-zone.drag-over{border-color:var(--primary);background:rgba(232,93,4,0.04);color:var(--primary)}
+
+/* =====================================================
+   SITETRACK: Dark Mode
+   ===================================================== */
+[data-theme="dark"] .gantt-name-col{border-right-color:var(--gray-700)}
+[data-theme="dark"] .gantt-week-label{border-right-color:var(--gray-700)}
+[data-theme="dark"] .gantt-task-row{border-bottom-color:var(--gray-700)}
+[data-theme="dark"] .gantt-bar-planned{background:var(--gray-700)}
+[data-theme="dark"] .boq-table th{background:var(--gray-800)}
+[data-theme="dark"] .boq-table td{border-bottom-color:var(--gray-700)}
+[data-theme="dark"] .boq-category td{background:var(--gray-800) !important}
+[data-theme="dark"] .boq-overuse td{background:rgba(239,68,68,0.12)}
+[data-theme="dark"] .boq-sheet-pill{border-color:var(--gray-600);background:var(--gray-800)}
+[data-theme="dark"] .log-entry{background:var(--gray-800);box-shadow:none}
+[data-theme="dark"] .excel-drop-zone{border-color:var(--gray-600)}
+[data-theme="dark"] .excel-drop-zone:hover,[data-theme="dark"] .excel-drop-zone.drag-over{border-color:var(--primary);background:rgba(232,93,4,0.1)}
+
+/* =====================================================
+   SITETRACK: Mobile Responsive
+   ===================================================== */
+@media(max-width:430px){
+  .gantt-name-col{width:100px;min-width:100px;font-size:.6rem}
+  .proj-detail-tabs{overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .proj-detail-tabs::-webkit-scrollbar{display:none}
+  .boq-table{font-size:.65rem}
+  .boq-table th,.boq-table td{padding:4px 5px}
+  .log-entry{padding:8px}
+}

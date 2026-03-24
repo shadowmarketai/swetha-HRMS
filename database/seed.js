@@ -208,6 +208,68 @@ async function seed() {
   }
   console.log('   Created ' + seedProjects.length + ' projects with tasks, team, and materials');
 
+  // 10. Seed SiteTrack WBS tasks for project 1
+  console.log('\n10. Seeding SiteTrack WBS tasks...');
+  // Get project 1 ID (first created project)
+  var projListRes = await fetch(API_BASE + '/projects', { method: 'GET', headers: authHeaders });
+  var projList = await projListRes.json();
+  var firstProjId = projList && projList.length > 0 ? projList[0].id : null;
+
+  if (firstProjId) {
+    var wbsTasks = [
+      { wbsCode: '1', level: 1, taskName: 'Site Preparation', lead: 'SS003', startDate: '2025-08-15', endDate: '2025-09-30', plannedDays: 45, progressPct: 100, status: 'completed' },
+      { wbsCode: '1.1', level: 2, taskName: 'Land Survey & Marking', lead: 'SS004', startDate: '2025-08-15', endDate: '2025-08-30', plannedDays: 15, progressPct: 100, status: 'completed' },
+      { wbsCode: '1.2', level: 2, taskName: 'Excavation & Leveling', lead: 'SS005', startDate: '2025-09-01', endDate: '2025-09-30', plannedDays: 30, progressPct: 100, status: 'completed' },
+      { wbsCode: '2', level: 1, taskName: 'Structure & Framing', lead: 'SS008', startDate: '2025-10-01', endDate: '2026-02-28', plannedDays: 150, progressPct: 65, status: 'in_progress' },
+      { wbsCode: '2.1', level: 2, taskName: 'Foundation & Plinth', lead: 'SS010', startDate: '2025-10-01', endDate: '2025-12-15', plannedDays: 75, progressPct: 100, status: 'completed', actualStart: '2025-10-05', actualEnd: '2025-12-20' },
+      { wbsCode: '2.2', level: 2, taskName: 'RCC Columns & Beams', lead: 'SS008', startDate: '2025-12-16', endDate: '2026-02-28', plannedDays: 75, progressPct: 40, status: 'in_progress', actualStart: '2025-12-22' }
+    ];
+    for (var wt of wbsTasks) {
+      await fetch(API_BASE + '/sitetrack/projects/' + firstProjId + '/wbs', {
+        method: 'POST', headers: authHeaders, body: JSON.stringify(wt)
+      });
+    }
+    console.log('   Created 6 WBS tasks for project: ' + projList[0].name);
+
+    // 11. Seed BOQ sheet + items for project 1
+    console.log('\n11. Seeding BOQ sheet & items...');
+    var boqSheetRes = await fetch(API_BASE + '/sitetrack/projects/' + firstProjId + '/boq', {
+      method: 'POST', headers: authHeaders,
+      body: JSON.stringify({ sheetType: 'civil', title: 'Civil Works - Porur Villa', areaSqft: 2400, quotedRate: 1875 })
+    });
+    var boqSheet = await boqSheetRes.json();
+    if (boqSheet && boqSheet.id) {
+      var boqItems = [
+        { itemNo: 'A', description: 'EARTH WORK', isCategory: true },
+        { itemNo: '1', description: 'Excavation for foundation', unit: 'Cu.m', plannedQty: 120, rate: 350 },
+        { itemNo: '2', description: 'Sand filling in foundation', unit: 'Cu.m', plannedQty: 80, rate: 950 },
+        { itemNo: 'B', description: 'CONCRETE WORK', isCategory: true },
+        { itemNo: '3', description: 'PCC 1:4:8 for bed concrete', unit: 'Cu.m', plannedQty: 25, rate: 4500 },
+        { itemNo: '4', description: 'RCC M25 for footings', unit: 'Cu.m', plannedQty: 45, rate: 6800 },
+        { itemNo: '5', description: 'RCC M25 for columns', unit: 'Cu.m', plannedQty: 35, rate: 7200 }
+      ];
+      for (var bi of boqItems) {
+        await fetch(API_BASE + '/sitetrack/boq/' + boqSheet.id + '/items', {
+          method: 'POST', headers: authHeaders, body: JSON.stringify(bi)
+        });
+      }
+      console.log('   Created 1 BOQ sheet with 7 items');
+    }
+
+    // 12. Seed daily work logs for project 1
+    console.log('\n12. Seeding daily work logs...');
+    var dailyLogs = [
+      { logDate: '2026-03-22', weather: 'Sunny', workersCount: 12, workDescription: 'RCC column casting for ground floor - 4 columns completed. Steel binding for next set started.', materialsNote: '8 bags cement, 2MT steel used' },
+      { logDate: '2026-03-23', weather: 'Cloudy', workersCount: 15, workDescription: 'Beam formwork installation for first floor. Electrical conduit placement in progress.', materialsNote: 'Plywood sheets for shuttering, PVC conduits', remarks: 'Minor delay due to material delivery' }
+    ];
+    for (var dl of dailyLogs) {
+      await fetch(API_BASE + '/sitetrack/projects/' + firstProjId + '/daily-logs', {
+        method: 'POST', headers: authHeaders, body: JSON.stringify(dl)
+      });
+    }
+    console.log('   Created 2 daily work logs');
+  }
+
   console.log('\nSeed complete! Database is ready.');
   console.log('Login credentials:');
   console.log('  MD:       MD001 / admin123');

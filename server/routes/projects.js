@@ -2,18 +2,20 @@ const router = require('express').Router();
 const pool = require('../config/db');
 const { verifyToken, requireRole } = require('../middleware/auth');
 
-// GET /api/projects — list all with nested tasks, team, materials
+// GET /api/projects — list all with nested tasks, team, materials, wbs
 router.get('/', verifyToken, async (req, res) => {
   try {
     const [projects] = await pool.query('SELECT * FROM projects ORDER BY id');
     const [tasks] = await pool.query('SELECT * FROM project_tasks ORDER BY project_id, id');
     const [team] = await pool.query('SELECT * FROM project_team ORDER BY project_id');
     const [materials] = await pool.query('SELECT * FROM project_materials ORDER BY project_id, id');
+    const [wbsTasks] = await pool.query('SELECT * FROM wbs_tasks ORDER BY project_id, wbs_code').catch(() => [[]]);
 
     const result = projects.map(p => {
       p.tasks = tasks.filter(t => t.project_id === p.id);
       p.team = team.filter(t => t.project_id === p.id).map(t => t.emp_code);
       p.materials = materials.filter(m => m.project_id === p.id);
+      p.wbs_tasks = wbsTasks.filter(w => w.project_id === p.id);
       return p;
     });
 
@@ -27,14 +29,15 @@ router.get('/', verifyToken, async (req, res) => {
 // POST /api/projects — create (MD/HR)
 router.post('/', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
   try {
-    const { name, client, location, budget, status, startDate, targetDate } = req.body;
+    const { name, client, location, budget, status, startDate, targetDate, contractorName, siteLocation, projectLead } = req.body;
     if (!name) return res.status(400).json({ error: 'Project name is required' });
 
     const [result] = await pool.query(
-      `INSERT INTO projects (name, client, location, budget, status, start_date, target_date, created_by)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO projects (name, client, location, budget, status, start_date, target_date, created_by, contractor_name, site_location, project_lead)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [name, client || null, location || null, budget || 0, status || 'Not Started',
-       startDate || null, targetDate || null, req.user.empCode]
+       startDate || null, targetDate || null, req.user.empCode,
+       contractorName || 'Swetha Structures Pvt Ltd', siteLocation || null, projectLead || null]
     );
 
     const [rows] = await pool.query('SELECT * FROM projects WHERE id = ?', [result.insertId]);
@@ -42,6 +45,7 @@ router.post('/', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
     proj.tasks = [];
     proj.team = [];
     proj.materials = [];
+    proj.wbs_tasks = [];
     res.status(201).json(proj);
   } catch (err) {
     console.error(err);
@@ -52,12 +56,14 @@ router.post('/', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
 // PUT /api/projects/:id — update
 router.put('/:id', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
   try {
-    const { name, client, location, budget, status, startDate, targetDate } = req.body;
+    const { name, client, location, budget, status, startDate, targetDate, contractorName, siteLocation, projectLead } = req.body;
     await pool.query(
       `UPDATE projects SET name = ?, client = ?, location = ?, budget = ?, status = ?,
-       start_date = ?, target_date = ? WHERE id = ?`,
+       start_date = ?, target_date = ?, contractor_name = ?, site_location = ?, project_lead = ? WHERE id = ?`,
       [name, client || null, location || null, budget || 0, status || 'Not Started',
-       startDate || null, targetDate || null, req.params.id]
+       startDate || null, targetDate || null,
+       contractorName || 'Swetha Structures Pvt Ltd', siteLocation || null, projectLead || null,
+       req.params.id]
     );
     const [rows] = await pool.query('SELECT * FROM projects WHERE id = ?', [req.params.id]);
     res.json(rows[0] || {});

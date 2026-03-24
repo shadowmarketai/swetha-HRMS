@@ -357,10 +357,26 @@ let projects = [];
 let projectNextId = 1;
 let projectTaskNextIds = {};
 
+// SiteTrack constants
+const BOQ_SHEET_TYPES = ['civil','peb','mezzanine_civil','mezzanine_peb'];
+const BOQ_SHEET_LABELS = { civil:'Civil Works', peb:'PEB Works', mezzanine_civil:'Mezzanine Civil', mezzanine_peb:'Mezzanine PEB' };
+const WEATHER_OPTIONS = ['Sunny','Cloudy','Rainy','Hot','Clear'];
+let currentBOQSheetId = null;
+
 function getProjectProgress(project) {
+  // Use WBS progress if WBS tasks exist
+  if (project.wbsTasks && project.wbsTasks.length > 0) {
+    return getWBSProgress(project);
+  }
   if (!project.tasks.length) return 0;
   const done = project.tasks.filter(t => t.status === 'Done').length;
   return Math.round((done / project.tasks.length) * 100);
+}
+
+function getWBSProgress(project) {
+  if (!project.wbsTasks || project.wbsTasks.length === 0) return 0;
+  var total = project.wbsTasks.reduce(function(sum, t) { return sum + (t.progressPct || 0); }, 0);
+  return Math.round(total / project.wbsTasks.length);
 }
 let announcementReadStatus = {};
 
@@ -5649,9 +5665,13 @@ function mapProject(row) {
     startDate: row.start_date || row.startDate || '',
     targetDate: row.target_date || row.targetDate || '',
     createdBy: row.created_by || row.createdBy || '',
+    contractorName: row.contractor_name || row.contractorName || 'Swetha Structures Pvt Ltd',
+    siteLocation: row.site_location || row.siteLocation || '',
+    projectLead: row.project_lead || row.projectLead || '',
     tasks: (row.tasks || []).map(mapProjectTask),
     team: row.team || [],
-    materials: (row.materials || []).map(mapProjectMaterial)
+    materials: (row.materials || []).map(mapProjectMaterial),
+    wbsTasks: (row.wbs_tasks || row.wbsTasks || []).map(mapWBSTask)
   };
 }
 function mapProjectTask(row) {
@@ -5675,6 +5695,82 @@ function mapProjectMaterial(row) {
     total: parseFloat(row.total) || 0,
     used: parseFloat(row.used) || 0,
     remaining: parseFloat(row.remaining) || 0
+  };
+}
+function mapWBSTask(row) {
+  return {
+    id: row.id,
+    projectId: row.project_id || row.projectId,
+    wbsCode: row.wbs_code || row.wbsCode || '',
+    level: parseInt(row.level, 10) || 1,
+    taskName: row.task_name || row.taskName || '',
+    lead: row.lead || '',
+    predecessor: row.predecessor || '',
+    startDate: row.start_date || row.startDate || '',
+    endDate: row.end_date || row.endDate || '',
+    actualStart: row.actual_start || row.actualStart || '',
+    actualEnd: row.actual_end || row.actualEnd || '',
+    plannedDays: parseInt(row.planned_days, 10) || 0,
+    workDays: parseInt(row.work_days, 10) || 0,
+    progressPct: parseFloat(row.progress_pct || row.progressPct) || 0,
+    status: row.status || 'pending'
+  };
+}
+function mapBOQSheet(row) {
+  return {
+    id: row.id,
+    projectId: row.project_id || row.projectId,
+    sheetType: row.sheet_type || row.sheetType || 'civil',
+    title: row.title || '',
+    areaSqft: parseFloat(row.area_sqft || row.areaSqft) || 0,
+    quotedRate: parseFloat(row.quoted_rate_per_sqft || row.quotedRate) || 0,
+    totalPlannedAmount: parseFloat(row.total_planned_amount || row.totalPlannedAmount) || 0,
+    items: (row.items || []).map(mapBOQItem)
+  };
+}
+function mapBOQItem(row) {
+  return {
+    id: row.id,
+    boqSheetId: row.boq_sheet_id || row.boqSheetId,
+    projectId: row.project_id || row.projectId,
+    itemNo: row.item_no || row.itemNo || '',
+    isCategory: !!(row.is_category || row.isCategory),
+    description: row.description || '',
+    unit: row.unit || '',
+    plannedQty: parseFloat(row.planned_qty || row.plannedQty) || 0,
+    rate: parseFloat(row.rate) || 0,
+    plannedAmount: parseFloat(row.planned_amount || row.plannedAmount) || 0,
+    actualQtyUsed: parseFloat(row.actual_qty_used || row.actualQtyUsed) || 0,
+    isPending: !!(row.is_pending || row.isPending)
+  };
+}
+function mapDailyWorkLog(row) {
+  return {
+    id: row.id,
+    projectId: row.project_id || row.projectId,
+    taskId: row.task_id || row.taskId || null,
+    taskName: row.task_name || row.taskName || '',
+    wbsCode: row.wbs_code || row.wbsCode || '',
+    logDate: row.log_date || row.logDate || '',
+    loggedBy: row.logged_by || row.loggedBy || '',
+    workersCount: parseInt(row.workers_count || row.workersCount, 10) || 0,
+    weather: row.weather || '',
+    workDescription: row.work_description || row.workDescription || '',
+    materialsNote: row.materials_note || row.materialsNote || '',
+    progressUpdate: parseFloat(row.progress_update || row.progressUpdate) || 0,
+    remarks: row.remarks || '',
+    createdAt: row.created_at || row.createdAt || ''
+  };
+}
+function mapUsageLog(row) {
+  return {
+    id: row.id,
+    boqItemId: row.boq_item_id || row.boqItemId,
+    projectId: row.project_id || row.projectId,
+    qtyUsed: parseFloat(row.qty_used || row.qtyUsed) || 0,
+    note: row.note || '',
+    loggedBy: row.logged_by || row.loggedBy || '',
+    loggedAt: row.logged_at || row.loggedAt || ''
   };
 }
 function mapDocument(row) {
@@ -8687,7 +8783,11 @@ function renderProgressScreen() {
     cardHtml += '<div class="progress-header"><h4>' + escapeHTML(p.name) + '</h4><span class="badge-status ' + badge + '">' + escapeHTML(p.status) + '</span></div>';
     cardHtml += '<div style="font-size:.72rem;color:var(--gray-500);margin:4px 0">' + escapeHTML(p.client) + ' &middot; ' + escapeHTML(p.location) + '</div>';
     cardHtml += '<div class="progress-bar-bg"><div class="progress-bar-fill" style="width:' + pct + '%;background:linear-gradient(90deg,' + barColor + ',' + barColor + ')"></div></div>';
-    cardHtml += '<div class="progress-meta"><span>' + pct + '% Complete (' + p.tasks.filter(function(t){return t.status==='Done';}).length + '/' + p.tasks.length + ' tasks)</span><span>Target: ' + escapeHTML(target) + '</span></div>';
+    var hasWBS = p.wbsTasks && p.wbsTasks.length > 0;
+    var progressLabel = hasWBS
+      ? pct + '% WBS Progress (' + p.wbsTasks.filter(function(t){return t.status==='completed';}).length + '/' + p.wbsTasks.length + ' tasks)'
+      : pct + '% Complete (' + p.tasks.filter(function(t){return t.status==='Done';}).length + '/' + p.tasks.length + ' tasks)';
+    cardHtml += '<div class="progress-meta"><span>' + progressLabel + '</span><span>Target: ' + escapeHTML(target) + '</span></div>';
     cardHtml += teamHtml;
     cardHtml += '</div>';
     return cardHtml;
@@ -8873,6 +8973,11 @@ function openProjectForm(editId) {
   html += '<div class="form-group"><label class="form-label">Client</label><input class="form-control" id="projClient" value="' + (proj ? escapeHTML(proj.client) : '') + '"></div>';
   html += '<div class="form-group"><label class="form-label">Location</label><input class="form-control" id="projLocation" value="' + (proj ? escapeHTML(proj.location) : '') + '"></div>';
   html += '<div class="form-group"><label class="form-label">Budget (Rs.)</label><input class="form-control" type="number" id="projBudget" value="' + (proj ? proj.budget : '') + '"></div>';
+  html += '<div class="form-group"><label class="form-label">Contractor</label><input class="form-control" id="projContractor" value="' + (proj ? escapeHTML(proj.contractorName || '') : 'Swetha Structures Pvt Ltd') + '"></div>';
+  html += '<div style="display:flex;gap:8px">';
+  html += '<div class="form-group" style="flex:1"><label class="form-label">Site Location</label><input class="form-control" id="projSiteLocation" value="' + (proj ? escapeHTML(proj.siteLocation || '') : '') + '"></div>';
+  html += '<div class="form-group" style="flex:1"><label class="form-label">Project Lead</label><input class="form-control" id="projLead" value="' + (proj ? escapeHTML(proj.projectLead || '') : '') + '"></div>';
+  html += '</div>';
   html += '<div style="display:flex;gap:8px">';
   html += '<div class="form-group" style="flex:1"><label class="form-label">Start Date</label><input class="form-control" type="date" id="projStart" value="' + (proj ? proj.startDate : '') + '"></div>';
   html += '<div class="form-group" style="flex:1"><label class="form-label">Target Date</label><input class="form-control" type="date" id="projTarget" value="' + (proj ? proj.targetDate : '') + '"></div>';
@@ -8898,7 +9003,10 @@ async function saveProject(editId) {
     budget: parseFloat(document.getElementById('projBudget').value) || 0,
     startDate: document.getElementById('projStart').value,
     targetDate: document.getElementById('projTarget').value,
-    status: document.getElementById('projStatus').value
+    status: document.getElementById('projStatus').value,
+    contractorName: document.getElementById('projContractor').value.trim(),
+    siteLocation: document.getElementById('projSiteLocation').value.trim(),
+    projectLead: document.getElementById('projLead').value.trim()
   };
 
   try {
@@ -8953,18 +9061,38 @@ function renderProjectDetailContent(proj) {
   var isMDorHR = currentUser && (currentUser.role === 'MD' || currentUser.role === 'HR');
   var isMD = currentUser && currentUser.role === 'MD';
   var pct = getProjectProgress(proj);
+  var hasWBS = proj.wbsTasks && proj.wbsTasks.length > 0;
+  var findProj = 'projects.find(function(p){return p.id===' + proj.id + ';})';
 
   // Tabs
   var html = '<div class="proj-detail-tabs">';
-  html += '<button class="proj-detail-tab' + (currentProjectTab==='overview'?' active':'') + '" onclick="currentProjectTab=\'overview\';renderProjectDetailContent(projects.find(function(p){return p.id===' + proj.id + ';}))">Overview</button>';
-  html += '<button class="proj-detail-tab' + (currentProjectTab==='tasks'?' active':'') + '" onclick="currentProjectTab=\'tasks\';renderProjectDetailContent(projects.find(function(p){return p.id===' + proj.id + ';}))">Tasks (' + proj.tasks.length + ')</button>';
-  html += '<button class="proj-detail-tab' + (currentProjectTab==='team'?' active':'') + '" onclick="currentProjectTab=\'team\';renderProjectDetailContent(projects.find(function(p){return p.id===' + proj.id + ';}))">Team (' + proj.team.length + ')</button>';
+  html += '<button class="proj-detail-tab' + (currentProjectTab==='overview'?' active':'') + '" onclick="currentProjectTab=\'overview\';renderProjectDetailContent(' + findProj + ')">Overview</button>';
+  // Show WBS tab if has WBS tasks or user is MD/HR
+  if (hasWBS || isMDorHR) {
+    html += '<button class="proj-detail-tab' + (currentProjectTab==='wbs'?' active':'') + '" onclick="currentProjectTab=\'wbs\';renderProjectDetailContent(' + findProj + ')">WBS' + (hasWBS ? ' (' + proj.wbsTasks.length + ')' : '') + '</button>';
+  }
+  html += '<button class="proj-detail-tab' + (currentProjectTab==='boq'?' active':'') + '" onclick="currentProjectTab=\'boq\';renderProjectDetailContent(' + findProj + ')">BOQ</button>';
+  html += '<button class="proj-detail-tab' + (currentProjectTab==='gantt'?' active':'') + '" onclick="currentProjectTab=\'gantt\';renderProjectDetailContent(' + findProj + ')">Gantt</button>';
+  html += '<button class="proj-detail-tab' + (currentProjectTab==='dailylog'?' active':'') + '" onclick="currentProjectTab=\'dailylog\';renderProjectDetailContent(' + findProj + ')">Daily Log</button>';
+  // Old Tasks tab only when no WBS
+  if (!hasWBS) {
+    html += '<button class="proj-detail-tab' + (currentProjectTab==='tasks'?' active':'') + '" onclick="currentProjectTab=\'tasks\';renderProjectDetailContent(' + findProj + ')">Tasks (' + proj.tasks.length + ')</button>';
+  }
+  html += '<button class="proj-detail-tab' + (currentProjectTab==='team'?' active':'') + '" onclick="currentProjectTab=\'team\';renderProjectDetailContent(' + findProj + ')">Team (' + proj.team.length + ')</button>';
   var matCount = projectMaterials.filter(function(m){return m.projectId===proj.id;}).length;
-  html += '<button class="proj-detail-tab' + (currentProjectTab==='materials'?' active':'') + '" onclick="currentProjectTab=\'materials\';renderProjectDetailContent(projects.find(function(p){return p.id===' + proj.id + ';}))">Materials (' + matCount + ')</button>';
+  html += '<button class="proj-detail-tab' + (currentProjectTab==='materials'?' active':'') + '" onclick="currentProjectTab=\'materials\';renderProjectDetailContent(' + findProj + ')">Materials (' + matCount + ')</button>';
   html += '</div>';
 
   if (currentProjectTab === 'overview') {
     html += renderProjectOverview(proj, pct, isMDorHR, isMD);
+  } else if (currentProjectTab === 'wbs') {
+    html += renderProjectWBS(proj, isMDorHR);
+  } else if (currentProjectTab === 'boq') {
+    html += renderProjectBOQ(proj, isMDorHR);
+  } else if (currentProjectTab === 'gantt') {
+    html += renderProjectGantt(proj);
+  } else if (currentProjectTab === 'dailylog') {
+    html += renderProjectDailyLogs(proj, isMDorHR);
   } else if (currentProjectTab === 'tasks') {
     html += renderProjectTasks(proj, isMDorHR);
   } else if (currentProjectTab === 'team') {
@@ -8986,6 +9114,9 @@ function renderProjectOverview(proj, pct, isMDorHR, isMD) {
   html += '<span class="badge-status" style="background:' + (statusColors[proj.status]||'var(--gray-400)') + ';color:#fff;padding:3px 10px;border-radius:12px;font-size:.68rem">' + escapeHTML(proj.status) + '</span></div>';
   html += '<div style="font-size:.78rem;color:var(--gray-500);margin-bottom:4px"><strong>Client:</strong> ' + escapeHTML(proj.client || 'N/A') + '</div>';
   html += '<div style="font-size:.78rem;color:var(--gray-500);margin-bottom:4px"><strong>Location:</strong> ' + escapeHTML(proj.location || 'N/A') + '</div>';
+  if (proj.siteLocation) html += '<div style="font-size:.78rem;color:var(--gray-500);margin-bottom:4px"><strong>Site:</strong> ' + escapeHTML(proj.siteLocation) + '</div>';
+  html += '<div style="font-size:.78rem;color:var(--gray-500);margin-bottom:4px"><strong>Contractor:</strong> ' + escapeHTML(proj.contractorName || 'N/A') + '</div>';
+  if (proj.projectLead) html += '<div style="font-size:.78rem;color:var(--gray-500);margin-bottom:4px"><strong>Lead:</strong> ' + escapeHTML(proj.projectLead) + '</div>';
   html += '<div style="font-size:.78rem;color:var(--gray-500);margin-bottom:4px"><strong>Budget:</strong> Rs.' + (proj.budget ? proj.budget.toLocaleString('en-IN') : '0') + '</div>';
   html += '<div style="display:flex;gap:16px;font-size:.72rem;color:var(--gray-400);margin-top:6px">';
   html += '<span>Start: ' + (proj.startDate || 'TBD') + '</span>';
@@ -8993,13 +9124,18 @@ function renderProjectOverview(proj, pct, isMDorHR, isMD) {
   html += '</div></div>';
 
   // Progress
+  var hasWBS = proj.wbsTasks && proj.wbsTasks.length > 0;
   html += '<div class="card" style="padding:14px;margin-top:10px">';
   html += '<div style="font-weight:600;font-size:.82rem;margin-bottom:8px">Progress</div>';
   html += '<div class="progress-bar-bg"><div class="progress-bar-fill" style="width:' + pct + '%;background:linear-gradient(90deg,var(--primary),var(--primary-light))"></div></div>';
   html += '<div style="display:flex;justify-content:space-between;font-size:.72rem;color:var(--gray-500);margin-top:4px">';
   html += '<span>' + pct + '% Complete</span>';
-  html += '<span>' + proj.tasks.filter(function(t){return t.status==='Done';}).length + ' of ' + proj.tasks.length + ' tasks done</span></div>';
-  html += '</div>';
+  if (hasWBS) {
+    html += '<span>' + proj.wbsTasks.filter(function(t){return t.status==='completed';}).length + ' of ' + proj.wbsTasks.length + ' WBS tasks done</span>';
+  } else {
+    html += '<span>' + proj.tasks.filter(function(t){return t.status==='Done';}).length + ' of ' + proj.tasks.length + ' tasks done</span>';
+  }
+  html += '</div></div>';
 
   // Task summary
   var pending = proj.tasks.filter(function(t){return t.status==='Pending';}).length;
@@ -9093,6 +9229,584 @@ function renderProjectTeam(proj, isMDorHR) {
   }
   html += '</div>';
   return html;
+}
+
+// =====================================================
+// SITETRACK: WBS TAB
+// =====================================================
+function renderProjectWBS(proj, isMDorHR) {
+  var html = '<div style="padding:0 16px">';
+  if (isMDorHR) {
+    html += '<div style="margin-top:10px;margin-bottom:8px;display:flex;gap:8px">';
+    html += '<button class="nf-btn nf-btn-primary nf-btn-sm" onclick="openWBSTaskForm(' + proj.id + ')">+ Add WBS Task</button>';
+    html += '</div>';
+  }
+  html += '<div id="wbsTaskFormArea"></div>';
+
+  if (!proj.wbsTasks || proj.wbsTasks.length === 0) {
+    html += '<div class="nf-empty" style="margin-top:16px">No WBS tasks yet. Add tasks to build the Work Breakdown Structure.</div>';
+  } else {
+    html += '<div style="overflow-x:auto"><table class="boq-table" style="width:100%;font-size:.75rem">';
+    html += '<thead><tr><th>WBS Code</th><th>Task</th><th>Lead</th><th>Start</th><th>End</th><th>Days</th><th>Progress</th><th>Status</th>';
+    if (isMDorHR) html += '<th></th>';
+    html += '</tr></thead><tbody>';
+
+    proj.wbsTasks.forEach(function(t) {
+      var statusColor = t.status === 'completed' ? 'var(--success)' : t.status === 'in_progress' ? 'var(--primary)' : 'var(--warning)';
+      var statusLabel = t.status === 'completed' ? 'Done' : t.status === 'in_progress' ? 'In Progress' : 'Pending';
+      html += '<tr class="wbs-level-' + t.level + '">';
+      html += '<td style="font-weight:600;white-space:nowrap">' + escapeHTML(t.wbsCode) + '</td>';
+      html += '<td>' + escapeHTML(t.taskName) + '</td>';
+      html += '<td>' + escapeHTML(t.lead || '-') + '</td>';
+      html += '<td style="white-space:nowrap">' + (t.startDate || '-') + '</td>';
+      html += '<td style="white-space:nowrap">' + (t.endDate || '-') + '</td>';
+      html += '<td>' + (t.plannedDays || '-') + '</td>';
+      html += '<td style="min-width:100px"><div class="progress-bar-bg" style="height:14px;border-radius:7px"><div class="progress-bar-fill" style="width:' + t.progressPct + '%;background:' + statusColor + ';height:100%;border-radius:7px"></div></div>';
+      html += '<div style="text-align:center;font-size:.65rem;margin-top:2px;cursor:pointer" onclick="promptWBSProgress(' + t.id + ',' + t.progressPct + ',' + proj.id + ')">' + Math.round(t.progressPct) + '%</div></td>';
+      html += '<td><span style="font-size:.65rem;padding:2px 8px;border-radius:10px;background:' + statusColor + ';color:#fff">' + statusLabel + '</span></td>';
+      if (isMDorHR) {
+        html += '<td><button style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:.7rem" onclick="deleteWBSTask(' + t.id + ',' + proj.id + ')">Del</button></td>';
+      }
+      html += '</tr>';
+    });
+    html += '</tbody></table></div>';
+  }
+  html += '</div>';
+  return html;
+}
+
+function openWBSTaskForm(projectId) {
+  var area = document.getElementById('wbsTaskFormArea');
+  if (!area) return;
+  area.innerHTML = '<div class="card" style="padding:12px;border-left:4px solid var(--primary);margin-bottom:8px">' +
+    '<div class="nf-section-title" style="margin-bottom:8px">Add WBS Task</div>' +
+    '<div style="display:flex;gap:8px">' +
+    '<div class="form-group" style="flex:1"><label class="form-label">WBS Code *</label><input class="form-control" id="wbsCode" placeholder="1.1"></div>' +
+    '<div class="form-group" style="flex:1"><label class="form-label">Level</label><select class="form-control" id="wbsLevel"><option value="1">Level 1</option><option value="2" selected>Level 2</option><option value="3">Level 3</option></select></div>' +
+    '</div>' +
+    '<div class="form-group"><label class="form-label">Task Name *</label><input class="form-control" id="wbsTaskName"></div>' +
+    '<div style="display:flex;gap:8px">' +
+    '<div class="form-group" style="flex:1"><label class="form-label">Lead</label><input class="form-control" id="wbsLead"></div>' +
+    '<div class="form-group" style="flex:1"><label class="form-label">Planned Days</label><input class="form-control" type="number" id="wbsPlannedDays"></div>' +
+    '</div>' +
+    '<div style="display:flex;gap:8px">' +
+    '<div class="form-group" style="flex:1"><label class="form-label">Start Date</label><input class="form-control" type="date" id="wbsStart"></div>' +
+    '<div class="form-group" style="flex:1"><label class="form-label">End Date</label><input class="form-control" type="date" id="wbsEnd"></div>' +
+    '</div>' +
+    '<div style="display:flex;gap:8px;margin-top:8px">' +
+    '<button class="nf-btn nf-btn-primary" onclick="saveWBSTask(' + projectId + ')">Add</button>' +
+    '<button class="nf-btn nf-btn-secondary" onclick="document.getElementById(\'wbsTaskFormArea\').innerHTML=\'\'">Cancel</button>' +
+    '</div></div>';
+}
+
+async function saveWBSTask(projectId) {
+  var code = document.getElementById('wbsCode').value.trim();
+  var name = document.getElementById('wbsTaskName').value.trim();
+  if (!code || !name) { showToast('WBS code and task name are required'); return; }
+  try {
+    var result = await apiCall('POST', '/sitetrack/projects/' + projectId + '/wbs', {
+      wbsCode: code,
+      level: parseInt(document.getElementById('wbsLevel').value, 10) || 1,
+      taskName: name,
+      lead: document.getElementById('wbsLead').value.trim(),
+      plannedDays: parseInt(document.getElementById('wbsPlannedDays').value, 10) || null,
+      startDate: document.getElementById('wbsStart').value || null,
+      endDate: document.getElementById('wbsEnd').value || null
+    });
+    var proj = projects.find(function(p){return p.id===projectId;});
+    if (proj) {
+      proj.wbsTasks.push(mapWBSTask(result));
+      showToast('WBS task added');
+      renderProjectDetailContent(proj);
+    }
+  } catch (e) { showToast('Error adding WBS task'); }
+}
+
+function promptWBSProgress(taskId, currentPct, projectId) {
+  var newPct = prompt('Update progress (0-100):', Math.round(currentPct));
+  if (newPct === null) return;
+  newPct = parseFloat(newPct);
+  if (isNaN(newPct) || newPct < 0 || newPct > 100) { showToast('Enter a value between 0 and 100'); return; }
+  updateWBSProgress(taskId, newPct, projectId);
+}
+
+async function updateWBSProgress(taskId, pct, projectId) {
+  try {
+    var result = await apiCall('PATCH', '/sitetrack/wbs/' + taskId + '/progress', { progressPct: pct });
+    var proj = projects.find(function(p){return p.id===projectId;});
+    if (proj) {
+      var idx = proj.wbsTasks.findIndex(function(t){return t.id===taskId;});
+      if (idx !== -1) proj.wbsTasks[idx] = mapWBSTask(result);
+      showToast('Progress updated');
+      renderProjectDetailContent(proj);
+    }
+  } catch (e) { showToast('Error updating progress'); }
+}
+
+async function deleteWBSTask(taskId, projectId) {
+  if (!confirm('Delete this WBS task?')) return;
+  try {
+    await apiCall('DELETE', '/sitetrack/wbs/' + taskId);
+    var proj = projects.find(function(p){return p.id===projectId;});
+    if (proj) {
+      proj.wbsTasks = proj.wbsTasks.filter(function(t){return t.id!==taskId;});
+      showToast('WBS task deleted');
+      renderProjectDetailContent(proj);
+    }
+  } catch (e) { showToast('Error deleting task'); }
+}
+
+// =====================================================
+// SITETRACK: BOQ TAB
+// =====================================================
+function renderProjectBOQ(proj, isMDorHR) {
+  var html = '<div style="padding:0 16px">';
+  if (isMDorHR) {
+    html += '<div style="margin-top:10px;margin-bottom:8px;display:flex;gap:8px;flex-wrap:wrap">';
+    html += '<button class="nf-btn nf-btn-primary nf-btn-sm" onclick="openBOQSheetForm(' + proj.id + ')">+ Add BOQ Sheet</button>';
+    html += '<button class="nf-btn nf-btn-secondary nf-btn-sm" onclick="showExcelUpload(' + proj.id + ')">Import Excel</button>';
+    html += '</div>';
+  }
+  html += '<div id="boqSheetFormArea"></div>';
+  html += '<div id="boqExcelArea"></div>';
+  html += '<div id="boqContent"><div class="nf-empty" style="margin-top:16px"><span class="spinner"></span> Loading BOQ...</div></div>';
+  html += '</div>';
+
+  // Load BOQ data async
+  setTimeout(function() { loadProjectBOQ(proj.id, isMDorHR); }, 50);
+  return html;
+}
+
+async function loadProjectBOQ(projectId, isMDorHR) {
+  var container = document.getElementById('boqContent');
+  if (!container) return;
+  try {
+    var sheets = await apiCall('GET', '/sitetrack/projects/' + projectId + '/boq');
+    if (!sheets || sheets.length === 0) {
+      container.innerHTML = '<div class="nf-empty" style="margin-top:16px">No BOQ sheets yet. Create a sheet or import from Excel.</div>';
+      return;
+    }
+    var mapped = sheets.map(mapBOQSheet);
+    var html = '';
+
+    // Sheet sub-tabs
+    html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin:10px 0">';
+    mapped.forEach(function(s) {
+      var active = currentBOQSheetId === s.id ? ' active' : '';
+      if (!currentBOQSheetId && mapped.indexOf(s) === 0) { active = ' active'; currentBOQSheetId = s.id; }
+      html += '<button class="boq-sheet-pill' + active + '" onclick="currentBOQSheetId=' + s.id + ';loadProjectBOQ(' + projectId + ',' + isMDorHR + ')">' + escapeHTML(BOQ_SHEET_LABELS[s.sheetType] || s.title) + '</button>';
+    });
+    html += '</div>';
+
+    var activeSheet = mapped.find(function(s){return s.id===currentBOQSheetId;}) || mapped[0];
+    if (activeSheet) {
+      html += '<div class="card" style="padding:10px;margin-bottom:8px;font-size:.75rem">';
+      html += '<strong>' + escapeHTML(activeSheet.title) + '</strong>';
+      if (activeSheet.areaSqft) html += ' &middot; Area: ' + activeSheet.areaSqft.toLocaleString('en-IN') + ' sqft';
+      if (activeSheet.quotedRate) html += ' &middot; Rate: Rs.' + activeSheet.quotedRate.toLocaleString('en-IN') + '/sqft';
+      html += ' &middot; Total: <strong>Rs.' + activeSheet.totalPlannedAmount.toLocaleString('en-IN') + '</strong>';
+      html += '</div>';
+
+      if (isMDorHR) {
+        html += '<div style="margin-bottom:8px"><button class="nf-btn nf-btn-primary nf-btn-sm" onclick="openBOQItemForm(' + activeSheet.id + ',' + projectId + ')">+ Add Item</button></div>';
+      }
+      html += '<div id="boqItemFormArea"></div>';
+
+      if (activeSheet.items.length === 0) {
+        html += '<div class="nf-empty">No items in this sheet</div>';
+      } else {
+        html += '<div style="overflow-x:auto"><table class="boq-table" style="width:100%;font-size:.72rem">';
+        html += '<thead><tr><th>Item</th><th>Description</th><th>Unit</th><th>Qty</th><th>Rate</th><th>Amount</th><th>Used</th><th>Delta</th><th></th></tr></thead>';
+        html += '<tbody>';
+        activeSheet.items.forEach(function(item) {
+          if (item.isCategory) {
+            html += '<tr class="boq-category"><td colspan="9" style="font-weight:700;background:var(--bg)">' + escapeHTML(item.description) + '</td></tr>';
+            return;
+          }
+          var delta = item.actualQtyUsed - item.plannedQty;
+          var deltaClass = delta > 0 ? 'delta-over' : delta < 0 ? 'delta-under' : 'delta-exact';
+          var isOver = item.plannedQty > 0 && item.actualQtyUsed > item.plannedQty;
+          html += '<tr class="' + (isOver ? 'boq-overuse' : '') + (item.isPending ? ' boq-pending-row' : '') + '">';
+          html += '<td>' + escapeHTML(item.itemNo) + '</td>';
+          html += '<td style="max-width:200px">' + escapeHTML(item.description) + '</td>';
+          html += '<td>' + escapeHTML(item.unit) + '</td>';
+          html += '<td style="text-align:right">' + item.plannedQty + '</td>';
+          html += '<td style="text-align:right">' + item.rate + '</td>';
+          html += '<td style="text-align:right">' + item.plannedAmount.toLocaleString('en-IN') + '</td>';
+          html += '<td style="text-align:right">' + item.actualQtyUsed + '</td>';
+          html += '<td><span class="' + deltaClass + '">' + (delta > 0 ? '+' : '') + delta.toFixed(1) + '</span></td>';
+          html += '<td style="white-space:nowrap">';
+          html += '<button class="nf-btn nf-btn-sm" style="font-size:.6rem;padding:2px 6px" onclick="logBOQUsage(' + item.id + ',' + projectId + ')">+Use</button> ';
+          html += '<button class="nf-btn nf-btn-sm" style="font-size:.6rem;padding:2px 6px;background:' + (item.isPending ? 'var(--warning)' : 'var(--gray-300)') + '" onclick="toggleBOQPending(' + item.id + ',' + projectId + ')">' + (item.isPending ? 'Pending' : 'Mark') + '</button>';
+          html += '</td></tr>';
+        });
+        html += '</tbody></table></div>';
+      }
+    }
+    container.innerHTML = html;
+  } catch (e) {
+    container.innerHTML = '<div class="nf-empty">Error loading BOQ data</div>';
+  }
+}
+
+function openBOQSheetForm(projectId) {
+  var area = document.getElementById('boqSheetFormArea');
+  if (!area) return;
+  var typeOpts = BOQ_SHEET_TYPES.map(function(t) {
+    return '<option value="' + t + '">' + BOQ_SHEET_LABELS[t] + '</option>';
+  }).join('');
+  area.innerHTML = '<div class="card" style="padding:12px;border-left:4px solid var(--primary);margin-bottom:8px">' +
+    '<div class="nf-section-title" style="margin-bottom:8px">Add BOQ Sheet</div>' +
+    '<div style="display:flex;gap:8px">' +
+    '<div class="form-group" style="flex:1"><label class="form-label">Type</label><select class="form-control" id="boqSheetType">' + typeOpts + '</select></div>' +
+    '<div class="form-group" style="flex:2"><label class="form-label">Title</label><input class="form-control" id="boqSheetTitle" placeholder="Civil Works"></div>' +
+    '</div>' +
+    '<div style="display:flex;gap:8px">' +
+    '<div class="form-group" style="flex:1"><label class="form-label">Area (sqft)</label><input class="form-control" type="number" id="boqArea"></div>' +
+    '<div class="form-group" style="flex:1"><label class="form-label">Rate/sqft</label><input class="form-control" type="number" id="boqRate"></div>' +
+    '</div>' +
+    '<div style="display:flex;gap:8px;margin-top:8px">' +
+    '<button class="nf-btn nf-btn-primary" onclick="saveBOQSheet(' + projectId + ')">Create</button>' +
+    '<button class="nf-btn nf-btn-secondary" onclick="document.getElementById(\'boqSheetFormArea\').innerHTML=\'\'">Cancel</button>' +
+    '</div></div>';
+}
+
+async function saveBOQSheet(projectId) {
+  var title = document.getElementById('boqSheetTitle').value.trim();
+  var sheetType = document.getElementById('boqSheetType').value;
+  if (!title) title = BOQ_SHEET_LABELS[sheetType] || 'Untitled';
+  try {
+    var result = await apiCall('POST', '/sitetrack/projects/' + projectId + '/boq', {
+      sheetType: sheetType, title: title,
+      areaSqft: parseFloat(document.getElementById('boqArea').value) || null,
+      quotedRate: parseFloat(document.getElementById('boqRate').value) || null
+    });
+    currentBOQSheetId = result.id;
+    showToast('BOQ sheet created');
+    document.getElementById('boqSheetFormArea').innerHTML = '';
+    loadProjectBOQ(projectId, true);
+  } catch (e) { showToast('Error creating sheet'); }
+}
+
+function openBOQItemForm(sheetId, projectId) {
+  var area = document.getElementById('boqItemFormArea');
+  if (!area) return;
+  area.innerHTML = '<div class="card" style="padding:12px;border-left:4px solid var(--primary);margin-bottom:8px">' +
+    '<div class="nf-section-title" style="margin-bottom:8px">Add BOQ Item</div>' +
+    '<div style="display:flex;gap:8px">' +
+    '<div class="form-group" style="flex:1"><label class="form-label">Item No</label><input class="form-control" id="boqItemNo" placeholder="1.1"></div>' +
+    '<div class="form-group" style="flex:2"><label class="form-label">Description *</label><input class="form-control" id="boqItemDesc"></div>' +
+    '</div>' +
+    '<div style="display:flex;gap:8px">' +
+    '<div class="form-group" style="flex:1"><label class="form-label">Unit</label><input class="form-control" id="boqItemUnit" placeholder="Cu.m"></div>' +
+    '<div class="form-group" style="flex:1"><label class="form-label">Qty</label><input class="form-control" type="number" id="boqItemQty"></div>' +
+    '<div class="form-group" style="flex:1"><label class="form-label">Rate</label><input class="form-control" type="number" id="boqItemRate"></div>' +
+    '</div>' +
+    '<div style="display:flex;gap:8px;margin-top:8px">' +
+    '<button class="nf-btn nf-btn-primary" onclick="saveBOQItem(' + sheetId + ',' + projectId + ')">Add</button>' +
+    '<button class="nf-btn nf-btn-secondary" onclick="document.getElementById(\'boqItemFormArea\').innerHTML=\'\'">Cancel</button>' +
+    '</div></div>';
+}
+
+async function saveBOQItem(sheetId, projectId) {
+  var desc = document.getElementById('boqItemDesc').value.trim();
+  if (!desc) { showToast('Description is required'); return; }
+  try {
+    await apiCall('POST', '/sitetrack/boq/' + sheetId + '/items', {
+      itemNo: document.getElementById('boqItemNo').value.trim(),
+      description: desc,
+      unit: document.getElementById('boqItemUnit').value.trim(),
+      plannedQty: parseFloat(document.getElementById('boqItemQty').value) || 0,
+      rate: parseFloat(document.getElementById('boqItemRate').value) || 0
+    });
+    showToast('Item added');
+    document.getElementById('boqItemFormArea').innerHTML = '';
+    loadProjectBOQ(projectId, true);
+  } catch (e) { showToast('Error adding item'); }
+}
+
+function logBOQUsage(itemId, projectId) {
+  var qty = prompt('Enter quantity used:');
+  if (!qty) return;
+  qty = parseFloat(qty);
+  if (isNaN(qty) || qty <= 0) { showToast('Enter a positive number'); return; }
+  var note = prompt('Note (optional):', '') || '';
+  apiCall('POST', '/sitetrack/boq-items/' + itemId + '/usage', { qtyUsed: qty, note: note })
+    .then(function() { showToast('Usage logged'); loadProjectBOQ(projectId, true); })
+    .catch(function() { showToast('Error logging usage'); });
+}
+
+function toggleBOQPending(itemId, projectId) {
+  apiCall('PATCH', '/sitetrack/boq-items/' + itemId + '/pending', {})
+    .then(function() { showToast('Pending status toggled'); loadProjectBOQ(projectId, true); })
+    .catch(function() { showToast('Error toggling pending'); });
+}
+
+function showExcelUpload(projectId) {
+  var area = document.getElementById('boqExcelArea');
+  if (!area) return;
+  area.innerHTML = '<div class="card" style="padding:16px;border-left:4px solid var(--primary);margin-bottom:10px">' +
+    '<div class="nf-section-title" style="margin-bottom:8px">Import BOQ from Excel</div>' +
+    '<p style="font-size:.72rem;color:var(--gray-500);margin-bottom:8px">Upload .xlsx with SUMMARY + ABSTRACT sheets. Existing BOQ data will be replaced.</p>' +
+    '<div id="boqDropZone" class="excel-drop-zone" onclick="document.getElementById(\'boqFileInput\').click()" ondragover="event.preventDefault();this.classList.add(\'drag-over\')" ondragleave="this.classList.remove(\'drag-over\')" ondrop="handleBOQDrop(event,' + projectId + ')">' +
+    '<div style="font-size:1.5rem;margin-bottom:4px">📄</div>' +
+    '<div style="font-size:.78rem;font-weight:600">Drop .xlsx file here or click to browse</div>' +
+    '</div>' +
+    '<input type="file" id="boqFileInput" accept=".xlsx,.xls" style="display:none" onchange="uploadBOQExcel(' + projectId + ',this.files[0])">' +
+    '<button class="nf-btn nf-btn-secondary" style="margin-top:8px" onclick="document.getElementById(\'boqExcelArea\').innerHTML=\'\'">Cancel</button>' +
+    '</div>';
+}
+
+function handleBOQDrop(e, projectId) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drag-over');
+  var file = e.dataTransfer.files[0];
+  if (file) uploadBOQExcel(projectId, file);
+}
+
+async function uploadBOQExcel(projectId, file) {
+  if (!file) return;
+  var ext = file.name.split('.').pop().toLowerCase();
+  if (ext !== 'xlsx' && ext !== 'xls') { showToast('Only .xlsx files are supported'); return; }
+  if (!confirm('This will replace ALL existing BOQ data for this project. Continue?')) return;
+
+  var formData = new FormData();
+  formData.append('file', file);
+
+  try {
+    var resp = await fetch(API_BASE + '/sitetrack/projects/' + projectId + '/import-boq', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + JWT_TOKEN },
+      body: formData
+    });
+    var result = await resp.json();
+    if (!resp.ok) throw new Error(result.error || 'Upload failed');
+    showToast('Imported ' + result.sheetsImported + ' BOQ sheets');
+    document.getElementById('boqExcelArea').innerHTML = '';
+    currentBOQSheetId = null;
+    loadProjectBOQ(projectId, true);
+  } catch (e) { showToast('Error: ' + e.message); }
+}
+
+// =====================================================
+// SITETRACK: GANTT TAB
+// =====================================================
+function renderProjectGantt(proj) {
+  var html = '<div style="padding:0 16px">';
+  var tasks = (proj.wbsTasks && proj.wbsTasks.length > 0) ? proj.wbsTasks : [];
+
+  if (tasks.length === 0) {
+    html += '<div class="nf-empty" style="margin-top:16px">Add WBS tasks with start/end dates to see the Gantt chart.</div>';
+    html += '</div>';
+    return html;
+  }
+
+  // Find date range
+  var allDates = [];
+  tasks.forEach(function(t) {
+    if (t.startDate) allDates.push(new Date(t.startDate));
+    if (t.endDate) allDates.push(new Date(t.endDate));
+    if (t.actualStart) allDates.push(new Date(t.actualStart));
+    if (t.actualEnd) allDates.push(new Date(t.actualEnd));
+  });
+
+  if (allDates.length === 0) {
+    html += '<div class="nf-empty" style="margin-top:16px">No dates set on WBS tasks for Gantt chart.</div>';
+    html += '</div>';
+    return html;
+  }
+
+  var minDate = new Date(Math.min.apply(null, allDates));
+  var maxDate = new Date(Math.max.apply(null, allDates));
+  // Pad by 1 week
+  minDate.setDate(minDate.getDate() - 7);
+  maxDate.setDate(maxDate.getDate() + 7);
+
+  var totalDays = Math.ceil((maxDate - minDate) / (1000 * 60 * 60 * 24));
+  var totalWeeks = Math.ceil(totalDays / 7);
+  if (totalWeeks < 2) totalWeeks = 2;
+
+  // Week headers
+  html += '<div class="gantt-container">';
+  html += '<div class="gantt-header-row">';
+  html += '<div class="gantt-name-col" style="font-weight:700;font-size:.7rem">Task</div>';
+  html += '<div class="gantt-weeks-col">';
+  for (var w = 0; w < totalWeeks; w++) {
+    var weekStart = new Date(minDate);
+    weekStart.setDate(weekStart.getDate() + w * 7);
+    html += '<div class="gantt-week-label">' + weekStart.toLocaleDateString('en-IN', {day:'numeric',month:'short'}) + '</div>';
+  }
+  html += '</div></div>';
+
+  // Today line position
+  var today = new Date();
+  var todayPct = ((today - minDate) / (maxDate - minDate)) * 100;
+
+  // Task bars
+  tasks.forEach(function(t) {
+    if (!t.startDate || !t.endDate) return;
+    var start = new Date(t.startDate);
+    var end = new Date(t.endDate);
+    var leftPct = Math.max(0, ((start - minDate) / (maxDate - minDate)) * 100);
+    var widthPct = Math.max(2, ((end - start) / (maxDate - minDate)) * 100);
+
+    var barColor = t.status === 'completed' ? 'var(--success)' : t.status === 'in_progress' ? 'var(--primary)' : 'var(--gray-300)';
+
+    html += '<div class="gantt-task-row">';
+    html += '<div class="gantt-name-col gantt-task-label wbs-level-' + t.level + '">' + escapeHTML(t.wbsCode) + ' ' + escapeHTML(t.taskName.substring(0, 25)) + '</div>';
+    html += '<div class="gantt-weeks-col gantt-timeline" style="position:relative">';
+    html += '<div class="gantt-bar-planned" style="left:' + leftPct + '%;width:' + widthPct + '%">';
+    html += '<div class="gantt-bar-fill" style="width:' + t.progressPct + '%;background:' + barColor + '"></div>';
+    if (t.progressPct > 0) html += '<span class="gantt-bar-pct">' + Math.round(t.progressPct) + '%</span>';
+    html += '</div>';
+
+    // Actual bar overlay
+    if (t.actualStart) {
+      var aStart = new Date(t.actualStart);
+      var aEnd = t.actualEnd ? new Date(t.actualEnd) : today;
+      var aLeft = Math.max(0, ((aStart - minDate) / (maxDate - minDate)) * 100);
+      var aWidth = Math.max(1, ((aEnd - aStart) / (maxDate - minDate)) * 100);
+      html += '<div style="position:absolute;top:14px;left:' + aLeft + '%;width:' + aWidth + '%;height:4px;background:var(--warning);border-radius:2px;opacity:0.7" title="Actual"></div>';
+    }
+    html += '</div></div>';
+  });
+
+  // Today line
+  if (todayPct >= 0 && todayPct <= 100) {
+    html += '<div class="gantt-task-row" style="height:0;position:relative">';
+    html += '<div class="gantt-name-col"></div>';
+    html += '<div class="gantt-weeks-col" style="position:relative">';
+    html += '<div class="gantt-today-line" style="left:' + todayPct + '%"><span class="gantt-today-tip">Today</span></div>';
+    html += '</div></div>';
+  }
+
+  // Legend
+  html += '<div class="gantt-legend">';
+  html += '<span><span style="display:inline-block;width:12px;height:8px;background:var(--gray-300);border-radius:2px;margin-right:4px"></span>Planned</span>';
+  html += '<span><span style="display:inline-block;width:12px;height:8px;background:var(--primary);border-radius:2px;margin-right:4px"></span>In Progress</span>';
+  html += '<span><span style="display:inline-block;width:12px;height:8px;background:var(--success);border-radius:2px;margin-right:4px"></span>Completed</span>';
+  html += '<span><span style="display:inline-block;width:12px;height:4px;background:var(--warning);border-radius:2px;margin-right:4px"></span>Actual</span>';
+  html += '</div>';
+
+  html += '</div></div>';
+  return html;
+}
+
+// =====================================================
+// SITETRACK: DAILY LOG TAB
+// =====================================================
+function renderProjectDailyLogs(proj, isMDorHR) {
+  var html = '<div style="padding:0 16px">';
+  html += '<div style="margin-top:10px;margin-bottom:8px"><button class="nf-btn nf-btn-primary nf-btn-sm" onclick="openDailyLogForm(' + proj.id + ')">+ Add Log Entry</button></div>';
+  html += '<div id="dailyLogFormArea"></div>';
+  html += '<div id="dailyLogContent"><div class="nf-empty" style="margin-top:16px"><span class="spinner"></span> Loading logs...</div></div>';
+  html += '</div>';
+  setTimeout(function() { loadDailyLogs(proj.id); }, 50);
+  return html;
+}
+
+async function loadDailyLogs(projectId) {
+  var container = document.getElementById('dailyLogContent');
+  if (!container) return;
+  try {
+    var logs = await apiCall('GET', '/sitetrack/projects/' + projectId + '/daily-logs');
+    if (!logs || logs.length === 0) {
+      container.innerHTML = '<div class="nf-empty" style="margin-top:16px">No daily logs yet.</div>';
+      return;
+    }
+    var mapped = logs.map(mapDailyWorkLog);
+    var html = '';
+    var weatherIcons = { Sunny:'☀️', Cloudy:'☁️', Rainy:'🌧️', Hot:'🔥', Clear:'🌤️' };
+
+    mapped.forEach(function(log) {
+      var emp = EMPLOYEES.find(function(e){return e.code===log.loggedBy;});
+      var empName = emp ? emp.name : log.loggedBy;
+      var icon = weatherIcons[log.weather] || '';
+
+      html += '<div class="log-entry">';
+      html += '<div class="log-header">';
+      html += '<span class="log-date">' + log.logDate + '</span>';
+      if (log.weather) html += '<span style="margin-left:8px">' + icon + ' ' + escapeHTML(log.weather) + '</span>';
+      if (log.workersCount) html += '<span style="margin-left:8px;font-size:.7rem;color:var(--gray-500)">👷 ' + log.workersCount + ' workers</span>';
+      html += '</div>';
+      html += '<div class="log-desc">' + escapeHTML(log.workDescription) + '</div>';
+      if (log.taskName) html += '<div class="log-meta">Task: ' + escapeHTML(log.wbsCode + ' - ' + log.taskName) + '</div>';
+      if (log.progressUpdate) html += '<div class="log-meta">Progress: ' + log.progressUpdate + '%</div>';
+      if (log.materialsNote) html += '<div class="log-meta">Materials: ' + escapeHTML(log.materialsNote) + '</div>';
+      if (log.remarks) html += '<div class="log-meta">Remarks: ' + escapeHTML(log.remarks) + '</div>';
+      html += '<div class="log-by">by ' + escapeHTML(empName) + '</div>';
+      html += '</div>';
+    });
+    container.innerHTML = html;
+  } catch (e) {
+    container.innerHTML = '<div class="nf-empty">Error loading daily logs</div>';
+  }
+}
+
+function openDailyLogForm(projectId) {
+  var area = document.getElementById('dailyLogFormArea');
+  if (!area) return;
+  var proj = projects.find(function(p){return p.id===projectId;});
+  var taskOpts = '<option value="">No task link</option>';
+  if (proj && proj.wbsTasks) {
+    proj.wbsTasks.forEach(function(t) {
+      taskOpts += '<option value="' + t.id + '">' + escapeHTML(t.wbsCode + ' - ' + t.taskName) + '</option>';
+    });
+  }
+  var weatherOpts = WEATHER_OPTIONS.map(function(w) {
+    return '<option value="' + w + '">' + w + '</option>';
+  }).join('');
+
+  area.innerHTML = '<div class="card" style="padding:12px;border-left:4px solid var(--primary);margin-bottom:8px">' +
+    '<div class="nf-section-title" style="margin-bottom:8px">Add Daily Log</div>' +
+    '<div style="display:flex;gap:8px">' +
+    '<div class="form-group" style="flex:1"><label class="form-label">Date</label><input class="form-control" type="date" id="dlDate" value="' + new Date().toISOString().split('T')[0] + '"></div>' +
+    '<div class="form-group" style="flex:1"><label class="form-label">Weather</label><select class="form-control" id="dlWeather"><option value="">--</option>' + weatherOpts + '</select></div>' +
+    '<div class="form-group" style="flex:1"><label class="form-label">Workers</label><input class="form-control" type="number" id="dlWorkers" min="0"></div>' +
+    '</div>' +
+    '<div class="form-group"><label class="form-label">Work Description *</label><textarea class="form-control" id="dlDesc" rows="2"></textarea></div>' +
+    '<div style="display:flex;gap:8px">' +
+    '<div class="form-group" style="flex:2"><label class="form-label">Link to WBS Task</label><select class="form-control" id="dlTask">' + taskOpts + '</select></div>' +
+    '<div class="form-group" style="flex:1"><label class="form-label">Progress %</label><input class="form-control" type="number" id="dlProgress" min="0" max="100"></div>' +
+    '</div>' +
+    '<div class="form-group"><label class="form-label">Materials Note</label><input class="form-control" id="dlMaterials"></div>' +
+    '<div class="form-group"><label class="form-label">Remarks</label><input class="form-control" id="dlRemarks"></div>' +
+    '<div style="display:flex;gap:8px;margin-top:8px">' +
+    '<button class="nf-btn nf-btn-primary" onclick="saveDailyLog(' + projectId + ')">Save</button>' +
+    '<button class="nf-btn nf-btn-secondary" onclick="document.getElementById(\'dailyLogFormArea\').innerHTML=\'\'">Cancel</button>' +
+    '</div></div>';
+}
+
+async function saveDailyLog(projectId) {
+  var desc = document.getElementById('dlDesc').value.trim();
+  if (!desc) { showToast('Work description is required'); return; }
+  var taskId = document.getElementById('dlTask').value || null;
+  var progress = document.getElementById('dlProgress').value;
+  try {
+    await apiCall('POST', '/sitetrack/projects/' + projectId + '/daily-logs', {
+      logDate: document.getElementById('dlDate').value,
+      weather: document.getElementById('dlWeather').value,
+      workersCount: parseInt(document.getElementById('dlWorkers').value, 10) || null,
+      workDescription: desc,
+      taskId: taskId ? parseInt(taskId, 10) : null,
+      progressUpdate: progress ? parseFloat(progress) : null,
+      materialsNote: document.getElementById('dlMaterials').value.trim(),
+      remarks: document.getElementById('dlRemarks').value.trim()
+    });
+    // If task progress was updated, refresh WBS data
+    if (taskId && progress) {
+      var proj = projects.find(function(p){return p.id===projectId;});
+      if (proj) {
+        try {
+          var wbsData = await apiCall('GET', '/sitetrack/projects/' + projectId + '/wbs');
+          proj.wbsTasks = wbsData.map(mapWBSTask);
+        } catch (e2) { /* ok */ }
+      }
+    }
+    showToast('Daily log saved');
+    document.getElementById('dailyLogFormArea').innerHTML = '';
+    loadDailyLogs(projectId);
+  } catch (e) { showToast('Error saving log'); }
 }
 
 function openTaskForm(projectId) {
