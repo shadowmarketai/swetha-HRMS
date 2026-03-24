@@ -299,7 +299,7 @@ const NAV_CONFIG = {
 };
 
 // F3: Self Service
-let employeeSelfData = {};
+// employeeSelfData removed — using EMPLOYEES array directly via ensureSelfData()
 
 // F4: Geo-fenced Attendance
 const SITE_LOCATIONS = [
@@ -308,8 +308,7 @@ const SITE_LOCATIONS = [
   {name:'Site - Porur', lat:11.0320, lng:76.9800, radius:250},
   {name:'PEB Unit - Kinathukadavu', lat:10.8100, lng:76.9700, radius:250}
 ];
-let siteLocations; try { siteLocations = JSON.parse(safeStorage.get('hrms_site_locations')); } catch { siteLocations = null; }
-if (!siteLocations || !Array.isArray(siteLocations)) siteLocations = SITE_LOCATIONS.map(s => ({...s}));
+let siteLocations = SITE_LOCATIONS.map(s => ({...s}));
 
 // F5: Tax / Form 16
 let taxDeclarations = {};
@@ -4275,39 +4274,21 @@ async function initAnalyticsCharts(m) {
 // LOCALSTORAGE PERSISTENCE
 // =====================================================
 const STORAGE_KEYS = {
-  // Session & preferences (always local)
+  // Session & preferences (always local — auth/biometric only)
   session: 'hrms_session',
-  notifPref: 'hrms_notif_pref',
+  notifPref: 'hrms_notif_perm',
   biometricEnabled: 'hrms_biometric_enabled',
-  // Local-only data (no backend endpoints)
+  // Local-only data (no backend endpoints yet)
   resumeBank: 'hrms_resume_bank',
   resumeNextId: 'hrms_resume_next_id',
-  kpiData: 'hrms_kpi_data',
-  employeeDocuments: 'hrms_employee_documents',
-  personalVisions: 'hrms_personal_visions',
-  employeeSelfData: 'hrms_employee_self_data',
-  siteLocations: 'hrms_site_locations',
-  shiftTypes: 'hrms_shift_types',
-  projects: 'hrms_projects',
-  projectNextId: 'hrms_project_next_id',
-  projectTaskNextIds: 'hrms_project_task_next_ids',
-  attendanceLogs: 'hrms_attendance_logs'
+  personalVisions: 'hrms_personal_visions'
 };
 
 function saveLocalOnlyData() {
   try {
     safeStorage.set(STORAGE_KEYS.resumeBank, JSON.stringify(RESUME_BANK));
     safeStorage.set(STORAGE_KEYS.resumeNextId, JSON.stringify(resumeNextId));
-    safeStorage.set(STORAGE_KEYS.kpiData, JSON.stringify(KPI_DATA));
-    safeStorage.set(STORAGE_KEYS.employeeDocuments, JSON.stringify(EMPLOYEE_DOCUMENTS));
     safeStorage.set(STORAGE_KEYS.personalVisions, JSON.stringify(PERSONAL_VISIONS));
-    safeStorage.set(STORAGE_KEYS.employeeSelfData, JSON.stringify(employeeSelfData));
-    safeStorage.set(STORAGE_KEYS.siteLocations, JSON.stringify(siteLocations));
-    safeStorage.set(STORAGE_KEYS.shiftTypes, JSON.stringify(SHIFT_TYPES));
-    safeStorage.set(STORAGE_KEYS.projects, JSON.stringify(projects));
-    safeStorage.set(STORAGE_KEYS.projectNextId, JSON.stringify(projectNextId));
-    safeStorage.set(STORAGE_KEYS.projectTaskNextIds, JSON.stringify(projectTaskNextIds));
-    safeStorage.set(STORAGE_KEYS.attendanceLogs, JSON.stringify(typeof attendanceLogs !== 'undefined' ? attendanceLogs : []));
   } catch (e) {
     // Failed to save local data
   }
@@ -4323,15 +4304,7 @@ function loadLocalOnlyData() {
     var d;
     d = load(STORAGE_KEYS.resumeBank); if (d) { RESUME_BANK.length = 0; d.forEach(function(e) { RESUME_BANK.push(e); }); }
     d = load(STORAGE_KEYS.resumeNextId); if (d !== null) resumeNextId = d;
-    d = load(STORAGE_KEYS.kpiData); if (d) { Object.keys(KPI_DATA).forEach(function(k) { delete KPI_DATA[k]; }); Object.assign(KPI_DATA, d); }
-    d = load(STORAGE_KEYS.employeeDocuments); if (d) { EMPLOYEE_DOCUMENTS.length = 0; d.forEach(function(e) { EMPLOYEE_DOCUMENTS.push(e); }); }
     d = load(STORAGE_KEYS.personalVisions); if (d) { Object.keys(PERSONAL_VISIONS).forEach(function(k) { delete PERSONAL_VISIONS[k]; }); Object.assign(PERSONAL_VISIONS, d); }
-    d = load(STORAGE_KEYS.employeeSelfData); if (d) { Object.keys(employeeSelfData).forEach(function(k) { delete employeeSelfData[k]; }); Object.assign(employeeSelfData, d); }
-    d = load(STORAGE_KEYS.siteLocations); if (d && Array.isArray(d)) { siteLocations.length = 0; d.forEach(function(e) { siteLocations.push(e); }); }
-    d = load(STORAGE_KEYS.shiftTypes); if (d && Array.isArray(d)) { SHIFT_TYPES.length = 0; d.forEach(function(e) { SHIFT_TYPES.push(e); }); }
-    d = load(STORAGE_KEYS.projects); if (d && Array.isArray(d)) { projects.length = 0; d.forEach(function(e) { projects.push(e); }); }
-    d = load(STORAGE_KEYS.projectNextId); if (d !== null) projectNextId = d;
-    d = load(STORAGE_KEYS.projectTaskNextIds); if (d) { Object.keys(projectTaskNextIds).forEach(function(k) { delete projectTaskNextIds[k]; }); Object.assign(projectTaskNextIds, d); }
   } catch (e) {
     // Failed to load local data
   }
@@ -4988,38 +4961,55 @@ function sendNotification(title, body, tag) {
 // =====================================================
 // BROWSER APIS — GPS CHECK-IN
 // =====================================================
-let attendanceLogs; try { attendanceLogs = JSON.parse(safeStorage.get(STORAGE_KEYS.attendanceLogs) || '[]'); } catch { attendanceLogs = []; }
+let attendanceLogs = [];
 
 function gpsCheckIn() {
   if (!navigator.geolocation) { showToast('Geolocation not supported'); return; }
   var btn = document.getElementById('gpsCheckinBtn');
   if (btn) btn.textContent = 'Getting location...';
 
-  function onSuccess(pos) {
+  async function onSuccess(pos) {
     var geoResult = checkGeofence(pos.coords.latitude, pos.coords.longitude);
     var remark = '';
     if (!geoResult.inside) {
       remark = prompt('You are outside the geofenced area. Please provide a reason:') || '';
     }
-    var log = {
-      empCode: currentUser.code,
-      type: 'checkin',
-      lat: pos.coords.latitude,
-      lng: pos.coords.longitude,
-      accuracy: pos.coords.accuracy,
-      timestamp: new Date().toISOString(),
-      location: geoResult.inside ? geoResult.location : 'Outside geofence',
-      remark: remark
-    };
-    attendanceLogs.push(log);
-    safeStorage.set(STORAGE_KEYS.attendanceLogs, JSON.stringify(attendanceLogs));
+    var locationName = geoResult.inside ? geoResult.location : 'Outside geofence';
+    try {
+      var result = await apiCall('POST', '/attendance/checkin', {
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        location: locationName,
+        remark: remark,
+        isWithinGeofence: geoResult.inside,
+        accuracy: pos.coords.accuracy
+      });
+      // Push mapped result to local array
+      if (result && result.row) {
+        attendanceLogs.push(mapAttendanceLog(result.row));
+      } else {
+        attendanceLogs.push({
+          empCode: currentUser.code, type: 'checkin',
+          lat: pos.coords.latitude, lng: pos.coords.longitude,
+          accuracy: pos.coords.accuracy, timestamp: new Date().toISOString(),
+          location: locationName, remark: remark
+        });
+      }
+    } catch (e) {
+      // Fallback: push local-only if API fails
+      attendanceLogs.push({
+        empCode: currentUser.code, type: 'checkin',
+        lat: pos.coords.latitude, lng: pos.coords.longitude,
+        accuracy: pos.coords.accuracy, timestamp: new Date().toISOString(),
+        location: locationName, remark: remark
+      });
+    }
     showToast('Checked in at ' + (geoResult.inside ? geoResult.location : pos.coords.latitude.toFixed(4) + '\u00B0N, ' + pos.coords.longitude.toFixed(4) + '\u00B0E'));
     addNotification('Check-In Recorded', 'Location: ' + (geoResult.inside ? geoResult.location : pos.coords.latitude.toFixed(4) + '\u00B0N'), 'checkin');
     // Notify MD & HR if outside geofence
     if (!geoResult.inside) {
       var alertMsg = currentUser.name + ' (' + currentUser.code + ') checked in OUTSIDE geofence at ' + pos.coords.latitude.toFixed(4) + '\u00B0N, ' + pos.coords.longitude.toFixed(4) + '\u00B0E' + (remark ? '. Reason: ' + remark : '');
       apiCall('POST', '/notifications', { title: 'Outside Geofence Check-In', body: alertMsg, category: 'checkin', target_emp_code: 'MD001' }).catch(function(){});
-      // Also notify all HR
       EMPLOYEES.filter(function(e) { return e.role === 'HR'; }).forEach(function(hr) {
         apiCall('POST', '/notifications', { title: 'Outside Geofence Check-In', body: alertMsg, category: 'checkin', target_emp_code: hr.code }).catch(function(){});
       });
@@ -5034,7 +5024,6 @@ function gpsCheckIn() {
   navigator.geolocation.getCurrentPosition(onSuccess,
     function(err) {
       if (err.code === 3) {
-        // Timeout — retry with network location (faster, less accurate)
         if (btn) btn.textContent = 'Retrying...';
         navigator.geolocation.getCurrentPosition(onSuccess,
           function(err2) {
@@ -5054,24 +5043,39 @@ function gpsCheckIn() {
 
 function gpsCheckOut() {
   if (!navigator.geolocation) { showToast('Geolocation not supported'); return; }
-  function onSuccess(pos) {
+  async function onSuccess(pos) {
     var geoResult = checkGeofence(pos.coords.latitude, pos.coords.longitude);
     var remark = '';
     if (!geoResult.inside) {
       remark = prompt('You are outside the geofenced area. Please provide a reason:') || '';
     }
-    var log = {
-      empCode: currentUser.code, type: 'checkout',
-      lat: pos.coords.latitude, lng: pos.coords.longitude,
-      accuracy: pos.coords.accuracy, timestamp: new Date().toISOString(),
-      location: geoResult.inside ? geoResult.location : 'Outside geofence',
-      remark: remark
-    };
-    attendanceLogs.push(log);
-    safeStorage.set(STORAGE_KEYS.attendanceLogs, JSON.stringify(attendanceLogs));
+    var locationName = geoResult.inside ? geoResult.location : 'Outside geofence';
+    try {
+      var result = await apiCall('POST', '/attendance/checkout', {
+        lat: pos.coords.latitude, lng: pos.coords.longitude,
+        location: locationName, remark: remark,
+        isWithinGeofence: geoResult.inside
+      });
+      if (result && result.row) {
+        attendanceLogs.push(mapAttendanceLog(result.row));
+      } else {
+        attendanceLogs.push({
+          empCode: currentUser.code, type: 'checkout',
+          lat: pos.coords.latitude, lng: pos.coords.longitude,
+          accuracy: pos.coords.accuracy, timestamp: new Date().toISOString(),
+          location: locationName, remark: remark
+        });
+      }
+    } catch (e) {
+      attendanceLogs.push({
+        empCode: currentUser.code, type: 'checkout',
+        lat: pos.coords.latitude, lng: pos.coords.longitude,
+        accuracy: pos.coords.accuracy, timestamp: new Date().toISOString(),
+        location: locationName, remark: remark
+      });
+    }
     showToast('Checked out at ' + (geoResult.inside ? geoResult.location : pos.coords.latitude.toFixed(4) + '\u00B0N, ' + pos.coords.longitude.toFixed(4) + '\u00B0E'));
     addNotification('Check-Out Recorded', 'Location: ' + (geoResult.inside ? geoResult.location : pos.coords.latitude.toFixed(4) + '\u00B0N'), 'checkout');
-    // Notify MD & HR if outside geofence
     if (!geoResult.inside) {
       var alertMsg = currentUser.name + ' (' + currentUser.code + ') checked out OUTSIDE geofence at ' + pos.coords.latitude.toFixed(4) + '\u00B0N, ' + pos.coords.longitude.toFixed(4) + '\u00B0E' + (remark ? '. Reason: ' + remark : '');
       apiCall('POST', '/notifications', { title: 'Outside Geofence Check-Out', body: alertMsg, category: 'checkout', target_emp_code: 'MD001' }).catch(function(){});
@@ -5659,6 +5663,92 @@ function mapTaxDeclaration(row) {
     monthlyTds: parseFloat(row.monthly_tds || row.monthlyTds) || 0
   };
 }
+function mapAttendanceLog(row) {
+  var ts = row.check_in || row.timestamp || row.created_at || '';
+  return {
+    id: row.id,
+    empCode: row.emp_code || row.empCode || '',
+    type: row.check_out ? 'checkout' : 'checkin',
+    lat: parseFloat(row.check_in_lat || row.lat) || 0,
+    lng: parseFloat(row.check_in_lng || row.lng) || 0,
+    checkOutLat: parseFloat(row.check_out_lat) || 0,
+    checkOutLng: parseFloat(row.check_out_lng) || 0,
+    accuracy: parseFloat(row.accuracy) || 0,
+    timestamp: ts ? new Date(ts).toISOString() : new Date().toISOString(),
+    checkIn: row.check_in ? new Date(row.check_in).toISOString() : null,
+    checkOut: row.check_out ? new Date(row.check_out).toISOString() : null,
+    location: row.location_name || row.location || '',
+    remark: row.remark || '',
+    status: row.status || 'Present',
+    logDate: row.log_date || '',
+    isWithinGeofence: row.is_within_geofence !== undefined ? !!row.is_within_geofence : true,
+    name: row.name || '',
+    dept: row.dept || ''
+  };
+}
+function mapGeofenceSite(row) {
+  return {
+    id: row.id,
+    name: row.name || '',
+    lat: parseFloat(row.lat) || 0,
+    lng: parseFloat(row.lng) || 0,
+    radius: parseInt(row.radius, 10) || 200,
+    isActive: row.is_active !== undefined ? !!row.is_active : true
+  };
+}
+function mapProject(row) {
+  return {
+    id: row.id,
+    name: row.name || '',
+    client: row.client || '',
+    location: row.location || '',
+    budget: parseFloat(row.budget) || 0,
+    status: row.status || 'Not Started',
+    startDate: row.start_date || row.startDate || '',
+    targetDate: row.target_date || row.targetDate || '',
+    createdBy: row.created_by || row.createdBy || '',
+    tasks: (row.tasks || []).map(mapProjectTask),
+    team: row.team || [],
+    materials: (row.materials || []).map(mapProjectMaterial)
+  };
+}
+function mapProjectTask(row) {
+  return {
+    id: row.id,
+    title: row.title || '',
+    description: row.description || '',
+    priority: row.priority || 'Medium',
+    assignedTo: row.assigned_to || row.assignedTo || '',
+    status: row.status || 'Pending',
+    dueDate: row.due_date || row.dueDate || '',
+    createdDate: row.created_at || row.createdDate || ''
+  };
+}
+function mapProjectMaterial(row) {
+  return {
+    id: row.id,
+    projectId: row.project_id || row.projectId,
+    name: row.name || '',
+    unit: row.unit || '',
+    total: parseFloat(row.total) || 0,
+    used: parseFloat(row.used) || 0,
+    remaining: parseFloat(row.remaining) || 0
+  };
+}
+function mapDocument(row) {
+  return {
+    id: row.id,
+    empCode: row.emp_code || row.empCode || '',
+    empName: row.emp_name || '',
+    docType: row.doc_type || row.docType || 'general',
+    docName: row.doc_name || row.docName || '',
+    filePath: row.file_path || row.filePath || '',
+    fileSize: row.file_size || row.fileSize || 0,
+    mimeType: row.mime_type || row.mimeType || '',
+    isGenerated: !!(row.is_generated || row.isGenerated),
+    uploadedAt: row.uploaded_at || row.uploadedAt || ''
+  };
+}
 
 // =====================================================
 // DB-FIRST: Load All Shared Data from Backend
@@ -5672,7 +5762,8 @@ async function loadFromBackend() {
     var fetchOpts = { method: 'GET', headers: headers };
     var base = API_BASE;
 
-    // Build request list — 18 parallel fetches
+    // Build request list — 23 parallel fetches
+    var curMonth = new Date().toISOString().slice(0, 7);
     var requests = [
       { key: 'employees', url: base + '/employees?limit=200' },
       { key: 'leaves', url: base + '/leaves?limit=500' },
@@ -5687,13 +5778,18 @@ async function loadFromBackend() {
       { key: 'exits', url: base + '/exit?limit=200' },
       { key: 'expenses', url: base + '/expenses?limit=500' },
       { key: 'shifts', url: base + '/shifts' },
-      { key: 'tax', url: base + '/tax' }
+      { key: 'tax', url: base + '/tax' },
+      { key: 'attendance', url: base + '/attendance?month=' + curMonth },
+      { key: 'geofenceSites', url: base + '/geofence/sites' },
+      { key: 'projects', url: base + '/projects' },
+      { key: 'documents', url: base + '/documents' }
     ];
     // MD/HR-only endpoints
     if (isMDorHR) {
       requests.push({ key: 'leaveBalanceAll', url: base + '/leaves/balance/all' });
       requests.push({ key: 'complianceFilings', url: base + '/compliance/filings' });
       requests.push({ key: 'contractWorkers', url: base + '/compliance/contract-workers' });
+      requests.push({ key: 'kpiAll', url: base + '/kpi' });
     } else {
       requests.push({ key: 'leaveBalance', url: base + '/leaves/balance' });
     }
@@ -5872,6 +5968,67 @@ async function loadFromBackend() {
         contractWorkers.length = 0;
         cwData.map(mapContractWorker).forEach(function(w) { contractWorkers.push(w); });
         contractWorkerNextId = contractWorkers.reduce(function(mx, w) { return Math.max(mx, w.id || 0); }, 0) + 1;
+      }
+    }
+
+    // 18. Attendance logs
+    if (keyIdx.attendance !== undefined) {
+      var attData = getData(keyIdx.attendance);
+      if (attData && Array.isArray(attData) && attData.length > 0) {
+        attendanceLogs.length = 0;
+        attData.map(mapAttendanceLog).forEach(function(a) { attendanceLogs.push(a); });
+      }
+    }
+
+    // 19. Geofence sites
+    if (keyIdx.geofenceSites !== undefined) {
+      var geoData = getData(keyIdx.geofenceSites);
+      if (geoData && Array.isArray(geoData) && geoData.length > 0) {
+        siteLocations.length = 0;
+        geoData.map(mapGeofenceSite).forEach(function(s) { siteLocations.push(s); });
+      }
+    }
+
+    // 20. Projects
+    if (keyIdx.projects !== undefined) {
+      var projData = getData(keyIdx.projects);
+      if (projData && Array.isArray(projData) && projData.length > 0) {
+        projects.length = 0;
+        projData.map(mapProject).forEach(function(p) { projects.push(p); });
+        projectNextId = projects.reduce(function(mx, p) { return Math.max(mx, p.id || 0); }, 0) + 1;
+        // Rebuild projectTaskNextIds from DB data
+        Object.keys(projectTaskNextIds).forEach(function(k) { delete projectTaskNextIds[k]; });
+        projects.forEach(function(p) {
+          var maxTaskId = (p.tasks || []).reduce(function(mx, t) { return Math.max(mx, t.id || 0); }, 0);
+          projectTaskNextIds[p.id] = maxTaskId + 1;
+        });
+        // Rebuild projectMaterials from DB data
+        projectMaterials.length = 0;
+        projects.forEach(function(p) {
+          (p.materials || []).forEach(function(m) { projectMaterials.push(m); });
+        });
+      }
+    }
+
+    // 21. KPI data (MD/HR)
+    if (isMDorHR && keyIdx.kpiAll !== undefined) {
+      var kpiAllData = getData(keyIdx.kpiAll);
+      if (kpiAllData && Array.isArray(kpiAllData)) {
+        Object.keys(KPI_DATA).forEach(function(k) { delete KPI_DATA[k]; });
+        kpiAllData.forEach(function(row) {
+          var code = row.emp_code || row.empCode;
+          if (!KPI_DATA[code]) KPI_DATA[code] = { scores: [], selfRatings: [] };
+          KPI_DATA[code].scores.push(row);
+        });
+      }
+    }
+
+    // 22. Documents
+    if (keyIdx.documents !== undefined) {
+      var docData = getData(keyIdx.documents);
+      if (docData && Array.isArray(docData)) {
+        EMPLOYEE_DOCUMENTS.length = 0;
+        docData.map(mapDocument).forEach(function(d) { EMPLOYEE_DOCUMENTS.push(d); });
       }
     }
 
@@ -6528,7 +6685,7 @@ function addNotification(title, body, category) {
     sendNotification(title, body, category + '-' + Date.now());
     showNotifPopup(title, body);
   }
-  try { safeStorage.set(STORAGE_KEYS.notifHistory, JSON.stringify(NOTIF_HISTORY)); } catch(e){}
+  // notifHistory saved to DB via API
   // Persist to backend (include target_emp_code for person-specific notifications)
   apiCall('POST', '/notifications', { title, body, category, target_emp_code: currentUser ? currentUser.code : null }).catch(function(){});
 }
@@ -6562,7 +6719,7 @@ function refreshNotifications() {
         showNotifPopup(newest.title, newest.body);
       }
     }
-    try { safeStorage.set(STORAGE_KEYS.notifHistory, JSON.stringify(NOTIF_HISTORY)); } catch(e){}
+    // notifHistory saved to DB via API
     // If notification overlay is open, re-render it
     var overlay = document.getElementById('overlay-notifications');
     if (overlay && overlay.classList.contains('active')) renderNotifications();
@@ -6642,14 +6799,14 @@ function markNotifRead(id) {
 function markAllNotifRead() {
   NOTIF_HISTORY.forEach(n => n.read = true);
   renderNotifications(); updateNotifBadge();
-  try { safeStorage.set(STORAGE_KEYS.notifHistory, JSON.stringify(NOTIF_HISTORY)); } catch(e){}
+  // notifHistory saved to DB via API
   apiCall('PATCH', '/notifications/read-all').catch(function(){});
 }
 
 function toggleNotifPref(key, btn) {
   btn.classList.toggle('on');
   notifPrefs[key] = btn.classList.contains('on');
-  try { safeStorage.set(STORAGE_KEYS.notifPrefs, JSON.stringify(notifPrefs)); } catch(e){}
+  // notifPrefs saved to DB via API
   apiCall('PUT', '/notifications/prefs', notifPrefs).catch(function(){});
 }
 
@@ -7259,11 +7416,9 @@ function migrateSelfData(data) {
   return data;
 }
 function ensureSelfData(code) {
-  if (!employeeSelfData[code]) employeeSelfData[code] = {};
-  var d = employeeSelfData[code];
-  migrateSelfData(d);
-  if (!d.documents) d.documents = { aadhaar: null, pan: null, resume: null, education: null, experience: null };
-  return d;
+  var emp = EMPLOYEES.find(function(e) { return e.code === code; }) || {};
+  if (!emp.documents) emp.documents = { aadhaar: null, pan: null, resume: null, education: null, experience: null };
+  return emp;
 }
 function updatePersonalDetails() {
   var phoneEl = document.getElementById('ssPhone');
@@ -7312,12 +7467,8 @@ function updatePersonalDetails() {
     Object.keys(payload).forEach(function(k) { emp[k] = payload[k]; });
     currentUser = Object.assign({}, currentUser, payload);
   }
-  // Also keep selfData in sync for sameAddress checkbox
-  var selfData = ensureSelfData(currentUser.code);
-  selfData.sameAddress = sameAddrEl ? sameAddrEl.checked : false;
   // Call self-update endpoint
   apiCall('PUT', '/employees/' + currentUser.code + '/self', payload).catch(function(){});
-  saveLocalOnlyData();
   showToast('Personal details saved successfully');
   var btn = document.querySelector('#selfServiceContent .ss-save-btn');
   if (btn) { btn.textContent = 'Saved ✓'; btn.style.background = 'var(--success)'; setTimeout(function() { btn.textContent = 'Save Changes'; btn.style.background = ''; }, 1500); }
@@ -7793,7 +7944,7 @@ function renderGeofenceSites() {
   c.innerHTML = html;
 }
 
-function addGeofenceSiteFromForm() {
+async function addGeofenceSiteFromForm() {
   var name = (document.getElementById('geoSiteName').value || '').trim();
   var lat = parseFloat(document.getElementById('geoSiteLat').value);
   var lng = parseFloat(document.getElementById('geoSiteLng').value);
@@ -7802,8 +7953,12 @@ function addGeofenceSiteFromForm() {
   if (isNaN(lat) || lat < -90 || lat > 90) { showToast('Invalid latitude (-90 to 90)'); return; }
   if (isNaN(lng) || lng < -180 || lng > 180) { showToast('Invalid longitude (-180 to 180)'); return; }
   if (isNaN(radius) || radius < 50 || radius > 5000) { showToast('Radius must be 50–5000 meters'); return; }
-  siteLocations.push({ name: name, lat: lat, lng: lng, radius: radius });
-  safeStorage.set(STORAGE_KEYS.siteLocations, JSON.stringify(siteLocations));
+  try {
+    var result = await apiCall('POST', '/geofence/sites', { name: name, lat: lat, lng: lng, radius: radius });
+    siteLocations.push(mapGeofenceSite(result));
+  } catch (e) {
+    siteLocations.push({ name: name, lat: lat, lng: lng, radius: radius });
+  }
   showToast('Site "' + name + '" added');
   document.getElementById('geoSiteName').value = '';
   document.getElementById('geoSiteLat').value = '';
@@ -7812,7 +7967,7 @@ function addGeofenceSiteFromForm() {
   renderGeofenceSites();
 }
 
-function editGeofenceSite(idx) {
+async function editGeofenceSite(idx) {
   var site = siteLocations[idx];
   if (!site) return;
   var newName = prompt('Site name:', site.name);
@@ -7831,19 +7986,27 @@ function editGeofenceSite(idx) {
   if (newRadius === null) return;
   newRadius = parseInt(newRadius, 10);
   if (isNaN(newRadius) || newRadius < 50 || newRadius > 5000) { showToast('Radius must be 50–5000 meters'); return; }
-  siteLocations[idx] = { name: newName, lat: newLat, lng: newLng, radius: newRadius };
-  safeStorage.set(STORAGE_KEYS.siteLocations, JSON.stringify(siteLocations));
+  try {
+    if (site.id) {
+      await apiCall('PUT', '/geofence/sites/' + site.id, { name: newName, lat: newLat, lng: newLng, radius: newRadius });
+    }
+  } catch (e) { /* update locally anyway */ }
+  siteLocations[idx] = Object.assign({}, site, { name: newName, lat: newLat, lng: newLng, radius: newRadius });
   showToast('Site updated');
   renderGeofenceSites();
 }
 
-function deleteGeofenceSite(idx) {
+async function deleteGeofenceSite(idx) {
   if (isTemporaryMD()) { showToast('Temporary MD does not have delete permissions'); return; }
   var site = siteLocations[idx];
   if (!site) return;
   if (!confirm('Delete site "' + site.name + '"?')) return;
+  try {
+    if (site.id) {
+      await apiCall('DELETE', '/geofence/sites/' + site.id);
+    }
+  } catch (e) { /* delete locally anyway */ }
   siteLocations.splice(idx, 1);
-  safeStorage.set(STORAGE_KEYS.siteLocations, JSON.stringify(siteLocations));
   showToast('Site deleted');
   renderGeofenceSites();
 }
@@ -8636,7 +8799,7 @@ function renderProgressScreen() {
 // =====================================================
 // MATERIALS TRACKING
 // =====================================================
-var projectMaterials = JSON.parse(safeStorage.get('hrms_projectMaterials') || 'null') || [
+var projectMaterials = [
   { projectId: 1, name: 'TMT Steel Bars', unit: 'MT', total: 50, used: 32, remaining: 18 },
   { projectId: 1, name: 'Cement Bags', unit: 'Bags', total: 500, used: 340, remaining: 160 },
   { projectId: 1, name: 'Sand', unit: 'Cu.ft', total: 200, used: 145, remaining: 55 },
@@ -8730,7 +8893,7 @@ function saveProjectMaterials(projectId) {
       projectMaterials[idx][field] = inp.value.trim();
     }
   });
-  saveMaterialsData();
+  saveMaterialsData(projectId);
   showToast('Materials saved');
   var proj = projects.find(function(p){return p.id===projectId;});
   if (proj) renderProjectDetailContent(proj);
@@ -8744,13 +8907,16 @@ function addMaterialRow(projectId) {
 
 function deleteMaterialRow(idx, projectId) {
   projectMaterials.splice(idx, 1);
-  saveMaterialsData();
+  saveMaterialsData(projectId);
   var proj = projects.find(function(p){return p.id===projectId;});
   if (proj) renderProjectDetailContent(proj);
 }
 
-function saveMaterialsData() {
-  try { safeStorage.set('hrms_projectMaterials', JSON.stringify(projectMaterials)); } catch(e) {}
+function saveMaterialsData(projectId) {
+  if (projectId) {
+    var mats = projectMaterials.filter(function(m) { return m.projectId === projectId; });
+    apiCall('POST', '/projects/' + projectId + '/materials/bulk', { materials: mats }).catch(function(){});
+  }
 }
 
 function openProjectForm(editId) {
@@ -8785,7 +8951,7 @@ function openProjectForm(editId) {
   container.innerHTML = html;
 }
 
-function saveProject(editId) {
+async function saveProject(editId) {
   var name = document.getElementById('projName').value.trim();
   if (!name) { showToast('Project name is required'); return; }
   var data = {
@@ -8798,31 +8964,38 @@ function saveProject(editId) {
     status: document.getElementById('projStatus').value
   };
 
-  if (editId) {
-    var proj = projects.find(function(p){return p.id===editId;});
-    if (proj) {
-      Object.assign(proj, data);
-      showToast('Project updated');
+  try {
+    if (editId) {
+      var proj = projects.find(function(p){return p.id===editId;});
+      if (proj) {
+        await apiCall('PUT', '/projects/' + editId, data);
+        Object.assign(proj, data);
+        showToast('Project updated');
+      }
+    } else {
+      var result = await apiCall('POST', '/projects', data);
+      var newProj = mapProject(result);
+      projects.push(newProj);
+      projectTaskNextIds[newProj.id] = 1;
+      projectNextId = Math.max(projectNextId, newProj.id + 1);
+      showToast('Project created');
     }
-  } else {
-    var newProj = Object.assign({id: projectNextId, createdBy: currentUser.code, tasks: [], team: []}, data);
-    projects.push(newProj);
-    projectTaskNextIds[projectNextId] = 1;
-    projectNextId++;
-    showToast('Project created');
+  } catch (e) {
+    showToast('Error saving project');
   }
-  apiCall('POST', '/projects', data).catch(function(){});
-  saveLocalOnlyData();
   renderProgressScreen();
 }
 
-function deleteProject(id) {
+async function deleteProject(id) {
   if (!currentUser || currentUser.role !== 'MD') { showToast('Only MD can delete projects'); return; }
   if (isTemporaryMD()) { showToast('Temporary MD does not have delete permissions'); return; }
   if (!confirm('Delete this project permanently?')) return;
+  try {
+    await apiCall('DELETE', '/projects/' + id);
+  } catch (e) { /* delete locally anyway */ }
   projects = projects.filter(function(p){return p.id !== id;});
+  projectMaterials = projectMaterials.filter(function(m){return m.projectId !== id;});
   delete projectTaskNextIds[id];
-  saveLocalOnlyData();
   showToast('Project deleted');
   hideOverlay('project-detail');
   renderProgressScreen();
@@ -9012,26 +9185,32 @@ function openTaskForm(projectId) {
     '</div></div>';
 }
 
-function saveProjectTask(projectId) {
+async function saveProjectTask(projectId) {
   var title = document.getElementById('projTaskTitle').value.trim();
   if (!title) { showToast('Task title is required'); return; }
   var proj = projects.find(function(p){return p.id===projectId;});
   if (!proj) return;
 
-  var taskId = projectTaskNextIds[projectId] || 1;
-  var task = {
-    id: taskId,
+  var taskData = {
     title: title,
     description: document.getElementById('projTaskDesc').value.trim(),
     priority: document.getElementById('projTaskPriority').value,
     assignedTo: document.getElementById('projTaskAssign').value,
     status: 'Pending',
-    dueDate: document.getElementById('projTaskDue').value,
-    createdDate: new Date().toISOString().split('T')[0]
+    dueDate: document.getElementById('projTaskDue').value
   };
-  proj.tasks.push(task);
-  projectTaskNextIds[projectId] = taskId + 1;
-  saveLocalOnlyData();
+  try {
+    var result = await apiCall('POST', '/projects/' + projectId + '/tasks', taskData);
+    var task = mapProjectTask(result);
+    proj.tasks.push(task);
+    projectTaskNextIds[projectId] = Math.max(projectTaskNextIds[projectId] || 1, task.id + 1);
+  } catch (e) {
+    var taskId = projectTaskNextIds[projectId] || 1;
+    taskData.id = taskId;
+    taskData.createdDate = new Date().toISOString().split('T')[0];
+    proj.tasks.push(taskData);
+    projectTaskNextIds[projectId] = taskId + 1;
+  }
   showToast('Task added');
   renderProjectDetailContent(proj);
 }
@@ -9044,7 +9223,7 @@ function toggleTaskStatus(projectId, taskId) {
   if (task.status === 'Pending') task.status = 'In Progress';
   else if (task.status === 'In Progress') task.status = 'Done';
   else task.status = 'Pending';
-  saveLocalOnlyData();
+  apiCall('PUT', '/projects/' + projectId + '/tasks/' + taskId, { status: task.status }).catch(function(){});
   renderProjectDetailContent(proj);
 }
 
@@ -9069,14 +9248,14 @@ function openAddMemberUI(projectId) {
     '</div></div>';
 }
 
-function addProjectMember(projectId) {
+async function addProjectMember(projectId) {
   var code = document.getElementById('projAddMember').value;
   if (!code) { showToast('Select an employee'); return; }
   var proj = projects.find(function(p){return p.id===projectId;});
   if (!proj) return;
   if (proj.team.indexOf(code) !== -1) { showToast('Already in team'); return; }
+  apiCall('POST', '/projects/' + projectId + '/team', { empCode: code }).catch(function(){});
   proj.team.push(code);
-  saveLocalOnlyData();
   showToast('Member added');
   renderProjectDetailContent(proj);
 }
@@ -9085,8 +9264,8 @@ function removeProjectMember(projectId, empCode) {
   var proj = projects.find(function(p){return p.id===projectId;});
   if (!proj) return;
   if (!confirm('Remove this member from the project?')) return;
+  apiCall('DELETE', '/projects/' + projectId + '/team/' + empCode).catch(function(){});
   proj.team = proj.team.filter(function(c){return c !== empCode;});
-  saveLocalOnlyData();
   showToast('Member removed');
   renderProjectDetailContent(proj);
 }

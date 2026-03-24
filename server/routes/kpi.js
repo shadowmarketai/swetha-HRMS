@@ -2,6 +2,20 @@ const router = require('express').Router();
 const pool = require('../config/db');
 const { verifyToken, requireRole } = require('../middleware/auth');
 
+// GET /api/kpi — all KPI data (MD/HR) — MUST be before /:empCode
+router.get('/', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
+  try {
+    const [scores] = await pool.query(
+      `SELECT k.*, e.name, e.dept FROM kpi_scores k
+       JOIN employees e ON k.emp_code = e.code ORDER BY k.period DESC, e.name`
+    );
+    res.json(scores);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // GET /api/kpi/:empCode — get KPI scores (IDOR protected)
 router.get('/:empCode', verifyToken, async (req, res) => {
   try {
@@ -12,20 +26,6 @@ router.get('/:empCode', verifyToken, async (req, res) => {
     const [scores] = await pool.query('SELECT * FROM kpi_scores WHERE emp_code = ? ORDER BY period DESC', [req.params.empCode]);
     const [selfRatings] = await pool.query('SELECT * FROM kpi_self_ratings WHERE emp_code = ? ORDER BY submitted_at DESC', [req.params.empCode]);
     res.json({ scores, selfRatings });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// GET /api/kpi — all KPI data (MD/HR)
-router.get('/', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
-  try {
-    const [scores] = await pool.query(
-      `SELECT k.*, e.name, e.dept FROM kpi_scores k
-       JOIN employees e ON k.emp_code = e.code ORDER BY k.period DESC, e.name`
-    );
-    res.json(scores);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });

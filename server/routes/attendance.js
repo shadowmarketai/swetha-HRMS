@@ -5,7 +5,7 @@ const { verifyToken, requireRole } = require('../middleware/auth');
 // POST /api/attendance/checkin — GPS check-in
 router.post('/checkin', verifyToken, async (req, res) => {
   try {
-    const { lat, lng } = req.body;
+    const { lat, lng, location, remark, isWithinGeofence, accuracy } = req.body;
     const today = new Date().toISOString().split('T')[0];
 
     // Check if already checked in today
@@ -18,18 +18,30 @@ router.post('/checkin', verifyToken, async (req, res) => {
       return res.status(400).json({ error: 'Already checked in today' });
     }
 
+    let rowId;
     if (existing.length > 0) {
       await pool.query(
-        'UPDATE attendance_logs SET check_in = NOW(), check_in_lat = ?, check_in_lng = ?, status = "Present" WHERE id = ?',
-        [lat || null, lng || null, existing[0].id]
+        `UPDATE attendance_logs SET check_in = NOW(), check_in_lat = ?, check_in_lng = ?,
+         status = "Present", location_name = ?, remark = ?, is_within_geofence = ?, accuracy = ? WHERE id = ?`,
+        [lat || null, lng || null, location || null, remark || null,
+         isWithinGeofence !== undefined ? (isWithinGeofence ? 1 : 0) : 1, accuracy || null, existing[0].id]
       );
+      rowId = existing[0].id;
     } else {
-      await pool.query(
-        'INSERT INTO attendance_logs (emp_code, check_in, check_in_lat, check_in_lng, status, log_date) VALUES (?, NOW(), ?, ?, "Present", ?)',
-        [req.user.empCode, lat || null, lng || null, today]
+      const [result] = await pool.query(
+        `INSERT INTO attendance_logs (emp_code, check_in, check_in_lat, check_in_lng, status, log_date,
+         location_name, remark, is_within_geofence, accuracy)
+         VALUES (?, NOW(), ?, ?, "Present", ?, ?, ?, ?, ?)`,
+        [req.user.empCode, lat || null, lng || null, today,
+         location || null, remark || null,
+         isWithinGeofence !== undefined ? (isWithinGeofence ? 1 : 0) : 1, accuracy || null]
       );
+      rowId = result.insertId;
     }
-    res.json({ message: 'Checked in successfully', time: new Date().toISOString() });
+
+    // Return the full inserted/updated row
+    const [rows] = await pool.query('SELECT * FROM attendance_logs WHERE id = ?', [rowId]);
+    res.json({ message: 'Checked in successfully', time: new Date().toISOString(), row: rows[0] || null });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
@@ -39,7 +51,7 @@ router.post('/checkin', verifyToken, async (req, res) => {
 // POST /api/attendance/checkout — GPS check-out
 router.post('/checkout', verifyToken, async (req, res) => {
   try {
-    const { lat, lng } = req.body;
+    const { lat, lng, location, remark, isWithinGeofence } = req.body;
     const today = new Date().toISOString().split('T')[0];
 
     const [existing] = await pool.query(
@@ -52,10 +64,16 @@ router.post('/checkout', verifyToken, async (req, res) => {
     }
 
     await pool.query(
-      'UPDATE attendance_logs SET check_out = NOW(), check_out_lat = ?, check_out_lng = ? WHERE id = ?',
-      [lat || null, lng || null, existing[0].id]
+      `UPDATE attendance_logs SET check_out = NOW(), check_out_lat = ?, check_out_lng = ?,
+       location_name = COALESCE(?, location_name), remark = COALESCE(?, remark),
+       is_within_geofence = ? WHERE id = ?`,
+      [lat || null, lng || null, location || null, remark || null,
+       isWithinGeofence !== undefined ? (isWithinGeofence ? 1 : 0) : 1, existing[0].id]
     );
-    res.json({ message: 'Checked out successfully', time: new Date().toISOString() });
+
+    // Return the full updated row
+    const [rows] = await pool.query('SELECT * FROM attendance_logs WHERE id = ?', [existing[0].id]);
+    res.json({ message: 'Checked out successfully', time: new Date().toISOString(), row: rows[0] || null });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });

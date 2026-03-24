@@ -165,6 +165,55 @@ async function seed() {
   }
   console.log('   Created ' + sampleFilings.length + ' sample compliance filings');
 
+  // 8. Seed geofence sites
+  console.log('\n8. Seeding geofence sites...');
+  await fetch(API_BASE + '/geofence/sites', { method: 'POST', headers: authHeaders, body: JSON.stringify({ name: 'Head Office - Saravanampatti', lat: 11.085, lng: 76.996, radius: 200 }) });
+  await fetch(API_BASE + '/geofence/sites', { method: 'POST', headers: authHeaders, body: JSON.stringify({ name: 'Factory - Sulur', lat: 11.0378, lng: 77.126, radius: 300 }) });
+  await fetch(API_BASE + '/geofence/sites', { method: 'POST', headers: authHeaders, body: JSON.stringify({ name: 'Site - Porur', lat: 11.032, lng: 76.98, radius: 250 }) });
+  await fetch(API_BASE + '/geofence/sites', { method: 'POST', headers: authHeaders, body: JSON.stringify({ name: 'PEB Unit - Kinathukadavu', lat: 10.81, lng: 76.97, radius: 250 }) });
+  console.log('   Created 4 geofence sites');
+
+  // 9. Seed projects with tasks, team, and materials
+  console.log('\n9. Seeding projects...');
+  const seedProjects = [
+    { name:'Porur Villa Project', client:'Mr. Rajesh Kumar', location:'Porur, Chennai', budget:4500000, status:'In Progress', startDate:'2025-08-15', targetDate:'2026-04-30',
+      tasks:[{title:'Foundation work',priority:'High',assignedTo:'SSC008',status:'Done',dueDate:'2025-11-30'},{title:'Structural framing',priority:'High',assignedTo:'SSC009',status:'Done',dueDate:'2026-01-15'},{title:'Brickwork & plastering',priority:'Medium',assignedTo:'SSC024',status:'In Progress',dueDate:'2026-03-15'},{title:'Electrical & plumbing',priority:'Medium',assignedTo:'SSC023',status:'Pending',dueDate:'2026-04-10'},{title:'Painting & finishing',priority:'Low',assignedTo:'SSC024',status:'Pending',dueDate:'2026-04-25'}],
+      team:['SSC008','SSC009','SSC023','SSC024'],
+      materials:[{name:'TMT Steel Bars',unit:'MT',total:50,used:32,remaining:18},{name:'Cement Bags',unit:'Bags',total:500,used:340,remaining:160},{name:'Sand',unit:'Cu.ft',total:200,used:145,remaining:55},{name:'Bricks',unit:'Nos',total:10000,used:7200,remaining:2800}]
+    },
+    { name:'Tambaram Warehouse', client:'ABC Logistics', location:'Tambaram, Chennai', budget:8500000, status:'Delayed', startDate:'2025-06-01', targetDate:'2026-06-30',
+      tasks:[{title:'Site clearing & excavation',priority:'High',assignedTo:'SSC010',status:'Done',dueDate:'2025-08-15'},{title:'Foundation & base slab',priority:'High',assignedTo:'SSC025',status:'Done',dueDate:'2025-11-30'},{title:'Steel structure erection',priority:'High',assignedTo:'SSC026',status:'In Progress',dueDate:'2026-03-31'},{title:'Roofing & cladding',priority:'Medium',assignedTo:'SSC025',status:'Pending',dueDate:'2026-05-30'}],
+      team:['SSC010','SSC025','SSC026'],
+      materials:[{name:'TMT Steel Bars',unit:'MT',total:80,used:45,remaining:35},{name:'Cement Bags',unit:'Bags',total:800,used:520,remaining:280},{name:'Ready Mix Concrete',unit:'Cu.m',total:300,used:180,remaining:120}]
+    },
+    { name:'PEB Factory Extension', client:'Swetha Structures', location:'Coimbatore', budget:3200000, status:'On Track', startDate:'2025-10-01', targetDate:'2026-03-31',
+      tasks:[{title:'Design & approval',priority:'High',assignedTo:'SSC030',status:'Done',dueDate:'2025-11-15'},{title:'Foundation work',priority:'High',assignedTo:'SSC031',status:'Done',dueDate:'2025-12-31'},{title:'PEB fabrication',priority:'High',assignedTo:'SSC032',status:'Done',dueDate:'2026-02-15'},{title:'Erection & commissioning',priority:'Medium',assignedTo:'SSC033',status:'In Progress',dueDate:'2026-03-25'}],
+      team:['SSC030','SSC031','SSC032','SSC033'],
+      materials:[{name:'MS Plates',unit:'MT',total:30,used:18,remaining:12},{name:'Welding Rods',unit:'Kg',total:200,used:140,remaining:60},{name:'Paint',unit:'Ltr',total:100,used:35,remaining:65}]
+    },
+    { name:'Guduvanchery Residence', client:'Mrs. Priya Sharma', location:'Guduvanchery', budget:6000000, status:'In Progress', startDate:'2026-01-10', targetDate:'2026-08-31',
+      tasks:[{title:'Soil testing & survey',priority:'High',assignedTo:'SSC011',status:'Done',dueDate:'2026-01-25'},{title:'Foundation excavation',priority:'High',assignedTo:'SSC027',status:'In Progress',dueDate:'2026-03-15'},{title:'RCC structure',priority:'High',assignedTo:'SSC028',status:'Pending',dueDate:'2026-05-30'},{title:'Brickwork',priority:'Medium',assignedTo:'SSC027',status:'Pending',dueDate:'2026-07-15'},{title:'Finishing & handover',priority:'Low',assignedTo:'SSC011',status:'Pending',dueDate:'2026-08-25'}],
+      team:['SSC011','SSC027','SSC028'],
+      materials:[{name:'PEB Sections',unit:'MT',total:120,used:75,remaining:45},{name:'Roofing Sheets',unit:'Sqm',total:500,used:320,remaining:180},{name:'Bolts & Nuts',unit:'Sets',total:2000,used:1400,remaining:600}]
+    }
+  ];
+  for (const sp of seedProjects) {
+    const pRes = await fetch(API_BASE + '/projects', { method: 'POST', headers: authHeaders, body: JSON.stringify(sp) });
+    const proj = await pRes.json();
+    if (proj && proj.id) {
+      for (const t of (sp.tasks || [])) {
+        await fetch(API_BASE + '/projects/' + proj.id + '/tasks', { method: 'POST', headers: authHeaders, body: JSON.stringify(t) });
+      }
+      for (const code of (sp.team || [])) {
+        await fetch(API_BASE + '/projects/' + proj.id + '/team', { method: 'POST', headers: authHeaders, body: JSON.stringify({ empCode: code }) });
+      }
+      if (sp.materials && sp.materials.length > 0) {
+        await fetch(API_BASE + '/projects/' + proj.id + '/materials/bulk', { method: 'POST', headers: authHeaders, body: JSON.stringify({ materials: sp.materials }) });
+      }
+    }
+  }
+  console.log('   Created ' + seedProjects.length + ' projects with tasks, team, and materials');
+
   console.log('\nSeed complete! Database is ready.');
   console.log('Login credentials:');
   console.log('  MD:       MD001 / admin123');

@@ -4,6 +4,51 @@ const path = require('path');
 const { verifyToken, requireRole } = require('../middleware/auth');
 const upload = require('../middleware/upload');
 
+// GET /api/documents — list all docs (MD/HR) or own docs (Employee)
+router.get('/', verifyToken, async (req, res) => {
+  try {
+    let query, params;
+    if (['MD', 'HR'].includes(req.user.role)) {
+      query = 'SELECT d.*, e.name as emp_name FROM documents d JOIN employees e ON d.emp_code = e.code ORDER BY d.uploaded_at DESC';
+      params = [];
+    } else {
+      query = 'SELECT * FROM documents WHERE emp_code = ? ORDER BY uploaded_at DESC';
+      params = [req.user.empCode];
+    }
+    const [rows] = await pool.query(query, params);
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/documents/download/:id — MUST be before /:empCode
+router.get('/download/:id', verifyToken, async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM documents WHERE id = ?', [req.params.id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Document not found' });
+    const doc = rows[0];
+    // Ownership check: employees can only download their own documents
+    if (doc.emp_code !== req.user.empCode && req.user.role === 'Employee') {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    if (doc.file_path && doc.file_path.includes('/uploads/')) {
+      // Path traversal protection
+      const uploadsDir = path.resolve(path.join(__dirname, '..', 'uploads'));
+      const resolvedPath = path.resolve(doc.file_path);
+      if (!resolvedPath.startsWith(uploadsDir)) {
+        return res.status(403).json({ error: 'Invalid file path' });
+      }
+      return res.download(resolvedPath, doc.doc_name);
+    }
+    res.json(doc);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // GET /api/documents/:empCode
 router.get('/:empCode', verifyToken, async (req, res) => {
   try {
@@ -42,32 +87,6 @@ router.post('/generate', verifyToken, requireRole('MD', 'HR'), async (req, res) 
       [empCode, docType, docName || docType, content || '']
     );
     res.json({ message: 'Document generated' });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// GET /api/documents/download/:id
-router.get('/download/:id', verifyToken, async (req, res) => {
-  try {
-    const [rows] = await pool.query('SELECT * FROM documents WHERE id = ?', [req.params.id]);
-    if (rows.length === 0) return res.status(404).json({ error: 'Document not found' });
-    const doc = rows[0];
-    // Ownership check: employees can only download their own documents
-    if (doc.emp_code !== req.user.empCode && req.user.role === 'Employee') {
-      return res.status(403).json({ error: 'Access denied' });
-    }
-    if (doc.file_path && doc.file_path.includes('/uploads/')) {
-      // Path traversal protection
-      const uploadsDir = path.resolve(path.join(__dirname, '..', 'uploads'));
-      const resolvedPath = path.resolve(doc.file_path);
-      if (!resolvedPath.startsWith(uploadsDir)) {
-        return res.status(403).json({ error: 'Invalid file path' });
-      }
-      return res.download(resolvedPath, doc.doc_name);
-    }
-    res.json(doc);
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });

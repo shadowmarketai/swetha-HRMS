@@ -112,6 +112,8 @@ app.use('/api/compliance', require('./routes/compliance'));
 app.use('/api/assets', require('./routes/assets'));
 app.use('/api/exit', require('./routes/exit'));
 app.use('/api/announcements', require('./routes/announcements'));
+app.use('/api/geofence', require('./routes/geofence'));
+app.use('/api/projects', require('./routes/projects'));
 // Health check — verifies app + DB connectivity
 app.get('/api/health', async (req, res) => {
   const health = { status: 'ok', timestamp: new Date().toISOString(), db: 'ok', uptime: process.uptime() };
@@ -139,6 +141,79 @@ app.get('*', (req, res) => {
     await pool.query("ALTER TABLE leave_applications MODIFY COLUMN status ENUM('pending','hr_accepted','approved','rejected') DEFAULT 'pending'").catch(() => {});
     // Add HR_Accepted to advance_requests status ENUM
     await pool.query("ALTER TABLE advance_requests MODIFY COLUMN status ENUM('Pending','HR_Accepted','Approved','Rejected') DEFAULT 'Pending'").catch(() => {});
+
+    // Phase A: Attendance logs — add geofence columns
+    await pool.query("ALTER TABLE attendance_logs ADD COLUMN location_name VARCHAR(200)").catch(() => {});
+    await pool.query("ALTER TABLE attendance_logs ADD COLUMN remark TEXT").catch(() => {});
+    await pool.query("ALTER TABLE attendance_logs ADD COLUMN is_within_geofence TINYINT(1) DEFAULT 1").catch(() => {});
+    await pool.query("ALTER TABLE attendance_logs ADD COLUMN accuracy DECIMAL(10,2)").catch(() => {});
+
+    // Phase B: Geofence sites table
+    await pool.query(`CREATE TABLE IF NOT EXISTS geofence_sites (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(200) NOT NULL,
+      lat DECIMAL(10,7) NOT NULL,
+      lng DECIMAL(10,7) NOT NULL,
+      radius INT NOT NULL DEFAULT 200,
+      is_active TINYINT(1) DEFAULT 1,
+      created_by VARCHAR(20),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )`).catch(() => {});
+    // Seed default sites if empty
+    const [geoCount] = await pool.query('SELECT COUNT(*) as cnt FROM geofence_sites').catch(() => [[]]);
+    if (geoCount && geoCount[0] && geoCount[0].cnt === 0) {
+      await pool.query(`INSERT INTO geofence_sites (name, lat, lng, radius) VALUES
+        ('Head Office - Saravanampatti', 11.0850000, 76.9960000, 200),
+        ('Factory - Sulur', 11.0378000, 77.1260000, 300),
+        ('Site - Porur', 11.0320000, 76.9800000, 250),
+        ('PEB Unit - Kinathukadavu', 10.8100000, 76.9700000, 250)`).catch(() => {});
+    }
+
+    // Phase D: Project tables
+    await pool.query(`CREATE TABLE IF NOT EXISTS projects (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      name VARCHAR(200) NOT NULL,
+      client VARCHAR(200),
+      location VARCHAR(200),
+      budget DECIMAL(14,2) DEFAULT 0,
+      status VARCHAR(50) DEFAULT 'Not Started',
+      start_date DATE,
+      target_date DATE,
+      created_by VARCHAR(20),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )`).catch(() => {});
+    await pool.query(`CREATE TABLE IF NOT EXISTS project_tasks (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      project_id INT NOT NULL,
+      title VARCHAR(200) NOT NULL,
+      description TEXT,
+      priority VARCHAR(20) DEFAULT 'Medium',
+      assigned_to VARCHAR(20),
+      status VARCHAR(30) DEFAULT 'Pending',
+      due_date DATE,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    )`).catch(() => {});
+    await pool.query(`CREATE TABLE IF NOT EXISTS project_team (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      project_id INT NOT NULL,
+      emp_code VARCHAR(20) NOT NULL,
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+      UNIQUE KEY unique_project_member (project_id, emp_code)
+    )`).catch(() => {});
+    await pool.query(`CREATE TABLE IF NOT EXISTS project_materials (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      project_id INT NOT NULL,
+      name VARCHAR(200) NOT NULL DEFAULT '',
+      unit VARCHAR(50) DEFAULT '',
+      total DECIMAL(12,2) DEFAULT 0,
+      used DECIMAL(12,2) DEFAULT 0,
+      remaining DECIMAL(12,2) DEFAULT 0,
+      FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+    )`).catch(() => {});
+
     console.log('DB migrations applied');
   } catch (e) { console.error('Migration error (non-fatal):', e.message); }
 })();

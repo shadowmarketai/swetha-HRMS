@@ -582,3 +582,69 @@ ALTER TABLE employees ADD COLUMN IF NOT EXISTS previous_employer VARCHAR(200);
 ALTER TABLE employees ADD COLUMN IF NOT EXISTS previous_role VARCHAR(100);
 ALTER TABLE employees ADD COLUMN IF NOT EXISTS years_of_experience DECIMAL(4,1);
 ALTER TABLE employees ADD COLUMN IF NOT EXISTS marital_status VARCHAR(20);
+
+-- Attendance logs — geofence columns
+ALTER TABLE attendance_logs ADD COLUMN IF NOT EXISTS location_name VARCHAR(200);
+ALTER TABLE attendance_logs ADD COLUMN IF NOT EXISTS remark TEXT;
+ALTER TABLE attendance_logs ADD COLUMN IF NOT EXISTS is_within_geofence TINYINT(1) DEFAULT 1;
+ALTER TABLE attendance_logs ADD COLUMN IF NOT EXISTS accuracy DECIMAL(10,2);
+
+-- Geofence Sites
+CREATE TABLE IF NOT EXISTS geofence_sites (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(200) NOT NULL,
+  lat DECIMAL(10,7) NOT NULL,
+  lng DECIMAL(10,7) NOT NULL,
+  radius INT NOT NULL DEFAULT 200,
+  is_active TINYINT(1) DEFAULT 1,
+  created_by VARCHAR(20),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- Projects
+CREATE TABLE IF NOT EXISTS projects (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  name VARCHAR(200) NOT NULL,
+  client VARCHAR(200),
+  location VARCHAR(200),
+  budget DECIMAL(14,2) DEFAULT 0,
+  status VARCHAR(50) DEFAULT 'Not Started',
+  start_date DATE,
+  target_date DATE,
+  created_by VARCHAR(20),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS project_tasks (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  project_id INT NOT NULL,
+  title VARCHAR(200) NOT NULL,
+  description TEXT,
+  priority VARCHAR(20) DEFAULT 'Medium',
+  assigned_to VARCHAR(20),
+  status VARCHAR(30) DEFAULT 'Pending',
+  due_date DATE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS project_team (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  project_id INT NOT NULL,
+  emp_code VARCHAR(20) NOT NULL,
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+  UNIQUE KEY unique_project_member (project_id, emp_code)
+);
+
+CREATE TABLE IF NOT EXISTS project_materials (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  project_id INT NOT NULL,
+  name VARCHAR(200) NOT NULL DEFAULT '',
+  unit VARCHAR(50) DEFAULT '',
+  total DECIMAL(12,2) DEFAULT 0,
+  used DECIMAL(12,2) DEFAULT 0,
+  remaining DECIMAL(12,2) DEFAULT 0,
+  FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+);
