@@ -18,7 +18,7 @@
 // Capture Google OAuth2 redirect token IMMEDIATELY before SW/cached JS can lose it
 (function(){var h=location.hash;if(h&&h.indexOf('access_token')>-1){sessionStorage.setItem('hrms_google_token',h.substring(1));history.replaceState(null,'',location.pathname+location.search)}})();
 </script>
-<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="styles.css?v=137">
 </head>
 <body>
 <div class="phone-frame" id="app">
@@ -952,6 +952,6 @@
 // Prevent login screen flash on refresh if session exists
 try{var s=localStorage.getItem('hrms_session');if(s){var p=JSON.parse(s);if(p&&p.token&&p.token.includes('.')&&Date.now()<p.expiry){document.getElementById('loginScreen').classList.add('hidden');}}}catch(e){}
 </script>
-<script src="app.js"></script>
+<script src="app.js?v=137"></script>
 </body>
 </html>
