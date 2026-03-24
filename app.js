@@ -9415,27 +9415,27 @@ async function loadProjectBOQ(projectId, isMDorHR) {
       if (activeSheet.items.length === 0) {
         html += '<div class="nf-empty">No items in this sheet</div>';
       } else {
-        html += '<div style="overflow-x:auto"><table class="boq-table" style="width:100%;font-size:.72rem">';
-        html += '<thead><tr><th>Item</th><th>Description</th><th>Unit</th><th>Qty</th><th>Rate</th><th>Amount</th><th>Used</th><th>Delta</th><th></th></tr></thead>';
+        html += '<div style="overflow-x:auto"><table class="boq-table" style="font-size:.72rem">';
+        html += '<thead><tr><th class="col-itemno">Item</th><th class="col-desc">Description</th><th class="col-unit">Unit</th><th class="col-num">Qty</th><th class="col-num">Rate</th><th class="col-amt">Amount</th><th class="col-num">Used</th><th class="col-bal">Balance</th><th class="col-actions">Actions</th></tr></thead>';
         html += '<tbody>';
         activeSheet.items.forEach(function(item) {
           if (item.isCategory) {
             html += '<tr class="boq-category"><td colspan="9" style="font-weight:700;background:var(--bg)">' + escapeHTML(item.description) + '</td></tr>';
             return;
           }
-          var delta = item.actualQtyUsed - item.plannedQty;
-          var deltaClass = delta > 0 ? 'delta-over' : delta < 0 ? 'delta-under' : 'delta-exact';
+          var balance = item.plannedQty - item.actualQtyUsed;
+          var balClass = balance < 0 ? 'delta-over' : balance > 0 ? 'delta-under' : 'delta-exact';
           var isOver = item.plannedQty > 0 && item.actualQtyUsed > item.plannedQty;
           html += '<tr class="' + (isOver ? 'boq-overuse' : '') + (item.isPending ? ' boq-pending-row' : '') + '">';
-          html += '<td>' + escapeHTML(item.itemNo) + '</td>';
-          html += '<td style="max-width:200px">' + escapeHTML(item.description) + '</td>';
-          html += '<td>' + escapeHTML(item.unit) + '</td>';
-          html += '<td style="text-align:right">' + item.plannedQty + '</td>';
-          html += '<td style="text-align:right">' + item.rate + '</td>';
-          html += '<td style="text-align:right">' + item.plannedAmount.toLocaleString('en-IN') + '</td>';
-          html += '<td style="text-align:right">' + item.actualQtyUsed + '</td>';
-          html += '<td><span class="' + deltaClass + '">' + (delta > 0 ? '+' : '') + delta.toFixed(1) + '</span></td>';
-          html += '<td style="white-space:nowrap">';
+          html += '<td class="col-itemno">' + escapeHTML(item.itemNo) + '</td>';
+          html += '<td class="col-desc" title="' + escapeHTML(item.description) + '">' + escapeHTML(item.description) + '</td>';
+          html += '<td class="col-unit">' + escapeHTML(item.unit) + '</td>';
+          html += '<td class="col-num">' + item.plannedQty + '</td>';
+          html += '<td class="col-num">' + item.rate + '</td>';
+          html += '<td class="col-amt">' + item.plannedAmount.toLocaleString('en-IN') + '</td>';
+          html += '<td class="col-num">' + item.actualQtyUsed + '</td>';
+          html += '<td class="col-bal"><span class="' + balClass + '">' + balance.toFixed(1) + '</span></td>';
+          html += '<td class="col-actions" style="white-space:nowrap">';
           html += '<button class="nf-btn nf-btn-sm" style="font-size:.6rem;padding:2px 6px" onclick="logBOQUsage(' + item.id + ',' + projectId + ')">+Use</button> ';
           html += '<button class="nf-btn nf-btn-sm" style="font-size:.6rem;padding:2px 6px;background:' + (item.isPending ? 'var(--warning)' : 'var(--gray-300)') + '" onclick="toggleBOQPending(' + item.id + ',' + projectId + ')">' + (item.isPending ? 'Pending' : 'Mark') + '</button>';
           html += '</td></tr>';

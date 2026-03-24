@@ -1760,10 +1760,17 @@ textarea.form-control{resize:vertical}
 /* =====================================================
    SITETRACK: BOQ Styles
    ===================================================== */
-.boq-table{border-collapse:collapse;width:100%}
-.boq-table th,.boq-table td{padding:6px 8px;border-bottom:1px solid var(--gray-100);text-align:left}
-.boq-table th{background:var(--bg);font-weight:600;font-size:.68rem;color:var(--gray-500);position:sticky;top:0}
+.boq-table{border-collapse:collapse;width:100%;table-layout:fixed}
+.boq-table th,.boq-table td{padding:6px 8px;border-bottom:1px solid var(--gray-100);text-align:left;overflow:hidden;text-overflow:ellipsis}
+.boq-table th{background:var(--bg);font-weight:600;font-size:.68rem;color:var(--gray-500);position:sticky;top:0;white-space:nowrap}
 .boq-table tr:hover{background:var(--bg)}
+.boq-table .col-itemno{width:50px}
+.boq-table .col-desc{width:auto}
+.boq-table .col-unit{width:50px;text-align:center}
+.boq-table .col-num{width:65px;text-align:right}
+.boq-table .col-amt{width:85px;text-align:right}
+.boq-table .col-bal{width:60px;text-align:right}
+.boq-table .col-actions{width:100px;text-align:center}
 .boq-category td{font-weight:700;background:var(--bg) !important;font-size:.72rem}
 .boq-overuse td{background:rgba(239,68,68,0.06)}
 .boq-pending-row td{border-left:3px solid var(--warning)}
