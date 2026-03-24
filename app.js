@@ -9363,7 +9363,7 @@ function renderProjectBOQ(proj, isMDorHR) {
   var html = '<div style="padding:0 16px">';
   if (isMDorHR) {
     html += '<div style="margin-top:10px;margin-bottom:8px;display:flex;gap:8px;flex-wrap:wrap">';
-    html += '<button class="nf-btn nf-btn-primary nf-btn-sm" onclick="openBOQSheetForm(' + proj.id + ')">+ Add BOQ Sheet</button>';
+    html += '<button class="nf-btn nf-btn-primary nf-btn-sm" onclick="openBOQSheetForm(' + proj.id + ')">+ Add BOQ</button>';
     html += '<button class="nf-btn nf-btn-secondary nf-btn-sm" onclick="showExcelUpload(' + proj.id + ')">Import Excel</button>';
     html += '</div>';
   }
@@ -9456,7 +9456,7 @@ function openBOQSheetForm(projectId) {
     return '<option value="' + t + '">' + BOQ_SHEET_LABELS[t] + '</option>';
   }).join('');
   area.innerHTML = '<div class="card" style="padding:12px;border-left:4px solid var(--primary);margin-bottom:8px">' +
-    '<div class="nf-section-title" style="margin-bottom:8px">Add BOQ Sheet</div>' +
+    '<div class="nf-section-title" style="margin-bottom:8px">Add BOQ</div>' +
     '<div style="display:flex;gap:8px">' +
     '<div class="form-group" style="flex:1"><label class="form-label">Type</label><select class="form-control" id="boqSheetType">' + typeOpts + '</select></div>' +
     '<div class="form-group" style="flex:2"><label class="form-label">Title</label><input class="form-control" id="boqSheetTitle" placeholder="Civil Works"></div>' +
@@ -9488,11 +9488,17 @@ async function saveBOQSheet(projectId) {
   } catch (e) { showToast('Error creating sheet'); }
 }
 
+var _boqItemAddCount = 0;
 function openBOQItemForm(sheetId, projectId) {
+  _boqItemAddCount = 0;
+  _renderBOQItemForm(sheetId, projectId);
+}
+function _renderBOQItemForm(sheetId, projectId) {
   var area = document.getElementById('boqItemFormArea');
   if (!area) return;
+  var countLabel = _boqItemAddCount > 0 ? ' <span style="font-size:.68rem;color:var(--success);margin-left:6px">(' + _boqItemAddCount + ' added)</span>' : '';
   area.innerHTML = '<div class="card" style="padding:12px;border-left:4px solid var(--primary);margin-bottom:8px">' +
-    '<div class="nf-section-title" style="margin-bottom:8px">Add BOQ Item</div>' +
+    '<div class="nf-section-title" style="margin-bottom:8px">Add BOQ Item' + countLabel + '</div>' +
     '<div style="display:flex;gap:8px">' +
     '<div class="form-group" style="flex:1"><label class="form-label">Item No</label><input class="form-control" id="boqItemNo" placeholder="1.1"></div>' +
     '<div class="form-group" style="flex:2"><label class="form-label">Description *</label><input class="form-control" id="boqItemDesc"></div>' +
@@ -9503,12 +9509,17 @@ function openBOQItemForm(sheetId, projectId) {
     '<div class="form-group" style="flex:1"><label class="form-label">Rate</label><input class="form-control" type="number" id="boqItemRate"></div>' +
     '</div>' +
     '<div style="display:flex;gap:8px;margin-top:8px">' +
-    '<button class="nf-btn nf-btn-primary" onclick="saveBOQItem(' + sheetId + ',' + projectId + ')">Add</button>' +
-    '<button class="nf-btn nf-btn-secondary" onclick="document.getElementById(\'boqItemFormArea\').innerHTML=\'\'">Cancel</button>' +
+    '<button class="nf-btn nf-btn-primary" onclick="saveBOQItem(' + sheetId + ',' + projectId + ',true)">Add & Next</button>' +
+    '<button class="nf-btn nf-btn-secondary" onclick="saveBOQItem(' + sheetId + ',' + projectId + ',false)">Add & Close</button>' +
+    '<button class="nf-btn" style="background:var(--gray-200);color:var(--text);border:none;border-radius:8px;padding:8px 14px;font-size:.78rem;cursor:pointer" onclick="closeBOQItemForm(' + projectId + ')">Done</button>' +
     '</div></div>';
 }
+function closeBOQItemForm(projectId) {
+  document.getElementById('boqItemFormArea').innerHTML = '';
+  if (_boqItemAddCount > 0) loadProjectBOQ(projectId, true);
+}
 
-async function saveBOQItem(sheetId, projectId) {
+async function saveBOQItem(sheetId, projectId, keepOpen) {
   var desc = document.getElementById('boqItemDesc').value.trim();
   if (!desc) { showToast('Description is required'); return; }
   try {
@@ -9519,9 +9530,18 @@ async function saveBOQItem(sheetId, projectId) {
       plannedQty: parseFloat(document.getElementById('boqItemQty').value) || 0,
       rate: parseFloat(document.getElementById('boqItemRate').value) || 0
     });
-    showToast('Item added');
-    document.getElementById('boqItemFormArea').innerHTML = '';
-    loadProjectBOQ(projectId, true);
+    _boqItemAddCount++;
+    showToast('Item added (' + _boqItemAddCount + ')');
+    if (keepOpen) {
+      // Clear fields but keep unit (often same across items)
+      var unitVal = document.getElementById('boqItemUnit').value;
+      _renderBOQItemForm(sheetId, projectId);
+      document.getElementById('boqItemUnit').value = unitVal;
+      document.getElementById('boqItemDesc').focus();
+    } else {
+      document.getElementById('boqItemFormArea').innerHTML = '';
+      loadProjectBOQ(projectId, true);
+    }
   } catch (e) { showToast('Error adding item'); }
 }
 
