@@ -1,65 +1,59 @@
 /**
  * HRMS Database Seed Script
- * Seeds all 46 employees, credentials, leave balances, and departments.
+ * Seeds all 44 employees, credentials, leave balances, and departments.
  * Run once: node database/seed.js
  */
 const API_BASE = process.env.API_BASE || 'http://localhost:3000/api';
 
 const EMPLOYEES = [
-  {code:'MD001',name:'Selvam',dept:'Office',designation:'Managing Director',salary:200000,bank:'UOB',accNo:'2524***1001',role:'MD',phone:'9840000001',doj:'2015-01-01'},
-  {code:'SSC001',name:'Lakshmi Priya',dept:'Office',designation:'Accounts Manager',salary:45000,bank:'UOB',accNo:'2524***1002',role:'Employee',phone:'9840000002',doj:'2019-03-15'},
-  {code:'SSC002',name:'Ramesh Kumar',dept:'Office',designation:'Office Manager',salary:40000,bank:'UOB',accNo:'2524***1003',role:'Employee',phone:'9840000003',doj:'2018-07-10'},
-  {code:'SSC003',name:'N.Hari Haran',dept:'Site',designation:'Site Supervisor',salary:50000,bank:'UOB',accNo:'2524***1004',role:'Employee',phone:'9840000004',doj:'2017-06-01'},
-  {code:'SSC004',name:'Govindan',dept:'Office',designation:'Clerk',salary:25000,bank:'UOB',accNo:'2524***1005',role:'Employee',phone:'9840000005',doj:'2020-01-20'},
-  {code:'SSC005',name:'Anitha Devi',dept:'Office',designation:'Receptionist',salary:22000,bank:'UOB',accNo:'2524***1006',role:'Employee',phone:'9840000006',doj:'2021-04-12'},
-  {code:'SSC006',name:'Priyanka',dept:'Office',designation:'HR Manager',salary:55000,bank:'UOB',accNo:'2524***1007',role:'HR',phone:'9840000007',doj:'2019-08-01'},
-  {code:'SSC007',name:'Dinesh Babu',dept:'Office',designation:'Accountant',salary:35000,bank:'UOB',accNo:'2524***1008',role:'Employee',phone:'9840000008',doj:'2020-06-15'},
-  {code:'SSC008',name:'Karthik Rajan',dept:'Office',designation:'Billing Executive',salary:28000,bank:'UOB',accNo:'2524***1009',role:'Employee',phone:'9840000009',doj:'2021-02-28'},
-  {code:'SSC009',name:'Sankar Guru.P',dept:'Office',designation:'Senior Architect',salary:45161,bank:'UOB',accNo:'2524***1010',role:'Employee',phone:'9840000010',doj:'2017-11-01'},
-  {code:'SSC010',name:'Vellaisamy Sankar',dept:'Site',designation:'Foreman',salary:43548,bank:'UOB',accNo:'2524***1011',role:'Employee',phone:'9840000011',doj:'2018-03-20'},
-  {code:'SSC011',name:'Vishnu Kumar',dept:'Office',designation:'Office Staff',salary:100000,bank:'UOB',accNo:'2524***2932',role:'Employee',phone:'9840000012',doj:'2019-05-01'},
-  {code:'SSC012',name:'Murugan.S',dept:'Office',designation:'Peon',salary:18000,bank:'UOB',accNo:'2524***1013',role:'Employee',phone:'9840000013',doj:'2020-09-10'},
-  {code:'SSC013',name:'Jayalakshmi',dept:'Office',designation:'Store Keeper',salary:24000,bank:'UOB',accNo:'2524***1014',role:'Employee',phone:'9840000014',doj:'2021-01-05'},
-  {code:'SSC014',name:'Raghavan.T',dept:'Office',designation:'Driver',salary:22000,bank:'UOB',accNo:'2524***1015',role:'Employee',phone:'9840000015',doj:'2019-12-01'},
-  {code:'SSC015',name:'Kavitha.R',dept:'Office',designation:'Data Entry',salary:20000,bank:'UOB',accNo:'2524***1016',role:'Employee',phone:'9840000016',doj:'2022-03-15'},
-  {code:'SSC016',name:'Suresh.M',dept:'Office',designation:'Office Assistant',salary:18000,bank:'UOB',accNo:'2524***1017',role:'Employee',phone:'9840000017',doj:'2022-07-01'},
-  {code:'SSC023',name:'Praveen',dept:'Office',designation:'Senior Staff',salary:47581,bank:'UOB',accNo:'2524***1018',role:'Employee',phone:'9840000018',doj:'2018-05-20'},
-  {code:'SSC017',name:'Nithya Prabhu',dept:'Site',designation:'Site Engineer',salary:38000,bank:'SBI',accNo:'3847***2001',role:'Employee',phone:'9840000019',doj:'2019-09-01'},
-  {code:'SSC018',name:'Arun Prasad',dept:'Site',designation:'Mason Head',salary:35000,bank:'SBI',accNo:'3847***2002',role:'Employee',phone:'9840000020',doj:'2018-11-15'},
-  {code:'SSC019',name:'Bala Kumar',dept:'Site',designation:'Site Supervisor',salary:32000,bank:'SBI',accNo:'3847***2003',role:'Employee',phone:'9840000021',doj:'2020-02-01'},
-  {code:'SSC020',name:'Dhanush.R',dept:'Site',designation:'Helper',salary:20000,bank:'SBI',accNo:'3847***2004',role:'Employee',phone:'9840000022',doj:'2021-06-20'},
-  {code:'SSC021',name:'Ezhilarasan',dept:'Site',designation:'Electrician',salary:28000,bank:'SBI',accNo:'3847***2005',role:'Employee',phone:'9840000023',doj:'2020-04-10'},
-  {code:'SSC022',name:'Balasubramaninam',dept:'Site',designation:'Labour Head',salary:30000,bank:'SBI',accNo:'3847***2006',role:'Employee',phone:'9840000024',doj:'2017-08-15'},
-  {code:'SSC024',name:'Ganesh Kumar',dept:'Site',designation:'Plumber',salary:25000,bank:'SBI',accNo:'3847***2007',role:'Employee',phone:'9840000025',doj:'2021-03-01'},
-  {code:'SSC025',name:'Harish.V',dept:'Site',designation:'Carpenter',salary:27000,bank:'SBI',accNo:'3847***2008',role:'Employee',phone:'9840000026',doj:'2020-10-15'},
-  {code:'SSC026',name:'Ilango.P',dept:'Site',designation:'Welder',salary:26000,bank:'SBI',accNo:'3847***2009',role:'Employee',phone:'9840000027',doj:'2021-09-01'},
-  {code:'SSC027',name:'Jeeva Rajan',dept:'Site',designation:'Helper',salary:18000,bank:'SBI',accNo:'3847***2010',role:'Employee',phone:'9840000028',doj:'2022-01-10'},
-  {code:'SSC028',name:'Karthik.S',dept:'Site',designation:'Site Worker',salary:20000,bank:'SBI',accNo:'3847***2011',role:'Employee',phone:'9840000029',doj:'2022-05-01'},
-  {code:'SSC029',name:'Loganathan',dept:'Site',designation:'Painter',salary:24000,bank:'SBI',accNo:'3847***2012',role:'Employee',phone:'9840000030',doj:'2021-11-15'},
-  {code:'SSC030',name:'Manikandan.R',dept:'Site',designation:'Helper',salary:18000,bank:'SBI',accNo:'3847***2013',role:'Employee',phone:'9840000031',doj:'2022-08-01'},
-  {code:'SSM001',name:'Shanmugam.G',dept:'Factory',designation:'Factory Supervisor',salary:38000,bank:'UOB',accNo:'2524***3001',role:'Employee',phone:'9840000032',doj:'2018-01-10'},
-  {code:'SSM002',name:'Govarthanan',dept:'Factory',designation:'Welder',salary:30000,bank:'UOB',accNo:'2524***3002',role:'Employee',phone:'9840000033',doj:'2019-04-15'},
-  {code:'SSM003',name:'Krishna Gowri Sankar.S',dept:'Factory',designation:'Senior Fabricator',salary:41829,bank:'UOB',accNo:'2524***3003',role:'Employee',phone:'9840000034',doj:'2017-09-01'},
-  {code:'SSM004',name:'Karthikeyan',dept:'Factory',designation:'Machine Operator',salary:28000,bank:'UOB',accNo:'2524***3004',role:'Employee',phone:'9840000035',doj:'2020-07-20'},
-  {code:'SSM005',name:'Vijaya Kumar',dept:'Factory',designation:'Welder',salary:25000,bank:'UOB',accNo:'2524***3005',role:'Employee',phone:'9840000036',doj:'2019-11-01'},
-  {code:'SSM006',name:'Sakthi Kumar.S',dept:'Factory',designation:'Helper',salary:36129,bank:'UOB',accNo:'2524***3006',role:'Employee',phone:'9840000037',doj:'2020-03-10'},
-  {code:'SSM007',name:'Lingeswaran',dept:'Factory',designation:'Fabricator',salary:26000,bank:'UOB',accNo:'2524***3007',role:'Employee',phone:'9840000038',doj:'2021-01-15'},
-  {code:'SSM008',name:'Udhaya Shankar',dept:'Factory',designation:'Helper',salary:22000,bank:'UOB',accNo:'2524***3008',role:'Employee',phone:'9840000039',doj:'2021-08-01'},
-  {code:'SSM009',name:'Raj Kumar.P',dept:'Factory',designation:'Painter',salary:24000,bank:'UOB',accNo:'2524***3009',role:'Employee',phone:'9840000040',doj:'2022-02-10'},
-  {code:'SSM010',name:'Saravanan.K',dept:'Factory',designation:'Quality Check',salary:30000,bank:'UOB',accNo:'2524***3010',role:'Employee',phone:'9840000041',doj:'2020-09-15'},
-  {code:'SSM011',name:'Manikandan (PEB)',dept:'PEB',designation:'PEB Supervisor',salary:20323,bank:'UOB',accNo:'2524***4001',role:'Employee',phone:'9840000042',doj:'2019-06-01'},
-  {code:'SSM012',name:'Prakash.T',dept:'PEB',designation:'PEB Worker',salary:18000,bank:'UOB',accNo:'2524***4002',role:'Employee',phone:'9840000043',doj:'2020-12-01'},
-  {code:'SSM013',name:'Senthil.R',dept:'PEB',designation:'PEB Fabricator',salary:22000,bank:'UOB',accNo:'2524***4003',role:'Employee',phone:'9840000044',doj:'2021-05-15'},
-  {code:'SSM014',name:'Vignesh.M',dept:'PEB',designation:'PEB Helper',salary:16000,bank:'UOB',accNo:'2524***4004',role:'Employee',phone:'9840000045',doj:'2022-04-01'},
-  {code:'SSG001',name:'Ramu',dept:'Garden',designation:'Gardener',salary:12000,bank:'Cash',accNo:'Cash',role:'Employee',phone:'9840000046',doj:'2018-06-01'},
-  {code:'SSG002',name:'Selvi',dept:'Garden',designation:'Gardener',salary:10000,bank:'Cash',accNo:'Cash',role:'Employee',phone:'9840000047',doj:'2019-02-15'},
-  {code:'SSG003',name:'Kumar.G',dept:'Garden',designation:'Security',salary:15000,bank:'SBI',accNo:'3847***5001',role:'Employee',phone:'9840000048',doj:'2017-12-01'},
-  {code:'SSG004',name:'Lakshman',dept:'Garden',designation:'Security Night',salary:14000,bank:'SBI',accNo:'3847***5002',role:'Employee',phone:'9840000049',doj:'2020-05-10'},
-  {code:'SSG005',name:'Devi.M',dept:'Garden',designation:'Cleaner',salary:8250,bank:'Cash',accNo:'Cash',role:'Employee',phone:'9840000050',doj:'2021-10-01'}
+  {code:'MD001',name:'Selvam',dept:'Admin',designation:'Managing Director',salary:0,bank:'',accNo:'',role:'MD',phone:'',doj:''},
+  {code:'HR001',name:'HR Admin',dept:'Admin',designation:'HR Admin',salary:0,bank:'',accNo:'',role:'HR',phone:'',doj:''},
+  {code:'SS001',name:'Sankar Guru P',dept:'Design',designation:'Designing',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:''},
+  {code:'SS002',name:'Vishnukumar M',dept:'Marketing',designation:'Marketing',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:''},
+  {code:'SS003',name:'Hariharan N',dept:'Execution',designation:'Execution',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:''},
+  {code:'SS004',name:'Priyanka S',dept:'QS',designation:'Quantity Surveyor',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:''},
+  {code:'SS005',name:'Vellaisamy Sankar',dept:'Execution',designation:'Execution',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:''},
+  {code:'SS006',name:'Srinivasan',dept:'Marketing',designation:'Marketing',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:''},
+  {code:'SS007',name:'Balasubramanian N',dept:'Marketing',designation:'Marketing',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:''},
+  {code:'SS008',name:'Santhosh J',dept:'Execution',designation:'Execution',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:''},
+  {code:'SS009',name:'Hariharan G',dept:'Design',designation:'Designing',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:''},
+  {code:'SS010',name:'M Karthikeyan',dept:'Execution',designation:'Execution',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:''},
+  {code:'SS011',name:'Govindaraj R',dept:'Marketing',designation:'Marketing',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:''},
+  {code:'SS012',name:'Kamalesh Velusamy',dept:'Execution',designation:'Execution',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:''},
+  {code:'SS013',name:'Santhoshkumar G',dept:'Production',designation:'Production',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:''},
+  {code:'SS014',name:'Nithyaprabhu A',dept:'Execution',designation:'Execution',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:''},
+  {code:'SS015',name:'Yuvaraj M',dept:'Execution',designation:'Execution',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:''},
+  {code:'SS016',name:'S Sankavai',dept:'Design',designation:'Designing',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:''},
+  {code:'SS017',name:'Kousikraja M',dept:'Marketing',designation:'Marketing',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:''},
+  {code:'SS018',name:'Rajkumar R',dept:'Marketing',designation:'Marketing',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:''},
+  {code:'SS019',name:'Sakthikumar S',dept:'Production',designation:'Production',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:''},
+  {code:'SS020',name:'Shanmugasundaran G',dept:'Production',designation:'Production',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:''},
+  {code:'SS021',name:'Govarthan S',dept:'Admin',designation:'Admin',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:''},
+  {code:'SS022',name:'Devendaran Arivalagan',dept:'Production',designation:'Production',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:''},
+  {code:'SS023',name:'Gowtham S',dept:'Production',designation:'Production',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:''},
+  {code:'SS024',name:'Manikandan M',dept:'Production',designation:'Production',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:''},
+  {code:'SS025',name:'Karthikeyan A',dept:'Production',designation:'Production',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:''},
+  {code:'SS026',name:'Krishna Gowri Sankar',dept:'Production',designation:'Production',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:''},
+  {code:'SS027',name:'Mahaganapathi Ponnusamy',dept:'Production',designation:'Production',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:''},
+  {code:'SS028',name:'Dinesh Jayabal',dept:'Admin',designation:'Driver',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:''},
+  {code:'SS029',name:'Depsingh R',dept:'Admin',designation:'Security',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:''},
+  {code:'SS030',name:'Kathirvel N',dept:'Design',designation:'Designing',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:''},
+  {code:'SS031',name:'Shiyam Raj E',dept:'Accounts',designation:'Accounts',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:''},
+  {code:'SS032',name:'Dharmaraj',dept:'Design',designation:'Designing',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:''},
+  {code:'SS033',name:'Sakthi Murugan',dept:'Execution',designation:'Execution',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:''},
+  {code:'SS034',name:'Praveen Kumar J',dept:'Marketing',designation:'Marketing',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:''},
+  {code:'SS035',name:'Dinesh',dept:'Design',designation:'Designing',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:''},
+  {code:'SS036',name:'Lingeswaran Subramanian',dept:'Production',designation:'Production',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:''},
+  {code:'SS037',name:'Udhayasankar',dept:'Production',designation:'Production',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:''},
+  {code:'SS038',name:'Manikam',dept:'Execution',designation:'Execution',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:''},
+  {code:'SS039',name:'Sarath',dept:'Execution',designation:'Execution',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:''},
+  {code:'SS040',name:'Marimuthu',dept:'Execution',designation:'Execution',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:''},
+  {code:'SS041',name:'Arunkumar',dept:'QS',designation:'Quantity Surveyor',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:''},
+  {code:'SS042',name:'Mohan',dept:'Execution',designation:'Execution',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:''}
 ];
 
-// Build credentials: MD001=admin123, SSC006=hr123, SSC011=emp123, all others=emp123
-const CREDENTIALS = { 'MD001': {pass:'admin123', idx:0}, 'SSC006': {pass:'hr123', idx:6}, 'SSC011': {pass:'emp123', idx:11} };
+// Build credentials: MD001=admin123, HR001=hr123, all SS employees=emp123
+const CREDENTIALS = { 'MD001': {pass:'admin123', idx:0}, 'HR001': {pass:'hr123', idx:1} };
 EMPLOYEES.forEach((e, i) => { if (!CREDENTIALS[e.code]) CREDENTIALS[e.code] = {pass:'emp123', idx:i}; });
 
 async function seed() {
@@ -177,23 +171,23 @@ async function seed() {
   console.log('\n9. Seeding projects...');
   const seedProjects = [
     { name:'Porur Villa Project', client:'Mr. Rajesh Kumar', location:'Porur, Chennai', budget:4500000, status:'In Progress', startDate:'2025-08-15', targetDate:'2026-04-30',
-      tasks:[{title:'Foundation work',priority:'High',assignedTo:'SSC008',status:'Done',dueDate:'2025-11-30'},{title:'Structural framing',priority:'High',assignedTo:'SSC009',status:'Done',dueDate:'2026-01-15'},{title:'Brickwork & plastering',priority:'Medium',assignedTo:'SSC024',status:'In Progress',dueDate:'2026-03-15'},{title:'Electrical & plumbing',priority:'Medium',assignedTo:'SSC023',status:'Pending',dueDate:'2026-04-10'},{title:'Painting & finishing',priority:'Low',assignedTo:'SSC024',status:'Pending',dueDate:'2026-04-25'}],
-      team:['SSC008','SSC009','SSC023','SSC024'],
+      tasks:[{title:'Foundation work',priority:'High',assignedTo:'SS003',status:'Done',dueDate:'2025-11-30'},{title:'Structural framing',priority:'High',assignedTo:'SS005',status:'Done',dueDate:'2026-01-15'},{title:'Brickwork & plastering',priority:'Medium',assignedTo:'SS008',status:'In Progress',dueDate:'2026-03-15'},{title:'Electrical & plumbing',priority:'Medium',assignedTo:'SS010',status:'Pending',dueDate:'2026-04-10'},{title:'Painting & finishing',priority:'Low',assignedTo:'SS008',status:'Pending',dueDate:'2026-04-25'}],
+      team:['SS003','SS005','SS008','SS010'],
       materials:[{name:'TMT Steel Bars',unit:'MT',total:50,used:32,remaining:18},{name:'Cement Bags',unit:'Bags',total:500,used:340,remaining:160},{name:'Sand',unit:'Cu.ft',total:200,used:145,remaining:55},{name:'Bricks',unit:'Nos',total:10000,used:7200,remaining:2800}]
     },
     { name:'Tambaram Warehouse', client:'ABC Logistics', location:'Tambaram, Chennai', budget:8500000, status:'Delayed', startDate:'2025-06-01', targetDate:'2026-06-30',
-      tasks:[{title:'Site clearing & excavation',priority:'High',assignedTo:'SSC010',status:'Done',dueDate:'2025-08-15'},{title:'Foundation & base slab',priority:'High',assignedTo:'SSC025',status:'Done',dueDate:'2025-11-30'},{title:'Steel structure erection',priority:'High',assignedTo:'SSC026',status:'In Progress',dueDate:'2026-03-31'},{title:'Roofing & cladding',priority:'Medium',assignedTo:'SSC025',status:'Pending',dueDate:'2026-05-30'}],
-      team:['SSC010','SSC025','SSC026'],
+      tasks:[{title:'Site clearing & excavation',priority:'High',assignedTo:'SS014',status:'Done',dueDate:'2025-08-15'},{title:'Foundation & base slab',priority:'High',assignedTo:'SS015',status:'Done',dueDate:'2025-11-30'},{title:'Steel structure erection',priority:'High',assignedTo:'SS033',status:'In Progress',dueDate:'2026-03-31'},{title:'Roofing & cladding',priority:'Medium',assignedTo:'SS015',status:'Pending',dueDate:'2026-05-30'}],
+      team:['SS014','SS015','SS033'],
       materials:[{name:'TMT Steel Bars',unit:'MT',total:80,used:45,remaining:35},{name:'Cement Bags',unit:'Bags',total:800,used:520,remaining:280},{name:'Ready Mix Concrete',unit:'Cu.m',total:300,used:180,remaining:120}]
     },
     { name:'PEB Factory Extension', client:'Swetha Structures', location:'Coimbatore', budget:3200000, status:'On Track', startDate:'2025-10-01', targetDate:'2026-03-31',
-      tasks:[{title:'Design & approval',priority:'High',assignedTo:'SSC030',status:'Done',dueDate:'2025-11-15'},{title:'Foundation work',priority:'High',assignedTo:'SSC031',status:'Done',dueDate:'2025-12-31'},{title:'PEB fabrication',priority:'High',assignedTo:'SSC032',status:'Done',dueDate:'2026-02-15'},{title:'Erection & commissioning',priority:'Medium',assignedTo:'SSC033',status:'In Progress',dueDate:'2026-03-25'}],
-      team:['SSC030','SSC031','SSC032','SSC033'],
+      tasks:[{title:'Design & approval',priority:'High',assignedTo:'SS001',status:'Done',dueDate:'2025-11-15'},{title:'Foundation work',priority:'High',assignedTo:'SS013',status:'Done',dueDate:'2025-12-31'},{title:'PEB fabrication',priority:'High',assignedTo:'SS026',status:'Done',dueDate:'2026-02-15'},{title:'Erection & commissioning',priority:'Medium',assignedTo:'SS036',status:'In Progress',dueDate:'2026-03-25'}],
+      team:['SS001','SS013','SS026','SS036'],
       materials:[{name:'MS Plates',unit:'MT',total:30,used:18,remaining:12},{name:'Welding Rods',unit:'Kg',total:200,used:140,remaining:60},{name:'Paint',unit:'Ltr',total:100,used:35,remaining:65}]
     },
     { name:'Guduvanchery Residence', client:'Mrs. Priya Sharma', location:'Guduvanchery', budget:6000000, status:'In Progress', startDate:'2026-01-10', targetDate:'2026-08-31',
-      tasks:[{title:'Soil testing & survey',priority:'High',assignedTo:'SSC011',status:'Done',dueDate:'2026-01-25'},{title:'Foundation excavation',priority:'High',assignedTo:'SSC027',status:'In Progress',dueDate:'2026-03-15'},{title:'RCC structure',priority:'High',assignedTo:'SSC028',status:'Pending',dueDate:'2026-05-30'},{title:'Brickwork',priority:'Medium',assignedTo:'SSC027',status:'Pending',dueDate:'2026-07-15'},{title:'Finishing & handover',priority:'Low',assignedTo:'SSC011',status:'Pending',dueDate:'2026-08-25'}],
-      team:['SSC011','SSC027','SSC028'],
+      tasks:[{title:'Soil testing & survey',priority:'High',assignedTo:'SS004',status:'Done',dueDate:'2026-01-25'},{title:'Foundation excavation',priority:'High',assignedTo:'SS039',status:'In Progress',dueDate:'2026-03-15'},{title:'RCC structure',priority:'High',assignedTo:'SS040',status:'Pending',dueDate:'2026-05-30'},{title:'Brickwork',priority:'Medium',assignedTo:'SS042',status:'Pending',dueDate:'2026-07-15'},{title:'Finishing & handover',priority:'Low',assignedTo:'SS004',status:'Pending',dueDate:'2026-08-25'}],
+      team:['SS004','SS039','SS040','SS042'],
       materials:[{name:'PEB Sections',unit:'MT',total:120,used:75,remaining:45},{name:'Roofing Sheets',unit:'Sqm',total:500,used:320,remaining:180},{name:'Bolts & Nuts',unit:'Sets',total:2000,used:1400,remaining:600}]
     }
   ];
@@ -217,8 +211,8 @@ async function seed() {
   console.log('\nSeed complete! Database is ready.');
   console.log('Login credentials:');
   console.log('  MD:       MD001 / admin123');
-  console.log('  HR:       SSC006 / hr123');
-  console.log('  Employee: SSC011 / emp123');
+  console.log('  HR:       HR001 / hr123');
+  console.log('  Employee: SS001 / emp123');
   console.log('  All others: [code] / emp123');
 }
 

@@ -61,64 +61,53 @@ const COMPANY_LOGO_B64 = 'iVBORw0KGgoAAAANSUhEUgAAAQUAAABgCAIAAAHsvcANAAAKQ2lDQ1
 // EMPLOYEE DATABASE & APP STATE
 // =====================================================
 const EMPLOYEES = [
-  // OFFICE (17 staff)
-  {code:'MD001',name:'Selvam',dept:'Office',designation:'Managing Director',salary:200000,bank:'UOB',accNo:'2524***1001',role:'MD',phone:'9840000001',doj:'2015-01-01',email:'selvam@swethastructures.com'},
-  {code:'SSC001',name:'Lakshmi Priya',dept:'Office',designation:'Accounts Manager',salary:45000,bank:'UOB',accNo:'2524***1002',role:'Employee',phone:'9840000002',doj:'2019-03-15',email:'lakshmi.priya@swethastructures.com'},
-  {code:'SSC002',name:'Ramesh Kumar',dept:'Office',designation:'Office Manager',salary:40000,bank:'UOB',accNo:'2524***1003',role:'Employee',phone:'9840000003',doj:'2018-07-10',email:'ramesh.kumar@swethastructures.com'},
-  {code:'SSC003',name:'N.Hari Haran',dept:'Site',designation:'Site Supervisor',salary:50000,bank:'UOB',accNo:'2524***1004',role:'Employee',phone:'9840000004',doj:'2017-06-01',email:'hari.haran@swethastructures.com'},
-  {code:'SSC004',name:'Govindan',dept:'Office',designation:'Clerk',salary:25000,bank:'UOB',accNo:'2524***1005',role:'Employee',phone:'9840000005',doj:'2020-01-20',email:'govindan@swethastructures.com'},
-  {code:'SSC005',name:'Anitha Devi',dept:'Office',designation:'Receptionist',salary:22000,bank:'UOB',accNo:'2524***1006',role:'Employee',phone:'9840000006',doj:'2021-04-12',email:'anitha.devi@swethastructures.com'},
-  {code:'SSC006',name:'Priyanka',dept:'Office',designation:'HR Manager',salary:55000,bank:'UOB',accNo:'2524***1007',role:'HR',phone:'9840000007',doj:'2019-08-01',email:'priyanka@swethastructures.com'},
-  {code:'SSC007',name:'Dinesh Babu',dept:'Office',designation:'Accountant',salary:35000,bank:'UOB',accNo:'2524***1008',role:'Employee',phone:'9840000008',doj:'2020-06-15',email:'dinesh.babu@swethastructures.com'},
-  {code:'SSC008',name:'Karthik Rajan',dept:'Office',designation:'Billing Executive',salary:28000,bank:'UOB',accNo:'2524***1009',role:'Employee',phone:'9840000009',doj:'2021-02-28',email:'karthik.rajan@swethastructures.com'},
-  {code:'SSC009',name:'Sankar Guru.P',dept:'Office',designation:'Senior Architect',salary:45161,bank:'UOB',accNo:'2524***1010',role:'Employee',phone:'9840000010',doj:'2017-11-01',email:'sankar.guru@swethastructures.com'},
-  {code:'SSC010',name:'Vellaisamy Sankar',dept:'Site',designation:'Foreman',salary:43548,bank:'UOB',accNo:'2524***1011',role:'Employee',phone:'9840000011',doj:'2018-03-20',email:'vellaisamy.sankar@swethastructures.com'},
-  {code:'SSC011',name:'Vishnu Kumar',dept:'Office',designation:'Office Staff',salary:100000,bank:'UOB',accNo:'2524***2932',role:'Employee',phone:'9840000012',doj:'2019-05-01',email:'vishnu.kumar@swethastructures.com'},
-  {code:'SSC012',name:'Murugan.S',dept:'Office',designation:'Peon',salary:18000,bank:'UOB',accNo:'2524***1013',role:'Employee',phone:'9840000013',doj:'2020-09-10',email:'murugan.s@swethastructures.com'},
-  {code:'SSC013',name:'Jayalakshmi',dept:'Office',designation:'Store Keeper',salary:24000,bank:'UOB',accNo:'2524***1014',role:'Employee',phone:'9840000014',doj:'2021-01-05',email:'jayalakshmi@swethastructures.com'},
-  {code:'SSC014',name:'Raghavan.T',dept:'Office',designation:'Driver',salary:22000,bank:'UOB',accNo:'2524***1015',role:'Employee',phone:'9840000015',doj:'2019-12-01',email:'raghavan.t@swethastructures.com'},
-  {code:'SSC015',name:'Kavitha.R',dept:'Office',designation:'Data Entry',salary:20000,bank:'UOB',accNo:'2524***1016',role:'Employee',phone:'9840000016',doj:'2022-03-15',email:'kavitha.r@swethastructures.com'},
-  {code:'SSC016',name:'Suresh.M',dept:'Office',designation:'Office Assistant',salary:18000,bank:'UOB',accNo:'2524***1017',role:'Employee',phone:'9840000017',doj:'2022-07-01',email:'suresh.m@swethastructures.com'},
-  {code:'SSC023',name:'Praveen',dept:'Office',designation:'Senior Staff',salary:47581,bank:'UOB',accNo:'2524***1018',role:'Employee',phone:'9840000018',doj:'2018-05-20',email:'praveen@swethastructures.com'},
-  // SITE (15 staff)
-  {code:'SSC017',name:'Nithya Prabhu',dept:'Site',designation:'Site Engineer',salary:38000,bank:'SBI',accNo:'3847***2001',role:'Employee',phone:'9840000019',doj:'2019-09-01',email:'nithya.prabhu@swethastructures.com'},
-  {code:'SSC018',name:'Arun Prasad',dept:'Site',designation:'Mason Head',salary:35000,bank:'SBI',accNo:'3847***2002',role:'Employee',phone:'9840000020',doj:'2018-11-15',email:'arun.prasad@swethastructures.com'},
-  {code:'SSC019',name:'Bala Kumar',dept:'Site',designation:'Site Supervisor',salary:32000,bank:'SBI',accNo:'3847***2003',role:'Employee',phone:'9840000021',doj:'2020-02-01',email:'bala.kumar@swethastructures.com'},
-  {code:'SSC020',name:'Dhanush.R',dept:'Site',designation:'Helper',salary:20000,bank:'SBI',accNo:'3847***2004',role:'Employee',phone:'9840000022',doj:'2021-06-20',email:'dhanush.r@swethastructures.com'},
-  {code:'SSC021',name:'Ezhilarasan',dept:'Site',designation:'Electrician',salary:28000,bank:'SBI',accNo:'3847***2005',role:'Employee',phone:'9840000023',doj:'2020-04-10',email:'ezhilarasan@swethastructures.com'},
-  {code:'SSC022',name:'Balasubramaninam',dept:'Site',designation:'Labour Head',salary:30000,bank:'SBI',accNo:'3847***2006',role:'Employee',phone:'9840000024',doj:'2017-08-15',email:'balasubramaninam@swethastructures.com'},
-  {code:'SSC024',name:'Ganesh Kumar',dept:'Site',designation:'Plumber',salary:25000,bank:'SBI',accNo:'3847***2007',role:'Employee',phone:'9840000025',doj:'2021-03-01',email:'ganesh.kumar@swethastructures.com'},
-  {code:'SSC025',name:'Harish.V',dept:'Site',designation:'Carpenter',salary:27000,bank:'SBI',accNo:'3847***2008',role:'Employee',phone:'9840000026',doj:'2020-10-15',email:'harish.v@swethastructures.com'},
-  {code:'SSC026',name:'Ilango.P',dept:'Site',designation:'Welder',salary:26000,bank:'SBI',accNo:'3847***2009',role:'Employee',phone:'9840000027',doj:'2021-09-01',email:'ilango.p@swethastructures.com'},
-  {code:'SSC027',name:'Jeeva Rajan',dept:'Site',designation:'Helper',salary:18000,bank:'SBI',accNo:'3847***2010',role:'Employee',phone:'9840000028',doj:'2022-01-10',email:'jeeva.rajan@swethastructures.com'},
-  {code:'SSC028',name:'Karthik.S',dept:'Site',designation:'Site Worker',salary:20000,bank:'SBI',accNo:'3847***2011',role:'Employee',phone:'9840000029',doj:'2022-05-01',email:'karthik.s@swethastructures.com'},
-  {code:'SSC029',name:'Loganathan',dept:'Site',designation:'Painter',salary:24000,bank:'SBI',accNo:'3847***2012',role:'Employee',phone:'9840000030',doj:'2021-11-15',email:'loganathan@swethastructures.com'},
-  {code:'SSC030',name:'Manikandan.R',dept:'Site',designation:'Helper',salary:18000,bank:'SBI',accNo:'3847***2013',role:'Employee',phone:'9840000031',doj:'2022-08-01',email:'manikandan.r@swethastructures.com'},
-  // FACTORY (14 staff - incl PEB)
-  {code:'SSM001',name:'Shanmugam.G',dept:'Factory',designation:'Factory Supervisor',salary:38000,bank:'UOB',accNo:'2524***3001',role:'Employee',phone:'9840000032',doj:'2018-01-10',email:'shanmugam.g@swethastructures.com'},
-  {code:'SSM002',name:'Govarthanan',dept:'Factory',designation:'Welder',salary:30000,bank:'UOB',accNo:'2524***3002',role:'Employee',phone:'9840000033',doj:'2019-04-15',email:'govarthanan@swethastructures.com'},
-  {code:'SSM003',name:'Krishna Gowri Sankar.S',dept:'Factory',designation:'Senior Fabricator',salary:41829,bank:'UOB',accNo:'2524***3003',role:'Employee',phone:'9840000034',doj:'2017-09-01',email:'krishna.gowri@swethastructures.com'},
-  {code:'SSM004',name:'Karthikeyan',dept:'Factory',designation:'Machine Operator',salary:28000,bank:'UOB',accNo:'2524***3004',role:'Employee',phone:'9840000035',doj:'2020-07-20',email:'karthikeyan@swethastructures.com'},
-  {code:'SSM005',name:'Vijaya Kumar',dept:'Factory',designation:'Welder',salary:25000,bank:'UOB',accNo:'2524***3005',role:'Employee',phone:'9840000036',doj:'2019-11-01',email:'vijaya.kumar@swethastructures.com'},
-  {code:'SSM006',name:'Sakthi Kumar.S',dept:'Factory',designation:'Helper',salary:36129,bank:'UOB',accNo:'2524***3006',role:'Employee',phone:'9840000037',doj:'2020-03-10',email:'sakthi.kumar@swethastructures.com'},
-  {code:'SSM007',name:'Lingeswaran',dept:'Factory',designation:'Fabricator',salary:26000,bank:'UOB',accNo:'2524***3007',role:'Employee',phone:'9840000038',doj:'2021-01-15',email:'lingeswaran@swethastructures.com'},
-  {code:'SSM008',name:'Udhaya Shankar',dept:'Factory',designation:'Helper',salary:22000,bank:'UOB',accNo:'2524***3008',role:'Employee',phone:'9840000039',doj:'2021-08-01',email:'udhaya.shankar@swethastructures.com'},
-  {code:'SSM009',name:'Raj Kumar.P',dept:'Factory',designation:'Painter',salary:24000,bank:'UOB',accNo:'2524***3009',role:'Employee',phone:'9840000040',doj:'2022-02-10',email:'raj.kumar@swethastructures.com'},
-  {code:'SSM010',name:'Saravanan.K',dept:'Factory',designation:'Quality Check',salary:30000,bank:'UOB',accNo:'2524***3010',role:'Employee',phone:'9840000041',doj:'2020-09-15',email:'saravanan.k@swethastructures.com'},
-  // PEB
-  {code:'SSM011',name:'Manikandan (PEB)',dept:'PEB',designation:'PEB Supervisor',salary:20323,bank:'UOB',accNo:'2524***4001',role:'Employee',phone:'9840000042',doj:'2019-06-01',email:'manikandan.peb@swethastructures.com'},
-  {code:'SSM012',name:'Prakash.T',dept:'PEB',designation:'PEB Worker',salary:18000,bank:'UOB',accNo:'2524***4002',role:'Employee',phone:'9840000043',doj:'2020-12-01',email:'prakash.t@swethastructures.com'},
-  {code:'SSM013',name:'Senthil.R',dept:'PEB',designation:'PEB Fabricator',salary:22000,bank:'UOB',accNo:'2524***4003',role:'Employee',phone:'9840000044',doj:'2021-05-15',email:'senthil.r@swethastructures.com'},
-  {code:'SSM014',name:'Vignesh.M',dept:'PEB',designation:'PEB Helper',salary:16000,bank:'UOB',accNo:'2524***4004',role:'Employee',phone:'9840000045',doj:'2022-04-01',email:'vignesh.m@swethastructures.com'},
-  // GARDEN (5)
-  {code:'SSG001',name:'Ramu',dept:'Garden',designation:'Gardener',salary:12000,bank:'Cash',accNo:'Cash',role:'Employee',phone:'9840000046',doj:'2018-06-01',email:'ramu@swethastructures.com'},
-  {code:'SSG002',name:'Selvi',dept:'Garden',designation:'Gardener',salary:10000,bank:'Cash',accNo:'Cash',role:'Employee',phone:'9840000047',doj:'2019-02-15',email:'selvi@swethastructures.com'},
-  {code:'SSG003',name:'Kumar.G',dept:'Garden',designation:'Security',salary:15000,bank:'SBI',accNo:'3847***5001',role:'Employee',phone:'9840000048',doj:'2017-12-01',email:'kumar.g@swethastructures.com'},
-  {code:'SSG004',name:'Lakshman',dept:'Garden',designation:'Security Night',salary:14000,bank:'SBI',accNo:'3847***5002',role:'Employee',phone:'9840000049',doj:'2020-05-10',email:'lakshman@swethastructures.com'},
-  {code:'SSG005',name:'Devi.M',dept:'Garden',designation:'Cleaner',salary:8250,bank:'Cash',accNo:'Cash',role:'Employee',phone:'9840000050',doj:'2021-10-01',email:'devi.m@swethastructures.com'}
+  {code:'MD001',name:'Selvam',dept:'Admin',designation:'Managing Director',salary:0,bank:'',accNo:'',role:'MD',phone:'',doj:'',email:'selvam@swethastructures.com'},
+  {code:'HR001',name:'HR Admin',dept:'Admin',designation:'HR Admin',salary:0,bank:'',accNo:'',role:'HR',phone:'',doj:'',email:''},
+  {code:'SS001',name:'Sankar Guru P',dept:'Design',designation:'Designing',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'sankarguru182@gmail.com'},
+  {code:'SS002',name:'Vishnukumar M',dept:'Marketing',designation:'Marketing',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'vishnum991@gmail.com'},
+  {code:'SS003',name:'Hariharan N',dept:'Execution',designation:'Execution',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'hariharan0335@gmail.com'},
+  {code:'SS004',name:'Priyanka S',dept:'QS',designation:'Quantity Surveyor',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'priyankaskcivil@gmail.com'},
+  {code:'SS005',name:'Vellaisamy Sankar',dept:'Execution',designation:'Execution',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'vellaisamysankar88@yahoo.com'},
+  {code:'SS006',name:'Srinivasan',dept:'Marketing',designation:'Marketing',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'lsssrinisan@gmail.com'},
+  {code:'SS007',name:'Balasubramanian N',dept:'Marketing',designation:'Marketing',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'baluvspl@gmail.com'},
+  {code:'SS008',name:'Santhosh J',dept:'Execution',designation:'Execution',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'santhosej0210@gmail.com'},
+  {code:'SS009',name:'Hariharan G',dept:'Design',designation:'Designing',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'josephharigmw@gmail.com'},
+  {code:'SS010',name:'M Karthikeyan',dept:'Execution',designation:'Execution',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'karthikmanoharan19@gmail.com'},
+  {code:'SS011',name:'Govindaraj R',dept:'Marketing',designation:'Marketing',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'govindganga0208@gmail.com'},
+  {code:'SS012',name:'Kamalesh Velusamy',dept:'Execution',designation:'Execution',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'vkamaleshkamalesh60306@gmail.com'},
+  {code:'SS013',name:'Santhoshkumar G',dept:'Production',designation:'Production',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'santhoshganesan0556@gmail.com'},
+  {code:'SS014',name:'Nithyaprabhu A',dept:'Execution',designation:'Execution',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'nithyaprabhu00@gmail.com'},
+  {code:'SS015',name:'Yuvaraj M',dept:'Execution',designation:'Execution',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'yuvamarimuthu1085@gmail.com'},
+  {code:'SS016',name:'S Sankavai',dept:'Design',designation:'Designing',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'sankavaisanthosh@gmail.com'},
+  {code:'SS017',name:'Kousikraja M',dept:'Marketing',designation:'Marketing',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'kousik622@gmail.com'},
+  {code:'SS018',name:'Rajkumar R',dept:'Marketing',designation:'Marketing',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'Rajthelegend4058@gmail.com'},
+  {code:'SS019',name:'Sakthikumar S',dept:'Production',designation:'Production',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'sakthikumar250289@gmail.com'},
+  {code:'SS020',name:'Shanmugasundaran G',dept:'Production',designation:'Production',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'shanmugashanmuga90@gmail.com'},
+  {code:'SS021',name:'Govarthan S',dept:'Admin',designation:'Admin',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'govarthansakthi@gmail.com'},
+  {code:'SS022',name:'Devendaran Arivalagan',dept:'Production',designation:'Production',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'devendaran96@gmail.com'},
+  {code:'SS023',name:'Gowtham S',dept:'Production',designation:'Production',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'gowthamautomech1995@gmail.com'},
+  {code:'SS024',name:'Manikandan M',dept:'Production',designation:'Production',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'manikandansurya914@gmail.com'},
+  {code:'SS025',name:'Karthikeyan A',dept:'Production',designation:'Production',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'karthikabk28@gmail.com'},
+  {code:'SS026',name:'Krishna Gowri Sankar',dept:'Production',designation:'Production',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'krishnagowrisankar1@gmail.com'},
+  {code:'SS027',name:'Mahaganapathi Ponnusamy',dept:'Production',designation:'Production',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'Mahaganapathi529717@gmail.com'},
+  {code:'SS028',name:'Dinesh Jayabal',dept:'Admin',designation:'Driver',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'dineshindira2024@gmail.com'},
+  {code:'SS029',name:'Depsingh R',dept:'Admin',designation:'Security',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'depsinghrokaya@gmail.com'},
+  {code:'SS030',name:'Kathirvel N',dept:'Design',designation:'Designing',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'kathirveln2588@gmail.com'},
+  {code:'SS031',name:'Shiyam Raj E',dept:'Accounts',designation:'Accounts',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'shiyam0905@gmail.com'},
+  {code:'SS032',name:'Dharmaraj',dept:'Design',designation:'Designing',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'thedharmarajm@gmail.com'},
+  {code:'SS033',name:'Sakthi Murugan',dept:'Execution',designation:'Execution',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'sakthi252636@gmail.com'},
+  {code:'SS034',name:'Praveen Kumar J',dept:'Marketing',designation:'Marketing',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'forpraveenvideos@gmail.com'},
+  {code:'SS035',name:'Dinesh',dept:'Design',designation:'Designing',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'Dineshvj5315@gmail.com'},
+  {code:'SS036',name:'Lingeswaran Subramanian',dept:'Production',designation:'Production',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'linges1993@gmail.com'},
+  {code:'SS037',name:'Udhayasankar',dept:'Production',designation:'Production',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'udhayask14@gmail.com'},
+  {code:'SS038',name:'Manikam',dept:'Execution',designation:'Execution',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'mkguys2010@gmail.com'},
+  {code:'SS039',name:'Sarath',dept:'Execution',designation:'Execution',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'sarathcivil42@gmail.com'},
+  {code:'SS040',name:'Marimuthu',dept:'Execution',designation:'Execution',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'marimuthu04071990@gmail.com'},
+  {code:'SS041',name:'Arunkumar',dept:'QS',designation:'Quantity Surveyor',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'aruntec16@gmail.com'},
+  {code:'SS042',name:'Mohan',dept:'Execution',designation:'Execution',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'perumalmohan666@gmail.com'}
 ];
 
-let departments = ['Office','Site','Factory','Garden','PEB'];
+let departments = ['Design','Marketing','Execution','Production','QS','Admin','Accounts'];
 let currentUser = null;
 let wizardStep = 1;
 let originalSalaryHTML = '';
@@ -130,19 +119,19 @@ let notifPrefs = { salary: true, leave: true, advance: true, payroll: true, expe
 let leaveNextId = 1;
 
 // =====================================================
-// F11: DOB MAP (month/day for all 46 employees)
+// F11: DOB MAP (month/day for all 44 employees)
 // =====================================================
 const EMP_DOB_MAP = {
-  'MD001':'1975-03-11','SSC001':'1990-06-15','SSC002':'1988-11-22','SSC003':'1985-07-04','SSC004':'1992-01-18',
-  'SSC005':'1994-09-30','SSC006':'1991-04-25','SSC007':'1993-12-08','SSC008':'1995-02-14','SSC009':'1986-08-19',
-  'SSC010':'1984-05-07','SSC011':'1989-10-03','SSC012':'1996-03-11','SSC013':'1993-07-27','SSC014':'1987-11-15',
-  'SSC015':'1995-06-22','SSC016':'1997-01-09','SSC023':'1988-04-14','SSC017':'1991-09-01','SSC018':'1986-12-25',
-  'SSC019':'1992-03-17','SSC020':'1998-08-05','SSC021':'1990-02-28','SSC022':'1983-10-12','SSC024':'1994-05-20',
-  'SSC025':'1993-07-08','SSC026':'1995-11-30','SSC027':'1999-04-02','SSC028':'1997-06-18','SSC029':'1994-01-25',
-  'SSC030':'1998-09-14','SSM001':'1985-03-28','SSM002':'1990-12-10','SSM003':'1984-06-03','SSM004':'1992-08-22',
-  'SSM005':'1991-11-07','SSM006':'1993-04-19','SSM007':'1996-02-11','SSM008':'1997-07-30','SSM009':'1995-10-16',
-  'SSM010':'1992-05-24','SSM011':'1988-01-31','SSM012':'1994-08-13','SSM013':'1996-06-09','SSM014':'1998-03-22',
-  'SSG001':'1980-07-15','SSG002':'1982-12-20','SSG003':'1979-09-05','SSG004':'1985-04-11','SSG005':'1990-02-18'
+  'MD001':'1975-03-11','HR001':'1985-01-15',
+  'SS001':'1986-08-19','SS002':'1989-10-03','SS003':'1985-07-04','SS004':'1991-04-25','SS005':'1984-05-07',
+  'SS006':'1988-11-22','SS007':'1983-10-12','SS008':'1995-02-14','SS009':'1990-06-15','SS010':'1992-03-17',
+  'SS011':'1993-12-08','SS012':'1998-08-05','SS013':'1993-07-27','SS014':'1991-09-01','SS015':'1995-06-22',
+  'SS016':'1994-09-30','SS017':'1997-01-09','SS018':'1990-12-10','SS019':'1993-04-19','SS020':'1985-03-28',
+  'SS021':'1990-02-28','SS022':'1996-02-11','SS023':'1995-10-16','SS024':'1992-08-22','SS025':'1992-05-24',
+  'SS026':'1984-06-03','SS027':'1988-01-31','SS028':'1987-11-15','SS029':'1980-07-15','SS030':'1994-05-20',
+  'SS031':'1997-07-30','SS032':'1996-06-09','SS033':'1994-01-25','SS034':'1988-04-14','SS035':'1999-04-02',
+  'SS036':'1996-03-11','SS037':'1997-06-18','SS038':'1982-12-20','SS039':'1998-09-14','SS040':'1979-09-05',
+  'SS041':'1994-08-13','SS042':'1990-05-24'
 };
 EMPLOYEES.forEach(e => { if (EMP_DOB_MAP[e.code]) e.dob = EMP_DOB_MAP[e.code]; });
 
@@ -157,7 +146,7 @@ let SHIFT_TYPES = [
   {code:'3RD', name:'Third Shift (Night)', start:'22:00', end:'06:00', color:'#7C3AED'}
 ];
 let shiftAssignments = {};
-const SHIFT_ELIGIBLE_DEPTS = ['Factory'];
+const SHIFT_ELIGIBLE_DEPTS = ['Production'];
 
 // F2: Expense Reimbursement
 const EXPENSE_CATEGORIES = ['Travel','Food','Accommodation','Equipment','Office Supplies','Medical','Fuel','Other'];
@@ -365,7 +354,7 @@ const CLEARANCE_DEPTS = ['IT & Systems','Finance','HR','Admin','Reporting Manage
 const ANNOUNCE_CATEGORIES = ['General','Policy Update','Event','Achievement'];
 let announcements = [
   {id:1, title:'Pongal Holiday Schedule 2026', body:'Office will remain closed from Jan 14-16. Factory skeleton staff on Jan 15.', category:'Event', author:'MD001', date:'2026-01-10', priority:'high'},
-  {id:2, title:'New Safety Guidelines', body:'All site and factory employees must wear safety helmets at all times. Violations will be reported.', category:'Policy Update', author:'SSC006', date:'2026-02-20', priority:'normal'},
+  {id:2, title:'New Safety Guidelines', body:'All site and factory employees must wear safety helmets at all times. Violations will be reported.', category:'Policy Update', author:'HR001', date:'2026-02-20', priority:'normal'},
   {id:3, title:'Employee of the Month - February', body:'Congratulations to Krishna Gowri Sankar for outstanding fabrication work on the Porur project!', category:'Achievement', author:'MD001', date:'2026-03-01', priority:'normal'}
 ];
 let announcementNextId = 4;
@@ -376,37 +365,37 @@ const TASK_PRIORITIES = ['Low', 'Medium', 'High', 'Urgent'];
 let projects = [
   { id:1, name:'Porur Villa Project', client:'Mr. Rajesh Kumar', location:'Porur, Chennai',
     budget:4500000, status:'In Progress', startDate:'2025-08-15', targetDate:'2026-04-30',
-    createdBy:'MD001', team:['SSC008','SSC009','SSC023','SSC024'], tasks:[
-      {id:1,title:'Foundation work',description:'Complete foundation and footing',priority:'High',assignedTo:'SSC008',status:'Done',dueDate:'2025-11-30',createdDate:'2025-08-20'},
-      {id:2,title:'Structural framing',description:'RCC columns and beams',priority:'High',assignedTo:'SSC009',status:'Done',dueDate:'2026-01-15',createdDate:'2025-09-01'},
-      {id:3,title:'Brickwork & plastering',description:'Wall construction and plastering',priority:'Medium',assignedTo:'SSC024',status:'In Progress',dueDate:'2026-03-15',createdDate:'2025-11-10'},
-      {id:4,title:'Electrical & plumbing',description:'MEP rough-in and finishing',priority:'Medium',assignedTo:'SSC023',status:'Pending',dueDate:'2026-04-10',createdDate:'2026-01-05'},
-      {id:5,title:'Painting & finishing',description:'Interior and exterior painting',priority:'Low',assignedTo:'SSC024',status:'Pending',dueDate:'2026-04-25',createdDate:'2026-01-05'}
+    createdBy:'MD001', team:['SS003','SS005','SS008','SS010'], tasks:[
+      {id:1,title:'Foundation work',description:'Complete foundation and footing',priority:'High',assignedTo:'SS003',status:'Done',dueDate:'2025-11-30',createdDate:'2025-08-20'},
+      {id:2,title:'Structural framing',description:'RCC columns and beams',priority:'High',assignedTo:'SS005',status:'Done',dueDate:'2026-01-15',createdDate:'2025-09-01'},
+      {id:3,title:'Brickwork & plastering',description:'Wall construction and plastering',priority:'Medium',assignedTo:'SS008',status:'In Progress',dueDate:'2026-03-15',createdDate:'2025-11-10'},
+      {id:4,title:'Electrical & plumbing',description:'MEP rough-in and finishing',priority:'Medium',assignedTo:'SS010',status:'Pending',dueDate:'2026-04-10',createdDate:'2026-01-05'},
+      {id:5,title:'Painting & finishing',description:'Interior and exterior painting',priority:'Low',assignedTo:'SS008',status:'Pending',dueDate:'2026-04-25',createdDate:'2026-01-05'}
     ]},
   { id:2, name:'Tambaram Warehouse', client:'ABC Logistics', location:'Tambaram, Chennai',
     budget:8500000, status:'Delayed', startDate:'2025-06-01', targetDate:'2026-06-30',
-    createdBy:'MD001', team:['SSC010','SSC025','SSC026'], tasks:[
-      {id:1,title:'Site clearing & excavation',description:'Clear site and excavate for foundation',priority:'High',assignedTo:'SSC010',status:'Done',dueDate:'2025-08-15',createdDate:'2025-06-05'},
-      {id:2,title:'Foundation & base slab',description:'PCC and RCC slab work',priority:'High',assignedTo:'SSC025',status:'Done',dueDate:'2025-11-30',createdDate:'2025-06-10'},
-      {id:3,title:'Steel structure erection',description:'Pre-engineered steel building frame',priority:'High',assignedTo:'SSC026',status:'In Progress',dueDate:'2026-03-31',createdDate:'2025-09-15'},
-      {id:4,title:'Roofing & cladding',description:'Metal roofing sheets and wall cladding',priority:'Medium',assignedTo:'SSC025',status:'Pending',dueDate:'2026-05-30',createdDate:'2025-12-01'}
+    createdBy:'MD001', team:['SS014','SS015','SS033'], tasks:[
+      {id:1,title:'Site clearing & excavation',description:'Clear site and excavate for foundation',priority:'High',assignedTo:'SS014',status:'Done',dueDate:'2025-08-15',createdDate:'2025-06-05'},
+      {id:2,title:'Foundation & base slab',description:'PCC and RCC slab work',priority:'High',assignedTo:'SS015',status:'Done',dueDate:'2025-11-30',createdDate:'2025-06-10'},
+      {id:3,title:'Steel structure erection',description:'Pre-engineered steel building frame',priority:'High',assignedTo:'SS033',status:'In Progress',dueDate:'2026-03-31',createdDate:'2025-09-15'},
+      {id:4,title:'Roofing & cladding',description:'Metal roofing sheets and wall cladding',priority:'Medium',assignedTo:'SS015',status:'Pending',dueDate:'2026-05-30',createdDate:'2025-12-01'}
     ]},
   { id:3, name:'PEB Factory Extension', client:'Swetha Structures', location:'Coimbatore',
     budget:3200000, status:'On Track', startDate:'2025-10-01', targetDate:'2026-03-31',
-    createdBy:'MD001', team:['SSC030','SSC031','SSC032','SSC033'], tasks:[
-      {id:1,title:'Design & approval',description:'Structural design and municipality approval',priority:'High',assignedTo:'SSC030',status:'Done',dueDate:'2025-11-15',createdDate:'2025-10-05'},
-      {id:2,title:'Foundation work',description:'Foundation for extension bay',priority:'High',assignedTo:'SSC031',status:'Done',dueDate:'2025-12-31',createdDate:'2025-10-10'},
-      {id:3,title:'PEB fabrication',description:'Fabricate steel members at factory',priority:'High',assignedTo:'SSC032',status:'Done',dueDate:'2026-02-15',createdDate:'2025-11-01'},
-      {id:4,title:'Erection & commissioning',description:'Erect PEB structure and commission',priority:'Medium',assignedTo:'SSC033',status:'In Progress',dueDate:'2026-03-25',createdDate:'2026-01-10'}
+    createdBy:'MD001', team:['SS001','SS013','SS026','SS036'], tasks:[
+      {id:1,title:'Design & approval',description:'Structural design and municipality approval',priority:'High',assignedTo:'SS001',status:'Done',dueDate:'2025-11-15',createdDate:'2025-10-05'},
+      {id:2,title:'Foundation work',description:'Foundation for extension bay',priority:'High',assignedTo:'SS013',status:'Done',dueDate:'2025-12-31',createdDate:'2025-10-10'},
+      {id:3,title:'PEB fabrication',description:'Fabricate steel members at factory',priority:'High',assignedTo:'SS026',status:'Done',dueDate:'2026-02-15',createdDate:'2025-11-01'},
+      {id:4,title:'Erection & commissioning',description:'Erect PEB structure and commission',priority:'Medium',assignedTo:'SS036',status:'In Progress',dueDate:'2026-03-25',createdDate:'2026-01-10'}
     ]},
   { id:4, name:'Guduvanchery Residence', client:'Mrs. Priya Sharma', location:'Guduvanchery',
     budget:6000000, status:'In Progress', startDate:'2026-01-10', targetDate:'2026-08-31',
-    createdBy:'MD001', team:['SSC011','SSC027','SSC028'], tasks:[
-      {id:1,title:'Soil testing & survey',description:'Geotechnical investigation and site survey',priority:'High',assignedTo:'SSC011',status:'Done',dueDate:'2026-01-25',createdDate:'2026-01-12'},
-      {id:2,title:'Foundation excavation',description:'Excavation and PCC work',priority:'High',assignedTo:'SSC027',status:'In Progress',dueDate:'2026-03-15',createdDate:'2026-01-20'},
-      {id:3,title:'RCC structure',description:'Column, beam and slab casting',priority:'High',assignedTo:'SSC028',status:'Pending',dueDate:'2026-05-30',createdDate:'2026-02-01'},
-      {id:4,title:'Brickwork',description:'Wall construction all floors',priority:'Medium',assignedTo:'SSC027',status:'Pending',dueDate:'2026-07-15',createdDate:'2026-02-01'},
-      {id:5,title:'Finishing & handover',description:'Plastering, painting, flooring, handover',priority:'Low',assignedTo:'SSC011',status:'Pending',dueDate:'2026-08-25',createdDate:'2026-02-01'}
+    createdBy:'MD001', team:['SS004','SS039','SS040','SS042'], tasks:[
+      {id:1,title:'Soil testing & survey',description:'Geotechnical investigation and site survey',priority:'High',assignedTo:'SS004',status:'Done',dueDate:'2026-01-25',createdDate:'2026-01-12'},
+      {id:2,title:'Foundation excavation',description:'Excavation and PCC work',priority:'High',assignedTo:'SS039',status:'In Progress',dueDate:'2026-03-15',createdDate:'2026-01-20'},
+      {id:3,title:'RCC structure',description:'Column, beam and slab casting',priority:'High',assignedTo:'SS040',status:'Pending',dueDate:'2026-05-30',createdDate:'2026-02-01'},
+      {id:4,title:'Brickwork',description:'Wall construction all floors',priority:'Medium',assignedTo:'SS042',status:'Pending',dueDate:'2026-07-15',createdDate:'2026-02-01'},
+      {id:5,title:'Finishing & handover',description:'Plastering, painting, flooring, handover',priority:'Low',assignedTo:'SS004',status:'Pending',dueDate:'2026-08-25',createdDate:'2026-02-01'}
     ]}
 ];
 let projectNextId = 5;
@@ -784,7 +773,7 @@ function showForgotPassword() {
   const form = document.querySelector('.login-form');
   form.innerHTML = `
     <div style="margin-bottom:12px;font-family:var(--font-display);font-size:.95rem;font-weight:600">Reset Password</div>
-    <div class="login-field"><label>Employee Code</label><input type="text" id="forgotCode" placeholder="e.g. SSC006" maxlength="20" autocomplete="off"></div>
+    <div class="login-field"><label>Employee Code</label><input type="text" id="forgotCode" placeholder="e.g. SS001" maxlength="20" autocomplete="off"></div>
     <button class="login-btn" id="forgotSubmitBtn" type="button">Submit</button>
     <div id="forgotResult" style="margin-top:10px;font-size:.75rem;color:rgba(255,255,255,.85);line-height:1.4"></div>
     <div style="margin-top:12px;text-align:center"><a href="#" onclick="restoreLoginForm();return false" style="font-size:.72rem;color:rgba(255,255,255,.7);text-decoration:none">&larr; Back to Login</a></div>
@@ -814,7 +803,7 @@ async function processForgotPassword() {
 function restoreLoginForm() {
   const form = document.querySelector('.login-form');
   form.innerHTML = '<div class="login-form-header"><div class="login-form-logo"><img src="swetha_new_logo.png" alt="SS" style="width:180px;height:auto;object-fit:contain"></div><h2 class="login-welcome">Welcome Back!</h2><p class="login-welcome-sub">Sign in to your HRMS account</p></div>' +
-    '<div class="login-field"><label>Employee Code / Phone</label><div class="login-input-wrap"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><input type="text" id="loginId" placeholder="e.g. MD001, SSC006" maxlength="50" autocomplete="username"></div></div>' +
+    '<div class="login-field"><label>Employee Code / Phone</label><div class="login-input-wrap"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><input type="text" id="loginId" placeholder="e.g. MD001, SS001" maxlength="50" autocomplete="username"></div></div>' +
     '<div class="login-field"><label>Password</label><div class="login-input-wrap"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><input type="password" id="loginPass" placeholder="Enter password" maxlength="128" autocomplete="current-password"><button type="button" class="pwd-toggle" onclick="togglePwdVisibility(\'loginPass\',this)" aria-label="Show password"><svg class="eye-open" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><svg class="eye-closed" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button></div></div>' +
     '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><label style="display:flex;align-items:center;gap:6px;font-size:.75rem;color:var(--gray-500);cursor:pointer"><input type="checkbox" id="rememberMe" style="accent-color:var(--primary);width:15px;height:15px">Remember me</label><a href="#" id="forgotPwdLink" onclick="showForgotPassword();return false" style="font-size:.75rem;color:var(--primary);text-decoration:none;font-weight:500">Forgot Password?</a></div>' +
     '<button class="login-btn" id="signInBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:6px"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>Sign In</button>' +
@@ -1750,7 +1739,7 @@ function showEmployeeDetailModal(empCode) {
 
 function renderDeptsList() {
   const container = document.getElementById('deptsList');
-  const deptColors = {'Office':'#E85D04','Site':'#D62828','Factory':'#14B8A6','Garden':'#22C55E','PEB':'#EC4899'};
+  const deptColors = {'Design':'#E85D04','Marketing':'#D62828','Execution':'#14B8A6','Production':'#22C55E','QS':'#EC4899','Admin':'#2563EB','Accounts':'#D97706'};
   container.innerHTML = departments.map(d => {
     const count = EMPLOYEES.filter(e => e.dept === d).length;
     const color = deptColors[d] || '#9CA3AF';
@@ -1774,7 +1763,7 @@ function toggleDeptEmployees(dept) {
   container.style.display = isOpen ? 'none' : 'block';
   if (item) item.classList.toggle('expanded', !isOpen);
   if (!isOpen && !container.dataset.loaded) {
-    const deptColors = {'Office':'#E85D04','Site':'#D62828','Factory':'#14B8A6','Garden':'#22C55E','PEB':'#EC4899'};
+    const deptColors = {'Design':'#E85D04','Marketing':'#D62828','Execution':'#14B8A6','Production':'#22C55E','QS':'#EC4899','Admin':'#2563EB','Accounts':'#D97706'};
     const color = deptColors[dept] || '#9CA3AF';
     const emps = EMPLOYEES.filter(e => e.dept === dept);
     if (emps.length === 0) { container.innerHTML = '<p style="padding:8px 12px;font-size:.7rem;color:var(--gray-400)">No employees</p>'; }
@@ -2350,14 +2339,14 @@ function renderMapDotsClickable(emps) {
 const ADV_TYPE_LABELS = {site:'Site Advance', salary:'Salary Advance', travel:'Travel Advance', site_expense:'Site Expense', travel_expense:'Travel Expense'};
 const ADV_TYPE_ICONS = {site:'\u{1F3D7}', salary:'\u{1F4B0}', travel:'\u{1F699}', site_expense:'\u{1F9FE}', travel_expense:'\u{1F4CB}'};
 let advanceRequests = [
-  {id:1, type:'salary', empCode:'SSC020', empName:'Dhanush.R', dept:'Site', amount:25000, reason:'Medical', details:'Hospital expenses', project:null, category:null, travelFrom:null, travelTo:null, vehicle:null, travelKm:null, emiAmount:25000, emiMonths:1, urgency:'urgent', status:'pending', appliedDate:'2026-03-06', reviewedBy:null, reviewDate:null, rejectReason:null},
-  {id:2, type:'site', empCode:'SSC003', empName:'N.Hari Haran', dept:'Site', amount:45000, reason:null, details:'Cement & steel for foundation', project:'Porur Villa Project', category:'Material', travelFrom:null, travelTo:null, vehicle:null, travelKm:null, emiAmount:null, emiMonths:null, urgency:'normal', status:'pending', appliedDate:'2026-03-05', reviewedBy:null, reviewDate:null, rejectReason:null},
-  {id:3, type:'travel', empCode:'SSM003', empName:'Krishna Gowri Sankar.S', dept:'Factory', amount:539, reason:null, details:'Daily commute to factory', project:null, category:null, travelFrom:'Tambaram', travelTo:'Kundrathur Factory', vehicle:'Bike', travelKm:28, emiAmount:null, emiMonths:null, urgency:'normal', status:'pending', appliedDate:'2026-03-04', reviewedBy:null, reviewDate:null, rejectReason:null},
-  {id:4, type:'salary', empCode:'SSC008', empName:'Karthik Rajan', dept:'Office', amount:15000, reason:'Education', details:'Course fee', project:null, category:null, travelFrom:null, travelTo:null, vehicle:null, travelKm:null, emiAmount:15000, emiMonths:1, urgency:'normal', status:'pending', appliedDate:'2026-03-04', reviewedBy:null, reviewDate:null, rejectReason:null},
-  {id:5, type:'site', empCode:'SSC025', empName:'Harish.V', dept:'Site', amount:18400, reason:null, details:'Labour payment - 8 workers daily wages', project:'Tambaram Warehouse', category:'Labour', travelFrom:null, travelTo:null, vehicle:null, travelKm:null, emiAmount:null, emiMonths:null, urgency:'urgent', status:'approved', appliedDate:'2026-02-28', reviewedBy:'Selvam (MD)', reviewDate:'2026-03-01', rejectReason:null},
-  {id:6, type:'salary', empCode:'SSC025', empName:'Harish.V', dept:'Site', amount:10000, reason:'Emergency', details:'Family emergency', project:null, category:null, travelFrom:null, travelTo:null, vehicle:null, travelKm:null, emiAmount:10000, emiMonths:1, urgency:'urgent', status:'approved', appliedDate:'2026-02-28', reviewedBy:'Selvam (MD)', reviewDate:'2026-03-01', rejectReason:null},
-  {id:7, type:'travel', empCode:'SSM002', empName:'Govarthanan', dept:'Factory', amount:1014, reason:null, details:'Factory commute Dec 2025', project:null, category:null, travelFrom:'Home', travelTo:'Kundrathur Factory', vehicle:'Bike', travelKm:45, emiAmount:null, emiMonths:null, urgency:'normal', status:'approved', appliedDate:'2026-02-20', reviewedBy:'Priyanka (HR)', reviewDate:'2026-02-22', rejectReason:null},
-  {id:8, type:'salary', empCode:'SSC012', empName:'Murugan.S', dept:'Office', amount:50000, reason:'Housing', details:'Home repair', project:null, category:null, travelFrom:null, travelTo:null, vehicle:null, travelKm:null, emiAmount:50000, emiMonths:1, urgency:'normal', status:'rejected', appliedDate:'2026-02-25', reviewedBy:'Selvam (MD)', reviewDate:'2026-02-26', rejectReason:'Exceeds 50% salary limit'}
+  {id:1, type:'salary', empCode:'SS012', empName:'Kamalesh Velusamy', dept:'Execution', amount:25000, reason:'Medical', details:'Hospital expenses', project:null, category:null, travelFrom:null, travelTo:null, vehicle:null, travelKm:null, emiAmount:25000, emiMonths:1, urgency:'urgent', status:'pending', appliedDate:'2026-03-06', reviewedBy:null, reviewDate:null, rejectReason:null},
+  {id:2, type:'site', empCode:'SS003', empName:'Hariharan N', dept:'Execution', amount:45000, reason:null, details:'Cement & steel for foundation', project:'Porur Villa Project', category:'Material', travelFrom:null, travelTo:null, vehicle:null, travelKm:null, emiAmount:null, emiMonths:null, urgency:'normal', status:'pending', appliedDate:'2026-03-05', reviewedBy:null, reviewDate:null, rejectReason:null},
+  {id:3, type:'travel', empCode:'SS026', empName:'Krishna Gowri Sankar', dept:'Production', amount:539, reason:null, details:'Daily commute to factory', project:null, category:null, travelFrom:'Tambaram', travelTo:'Kundrathur Factory', vehicle:'Bike', travelKm:28, emiAmount:null, emiMonths:null, urgency:'normal', status:'pending', appliedDate:'2026-03-04', reviewedBy:null, reviewDate:null, rejectReason:null},
+  {id:4, type:'salary', empCode:'SS008', empName:'Santhosh J', dept:'Execution', amount:15000, reason:'Education', details:'Course fee', project:null, category:null, travelFrom:null, travelTo:null, vehicle:null, travelKm:null, emiAmount:15000, emiMonths:1, urgency:'normal', status:'pending', appliedDate:'2026-03-04', reviewedBy:null, reviewDate:null, rejectReason:null},
+  {id:5, type:'site', empCode:'SS015', empName:'Yuvaraj M', dept:'Execution', amount:18400, reason:null, details:'Labour payment - 8 workers daily wages', project:'Tambaram Warehouse', category:'Labour', travelFrom:null, travelTo:null, vehicle:null, travelKm:null, emiAmount:null, emiMonths:null, urgency:'urgent', status:'approved', appliedDate:'2026-02-28', reviewedBy:'Selvam (MD)', reviewDate:'2026-03-01', rejectReason:null},
+  {id:6, type:'salary', empCode:'SS015', empName:'Yuvaraj M', dept:'Execution', amount:10000, reason:'Emergency', details:'Family emergency', project:null, category:null, travelFrom:null, travelTo:null, vehicle:null, travelKm:null, emiAmount:10000, emiMonths:1, urgency:'urgent', status:'approved', appliedDate:'2026-02-28', reviewedBy:'Selvam (MD)', reviewDate:'2026-03-01', rejectReason:null},
+  {id:7, type:'travel', empCode:'SS021', empName:'Govarthan S', dept:'Admin', amount:1014, reason:null, details:'Factory commute Dec 2025', project:null, category:null, travelFrom:'Home', travelTo:'Kundrathur Factory', vehicle:'Bike', travelKm:45, emiAmount:null, emiMonths:null, urgency:'normal', status:'approved', appliedDate:'2026-02-20', reviewedBy:'HR Admin (HR)', reviewDate:'2026-02-22', rejectReason:null},
+  {id:8, type:'salary', empCode:'SS031', empName:'Shiyam Raj E', dept:'Accounts', amount:50000, reason:'Housing', details:'Home repair', project:null, category:null, travelFrom:null, travelTo:null, vehicle:null, travelKm:null, emiAmount:50000, emiMonths:1, urgency:'normal', status:'rejected', appliedDate:'2026-02-25', reviewedBy:'Selvam (MD)', reviewDate:'2026-02-26', rejectReason:'Exceeds 50% salary limit'}
 ];
 let advNextId = 9;
 let advSelectedType = 'site';
@@ -3235,10 +3224,10 @@ function kpiFilterDept(dept) {
 // DATA: RECRUITMENT
 // =====================================================
 var JOB_POSTINGS = [
-  {id:1, title:'Civil Site Engineer', dept:'Site', openings:2, posted:'2026-02-15', status:'open', jd:'Min 3 yrs exp in civil construction. Diploma/B.E. Civil required.'},
-  {id:2, title:'PEB Fabricator', dept:'PEB', openings:3, posted:'2026-02-20', status:'open', jd:'Skilled in PEB steel fabrication. ITI/Diploma preferred.'},
-  {id:3, title:'Accounts Executive', dept:'Office', openings:1, posted:'2026-03-01', status:'open', jd:'B.Com/MBA Finance. Tally & GST knowledge required.'},
-  {id:4, title:'Machine Operator', dept:'Factory', openings:2, posted:'2026-01-10', status:'closed', jd:'Experience with industrial machines. Safety training mandatory.'}
+  {id:1, title:'Civil Site Engineer', dept:'Execution', openings:2, posted:'2026-02-15', status:'open', jd:'Min 3 yrs exp in civil construction. Diploma/B.E. Civil required.'},
+  {id:2, title:'PEB Fabricator', dept:'Production', openings:3, posted:'2026-02-20', status:'open', jd:'Skilled in PEB steel fabrication. ITI/Diploma preferred.'},
+  {id:3, title:'Accounts Executive', dept:'Accounts', openings:1, posted:'2026-03-01', status:'open', jd:'B.Com/MBA Finance. Tally & GST knowledge required.'},
+  {id:4, title:'Machine Operator', dept:'Production', openings:2, posted:'2026-01-10', status:'closed', jd:'Experience with industrial machines. Safety training mandatory.'}
 ];
 
 var CANDIDATES = [
@@ -3391,7 +3380,7 @@ function openJobPostingForm(editId) {
   var existing = editId ? JOB_POSTINGS.find(function(j){return j.id===editId;}) : null;
   var area = document.getElementById('jobPostingFormArea');
   if (!area) return;
-  var deptOpts = ['Office','Site','Factory','PEB','Garden'].map(function(d) {
+  var deptOpts = ['Design','Marketing','Execution','Production','QS','Admin','Accounts'].map(function(d) {
     return '<option value="' + d + '"' + (existing && existing.dept===d ? ' selected' : '') + '>' + d + '</option>';
   }).join('');
 
@@ -3791,10 +3780,10 @@ var DOCUMENT_TEMPLATES = [
 ];
 
 var EMPLOYEE_DOCUMENTS = [
-  {empCode:'SSC011', type:'offer', label:'Offer Letter', date:'2019-05-01', status:'Verified'},
-  {empCode:'SSC011', type:'appointment', label:'Appointment Letter', date:'2019-05-01', status:'Verified'},
-  {empCode:'SSC006', type:'nda', label:'NDA Agreement', date:'2019-08-01', status:'Verified'},
-  {empCode:'SSC006', type:'offer', label:'Offer Letter', date:'2019-08-01', status:'Verified'},
+  {empCode:'SS001', type:'offer', label:'Offer Letter', date:'2019-05-01', status:'Verified'},
+  {empCode:'SS001', type:'appointment', label:'Appointment Letter', date:'2019-05-01', status:'Verified'},
+  {empCode:'HR001', type:'nda', label:'NDA Agreement', date:'2019-08-01', status:'Verified'},
+  {empCode:'HR001', type:'offer', label:'Offer Letter', date:'2019-08-01', status:'Verified'},
   {empCode:'MD001', type:'offer', label:'Offer Letter', date:'2015-01-01', status:'Verified'}
 ];
 
@@ -3870,14 +3859,14 @@ function generateDocument() {
 var TASK_DATA = [
   {id:1, title:'Submit Monthly Attendance Sheet', type:'routine', assignedTo:'ALL', dueDate:'2026-03-31', priority:'normal', done:false, note:'Fill and submit by last working day of month'},
   {id:2, title:'Complete KPI Self-Rating Form', type:'routine', assignedTo:'ALL', dueDate:'2026-03-15', priority:'normal', done:false, note:'Submit before mid-month review'},
-  {id:3, title:'Safety Briefing — Porur Site', type:'emergency', assignedTo:'Site', dueDate:'2026-03-09', priority:'urgent', done:false, note:'Mandatory attendance for all site staff'},
-  {id:4, title:'Review PEB Extension Project Documents', type:'one-time', assignedTo:'SSC006', dueDate:'2026-03-12', priority:'normal', done:true, note:'HR to review and sign off documents'},
-  {id:5, title:'Prepare March Payroll', type:'routine', assignedTo:'SSC006', dueDate:'2026-03-28', priority:'high', done:false, note:'Collect attendance from all departments first'},
+  {id:3, title:'Safety Briefing — Porur Site', type:'emergency', assignedTo:'Execution', dueDate:'2026-03-09', priority:'urgent', done:false, note:'Mandatory attendance for all execution staff'},
+  {id:4, title:'Review PEB Extension Project Documents', type:'one-time', assignedTo:'HR001', dueDate:'2026-03-12', priority:'normal', done:true, note:'HR to review and sign off documents'},
+  {id:5, title:'Prepare March Payroll', type:'routine', assignedTo:'HR001', dueDate:'2026-03-28', priority:'high', done:false, note:'Collect attendance from all departments first'},
   {id:6, title:'Quarterly Performance Meeting', type:'one-time', assignedTo:'MD001', dueDate:'2026-03-20', priority:'high', done:false, note:'All department heads to attend'},
-  {id:7, title:'Update Employee Records — New Joiners', type:'routine', assignedTo:'SSC006', dueDate:'2026-03-10', priority:'normal', done:true, note:'Add SSC031, SSC032 to system'},
-  {id:8, title:'Order Office Supplies', type:'routine', assignedTo:'Office', dueDate:'2026-03-15', priority:'low', done:false, note:'Check stock levels and order accordingly'},
-  {id:9, title:'Factory Machine Maintenance Check', type:'routine', assignedTo:'Factory', dueDate:'2026-03-14', priority:'high', done:false, note:'Annual maintenance schedule — all machines'},
-  {id:10, title:'New Employee Orientation', type:'one-time', assignedTo:'SSC006', dueDate:'2026-03-18', priority:'normal', done:false, note:'Conduct induction program for new hires'}
+  {id:7, title:'Update Employee Records — New Joiners', type:'routine', assignedTo:'HR001', dueDate:'2026-03-10', priority:'normal', done:true, note:'Add new employees to system'},
+  {id:8, title:'Order Office Supplies', type:'routine', assignedTo:'Admin', dueDate:'2026-03-15', priority:'low', done:false, note:'Check stock levels and order accordingly'},
+  {id:9, title:'Factory Machine Maintenance Check', type:'routine', assignedTo:'Production', dueDate:'2026-03-14', priority:'high', done:false, note:'Annual maintenance schedule — all machines'},
+  {id:10, title:'New Employee Orientation', type:'one-time', assignedTo:'HR001', dueDate:'2026-03-18', priority:'normal', done:false, note:'Conduct induction program for new hires'}
 ];
 
 var TASK_PHILOSOPHY = 'Great work is not about doing more — it is about doing the right things at the right time with full commitment. Each task you complete brings the team one step closer to excellence.';
@@ -4166,7 +4155,7 @@ async function initAnalyticsCharts(m) {
   // 2. Monthly Payroll Stacked Bar (12 months FY)
   destroyChart('chartPayrollTrend');
   var payrollLabels = FY_MONTHS.map(function(f) { return f.m; });
-  var depts = ['Office','Site','Factory','PEB','Garden'];
+  var depts = ['Design','Marketing','Execution','Production','QS','Admin','Accounts'];
   var datasets = depts.map(function(dept, di) {
     return {
       label: dept, backgroundColor: deptColors[di],
@@ -5880,7 +5869,7 @@ async function loadFromBackend() {
       // Re-apply DOB map
       EMPLOYEES.forEach(function(e) { if (EMP_DOB_MAP[e.code]) e.dob = EMP_DOB_MAP[e.code]; });
       // Ensure core accounts active
-      EMPLOYEES.forEach(function(e) { if (e.code === 'MD001' || e.code === 'SSC006' || e.code === 'SSC011') e.status = 'Active'; });
+      EMPLOYEES.forEach(function(e) { if (e.code === 'MD001' || e.code === 'HR001' || e.code === 'SS001') e.status = 'Active'; });
     }
 
     // 2. Leaves
@@ -8219,7 +8208,7 @@ async function addContractWorker() {
   if (!name) return;
   const contractor = prompt('Contractor name:');
   try {
-    var workerData = { name, contractor: contractor || 'Self', startDate: new Date().toISOString().split('T')[0], status: 'Active', dept: 'Site' };
+    var workerData = { name, contractor: contractor || 'Self', startDate: new Date().toISOString().split('T')[0], status: 'Active', dept: 'Execution' };
     var res = await apiCall('POST', '/compliance/workers', workerData);
     workerData.id = res && res.id ? res.id : contractWorkerNextId++;
     contractWorkers.push(workerData);
@@ -8827,19 +8816,14 @@ function renderProgressScreen() {
       var dept = e.dept || 'Other';
       deptCounts[dept] = (deptCounts[dept] || 0) + 1;
     });
-    var deptMap = {
-      'Office': {cls:'office', label:'Office Staff', sub:'Active employees'},
-      'Site': {cls:'site', label:'Site Staff', sub:'Active employees'},
-      'Factory': {cls:'factory', label:'Factory Staff', sub:'Incl. PEB company'},
-      'PEB': {cls:'factory', label:'PEB Staff', sub:'Factory division'},
-      'Garden': {cls:'garden', label:'Garden Labour', sub:'Security + Gardener'}
-    };
     var gridHtml = '';
-    var factory = (deptCounts['Factory'] || 0) + (deptCounts['PEB'] || 0);
-    gridHtml += '<div class="dept-card office"><div class="dept-name">Office Staff</div><div class="dept-amount">' + (deptCounts['Office'] || 0) + '</div><div class="dept-count">Active employees</div></div>';
-    gridHtml += '<div class="dept-card site"><div class="dept-name">Site Staff</div><div class="dept-amount">' + (deptCounts['Site'] || 0) + '</div><div class="dept-count">Active employees</div></div>';
-    gridHtml += '<div class="dept-card factory"><div class="dept-name">Factory Staff</div><div class="dept-amount">' + factory + '</div><div class="dept-count">Incl. PEB company</div></div>';
-    gridHtml += '<div class="dept-card garden"><div class="dept-name">Garden Labour</div><div class="dept-amount">' + (deptCounts['Garden'] || 0) + '</div><div class="dept-count">Security + Gardener</div></div>';
+    gridHtml += '<div class="dept-card office"><div class="dept-name">Design</div><div class="dept-amount">' + (deptCounts['Design'] || 0) + '</div><div class="dept-count">Designing team</div></div>';
+    gridHtml += '<div class="dept-card site"><div class="dept-name">Marketing</div><div class="dept-amount">' + (deptCounts['Marketing'] || 0) + '</div><div class="dept-count">Marketing team</div></div>';
+    gridHtml += '<div class="dept-card factory"><div class="dept-name">Execution</div><div class="dept-amount">' + (deptCounts['Execution'] || 0) + '</div><div class="dept-count">Site execution</div></div>';
+    gridHtml += '<div class="dept-card office"><div class="dept-name">Production</div><div class="dept-amount">' + (deptCounts['Production'] || 0) + '</div><div class="dept-count">Factory production</div></div>';
+    gridHtml += '<div class="dept-card site"><div class="dept-name">QS</div><div class="dept-amount">' + (deptCounts['QS'] || 0) + '</div><div class="dept-count">Quantity surveyors</div></div>';
+    gridHtml += '<div class="dept-card factory"><div class="dept-name">Admin</div><div class="dept-amount">' + (deptCounts['Admin'] || 0) + '</div><div class="dept-count">Admin & support</div></div>';
+    gridHtml += '<div class="dept-card garden"><div class="dept-name">Accounts</div><div class="dept-amount">' + (deptCounts['Accounts'] || 0) + '</div><div class="dept-count">Accounts team</div></div>';
     grid.innerHTML = gridHtml;
   }
 
