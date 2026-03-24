@@ -291,13 +291,8 @@ const NAV_CONFIG = {
 // employeeSelfData removed — using EMPLOYEES array directly via ensureSelfData()
 
 // F4: Geo-fenced Attendance
-const SITE_LOCATIONS = [
-  {name:'Head Office - Saravanampatti', lat:11.0850, lng:76.9960, radius:200},
-  {name:'Factory - Sulur', lat:11.0378, lng:77.1260, radius:300},
-  {name:'Site - Porur', lat:11.0320, lng:76.9800, radius:250},
-  {name:'PEB Unit - Kinathukadavu', lat:10.8100, lng:76.9700, radius:250}
-];
-let siteLocations = SITE_LOCATIONS.map(s => ({...s}));
+const SITE_LOCATIONS = [];
+let siteLocations = [];
 
 // F5: Tax / Form 16
 let taxDeclarations = {};
@@ -352,54 +347,15 @@ const CLEARANCE_DEPTS = ['IT & Systems','Finance','HR','Admin','Reporting Manage
 
 // F10: Announcements
 const ANNOUNCE_CATEGORIES = ['General','Policy Update','Event','Achievement'];
-let announcements = [
-  {id:1, title:'Pongal Holiday Schedule 2026', body:'Office will remain closed from Jan 14-16. Factory skeleton staff on Jan 15.', category:'Event', author:'MD001', date:'2026-01-10', priority:'high'},
-  {id:2, title:'New Safety Guidelines', body:'All site and factory employees must wear safety helmets at all times. Violations will be reported.', category:'Policy Update', author:'HR001', date:'2026-02-20', priority:'normal'},
-  {id:3, title:'Employee of the Month - February', body:'Congratulations to Krishna Gowri Sankar for outstanding fabrication work on the Porur project!', category:'Achievement', author:'MD001', date:'2026-03-01', priority:'normal'}
-];
-let announcementNextId = 4;
+let announcements = [];
+let announcementNextId = 1;
 
 // PROJECT MANAGEMENT
 const PROJECT_STATUSES = ['Not Started', 'In Progress', 'On Track', 'Delayed', 'Completed'];
 const TASK_PRIORITIES = ['Low', 'Medium', 'High', 'Urgent'];
-let projects = [
-  { id:1, name:'Porur Villa Project', client:'Mr. Rajesh Kumar', location:'Porur, Chennai',
-    budget:4500000, status:'In Progress', startDate:'2025-08-15', targetDate:'2026-04-30',
-    createdBy:'MD001', team:['SS003','SS005','SS008','SS010'], tasks:[
-      {id:1,title:'Foundation work',description:'Complete foundation and footing',priority:'High',assignedTo:'SS003',status:'Done',dueDate:'2025-11-30',createdDate:'2025-08-20'},
-      {id:2,title:'Structural framing',description:'RCC columns and beams',priority:'High',assignedTo:'SS005',status:'Done',dueDate:'2026-01-15',createdDate:'2025-09-01'},
-      {id:3,title:'Brickwork & plastering',description:'Wall construction and plastering',priority:'Medium',assignedTo:'SS008',status:'In Progress',dueDate:'2026-03-15',createdDate:'2025-11-10'},
-      {id:4,title:'Electrical & plumbing',description:'MEP rough-in and finishing',priority:'Medium',assignedTo:'SS010',status:'Pending',dueDate:'2026-04-10',createdDate:'2026-01-05'},
-      {id:5,title:'Painting & finishing',description:'Interior and exterior painting',priority:'Low',assignedTo:'SS008',status:'Pending',dueDate:'2026-04-25',createdDate:'2026-01-05'}
-    ]},
-  { id:2, name:'Tambaram Warehouse', client:'ABC Logistics', location:'Tambaram, Chennai',
-    budget:8500000, status:'Delayed', startDate:'2025-06-01', targetDate:'2026-06-30',
-    createdBy:'MD001', team:['SS014','SS015','SS033'], tasks:[
-      {id:1,title:'Site clearing & excavation',description:'Clear site and excavate for foundation',priority:'High',assignedTo:'SS014',status:'Done',dueDate:'2025-08-15',createdDate:'2025-06-05'},
-      {id:2,title:'Foundation & base slab',description:'PCC and RCC slab work',priority:'High',assignedTo:'SS015',status:'Done',dueDate:'2025-11-30',createdDate:'2025-06-10'},
-      {id:3,title:'Steel structure erection',description:'Pre-engineered steel building frame',priority:'High',assignedTo:'SS033',status:'In Progress',dueDate:'2026-03-31',createdDate:'2025-09-15'},
-      {id:4,title:'Roofing & cladding',description:'Metal roofing sheets and wall cladding',priority:'Medium',assignedTo:'SS015',status:'Pending',dueDate:'2026-05-30',createdDate:'2025-12-01'}
-    ]},
-  { id:3, name:'PEB Factory Extension', client:'Swetha Structures', location:'Coimbatore',
-    budget:3200000, status:'On Track', startDate:'2025-10-01', targetDate:'2026-03-31',
-    createdBy:'MD001', team:['SS001','SS013','SS026','SS036'], tasks:[
-      {id:1,title:'Design & approval',description:'Structural design and municipality approval',priority:'High',assignedTo:'SS001',status:'Done',dueDate:'2025-11-15',createdDate:'2025-10-05'},
-      {id:2,title:'Foundation work',description:'Foundation for extension bay',priority:'High',assignedTo:'SS013',status:'Done',dueDate:'2025-12-31',createdDate:'2025-10-10'},
-      {id:3,title:'PEB fabrication',description:'Fabricate steel members at factory',priority:'High',assignedTo:'SS026',status:'Done',dueDate:'2026-02-15',createdDate:'2025-11-01'},
-      {id:4,title:'Erection & commissioning',description:'Erect PEB structure and commission',priority:'Medium',assignedTo:'SS036',status:'In Progress',dueDate:'2026-03-25',createdDate:'2026-01-10'}
-    ]},
-  { id:4, name:'Guduvanchery Residence', client:'Mrs. Priya Sharma', location:'Guduvanchery',
-    budget:6000000, status:'In Progress', startDate:'2026-01-10', targetDate:'2026-08-31',
-    createdBy:'MD001', team:['SS004','SS039','SS040','SS042'], tasks:[
-      {id:1,title:'Soil testing & survey',description:'Geotechnical investigation and site survey',priority:'High',assignedTo:'SS004',status:'Done',dueDate:'2026-01-25',createdDate:'2026-01-12'},
-      {id:2,title:'Foundation excavation',description:'Excavation and PCC work',priority:'High',assignedTo:'SS039',status:'In Progress',dueDate:'2026-03-15',createdDate:'2026-01-20'},
-      {id:3,title:'RCC structure',description:'Column, beam and slab casting',priority:'High',assignedTo:'SS040',status:'Pending',dueDate:'2026-05-30',createdDate:'2026-02-01'},
-      {id:4,title:'Brickwork',description:'Wall construction all floors',priority:'Medium',assignedTo:'SS042',status:'Pending',dueDate:'2026-07-15',createdDate:'2026-02-01'},
-      {id:5,title:'Finishing & handover',description:'Plastering, painting, flooring, handover',priority:'Low',assignedTo:'SS004',status:'Pending',dueDate:'2026-08-25',createdDate:'2026-02-01'}
-    ]}
-];
-let projectNextId = 5;
-let projectTaskNextIds = {1:6, 2:5, 3:5, 4:6};
+let projects = [];
+let projectNextId = 1;
+let projectTaskNextIds = {};
 
 function getProjectProgress(project) {
   if (!project.tasks.length) return 0;
@@ -562,14 +518,6 @@ async function loginAs(empCode) {
     // Ensure badge is updated immediately after data load
     updateNotifBadge();
 
-    // MD/HR: check for new employees needing setup (salary=0)
-    if (currentUser.role === 'MD' || currentUser.role === 'HR') {
-      var newEmps = EMPLOYEES.filter(function(e) { return e.salary === 0 && e.code !== currentUser.code; });
-      if (newEmps.length > 0) {
-        var names = newEmps.map(function(e) { return e.name + ' (' + e.code + ')'; }).join(', ');
-        setTimeout(function() { showToast(newEmps.length + ' new employee(s) need setup: ' + names); }, 1000);
-      }
-    }
   } finally {
     hideLoadingSpinner();
   }
@@ -2338,17 +2286,8 @@ function renderMapDotsClickable(emps) {
 // =====================================================
 const ADV_TYPE_LABELS = {site:'Site Advance', salary:'Salary Advance', travel:'Travel Advance', site_expense:'Site Expense', travel_expense:'Travel Expense'};
 const ADV_TYPE_ICONS = {site:'\u{1F3D7}', salary:'\u{1F4B0}', travel:'\u{1F699}', site_expense:'\u{1F9FE}', travel_expense:'\u{1F4CB}'};
-let advanceRequests = [
-  {id:1, type:'salary', empCode:'SS012', empName:'Kamalesh Velusamy', dept:'Execution', amount:25000, reason:'Medical', details:'Hospital expenses', project:null, category:null, travelFrom:null, travelTo:null, vehicle:null, travelKm:null, emiAmount:25000, emiMonths:1, urgency:'urgent', status:'pending', appliedDate:'2026-03-06', reviewedBy:null, reviewDate:null, rejectReason:null},
-  {id:2, type:'site', empCode:'SS003', empName:'Hariharan N', dept:'Execution', amount:45000, reason:null, details:'Cement & steel for foundation', project:'Porur Villa Project', category:'Material', travelFrom:null, travelTo:null, vehicle:null, travelKm:null, emiAmount:null, emiMonths:null, urgency:'normal', status:'pending', appliedDate:'2026-03-05', reviewedBy:null, reviewDate:null, rejectReason:null},
-  {id:3, type:'travel', empCode:'SS026', empName:'Krishna Gowri Sankar', dept:'Production', amount:539, reason:null, details:'Daily commute to factory', project:null, category:null, travelFrom:'Tambaram', travelTo:'Kundrathur Factory', vehicle:'Bike', travelKm:28, emiAmount:null, emiMonths:null, urgency:'normal', status:'pending', appliedDate:'2026-03-04', reviewedBy:null, reviewDate:null, rejectReason:null},
-  {id:4, type:'salary', empCode:'SS008', empName:'Santhosh J', dept:'Execution', amount:15000, reason:'Education', details:'Course fee', project:null, category:null, travelFrom:null, travelTo:null, vehicle:null, travelKm:null, emiAmount:15000, emiMonths:1, urgency:'normal', status:'pending', appliedDate:'2026-03-04', reviewedBy:null, reviewDate:null, rejectReason:null},
-  {id:5, type:'site', empCode:'SS015', empName:'Yuvaraj M', dept:'Execution', amount:18400, reason:null, details:'Labour payment - 8 workers daily wages', project:'Tambaram Warehouse', category:'Labour', travelFrom:null, travelTo:null, vehicle:null, travelKm:null, emiAmount:null, emiMonths:null, urgency:'urgent', status:'approved', appliedDate:'2026-02-28', reviewedBy:'Selvam (MD)', reviewDate:'2026-03-01', rejectReason:null},
-  {id:6, type:'salary', empCode:'SS015', empName:'Yuvaraj M', dept:'Execution', amount:10000, reason:'Emergency', details:'Family emergency', project:null, category:null, travelFrom:null, travelTo:null, vehicle:null, travelKm:null, emiAmount:10000, emiMonths:1, urgency:'urgent', status:'approved', appliedDate:'2026-02-28', reviewedBy:'Selvam (MD)', reviewDate:'2026-03-01', rejectReason:null},
-  {id:7, type:'travel', empCode:'SS021', empName:'Govarthan S', dept:'Admin', amount:1014, reason:null, details:'Factory commute Dec 2025', project:null, category:null, travelFrom:'Home', travelTo:'Kundrathur Factory', vehicle:'Bike', travelKm:45, emiAmount:null, emiMonths:null, urgency:'normal', status:'approved', appliedDate:'2026-02-20', reviewedBy:'HR Admin (HR)', reviewDate:'2026-02-22', rejectReason:null},
-  {id:8, type:'salary', empCode:'SS031', empName:'Shiyam Raj E', dept:'Accounts', amount:50000, reason:'Housing', details:'Home repair', project:null, category:null, travelFrom:null, travelTo:null, vehicle:null, travelKm:null, emiAmount:50000, emiMonths:1, urgency:'normal', status:'rejected', appliedDate:'2026-02-25', reviewedBy:'Selvam (MD)', reviewDate:'2026-02-26', rejectReason:'Exceeds 50% salary limit'}
-];
-let advNextId = 9;
+let advanceRequests = [];
+let advNextId = 1;
 let advSelectedType = 'site';
 let advSelectedUrgency = 'normal';
 let advReqActiveTab = 'pending';
@@ -3223,34 +3162,16 @@ function kpiFilterDept(dept) {
 // =====================================================
 // DATA: RECRUITMENT
 // =====================================================
-var JOB_POSTINGS = [
-  {id:1, title:'Civil Site Engineer', dept:'Execution', openings:2, posted:'2026-02-15', status:'open', jd:'Min 3 yrs exp in civil construction. Diploma/B.E. Civil required.'},
-  {id:2, title:'PEB Fabricator', dept:'Production', openings:3, posted:'2026-02-20', status:'open', jd:'Skilled in PEB steel fabrication. ITI/Diploma preferred.'},
-  {id:3, title:'Accounts Executive', dept:'Accounts', openings:1, posted:'2026-03-01', status:'open', jd:'B.Com/MBA Finance. Tally & GST knowledge required.'},
-  {id:4, title:'Machine Operator', dept:'Production', openings:2, posted:'2026-01-10', status:'closed', jd:'Experience with industrial machines. Safety training mandatory.'}
-];
+var JOB_POSTINGS = [];
 
-var CANDIDATES = [
-  {id:1, name:'Aravind Kumar', role:'Civil Site Engineer', jobId:1, stage:'Applied', rating:3, phone:'9876543210', exp:'4 yrs'},
-  {id:2, name:'Muthukumar.S', role:'Civil Site Engineer', jobId:1, stage:'Screening', rating:4, phone:'9876543211', exp:'5 yrs'},
-  {id:3, name:'Pradeep Raj', role:'PEB Fabricator', jobId:2, stage:'Interview', rating:4, phone:'9876543212', exp:'3 yrs'},
-  {id:4, name:'Sathish.V', role:'PEB Fabricator', jobId:2, stage:'Applied', rating:2, phone:'9876543213', exp:'2 yrs'},
-  {id:5, name:'Deepa Nair', role:'Accounts Executive', jobId:3, stage:'Offer', rating:5, phone:'9876543214', exp:'6 yrs'},
-  {id:6, name:'Ramkumar.M', role:'PEB Fabricator', jobId:2, stage:'Hired', rating:5, phone:'9876543215', exp:'7 yrs'},
-  {id:7, name:'Jeeva.P', role:'Civil Site Engineer', jobId:1, stage:'Rejected', rating:2, phone:'9876543216', exp:'1 yr'},
-  {id:8, name:'Anbu Selvan', role:'Accounts Executive', jobId:3, stage:'Screening', rating:3, phone:'9876543217', exp:'4 yrs'}
-];
+var CANDIDATES = [];
 
-var jobNextId = 5;
-var candidateNextId = 9;
+var jobNextId = 1;
+var candidateNextId = 1;
 var PIPELINE_STAGES = ['Applied','Screening','Interview','Offer','Hired','Rejected'];
 
-var RESUME_BANK = [
-  {id:1, name:'Karthik Raj', phone:'9845001234', email:'karthik.raj@gmail.com', role:'Welder', skills:['Arc Welding','MIG','Safety Cert'], exp:'5 yrs', resumeText:'Experienced welder with 5 years in structural steel fabrication, MIG/TIG certified, strong safety record.', uploadDate:'2026-03-10', source:'upload'},
-  {id:2, name:'Meena Kumari', phone:'9845005678', email:'meena.k@gmail.com', role:'Site Engineer', skills:['AutoCAD','Site Planning','Civil Engg'], exp:'4 yrs', resumeText:'B.E. Civil with 4 years experience in site planning and project coordination for commercial buildings.', uploadDate:'2026-03-12', source:'upload'},
-  {id:3, name:'Suresh Babu.T', phone:'9845009012', email:'suresh.t@gmail.com', role:'Accounts Executive', skills:['Tally','GST Filing','Excel'], exp:'6 yrs', resumeText:'M.Com with strong expertise in Tally ERP, GST filing, and financial reporting for construction firms.', uploadDate:'2026-03-15', source:'upload'}
-];
-var resumeNextId = 4;
+var RESUME_BANK = [];
+var resumeNextId = 1;
 
 function renderRecruitmentOverlay() {
   var el = document.getElementById('hrRecruitContent');
@@ -3779,13 +3700,7 @@ var DOCUMENT_TEMPLATES = [
   {id:'experience', label:'Experience Certificate', desc:'Experience & relieving certificate', icon:'&#127891;'}
 ];
 
-var EMPLOYEE_DOCUMENTS = [
-  {empCode:'SS001', type:'offer', label:'Offer Letter', date:'2019-05-01', status:'Verified'},
-  {empCode:'SS001', type:'appointment', label:'Appointment Letter', date:'2019-05-01', status:'Verified'},
-  {empCode:'HR001', type:'nda', label:'NDA Agreement', date:'2019-08-01', status:'Verified'},
-  {empCode:'HR001', type:'offer', label:'Offer Letter', date:'2019-08-01', status:'Verified'},
-  {empCode:'MD001', type:'offer', label:'Offer Letter', date:'2015-01-01', status:'Verified'}
-];
+var EMPLOYEE_DOCUMENTS = [];
 
 function renderDocumentsOverlay() {
   var el = document.getElementById('hrDocumentsContent');
@@ -3856,18 +3771,7 @@ function generateDocument() {
 // =====================================================
 // DATA: TASKS
 // =====================================================
-var TASK_DATA = [
-  {id:1, title:'Submit Monthly Attendance Sheet', type:'routine', assignedTo:'ALL', dueDate:'2026-03-31', priority:'normal', done:false, note:'Fill and submit by last working day of month'},
-  {id:2, title:'Complete KPI Self-Rating Form', type:'routine', assignedTo:'ALL', dueDate:'2026-03-15', priority:'normal', done:false, note:'Submit before mid-month review'},
-  {id:3, title:'Safety Briefing — Porur Site', type:'emergency', assignedTo:'Execution', dueDate:'2026-03-09', priority:'urgent', done:false, note:'Mandatory attendance for all execution staff'},
-  {id:4, title:'Review PEB Extension Project Documents', type:'one-time', assignedTo:'HR001', dueDate:'2026-03-12', priority:'normal', done:true, note:'HR to review and sign off documents'},
-  {id:5, title:'Prepare March Payroll', type:'routine', assignedTo:'HR001', dueDate:'2026-03-28', priority:'high', done:false, note:'Collect attendance from all departments first'},
-  {id:6, title:'Quarterly Performance Meeting', type:'one-time', assignedTo:'MD001', dueDate:'2026-03-20', priority:'high', done:false, note:'All department heads to attend'},
-  {id:7, title:'Update Employee Records — New Joiners', type:'routine', assignedTo:'HR001', dueDate:'2026-03-10', priority:'normal', done:true, note:'Add new employees to system'},
-  {id:8, title:'Order Office Supplies', type:'routine', assignedTo:'Admin', dueDate:'2026-03-15', priority:'low', done:false, note:'Check stock levels and order accordingly'},
-  {id:9, title:'Factory Machine Maintenance Check', type:'routine', assignedTo:'Production', dueDate:'2026-03-14', priority:'high', done:false, note:'Annual maintenance schedule — all machines'},
-  {id:10, title:'New Employee Orientation', type:'one-time', assignedTo:'HR001', dueDate:'2026-03-18', priority:'normal', done:false, note:'Conduct induction program for new hires'}
-];
+var TASK_DATA = [];
 
 var TASK_PHILOSOPHY = 'Great work is not about doing more — it is about doing the right things at the right time with full commitment. Each task you complete brings the team one step closer to excellence.';
 
