@@ -9400,11 +9400,9 @@ async function loadProjectBOQ(projectId, isMDorHR) {
 
     var activeSheet = mapped.find(function(s){return s.id===currentBOQSheetId;}) || mapped[0];
     if (activeSheet) {
-      html += '<div class="card" style="padding:10px;margin-bottom:8px;font-size:.75rem">';
-      html += '<strong>' + escapeHTML(activeSheet.title) + '</strong>';
+      html += '<div style="padding:6px 0;margin-bottom:4px;font-size:.75rem;color:var(--text-secondary)">';
+      html += 'Total: <strong style="color:var(--text)">Rs.' + activeSheet.totalPlannedAmount.toLocaleString('en-IN') + '</strong>';
       if (activeSheet.areaSqft) html += ' &middot; Area: ' + activeSheet.areaSqft.toLocaleString('en-IN') + ' sqft';
-      if (activeSheet.quotedRate) html += ' &middot; Rate: Rs.' + activeSheet.quotedRate.toLocaleString('en-IN') + '/sqft';
-      html += ' &middot; Total: <strong>Rs.' + activeSheet.totalPlannedAmount.toLocaleString('en-IN') + '</strong>';
       html += '</div>';
 
       if (isMDorHR) {

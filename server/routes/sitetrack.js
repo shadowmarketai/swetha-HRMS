@@ -669,7 +669,6 @@ router.post('/projects/:pid/import-boq', verifyToken, requireRole('MD', 'HR'), u
 
       var ws = findWorksheet(wb, SHEET_MAP[sheetType]);
       var title = SHEET_TITLES[sheetType];
-      if (pkg.description) title = pkg.description;
 
       var [sheetResult] = await pool.query(
         `INSERT INTO boq_sheets (project_id, sheet_type, title, area_sqft, quoted_rate_per_sqft, total_planned_amount)
