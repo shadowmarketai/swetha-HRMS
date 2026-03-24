@@ -661,8 +661,12 @@ router.post('/projects/:pid/import-boq', verifyToken, requireRole('MD', 'HR'), u
     // Delete existing BOQ data for this project
     await pool.query('DELETE FROM boq_items WHERE project_id = ?', [req.params.pid]);
     await pool.query('DELETE FROM boq_sheets WHERE project_id = ?', [req.params.pid]);
+    // Also clear existing WBS tasks (will be regenerated from BOQ categories)
+    await pool.query('DELETE FROM daily_work_logs WHERE project_id = ? AND task_id IN (SELECT id FROM wbs_tasks WHERE project_id = ?)', [req.params.pid, req.params.pid]).catch(function(){});
+    await pool.query('DELETE FROM wbs_tasks WHERE project_id = ?', [req.params.pid]);
 
     var imported = [];
+    var wbsParentNum = 0;
     for (var sno = 1; sno <= 4; sno++) {
       var sheetType = snoToType[sno];
       var pkg = summaryData[sno] || {};
@@ -678,6 +682,19 @@ router.post('/projects/:pid/import-boq', verifyToken, requireRole('MD', 'HR'), u
       var sheetId = sheetResult.insertId;
 
       var itemsData = parseAbstractSheet(ws);
+      if (!itemsData.length) continue;
+
+      // Create level-1 WBS parent for this sheet type
+      wbsParentNum++;
+      var parentCode = String(wbsParentNum);
+      await pool.query(
+        `INSERT INTO wbs_tasks (project_id, wbs_code, level, task_name, status)
+         VALUES (?, ?, 1, ?, 'pending')`,
+        [req.params.pid, parentCode, SHEET_TITLES[sheetType]]
+      );
+
+      // Insert BOQ items + create level-2 WBS tasks from categories
+      var catNum = 0;
       for (var j = 0; j < itemsData.length; j++) {
         var it = itemsData[j];
         await pool.query(
@@ -687,6 +704,17 @@ router.post('/projects/:pid/import-boq', verifyToken, requireRole('MD', 'HR'), u
           [sheetId, req.params.pid, it.item_no, it.is_category, it.description, it.unit,
            it.planned_qty, it.rate, it.planned_amount, 0, 0]
         );
+
+        // Each BOQ category becomes a level-2 WBS task
+        if (it.is_category && it.description) {
+          catNum++;
+          var childCode = parentCode + '.' + catNum;
+          await pool.query(
+            `INSERT INTO wbs_tasks (project_id, wbs_code, level, task_name, status)
+             VALUES (?, ?, 2, ?, 'pending')`,
+            [req.params.pid, childCode, it.description]
+          );
+        }
       }
 
       // Recalc total from items if summary didn't provide it
@@ -702,7 +730,11 @@ router.post('/projects/:pid/import-boq', verifyToken, requireRole('MD', 'HR'), u
       });
     }
 
-    res.json({ sheetsImported: imported.length, sheets: imported });
+    // Fetch generated WBS count for response
+    var [wbsRows] = await pool.query('SELECT COUNT(*) as cnt FROM wbs_tasks WHERE project_id = ?', [req.params.pid]);
+    var wbsCount = wbsRows[0] ? wbsRows[0].cnt : 0;
+
+    res.json({ sheetsImported: imported.length, sheets: imported, wbsTasksCreated: wbsCount });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });

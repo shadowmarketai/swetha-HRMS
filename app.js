@@ -9687,7 +9687,7 @@ async function uploadBOQExcel(projectId, file) {
   if (!file) return;
   var ext = file.name.split('.').pop().toLowerCase();
   if (ext !== 'xlsx' && ext !== 'xls') { showToast('Only .xlsx files are supported'); return; }
-  if (!confirm('This will replace ALL existing BOQ data for this project. Continue?')) return;
+  if (!confirm('This will replace ALL existing BOQ and WBS data for this project. Continue?')) return;
 
   var formData = new FormData();
   formData.append('file', file);
@@ -9700,9 +9700,17 @@ async function uploadBOQExcel(projectId, file) {
     });
     var result = await resp.json();
     if (!resp.ok) throw new Error(result.error || 'Upload failed');
-    showToast('Imported ' + result.sheetsImported + ' BOQ sheets');
+    var msg = 'Imported ' + result.sheetsImported + ' BOQ sheets';
+    if (result.wbsTasksCreated) msg += ' + ' + result.wbsTasksCreated + ' WBS tasks';
+    showToast(msg);
     document.getElementById('boqExcelArea').innerHTML = '';
     currentBOQSheetId = null;
+    // Reload WBS tasks into project object
+    try {
+      var wbsData = await apiCall('GET', '/sitetrack/projects/' + projectId + '/wbs');
+      var proj = projects.find(function(p){return p.id===projectId;});
+      if (proj) proj.wbsTasks = (wbsData || []).map(mapWBSTask);
+    } catch(e2){}
     loadProjectBOQ(projectId, true);
   } catch (e) { showToast('Error: ' + e.message); }
 }
