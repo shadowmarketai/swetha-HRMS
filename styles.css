@@ -1714,6 +1714,7 @@ textarea.form-control{resize:vertical}
 
 /* ===== HOME GRID — responsive breakpoint ===== */
 @media(max-width:430px){
+  .home-grid{grid-template-columns:1fr}
   .header-logo-img{height:32px;padding:2px 6px}
   .checkin-hero{min-height:160px}
   .checkin-hero-content{padding:18px 16px}
