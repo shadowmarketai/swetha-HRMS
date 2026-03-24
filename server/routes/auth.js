@@ -109,6 +109,23 @@ router.post('/google', [
   }
 });
 
+// GET /api/auth/me — refresh JWT with current role from DB
+router.get('/me', verifyToken, async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      'SELECT u.role, e.name, e.dept, e.designation FROM users u JOIN employees e ON u.emp_code = e.code WHERE u.emp_code = ? AND u.is_active = 1',
+      [req.user.empCode]
+    );
+    if (rows.length === 0) return res.status(401).json({ error: 'User not found' });
+    const user = rows[0];
+    const token = generateToken({ empCode: req.user.empCode, role: user.role, name: user.name });
+    res.json({ token, user: { empCode: req.user.empCode, name: user.name, role: user.role, dept: user.dept, designation: user.designation } });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // POST /api/auth/register (MD or HR — create new users)
 router.post('/register', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
   try {

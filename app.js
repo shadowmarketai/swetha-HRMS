@@ -528,6 +528,27 @@ async function loginAs(empCode) {
     }
     currentUser = {...EMPLOYEES[empIdx]};
 
+    // Refresh JWT if role changed since last login
+    try {
+      var meRes = await fetch(API_BASE + '/auth/me', { method: 'GET', headers: apiHeaders() });
+      if (meRes.ok) {
+        var meData = await meRes.json();
+        if (meData.token) {
+          JWT_TOKEN = meData.token;
+          safeStorage.set('hrms_jwt', meData.token);
+          var session = safeStorage.get(STORAGE_KEYS.session);
+          if (session) {
+            var s = JSON.parse(session);
+            s.token = meData.token;
+            safeStorage.set(STORAGE_KEYS.session, JSON.stringify(s));
+          }
+        }
+        if (meData.user && meData.user.role) {
+          currentUser.role = meData.user.role;
+        }
+      }
+    } catch (e) { /* non-fatal — stale JWT still works for this session */ }
+
     // Show main UI
     document.getElementById('loginScreen').classList.add('hidden');
     document.getElementById('appHeader').style.display = '';
@@ -5581,7 +5602,15 @@ function mapExpense(row) {
     status: row.status || 'Pending',
     reviewedBy: row.reviewed_by || row.reviewedBy || null,
     reviewDate: row.review_date ? String(row.review_date).substring(0, 10) : (row.reviewDate || null),
-    submittedOn: row.submitted_at ? String(row.submitted_at).substring(0, 10) : (row.submittedOn || '')
+    submittedOn: row.submitted_at ? String(row.submitted_at).substring(0, 10) : (row.submittedOn || ''),
+    expenseType: row.expense_type || row.expenseType || '',
+    project: row.project || '',
+    travelFrom: row.travel_from || row.travelFrom || '',
+    travelTo: row.travel_to || row.travelTo || '',
+    vehicle: row.vehicle || '',
+    travelKm: row.travel_km != null ? parseInt(row.travel_km, 10) : (row.travelKm != null ? parseInt(row.travelKm, 10) : null),
+    travelDays: row.travel_days != null ? parseInt(row.travel_days, 10) : (row.travelDays != null ? parseInt(row.travelDays, 10) : null),
+    date: row.expense_date ? String(row.expense_date).substring(0, 10) : (row.date || '')
   };
 }
 function mapAsset(row) {

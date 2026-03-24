@@ -214,6 +214,17 @@ app.get('*', (req, res) => {
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
     )`).catch(() => {});
 
+    // Phase E: Expense reimbursements — add expense_type + travel fields + dual approval
+    await pool.query("ALTER TABLE expense_reimbursements ADD COLUMN expense_type VARCHAR(30) DEFAULT NULL").catch(() => {});
+    await pool.query("ALTER TABLE expense_reimbursements ADD COLUMN project VARCHAR(200) DEFAULT NULL").catch(() => {});
+    await pool.query("ALTER TABLE expense_reimbursements ADD COLUMN travel_from VARCHAR(200) DEFAULT NULL").catch(() => {});
+    await pool.query("ALTER TABLE expense_reimbursements ADD COLUMN travel_to VARCHAR(200) DEFAULT NULL").catch(() => {});
+    await pool.query("ALTER TABLE expense_reimbursements ADD COLUMN vehicle VARCHAR(100) DEFAULT NULL").catch(() => {});
+    await pool.query("ALTER TABLE expense_reimbursements ADD COLUMN travel_km INT DEFAULT NULL").catch(() => {});
+    await pool.query("ALTER TABLE expense_reimbursements ADD COLUMN travel_days INT DEFAULT NULL").catch(() => {});
+    await pool.query("ALTER TABLE expense_reimbursements ADD COLUMN expense_date DATE DEFAULT NULL").catch(() => {});
+    await pool.query("ALTER TABLE expense_reimbursements MODIFY COLUMN status ENUM('Pending','hr_accepted','Approved','Rejected') DEFAULT 'Pending'").catch(() => {});
+
     console.log('DB migrations applied');
   } catch (e) { console.error('Migration error (non-fatal):', e.message); }
 })();

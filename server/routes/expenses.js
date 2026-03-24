@@ -31,13 +31,13 @@ router.get('/', verifyToken, async (req, res) => {
 // POST /api/expenses — submit expense
 router.post('/', verifyToken, async (req, res) => {
   try {
-    const { category, amount, description } = req.body;
+    const { category, amount, description, expenseType, project, travelFrom, travelTo, vehicle, travelKm, travelDays, date } = req.body;
     if (!category || !amount) return res.status(400).json({ error: 'Category and amount required' });
     const [emp] = await pool.query('SELECT name FROM employees WHERE code = ?', [req.user.empCode]);
     const empName = emp.length > 0 ? emp[0].name : '';
     const [result] = await pool.query(
-      'INSERT INTO expense_reimbursements (emp_code, emp_name, category, amount, description) VALUES (?, ?, ?, ?, ?)',
-      [req.user.empCode, empName, category, amount, description || '']
+      'INSERT INTO expense_reimbursements (emp_code, emp_name, category, amount, description, expense_type, project, travel_from, travel_to, vehicle, travel_km, travel_days, expense_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [req.user.empCode, empName, category, amount, description || '', expenseType || null, project || null, travelFrom || null, travelTo || null, vehicle || null, travelKm || null, travelDays || null, date || null]
     );
     res.status(201).json({ id: result.insertId, success: true });
   } catch (err) {
@@ -46,16 +46,27 @@ router.post('/', verifyToken, async (req, res) => {
   }
 });
 
-// PUT /api/expenses/:id/approve
+// PUT /api/expenses/:id/approve (supports dual approval: HR accept → MD confirm)
 router.put('/:id/approve', verifyToken, requireRole('MD', 'HR'), auditLog('approve', 'expense'), async (req, res) => {
   try {
     const [existing] = await pool.query('SELECT status FROM expense_reimbursements WHERE id = ?', [req.params.id]);
     if (existing.length === 0) return res.status(404).json({ error: 'Expense not found' });
-    if (existing[0].status !== 'Pending') return res.status(400).json({ error: `Cannot approve: status is ${existing[0].status}` });
-    await pool.query(
-      'UPDATE expense_reimbursements SET status = "Approved", reviewed_by = ?, review_date = CURDATE() WHERE id = ?',
-      [req.user.empCode, req.params.id]
-    );
+    const currentStatus = existing[0].status;
+    if (req.body.hrAccept) {
+      // HR accept step — only from Pending
+      if (currentStatus !== 'Pending') return res.status(400).json({ error: `Cannot accept: status is ${currentStatus}` });
+      await pool.query(
+        'UPDATE expense_reimbursements SET status = "hr_accepted", reviewed_by = ?, review_date = CURDATE() WHERE id = ?',
+        [req.user.empCode, req.params.id]
+      );
+    } else {
+      // Final approve — from Pending or hr_accepted
+      if (currentStatus !== 'Pending' && currentStatus !== 'hr_accepted') return res.status(400).json({ error: `Cannot approve: status is ${currentStatus}` });
+      await pool.query(
+        'UPDATE expense_reimbursements SET status = "Approved", reviewed_by = ?, review_date = CURDATE() WHERE id = ?',
+        [req.user.empCode, req.params.id]
+      );
+    }
     res.json({ success: true });
   } catch (err) {
     console.error(err);
@@ -68,7 +79,7 @@ router.put('/:id/reject', verifyToken, requireRole('MD', 'HR'), auditLog('reject
   try {
     const [existing] = await pool.query('SELECT status FROM expense_reimbursements WHERE id = ?', [req.params.id]);
     if (existing.length === 0) return res.status(404).json({ error: 'Expense not found' });
-    if (existing[0].status !== 'Pending') return res.status(400).json({ error: `Cannot reject: status is ${existing[0].status}` });
+    if (existing[0].status !== 'Pending' && existing[0].status !== 'hr_accepted') return res.status(400).json({ error: `Cannot reject: status is ${existing[0].status}` });
     await pool.query(
       'UPDATE expense_reimbursements SET status = "Rejected", reviewed_by = ?, review_date = CURDATE() WHERE id = ?',
       [req.user.empCode, req.params.id]
