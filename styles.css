@@ -1760,17 +1760,17 @@ textarea.form-control{resize:vertical}
 /* =====================================================
    SITETRACK: BOQ Styles
    ===================================================== */
-.boq-table{border-collapse:collapse;width:100%;table-layout:fixed}
-.boq-table th,.boq-table td{padding:6px 8px;border-bottom:1px solid var(--gray-100);text-align:left;overflow:hidden;text-overflow:ellipsis}
-.boq-table th{background:var(--bg);font-weight:600;font-size:.68rem;color:var(--gray-500);position:sticky;top:0;white-space:nowrap}
+.boq-table{border-collapse:collapse;width:100%;table-layout:auto}
+.boq-table th,.boq-table td{padding:5px 6px;border-bottom:1px solid var(--gray-100);text-align:left;vertical-align:top}
+.boq-table th{background:var(--bg);font-weight:600;font-size:.65rem;color:var(--gray-500);position:sticky;top:0;white-space:nowrap}
 .boq-table tr:hover{background:var(--bg)}
-.boq-table .col-itemno{width:50px}
-.boq-table .col-desc{width:auto}
-.boq-table .col-unit{width:50px;text-align:center}
-.boq-table .col-num{width:65px;text-align:right}
-.boq-table .col-amt{width:85px;text-align:right}
-.boq-table .col-bal{width:60px;text-align:right}
-.boq-table .col-actions{width:100px;text-align:center}
+.boq-table .col-sno{width:40px;white-space:nowrap}
+.boq-table .col-desc{min-width:180px;word-wrap:break-word;white-space:normal;line-height:1.35}
+.boq-table .col-unit{width:40px;text-align:center}
+.boq-table .col-qty,.boq-table .col-rate,.boq-table .col-used{text-align:right;white-space:nowrap}
+.boq-table .col-amt{text-align:right;white-space:nowrap}
+.boq-table .col-bal{text-align:right;white-space:nowrap}
+.boq-table .col-actions{width:90px;text-align:center;white-space:nowrap}
 .boq-category td{font-weight:700;background:var(--bg) !important;font-size:.72rem}
 .boq-overuse td{background:rgba(239,68,68,0.06)}
 .boq-pending-row td{border-left:3px solid var(--warning)}
@@ -1779,6 +1779,22 @@ textarea.form-control{resize:vertical}
 .delta-exact{color:var(--gray-400);font-size:.68rem}
 .boq-sheet-pill{padding:5px 14px;border-radius:16px;border:1px solid var(--gray-200);background:var(--card);font-size:.72rem;cursor:pointer;transition:all .2s}
 .boq-sheet-pill.active,.boq-sheet-pill:hover{background:var(--primary);color:#fff;border-color:var(--primary)}
+.boq-editable,.wbs-editable{cursor:pointer;position:relative}
+.boq-editable:hover,.wbs-editable:hover{background:rgba(232,93,4,0.06)!important}
+.boq-inline-input{width:100%;border:1px solid var(--primary);border-radius:3px;padding:2px 4px;font-size:.72rem;background:var(--card);color:var(--text);outline:none;box-sizing:border-box}
+textarea.boq-inline-input{resize:vertical;min-height:36px}
+.wbs-table{border-collapse:collapse;width:100%;table-layout:auto}
+.wbs-table th,.wbs-table td{padding:5px 6px;border-bottom:1px solid var(--gray-100);text-align:left;vertical-align:middle;font-size:.72rem}
+.wbs-table th{background:var(--bg);font-weight:600;font-size:.65rem;color:var(--gray-500);position:sticky;top:0;white-space:nowrap}
+.wbs-table tr:hover{background:var(--bg)}
+.wbs-table .wbs-col-code{width:50px;font-weight:600;white-space:nowrap}
+.wbs-table .wbs-col-task{min-width:140px;word-wrap:break-word;white-space:normal}
+.wbs-table .wbs-col-lead{width:75px}
+.wbs-table .wbs-col-date{width:88px;white-space:nowrap;font-size:.68rem}
+.wbs-table .wbs-col-days{width:42px;text-align:center}
+.wbs-table .wbs-col-prog{width:85px;min-width:75px}
+.wbs-table .wbs-col-status{width:65px;text-align:center}
+.wbs-table .wbs-col-del{width:28px;text-align:center}
 
 /* =====================================================
    SITETRACK: Daily Log
@@ -1803,11 +1819,13 @@ textarea.form-control{resize:vertical}
 [data-theme="dark"] .gantt-week-label{border-right-color:var(--gray-700)}
 [data-theme="dark"] .gantt-task-row{border-bottom-color:var(--gray-700)}
 [data-theme="dark"] .gantt-bar-planned{background:var(--gray-700)}
-[data-theme="dark"] .boq-table th{background:var(--gray-800)}
-[data-theme="dark"] .boq-table td{border-bottom-color:var(--gray-700)}
+[data-theme="dark"] .boq-table th,[data-theme="dark"] .wbs-table th{background:var(--gray-800)}
+[data-theme="dark"] .boq-table td,[data-theme="dark"] .wbs-table td{border-bottom-color:var(--gray-700)}
 [data-theme="dark"] .boq-category td{background:var(--gray-800) !important}
 [data-theme="dark"] .boq-overuse td{background:rgba(239,68,68,0.12)}
 [data-theme="dark"] .boq-sheet-pill{border-color:var(--gray-600);background:var(--gray-800)}
+[data-theme="dark"] .boq-editable:hover,[data-theme="dark"] .wbs-editable:hover{background:rgba(232,93,4,0.12)!important}
+[data-theme="dark"] .boq-inline-input{background:var(--gray-900);border-color:var(--primary)}
 [data-theme="dark"] .log-entry{background:var(--gray-800);box-shadow:none}
 [data-theme="dark"] .excel-drop-zone{border-color:var(--gray-600)}
 [data-theme="dark"] .excel-drop-zone:hover,[data-theme="dark"] .excel-drop-zone.drag-over{border-color:var(--primary);background:rgba(232,93,4,0.1)}
@@ -1819,7 +1837,8 @@ textarea.form-control{resize:vertical}
   .gantt-name-col{width:100px;min-width:100px;font-size:.6rem}
   .proj-detail-tabs{overflow-x:auto;white-space:nowrap;-webkit-overflow-scrolling:touch;scrollbar-width:none}
   .proj-detail-tabs::-webkit-scrollbar{display:none}
-  .boq-table{font-size:.65rem}
-  .boq-table th,.boq-table td{padding:4px 5px}
+  .boq-table,.wbs-table{font-size:.65rem}
+  .boq-table th,.boq-table td,.wbs-table th,.wbs-table td{padding:4px 4px}
+  .wbs-table .wbs-col-date{width:78px;font-size:.6rem}
   .log-entry{padding:8px}
 }

@@ -9246,26 +9246,41 @@ function renderProjectWBS(proj, isMDorHR) {
   if (!proj.wbsTasks || proj.wbsTasks.length === 0) {
     html += '<div class="nf-empty" style="margin-top:16px">No WBS tasks yet. Add tasks to build the Work Breakdown Structure.</div>';
   } else {
-    html += '<div style="overflow-x:auto"><table class="boq-table" style="width:100%;font-size:.75rem">';
-    html += '<thead><tr><th>WBS Code</th><th>Task</th><th>Lead</th><th>Start</th><th>End</th><th>Days</th><th>Progress</th><th>Status</th>';
-    if (isMDorHR) html += '<th></th>';
+    html += '<div style="overflow-x:auto"><table class="wbs-table" style="width:100%;font-size:.75rem">';
+    html += '<thead><tr><th class="wbs-col-code">Code</th><th class="wbs-col-task">Task Name</th><th class="wbs-col-lead">Lead</th><th class="wbs-col-date">Plan Start</th><th class="wbs-col-date">Plan End</th><th class="wbs-col-date">Act. Start</th><th class="wbs-col-date">Act. End</th><th class="wbs-col-days">P.Days</th><th class="wbs-col-days">W.Days</th><th class="wbs-col-prog">Progress</th><th class="wbs-col-status">Status</th>';
+    if (isMDorHR) html += '<th class="wbs-col-del"></th>';
     html += '</tr></thead><tbody>';
 
+    var canEdit = currentUser && currentUser.role === 'MD';
     proj.wbsTasks.forEach(function(t) {
       var statusColor = t.status === 'completed' ? 'var(--success)' : t.status === 'in_progress' ? 'var(--primary)' : 'var(--warning)';
       var statusLabel = t.status === 'completed' ? 'Done' : t.status === 'in_progress' ? 'In Progress' : 'Pending';
       html += '<tr class="wbs-level-' + t.level + '">';
-      html += '<td style="font-weight:600;white-space:nowrap">' + escapeHTML(t.wbsCode) + '</td>';
-      html += '<td>' + escapeHTML(t.taskName) + '</td>';
-      html += '<td>' + escapeHTML(t.lead || '-') + '</td>';
-      html += '<td style="white-space:nowrap">' + (t.startDate || '-') + '</td>';
-      html += '<td style="white-space:nowrap">' + (t.endDate || '-') + '</td>';
-      html += '<td>' + (t.plannedDays || '-') + '</td>';
-      html += '<td style="min-width:100px"><div class="progress-bar-bg" style="height:14px;border-radius:7px"><div class="progress-bar-fill" style="width:' + t.progressPct + '%;background:' + statusColor + ';height:100%;border-radius:7px"></div></div>';
+      html += '<td class="wbs-col-code">' + escapeHTML(t.wbsCode) + '</td>';
+      if (canEdit) {
+        html += '<td class="wbs-col-task wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'taskName\',\'text\',' + proj.id + ')">' + escapeHTML(t.taskName) + '</td>';
+        html += '<td class="wbs-col-lead wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'lead\',\'text\',' + proj.id + ')">' + escapeHTML(t.lead || '-') + '</td>';
+        html += '<td class="wbs-col-date wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'startDate\',\'date\',' + proj.id + ')">' + (t.startDate || '-') + '</td>';
+        html += '<td class="wbs-col-date wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'endDate\',\'date\',' + proj.id + ')">' + (t.endDate || '-') + '</td>';
+        html += '<td class="wbs-col-date wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'actualStart\',\'date\',' + proj.id + ')">' + (t.actualStart || '-') + '</td>';
+        html += '<td class="wbs-col-date wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'actualEnd\',\'date\',' + proj.id + ')">' + (t.actualEnd || '-') + '</td>';
+        html += '<td class="wbs-col-days wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'plannedDays\',\'number\',' + proj.id + ')">' + (t.plannedDays || '-') + '</td>';
+        html += '<td class="wbs-col-days wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'workDays\',\'number\',' + proj.id + ')">' + (t.workDays || '-') + '</td>';
+      } else {
+        html += '<td class="wbs-col-task">' + escapeHTML(t.taskName) + '</td>';
+        html += '<td class="wbs-col-lead">' + escapeHTML(t.lead || '-') + '</td>';
+        html += '<td class="wbs-col-date">' + (t.startDate || '-') + '</td>';
+        html += '<td class="wbs-col-date">' + (t.endDate || '-') + '</td>';
+        html += '<td class="wbs-col-date">' + (t.actualStart || '-') + '</td>';
+        html += '<td class="wbs-col-date">' + (t.actualEnd || '-') + '</td>';
+        html += '<td class="wbs-col-days">' + (t.plannedDays || '-') + '</td>';
+        html += '<td class="wbs-col-days">' + (t.workDays || '-') + '</td>';
+      }
+      html += '<td class="wbs-col-prog"><div class="progress-bar-bg" style="height:14px;border-radius:7px"><div class="progress-bar-fill" style="width:' + t.progressPct + '%;background:' + statusColor + ';height:100%;border-radius:7px"></div></div>';
       html += '<div style="text-align:center;font-size:.65rem;margin-top:2px;cursor:pointer" onclick="promptWBSProgress(' + t.id + ',' + t.progressPct + ',' + proj.id + ')">' + Math.round(t.progressPct) + '%</div></td>';
-      html += '<td><span style="font-size:.65rem;padding:2px 8px;border-radius:10px;background:' + statusColor + ';color:#fff">' + statusLabel + '</span></td>';
+      html += '<td class="wbs-col-status"><span style="font-size:.65rem;padding:2px 8px;border-radius:10px;background:' + statusColor + ';color:#fff">' + statusLabel + '</span></td>';
       if (isMDorHR) {
-        html += '<td><button style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:.7rem" onclick="deleteWBSTask(' + t.id + ',' + proj.id + ')">Del</button></td>';
+        html += '<td class="wbs-col-del"><button style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:.7rem" onclick="deleteWBSTask(' + t.id + ',' + proj.id + ')">Del</button></td>';
       }
       html += '</tr>';
     });
@@ -9400,11 +9415,6 @@ async function loadProjectBOQ(projectId, isMDorHR) {
 
     var activeSheet = mapped.find(function(s){return s.id===currentBOQSheetId;}) || mapped[0];
     if (activeSheet) {
-      html += '<div style="padding:6px 0;margin-bottom:4px;font-size:.75rem;color:var(--text-secondary)">';
-      html += 'Total: <strong style="color:var(--text)">Rs.' + activeSheet.totalPlannedAmount.toLocaleString('en-IN') + '</strong>';
-      if (activeSheet.areaSqft) html += ' &middot; Area: ' + activeSheet.areaSqft.toLocaleString('en-IN') + ' sqft';
-      html += '</div>';
-
       if (isMDorHR) {
         html += '<div style="margin-bottom:8px"><button class="nf-btn nf-btn-primary nf-btn-sm" onclick="openBOQItemForm(' + activeSheet.id + ',' + projectId + ')">+ Add Item</button></div>';
       }
@@ -9414,28 +9424,38 @@ async function loadProjectBOQ(projectId, isMDorHR) {
         html += '<div class="nf-empty">No items in this sheet</div>';
       } else {
         html += '<div style="overflow-x:auto"><table class="boq-table" style="font-size:.72rem">';
-        html += '<thead><tr><th class="col-itemno">Item</th><th class="col-desc">Description</th><th class="col-unit">Unit</th><th class="col-num">Qty</th><th class="col-num">Rate</th><th class="col-amt">Amount</th><th class="col-num">Used</th><th class="col-bal">Balance</th><th class="col-actions">Actions</th></tr></thead>';
+        html += '<thead><tr><th class="col-sno">S.No</th><th class="col-desc">Description</th><th class="col-unit">Unit</th><th class="col-qty">Qty</th><th class="col-rate">Rate</th><th class="col-amt">Amount</th><th class="col-used">Used</th><th class="col-bal">Balance</th><th class="col-actions">Actions</th></tr></thead>';
+        var canEdit = currentUser && currentUser.role === 'MD';
         html += '<tbody>';
         activeSheet.items.forEach(function(item) {
           if (item.isCategory) {
-            html += '<tr class="boq-category"><td colspan="9" style="font-weight:700;background:var(--bg)">' + escapeHTML(item.description) + '</td></tr>';
+            html += '<tr class="boq-category"><td colspan="9">' + escapeHTML(item.description) + '</td></tr>';
             return;
           }
           var balance = item.plannedQty - item.actualQtyUsed;
           var balClass = balance < 0 ? 'delta-over' : balance > 0 ? 'delta-under' : 'delta-exact';
           var isOver = item.plannedQty > 0 && item.actualQtyUsed > item.plannedQty;
           html += '<tr class="' + (isOver ? 'boq-overuse' : '') + (item.isPending ? ' boq-pending-row' : '') + '">';
-          html += '<td class="col-itemno">' + escapeHTML(item.itemNo) + '</td>';
-          html += '<td class="col-desc" title="' + escapeHTML(item.description) + '">' + escapeHTML(item.description) + '</td>';
-          html += '<td class="col-unit">' + escapeHTML(item.unit) + '</td>';
-          html += '<td class="col-num">' + item.plannedQty + '</td>';
-          html += '<td class="col-num">' + item.rate + '</td>';
+          html += '<td class="col-sno">' + escapeHTML(item.itemNo) + '</td>';
+          if (canEdit) {
+            html += '<td class="col-desc boq-editable" onclick="boqEditCell(this,' + item.id + ',\'description\',\'text\',' + projectId + ')">' + escapeHTML(item.description) + '</td>';
+            html += '<td class="col-unit boq-editable" onclick="boqEditCell(this,' + item.id + ',\'unit\',\'text\',' + projectId + ')">' + escapeHTML(item.unit) + '</td>';
+            html += '<td class="col-qty boq-editable" onclick="boqEditCell(this,' + item.id + ',\'plannedQty\',\'number\',' + projectId + ')">' + item.plannedQty + '</td>';
+            html += '<td class="col-rate boq-editable" onclick="boqEditCell(this,' + item.id + ',\'rate\',\'number\',' + projectId + ')">' + item.rate + '</td>';
+          } else {
+            html += '<td class="col-desc">' + escapeHTML(item.description) + '</td>';
+            html += '<td class="col-unit">' + escapeHTML(item.unit) + '</td>';
+            html += '<td class="col-qty">' + item.plannedQty + '</td>';
+            html += '<td class="col-rate">' + item.rate + '</td>';
+          }
           html += '<td class="col-amt">' + item.plannedAmount.toLocaleString('en-IN') + '</td>';
-          html += '<td class="col-num">' + item.actualQtyUsed + '</td>';
+          html += '<td class="col-used">' + item.actualQtyUsed + '</td>';
           html += '<td class="col-bal"><span class="' + balClass + '">' + balance.toFixed(1) + '</span></td>';
-          html += '<td class="col-actions" style="white-space:nowrap">';
-          html += '<button class="nf-btn nf-btn-sm" style="font-size:.6rem;padding:2px 6px" onclick="logBOQUsage(' + item.id + ',' + projectId + ')">+Use</button> ';
-          html += '<button class="nf-btn nf-btn-sm" style="font-size:.6rem;padding:2px 6px;background:' + (item.isPending ? 'var(--warning)' : 'var(--gray-300)') + '" onclick="toggleBOQPending(' + item.id + ',' + projectId + ')">' + (item.isPending ? 'Pending' : 'Mark') + '</button>';
+          html += '<td class="col-actions">';
+          if (isMDorHR) {
+            html += '<button class="nf-btn nf-btn-sm" style="font-size:.6rem;padding:2px 6px" onclick="logBOQUsage(' + item.id + ',' + projectId + ')">+Use</button> ';
+            html += '<button class="nf-btn nf-btn-sm" style="font-size:.6rem;padding:2px 6px;background:' + (item.isPending ? 'var(--warning)' : 'var(--gray-300)') + '" onclick="toggleBOQPending(' + item.id + ',' + projectId + ')">' + (item.isPending ? 'Pending' : 'Mark') + '</button>';
+          }
           html += '</td></tr>';
         });
         html += '</tbody></table></div>';
@@ -9558,6 +9578,87 @@ function toggleBOQPending(itemId, projectId) {
   apiCall('PATCH', '/sitetrack/boq-items/' + itemId + '/pending', {})
     .then(function() { showToast('Pending status toggled'); loadProjectBOQ(projectId, true); })
     .catch(function() { showToast('Error toggling pending'); });
+}
+
+function boqEditCell(td, itemId, field, inputType, projectId) {
+  if (td.querySelector('input,textarea')) return;
+  var oldVal = td.textContent.trim();
+  var isDesc = field === 'description';
+  if (isDesc) {
+    var ta = document.createElement('textarea');
+    ta.className = 'boq-inline-input';
+    ta.value = oldVal;
+    ta.rows = 2;
+    td.textContent = '';
+    td.appendChild(ta);
+    ta.focus();
+    ta.addEventListener('blur', function() { _boqSaveCell(td, ta.value, oldVal, itemId, field, projectId); });
+    ta.addEventListener('keydown', function(e) { if (e.key === 'Escape') { td.textContent = oldVal; } });
+  } else {
+    var inp = document.createElement('input');
+    inp.type = inputType;
+    inp.className = 'boq-inline-input';
+    inp.value = oldVal;
+    td.textContent = '';
+    td.appendChild(inp);
+    inp.focus();
+    inp.select();
+    inp.addEventListener('blur', function() { _boqSaveCell(td, inp.value, oldVal, itemId, field, projectId); });
+    inp.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') { inp.blur(); }
+      if (e.key === 'Escape') { td.textContent = oldVal; }
+    });
+  }
+}
+function _boqSaveCell(td, newVal, oldVal, itemId, field, projectId) {
+  newVal = newVal.trim();
+  if (newVal === oldVal) { td.textContent = oldVal; return; }
+  var payload = {};
+  payload[field] = field === 'plannedQty' || field === 'rate' ? parseFloat(newVal) || 0 : newVal;
+  td.textContent = newVal || oldVal;
+  td.style.opacity = '0.6';
+  apiCall('PUT', '/sitetrack/boq-items/' + itemId, payload)
+    .then(function() { td.style.opacity = '1'; loadProjectBOQ(projectId, true); })
+    .catch(function() { td.textContent = oldVal; td.style.opacity = '1'; showToast('Error saving'); });
+}
+
+function wbsEditCell(td, taskId, field, inputType, projectId) {
+  if (td.querySelector('input')) return;
+  var oldVal = td.textContent.trim();
+  if (oldVal === '-') oldVal = '';
+  var inp = document.createElement('input');
+  inp.type = inputType;
+  inp.className = 'boq-inline-input';
+  inp.value = oldVal;
+  td.textContent = '';
+  td.appendChild(inp);
+  inp.focus();
+  if (inputType !== 'date') inp.select();
+  inp.addEventListener('blur', function() { _wbsSaveCell(td, inp.value, oldVal, taskId, field, projectId); });
+  inp.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { inp.blur(); }
+    if (e.key === 'Escape') { td.textContent = oldVal || '-'; }
+  });
+}
+function _wbsSaveCell(td, newVal, oldVal, taskId, field, projectId) {
+  newVal = newVal.trim();
+  if (newVal === oldVal) { td.textContent = oldVal || '-'; return; }
+  var payload = {};
+  if (field === 'plannedDays' || field === 'workDays') payload[field] = parseInt(newVal, 10) || null;
+  else payload[field] = newVal || null;
+  td.textContent = newVal || '-';
+  td.style.opacity = '0.6';
+  apiCall('PUT', '/sitetrack/wbs/' + taskId, payload)
+    .then(function(result) {
+      td.style.opacity = '1';
+      var proj = projects.find(function(p){return p.id===projectId;});
+      if (proj) {
+        var idx = proj.wbsTasks.findIndex(function(t){return t.id===taskId;});
+        if (idx !== -1) proj.wbsTasks[idx] = mapWBSTask(result);
+        renderProjectDetailContent(proj);
+      }
+    })
+    .catch(function() { td.textContent = oldVal || '-'; td.style.opacity = '1'; showToast('Error saving'); });
 }
 
 function showExcelUpload(projectId) {
