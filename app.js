@@ -7322,7 +7322,7 @@ async function submitExpenseReimbursement() {
   var date = document.getElementById('expDate').value;
   if (!cat || !amount || !date) { showToast('Please fill all required fields'); return; }
   try {
-    var res = await apiCall('POST', '/expenses', { category: cat, amount: amount, description: desc });
+    var res = await apiCall('POST', '/expenses', { category: cat, amount: amount, description: desc, date: date });
     var exp = {
       id: (res && res.id) || expReimbNextId++, empCode: currentUser.code, empName: currentUser.name, dept: currentUser.dept,
       category: cat, amount: amount, description: desc, date: date, status: 'Pending',
