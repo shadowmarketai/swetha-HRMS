@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const pool = require('../config/db');
+const bcrypt = require('bcryptjs');
 const { verifyToken, requireRole } = require('../middleware/auth');
 const { body, validationResult } = require('express-validator');
 const { auditLog } = require('../middleware/audit');
@@ -149,9 +150,10 @@ router.put('/:code', verifyToken, requireRole('MD', 'HR'), auditLog('update', 'e
 
     // Sync role to users table if role changed
     if (b.role && b.role !== cur.role) {
+      const defaultHash = await bcrypt.hash('emp123', 10);
       await pool.query(
-        'INSERT INTO users (emp_code, role) VALUES (?, ?) ON DUPLICATE KEY UPDATE role = VALUES(role)',
-        [req.params.code, b.role]
+        'INSERT INTO users (emp_code, password_hash, role) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE role = VALUES(role)',
+        [req.params.code, defaultHash, b.role]
       );
     }
     res.json({ message: 'Employee updated' });
