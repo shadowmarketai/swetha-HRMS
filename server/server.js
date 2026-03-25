@@ -261,7 +261,7 @@ app.get('*', (req, res) => {
       project_id INT NOT NULL,
       wbs_code VARCHAR(50) NOT NULL,
       \`level\` INT DEFAULT 1,
-      task_name VARCHAR(500) NOT NULL,
+      task_name VARCHAR(2000) NOT NULL,
       \`lead\` VARCHAR(255),
       predecessor VARCHAR(50),
       start_date DATE, end_date DATE,
@@ -274,6 +274,9 @@ app.get('*', (req, res) => {
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
       INDEX ix_wbs_proj_code (project_id, wbs_code)
     )`).catch(function(e) { console.error('wbs_tasks migration error:', e.message); });
+
+    // Widen task_name for long BOQ category descriptions
+    await pool.query("ALTER TABLE wbs_tasks MODIFY COLUMN task_name VARCHAR(2000) NOT NULL").catch(() => {});
 
     await pool.query(`CREATE TABLE IF NOT EXISTS boq_sheets (
       id INT AUTO_INCREMENT PRIMARY KEY,

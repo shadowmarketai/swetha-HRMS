@@ -770,9 +770,10 @@ router.post('/projects/:pid/import-boq', verifyToken, requireRole('MD', 'HR'), u
         if (it.is_category && it.description) {
           catNum++;
           var childCode = parentCode + '.' + catNum;
+          var taskName = it.description.length > 1990 ? it.description.substring(0, 1990) + '...' : it.description;
           await pool.query(
             "INSERT INTO wbs_tasks (project_id, wbs_code, `level`, task_name, status) VALUES (?, ?, 2, ?, 'pending')",
-            [req.params.pid, childCode, it.description]
+            [req.params.pid, childCode, taskName]
           );
         }
       }
