@@ -588,15 +588,16 @@ function parseAbstractSheet(ws) {
   var headerIdx = -1;
   for (var r = 0; r < data.length; r++) {
     var text = data[r].map(function(c) { return String(c || '').toUpperCase(); }).join(' ');
-    if (text.indexOf('ITEM') !== -1 && (text.indexOf('UNIT') !== -1 || text.indexOf('QTY') !== -1 || text.indexOf('QUANTITY') !== -1)) {
+    if (text.indexOf('ITEM') !== -1 && (text.indexOf('UNIT') !== -1 || text.indexOf('QTY') !== -1 || text.indexOf('QUANTITY') !== -1 || text.indexOf('RATE') !== -1)) {
       headerIdx = r;
       break;
     }
   }
   if (headerIdx === -1) headerIdx = 0;
 
-  // Detect column positions
-  var colItemNo = 0, colDesc = 1, colUnit = 2, colQty = 3, colRate = 4, colAmount = 5;
+  // Detect column positions (flexible matching)
+  var colItemNo = 0, colDesc = 1, colUnit = 2, colQty = 3, colRate = -1, colAmount = -1;
+  var colMaterialRate = -1, colLabourRate = -1, colMaterialAmount = -1, colLabourAmount = -1;
   var headerRow = data[headerIdx] || [];
   headerRow.forEach(function(cell, idx) {
     var txt = String(cell || '').toUpperCase().trim();
@@ -604,9 +605,18 @@ function parseAbstractSheet(ws) {
     else if (txt.indexOf('DESC') !== -1) colDesc = idx;
     else if (txt === 'UNIT') colUnit = idx;
     else if (txt === 'QUANTITY' || txt === 'QTY') colQty = idx;
-    else if (txt === 'RATE') colRate = idx;
-    else if (txt === 'AMOUNT' || txt === 'AMT') colAmount = idx;
+    else if (txt.indexOf('MATERIAL') !== -1 && txt.indexOf('RATE') !== -1) colMaterialRate = idx;
+    else if (txt.indexOf('LABOUR') !== -1 && txt.indexOf('RATE') !== -1) colLabourRate = idx;
+    else if (txt.indexOf('MATERIAL') !== -1 && txt.indexOf('AMOUNT') !== -1) colMaterialAmount = idx;
+    else if (txt.indexOf('LABOUR') !== -1 && txt.indexOf('AMOUNT') !== -1) colLabourAmount = idx;
+    else if (txt.indexOf('RATE') !== -1 && colRate === -1) colRate = idx;
+    else if ((txt.indexOf('AMOUNT') !== -1 || txt === 'AMT') && colAmount === -1) colAmount = idx;
   });
+
+  // If no single rate/amount column found, use material columns as primary
+  var hasSplitCols = colMaterialRate !== -1 || colLabourRate !== -1;
+  if (colRate === -1) colRate = colMaterialRate !== -1 ? colMaterialRate : 4;
+  if (colAmount === -1) colAmount = colMaterialAmount !== -1 ? colMaterialAmount : 5;
 
   var items = [];
   for (var i = headerIdx + 1; i < data.length; i++) {
@@ -619,15 +629,28 @@ function parseAbstractSheet(ws) {
 
     var descUp = desc.toUpperCase();
     var itemUp = itemNo.toUpperCase();
-    // Stop only at final summary rows (GRAND TOTAL, QUOTED RATE PER SQFT, SAY RS)
+    // Stop at final summary rows
     if (descUp.indexOf('GRAND TOTAL') !== -1 || itemUp.indexOf('GRAND TOTAL') !== -1) break;
     if (descUp.indexOf('QUOTED RATE') !== -1 || descUp.indexOf('SAY RS') !== -1 || descUp.indexOf('SAY RUPEES') !== -1) break;
-    // Skip intermediate total/sub-total rows (don't break — continue to next section)
+    // Skip total/estimated/area rows
     if (descUp.indexOf('TOTAL') !== -1 || itemUp.indexOf('TOTAL') !== -1) continue;
+    if (descUp.indexOf('AREA OF THE BUILDING') !== -1 || descUp.indexOf('RATE/ SQFT') !== -1 || descUp.indexOf('RATE/SQFT') !== -1) continue;
 
     var qty = toFloat(row[colQty]);
-    var rate = toFloat(row[colRate]);
-    var amount = toFloat(row[colAmount]);
+
+    // Handle split Material Rate + Labour Rate columns
+    var rate, amount;
+    if (hasSplitCols) {
+      var matRate = colMaterialRate !== -1 ? (toFloat(row[colMaterialRate]) || 0) : 0;
+      var labRate = colLabourRate !== -1 ? (toFloat(row[colLabourRate]) || 0) : 0;
+      rate = matRate + labRate;
+      var matAmt = colMaterialAmount !== -1 ? (toFloat(row[colMaterialAmount]) || 0) : 0;
+      var labAmt = colLabourAmount !== -1 ? (toFloat(row[colLabourAmount]) || 0) : 0;
+      amount = (matAmt + labAmt) || null;
+    } else {
+      rate = toFloat(row[colRate]);
+      amount = toFloat(row[colAmount]);
+    }
 
     var isCategory = (qty === null || qty === 0) && (rate === null || rate === 0);
     if (amount === null && qty && rate) amount = Math.round(qty * rate * 100) / 100;
@@ -647,6 +670,32 @@ function parseAbstractSheet(ws) {
   return items;
 }
 
+// Auto-detect sheet type from name
+function detectSheetType(name) {
+  var upper = name.toUpperCase();
+  if (upper.indexOf('MEZZ') !== -1 && upper.indexOf('PEB') !== -1) return 'mezzanine_peb';
+  if (upper.indexOf('MEZZ') !== -1 && upper.indexOf('CIVIL') !== -1) return 'mezzanine_civil';
+  if (upper.indexOf('MEZZ') !== -1) return 'mezzanine_civil';
+  if (upper.indexOf('CIVIL') !== -1) return 'civil';
+  return 'peb';
+}
+
+// Discover all abstract/BOQ sheets in workbook
+function discoverAbstractSheets(wb) {
+  var sheets = [];
+  wb.SheetNames.forEach(function(name) {
+    var upper = name.toUpperCase();
+    if (upper.indexOf('ABSTRACT') !== -1 || upper.indexOf('BOQ') !== -1) {
+      sheets.push({
+        name: name,
+        type: detectSheetType(name),
+        ws: wb.Sheets[name]
+      });
+    }
+  });
+  return sheets;
+}
+
 // POST /projects/:pid/import-boq — Upload Excel
 router.post('/projects/:pid/import-boq', verifyToken, requireRole('MD', 'HR'), upload.single('file'), async function(req, res) {
   try {
@@ -658,7 +707,6 @@ router.post('/projects/:pid/import-boq', verifyToken, requireRole('MD', 'HR'), u
 
     var wb = XLSX.read(req.file.buffer, { type: 'buffer' });
     var summaryData = parseSummarySheet(wb);
-    var snoToType = { 1: 'civil', 2: 'peb', 3: 'mezzanine_civil', 4: 'mezzanine_peb' };
 
     // Delete existing BOQ data for this project
     await pool.query('DELETE FROM boq_items WHERE project_id = ?', [req.params.pid]);
@@ -667,31 +715,45 @@ router.post('/projects/:pid/import-boq', verifyToken, requireRole('MD', 'HR'), u
     await pool.query('DELETE FROM daily_work_logs WHERE project_id = ? AND task_id IN (SELECT id FROM wbs_tasks WHERE project_id = ?)', [req.params.pid, req.params.pid]).catch(function(){});
     await pool.query('DELETE FROM wbs_tasks WHERE project_id = ?', [req.params.pid]);
 
+    // Auto-discover all abstract sheets from the workbook
+    var abstractSheets = discoverAbstractSheets(wb);
+
+    // If no abstract sheets found, try the 4 predefined types as fallback
+    if (abstractSheets.length === 0) {
+      var snoToType = { 1: 'civil', 2: 'peb', 3: 'mezzanine_civil', 4: 'mezzanine_peb' };
+      for (var sno = 1; sno <= 4; sno++) {
+        var ws = findWorksheet(wb, SHEET_MAP[snoToType[sno]]);
+        if (ws) abstractSheets.push({ name: snoToType[sno], type: snoToType[sno], ws: ws });
+      }
+    }
+
     var imported = [];
     var wbsParentNum = 0;
-    for (var sno = 1; sno <= 4; sno++) {
-      var sheetType = snoToType[sno];
-      var pkg = summaryData[sno] || {};
+    for (var si = 0; si < abstractSheets.length; si++) {
+      var sheetInfo = abstractSheets[si];
+      var sheetType = sheetInfo.type;
+      // Use sheet name as title (clean up parentheses notation)
+      var title = sheetInfo.name.replace(/^ABSTRACT[\s-]*/i, '').trim() || (SHEET_TITLES[sheetType] || sheetInfo.name);
+      if (!title) title = sheetInfo.name;
 
-      var ws = findWorksheet(wb, SHEET_MAP[sheetType]);
-      var title = SHEET_TITLES[sheetType];
+      // Match summary data by position or type
+      var pkg = summaryData[si + 1] || {};
+
+      var itemsData = parseAbstractSheet(sheetInfo.ws);
+      if (!itemsData.length) continue;
 
       var [sheetResult] = await pool.query(
-        `INSERT INTO boq_sheets (project_id, sheet_type, title, area_sqft, quoted_rate_per_sqft, total_planned_amount)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        'INSERT INTO boq_sheets (project_id, sheet_type, title, area_sqft, quoted_rate_per_sqft, total_planned_amount) VALUES (?, ?, ?, ?, ?, ?)',
         [req.params.pid, sheetType, title, pkg.area_sqft || null, pkg.rate || null, pkg.amount || 0]
       );
       var sheetId = sheetResult.insertId;
 
-      var itemsData = parseAbstractSheet(ws);
-      if (!itemsData.length) continue;
-
-      // Create level-1 WBS parent for this sheet type
+      // Create level-1 WBS parent for this sheet
       wbsParentNum++;
       var parentCode = String(wbsParentNum);
       await pool.query(
         "INSERT INTO wbs_tasks (project_id, wbs_code, `level`, task_name, status) VALUES (?, ?, 1, ?, 'pending')",
-        [req.params.pid, parentCode, SHEET_TITLES[sheetType]]
+        [req.params.pid, parentCode, title]
       );
 
       // Insert BOQ items + create level-2 WBS tasks from categories
@@ -699,9 +761,7 @@ router.post('/projects/:pid/import-boq', verifyToken, requireRole('MD', 'HR'), u
       for (var j = 0; j < itemsData.length; j++) {
         var it = itemsData[j];
         await pool.query(
-          `INSERT INTO boq_items (boq_sheet_id, project_id, item_no, is_category, description, unit,
-            planned_qty, rate, planned_amount, actual_qty_used, is_pending)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          'INSERT INTO boq_items (boq_sheet_id, project_id, item_no, is_category, description, unit, planned_qty, rate, planned_amount, actual_qty_used, is_pending) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
           [sheetId, req.params.pid, it.item_no, it.is_category, it.description, it.unit,
            it.planned_qty, it.rate, it.planned_amount, 0, 0]
         );
@@ -717,10 +777,8 @@ router.post('/projects/:pid/import-boq', verifyToken, requireRole('MD', 'HR'), u
         }
       }
 
-      // Recalc total from items if summary didn't provide it
-      if (!pkg.amount && itemsData.length) {
-        await recalcSheetTotal(sheetId);
-      }
+      // Recalc total from items
+      await recalcSheetTotal(sheetId);
 
       imported.push({
         sheetType: sheetType,
