@@ -2,6 +2,7 @@ const router = require('express').Router();
 const pool = require('../config/db');
 const { verifyToken, requireRole } = require('../middleware/auth');
 const { auditLog } = require('../middleware/audit');
+const upload = require('../middleware/upload');
 
 // GET /api/expenses — list expense reimbursements
 router.get('/', verifyToken, async (req, res) => {
@@ -28,18 +29,19 @@ router.get('/', verifyToken, async (req, res) => {
   }
 });
 
-// POST /api/expenses — submit expense
-router.post('/', verifyToken, async (req, res) => {
+// POST /api/expenses — submit expense (supports optional bill file upload)
+router.post('/', verifyToken, upload.single('bill'), async (req, res) => {
   try {
     const { category, amount, description, expenseType, project, travelFrom, travelTo, vehicle, travelKm, travelDays, date } = req.body;
     if (!category || !amount) return res.status(400).json({ error: 'Category and amount required' });
     const [emp] = await pool.query('SELECT name FROM employees WHERE code = ?', [req.user.empCode]);
     const empName = emp.length > 0 ? emp[0].name : '';
+    const billUrl = req.file ? '/uploads/' + req.file.filename : null;
     const [result] = await pool.query(
-      'INSERT INTO expense_reimbursements (emp_code, emp_name, category, amount, description, expense_type, project, travel_from, travel_to, vehicle, travel_km, travel_days, expense_date) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [req.user.empCode, empName, category, amount, description || '', expenseType || null, project || null, travelFrom || null, travelTo || null, vehicle || null, travelKm || null, travelDays || null, date || null]
+      'INSERT INTO expense_reimbursements (emp_code, emp_name, category, amount, description, expense_type, project, travel_from, travel_to, vehicle, travel_km, travel_days, expense_date, bill_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [req.user.empCode, empName, category, amount, description || '', expenseType || null, project || null, travelFrom || null, travelTo || null, vehicle || null, travelKm || null, travelDays || null, date || null, billUrl]
     );
-    res.status(201).json({ id: result.insertId, success: true });
+    res.status(201).json({ id: result.insertId, success: true, billUrl: billUrl });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });

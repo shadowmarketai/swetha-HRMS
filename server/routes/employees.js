@@ -4,18 +4,24 @@ const { verifyToken, requireRole } = require('../middleware/auth');
 const { body, validationResult } = require('express-validator');
 const { auditLog } = require('../middleware/audit');
 
-// GET /api/employees — list all (MD/HR) or self (Employee)
+// GET /api/employees — list all (MD/HR gets full details, Employee gets directory + own full record)
 router.get('/', verifyToken, async (req, res) => {
   try {
-    if (!['MD', 'HR'].includes(req.user.role)) {
-      const [rows] = await pool.query('SELECT * FROM employees WHERE code = ?', [req.user.empCode]);
-      return res.json(rows);
-    }
     const page = Math.max(1, parseInt(req.query.page) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+    const limit = Math.min(200, Math.max(1, parseInt(req.query.limit) || 20));
     const offset = (page - 1) * limit;
     const [[{ total }]] = await pool.query('SELECT COUNT(*) as total FROM employees WHERE is_active = 1');
-    const [rows] = await pool.query('SELECT * FROM employees WHERE is_active = 1 ORDER BY dept, name LIMIT ? OFFSET ?', [limit, offset]);
+    if (['MD', 'HR'].includes(req.user.role)) {
+      const [rows] = await pool.query('SELECT * FROM employees WHERE is_active = 1 ORDER BY dept, name LIMIT ? OFFSET ?', [limit, offset]);
+      return res.json({ data: rows, total, page, limit });
+    }
+    // Employee: return all employees with public fields; own record gets full details
+    const [pubRows] = await pool.query(
+      'SELECT code, name, dept, designation, role, phone, doj, email, photo_url, is_active FROM employees WHERE is_active = 1 AND code != ? ORDER BY dept, name LIMIT ? OFFSET ?',
+      [req.user.empCode, limit, offset]
+    );
+    const [selfRows] = await pool.query('SELECT * FROM employees WHERE code = ?', [req.user.empCode]);
+    const rows = selfRows.concat(pubRows);
     res.json({ data: rows, total, page, limit });
   } catch (err) {
     console.error(err);
@@ -103,43 +109,49 @@ router.put('/:code/self', verifyToken, auditLog('update', 'employee'), async (re
 });
 
 // PUT /api/employees/:code — update (partial updates supported, MD/HR only)
+// Dynamically builds UPDATE query with only provided fields to avoid column-not-exists errors
 router.put('/:code', verifyToken, requireRole('MD', 'HR'), auditLog('update', 'employee'), async (req, res) => {
   try {
-    // Fetch existing record to merge with partial updates
     const [existing] = await pool.query('SELECT * FROM employees WHERE code = ?', [req.params.code]);
     if (existing.length === 0) return res.status(404).json({ error: 'Employee not found' });
     const cur = existing[0];
     const b = req.body;
-    const newRole = b.role ?? cur.role;
-    const [result] = await pool.query(
-      `UPDATE employees SET name=?, dept=?, designation=?, salary=?, bank=?, acc_no=?, role=?, phone=?, doj=?, email=?, address=?,
-       dob=?, present_address=?, permanent_address=?, father_name=?, father_mobile=?,
-       mother_name=?, mother_mobile=?, spouse_name=?, spouse_mobile=?, blood_group=?,
-       pan=?, aadhaar=?, uan=?, qualification=?, institution=?, year_of_passing=?,
-       previous_employer=?, previous_role=?, years_of_experience=?, marital_status=? WHERE code=?`,
-      [
-        b.name ?? cur.name, b.dept ?? cur.dept, b.designation ?? cur.designation,
-        b.salary ?? cur.salary, b.bank ?? cur.bank, b.accNo ?? cur.acc_no,
-        newRole, b.phone ?? cur.phone, b.doj ?? cur.doj,
-        b.email ?? cur.email, b.address ?? cur.address,
-        b.dob ?? cur.dob, b.presentAddress ?? cur.present_address,
-        b.permanentAddress ?? cur.permanent_address,
-        b.fatherName ?? cur.father_name, b.fatherMobile ?? cur.father_mobile,
-        b.motherName ?? cur.mother_name, b.motherMobile ?? cur.mother_mobile,
-        b.spouseName ?? cur.spouse_name, b.spouseMobile ?? cur.spouse_mobile,
-        b.bloodGroup ?? cur.blood_group, b.pan ?? cur.pan, b.aadhaar ?? cur.aadhaar,
-        b.uan ?? cur.uan, b.qualification ?? cur.qualification,
-        b.institution ?? cur.institution, b.yearOfPassing ?? cur.year_of_passing,
-        b.previousEmployer ?? cur.previous_employer, b.previousRole ?? cur.previous_role,
-        b.yearsOfExperience ?? cur.years_of_experience, b.maritalStatus ?? cur.marital_status,
-        req.params.code
-      ]
-    );
-    // Sync role to users table if role changed (upsert in case no users record exists)
+
+    // Map frontend camelCase keys to DB snake_case columns
+    const fieldMap = {
+      name: 'name', dept: 'dept', designation: 'designation', salary: 'salary',
+      bank: 'bank', accNo: 'acc_no', role: 'role', phone: 'phone', doj: 'doj',
+      email: 'email', address: 'address', dob: 'dob',
+      presentAddress: 'present_address', permanentAddress: 'permanent_address',
+      fatherName: 'father_name', fatherMobile: 'father_mobile',
+      motherName: 'mother_name', motherMobile: 'mother_mobile',
+      spouseName: 'spouse_name', spouseMobile: 'spouse_mobile',
+      bloodGroup: 'blood_group', pan: 'pan', aadhaar: 'aadhaar', uan: 'uan',
+      qualification: 'qualification', institution: 'institution',
+      yearOfPassing: 'year_of_passing', previousEmployer: 'previous_employer',
+      previousRole: 'previous_role', yearsOfExperience: 'years_of_experience',
+      maritalStatus: 'marital_status'
+    };
+
+    const setClauses = [];
+    const values = [];
+    for (const [jsKey, dbCol] of Object.entries(fieldMap)) {
+      if (b[jsKey] !== undefined) {
+        setClauses.push(`${dbCol} = ?`);
+        values.push(b[jsKey]);
+      }
+    }
+
+    if (setClauses.length === 0) return res.status(400).json({ error: 'No fields to update' });
+
+    values.push(req.params.code);
+    await pool.query(`UPDATE employees SET ${setClauses.join(', ')} WHERE code = ?`, values);
+
+    // Sync role to users table if role changed
     if (b.role && b.role !== cur.role) {
       await pool.query(
         'INSERT INTO users (emp_code, role) VALUES (?, ?) ON DUPLICATE KEY UPDATE role = VALUES(role)',
-        [req.params.code, newRole]
+        [req.params.code, b.role]
       );
     }
     res.json({ message: 'Employee updated' });

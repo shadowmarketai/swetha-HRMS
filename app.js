@@ -1584,7 +1584,7 @@ function renderRolesList() {
         <p>${e.code} &middot; ${escapeHTML(e.dept)} &middot; ${escapeHTML(e.designation)}</p>
       </div>
       ${isMD001 ? '<span class="role-badge md" style="font-size:.65rem">Primary MD</span>' :
-        `<select class="emp-role-select" onclick="event.stopPropagation()" onchange="changeRole(${i},this.value)">
+        `<select class="emp-role-select" onclick="event.stopPropagation()" onchange="changeRole('${e.code}',this.value)">
         <option value="Employee"${e.role==='Employee'?' selected':''}>Employee</option>
         <option value="HR"${e.role==='HR'?' selected':''}>HR</option>
         <option value="Manager"${e.role==='Manager'?' selected':''}>Manager</option>
@@ -1594,8 +1594,8 @@ function renderRolesList() {
   }).join('');
 }
 
-async function changeRole(idx, newRole) {
-  var emp = EMPLOYEES[idx];
+async function changeRole(empCode, newRole) {
+  var emp = EMPLOYEES.find(function(e) { return e.code === empCode; });
   if (!emp) return;
   if (emp.code === 'MD001') { showToast('Cannot change the primary MD role'); return; }
   var oldRole = emp.role;
@@ -1625,13 +1625,14 @@ async function changeRole(idx, newRole) {
   }
 }
 
-// Employee Detail Modal — shows full personal details
+// Employee Detail Modal — shows full details; editable for MD/HR
 function showEmployeeDetailModal(empCode) {
   var emp = EMPLOYEES.find(function(e) { return e.code === empCode; });
   if (!emp) return;
   var ext = getExtendedData(empCode);
   var container = document.getElementById('empDetailModalContent');
   if (!container) return;
+  var canEdit = currentUser && (currentUser.role === 'MD' || currentUser.role === 'HR');
 
   var colors = ['#E85D04','#22C55E','#F59E0B','#EF4444','#14B8A6','#EC4899','#D62828'];
   var idx = EMPLOYEES.indexOf(emp);
@@ -1650,6 +1651,12 @@ function showEmployeeDetailModal(empCode) {
   function field(label, value, full) {
     return '<div class="edm-field' + (full ? ' full' : '') + '"><div class="edm-field-label">' + escapeHTML(label) + '</div><div class="edm-field-value">' + escapeHTML(String(value || 'N/A')) + '</div></div>';
   }
+  function editField(label, key, value, type, full) {
+    var inputType = type || 'text';
+    var val = value || '';
+    return '<div class="edm-field' + (full ? ' full' : '') + '"><div class="edm-field-label">' + escapeHTML(label) + '</div>' +
+      '<input type="' + inputType + '" class="edm-edit-input" data-field="' + key + '" value="' + escapeHTML(String(val)) + '" style="width:100%;padding:6px 8px;border:1.5px solid var(--gray-200);border-radius:var(--radius-xs);font-size:.78rem;font-family:var(--font-body);background:var(--card-bg);color:var(--text-primary)"></div>';
+  }
 
   var html = '<div class="edm-header">';
   html += '<div class="edm-avatar" style="background:' + avatarColor + '">' + init + '</div>';
@@ -1661,44 +1668,121 @@ function showEmployeeDetailModal(empCode) {
   // Basic Info
   html += '<div class="edm-section"><div class="edm-section-title">Basic Information</div><div class="edm-grid">';
   html += field('Employee Code', emp.code);
-  html += field('Department', emp.dept);
-  html += field('Designation', emp.designation);
-  html += field('Date of Joining', emp.doj);
-  html += field('Salary', emp.salary ? 'Rs.' + Number(emp.salary).toLocaleString('en-IN') : 'N/A');
+  if (canEdit) {
+    html += editField('Name', 'name', emp.name);
+    html += editField('Department', 'dept', emp.dept);
+    html += editField('Designation', 'designation', emp.designation);
+    html += editField('Date of Joining', 'doj', emp.doj, 'date');
+    html += editField('Date of Birth', 'dob', emp.dob || ext.dob, 'date');
+    html += editField('Salary', 'salary', emp.salary, 'number');
+  } else {
+    html += field('Department', emp.dept);
+    html += field('Designation', emp.designation);
+    html += field('Date of Joining', emp.doj);
+    html += field('Salary', emp.salary ? 'Rs.' + Number(emp.salary).toLocaleString('en-IN') : 'N/A');
+  }
   html += field('Role', emp.role);
   html += '</div></div>';
 
   // Contact Info
   html += '<div class="edm-section"><div class="edm-section-title">Contact Information</div><div class="edm-grid">';
-  html += field('Phone', emp.phone);
-  html += field('Email', emp.email);
-  html += field('Emergency Contact', ext.emergencyContact);
-  html += field('Address', ext.address, true);
+  if (canEdit) {
+    html += editField('Phone', 'phone', emp.phone);
+    html += editField('Email', 'email', emp.email, 'email');
+    html += editField('Present Address', 'presentAddress', emp.presentAddress || ext.address, 'text', true);
+    html += editField('Permanent Address', 'permanentAddress', emp.permanentAddress, 'text', true);
+  } else {
+    html += field('Phone', emp.phone);
+    html += field('Email', emp.email);
+    html += field('Address', emp.presentAddress || ext.address, true);
+  }
   html += '</div></div>';
 
   // Family Info
   html += '<div class="edm-section"><div class="edm-section-title">Family Details</div><div class="edm-grid">';
-  html += field('Father\'s Name', ext.fatherName);
-  html += field('Mother\'s Name', ext.motherName);
-  html += field('Blood Group', ext.bloodGroup);
+  if (canEdit) {
+    html += editField('Father\'s Name', 'fatherName', emp.fatherName || ext.fatherName);
+    html += editField('Father\'s Mobile', 'fatherMobile', emp.fatherMobile);
+    html += editField('Mother\'s Name', 'motherName', emp.motherName || ext.motherName);
+    html += editField('Mother\'s Mobile', 'motherMobile', emp.motherMobile);
+    html += editField('Spouse Name', 'spouseName', emp.spouseName);
+    html += editField('Spouse Mobile', 'spouseMobile', emp.spouseMobile);
+    html += editField('Blood Group', 'bloodGroup', emp.bloodGroup || ext.bloodGroup);
+    html += '<div class="edm-field"><div class="edm-field-label">Marital Status</div><select class="edm-edit-input" data-field="maritalStatus" style="width:100%;padding:6px 8px;border:1.5px solid var(--gray-200);border-radius:var(--radius-xs);font-size:.78rem;background:var(--card-bg);color:var(--text-primary)"><option value="">Select</option><option' + (emp.maritalStatus==='Single'?' selected':'') + '>Single</option><option' + (emp.maritalStatus==='Married'?' selected':'') + '>Married</option><option' + (emp.maritalStatus==='Divorced'?' selected':'') + '>Divorced</option><option' + (emp.maritalStatus==='Widowed'?' selected':'') + '>Widowed</option></select></div>';
+  } else {
+    html += field('Father\'s Name', emp.fatherName || ext.fatherName);
+    html += field('Mother\'s Name', emp.motherName || ext.motherName);
+    html += field('Blood Group', emp.bloodGroup || ext.bloodGroup);
+  }
   html += '</div></div>';
 
   // Identity Documents
   html += '<div class="edm-section"><div class="edm-section-title">Identity & Statutory</div><div class="edm-grid">';
-  html += field('Aadhaar', ext.aadhaar);
-  html += field('PAN', ext.pan);
-  html += field('UAN (PF)', ext.uan);
-  html += field('ESI No', ext.esiNo);
+  if (canEdit) {
+    html += editField('Aadhaar', 'aadhaar', emp.aadhaar || ext.aadhaar);
+    html += editField('PAN', 'pan', emp.pan || ext.pan);
+    html += editField('UAN (PF)', 'uan', emp.uan || ext.uan);
+  } else {
+    html += field('Aadhaar', emp.aadhaar || ext.aadhaar);
+    html += field('PAN', emp.pan || ext.pan);
+    html += field('UAN (PF)', emp.uan || ext.uan);
+  }
   html += '</div></div>';
 
   // Bank Details
   html += '<div class="edm-section"><div class="edm-section-title">Bank Details</div><div class="edm-grid">';
-  html += field('Bank', emp.bank || 'Indian Bank');
-  html += field('Account No', emp.accNo || 'N/A');
+  if (canEdit) {
+    html += editField('Bank Name', 'bank', emp.bank);
+    html += editField('Account No', 'accNo', emp.accNo);
+  } else {
+    html += field('Bank', emp.bank || 'N/A');
+    html += field('Account No', emp.accNo || 'N/A');
+  }
   html += '</div></div>';
+
+  // Education & Experience (editable only)
+  if (canEdit) {
+    html += '<div class="edm-section"><div class="edm-section-title">Education & Experience</div><div class="edm-grid">';
+    html += editField('Qualification', 'qualification', emp.qualification);
+    html += editField('Institution', 'institution', emp.institution);
+    html += editField('Year of Passing', 'yearOfPassing', emp.yearOfPassing);
+    html += editField('Previous Employer', 'previousEmployer', emp.previousEmployer);
+    html += editField('Previous Role', 'previousRole', emp.previousRole);
+    html += editField('Years of Experience', 'yearsOfExperience', emp.yearsOfExperience, 'number');
+    html += '</div></div>';
+  }
+
+  // Save button for MD/HR
+  if (canEdit) {
+    html += '<div style="padding:12px 0;text-align:center"><button class="nf-btn nf-btn-primary" onclick="saveEmployeeDetails(\'' + empCode + '\')" style="min-width:160px">Save Changes</button></div>';
+  }
 
   container.innerHTML = html;
   showOverlay('emp-detail');
+}
+
+async function saveEmployeeDetails(empCode) {
+  var inputs = document.querySelectorAll('.edm-edit-input');
+  var body = {};
+  inputs.forEach(function(inp) {
+    var key = inp.getAttribute('data-field');
+    var val = inp.value.trim();
+    if (key && val !== '') body[key] = val;
+  });
+  if (Object.keys(body).length === 0) { showToast('No changes to save'); return; }
+  try {
+    await apiCall('PUT', '/employees/' + empCode, body);
+    // Update local EMPLOYEES array
+    var emp = EMPLOYEES.find(function(e) { return e.code === empCode; });
+    if (emp) {
+      Object.keys(body).forEach(function(k) { emp[k] = body[k]; });
+    }
+    showToast('Employee details saved successfully');
+    hideOverlay('emp-detail');
+    // Re-render admin panel if visible
+    if (document.getElementById('rolesList')) renderRolesList();
+    if (document.getElementById('allEmpList')) renderAllEmpList();
+  } catch (e) { showToast(e.message || 'Error saving details'); }
 }
 
 function renderDeptsList() {
@@ -2871,20 +2955,26 @@ async function submitSiteExpenseBill() {
   var category = (document.getElementById('seBillCategory') || {}).value || '';
   var amount = parseInt((document.getElementById('seBillAmount') || {}).value, 10) || 0;
   var desc = (document.getElementById('seBillDesc') || {}).value || '';
+  var billInput = document.getElementById('seBillInput');
   if (!project) { showToast('Please select a project/site'); return; }
   if (!category) { showToast('Please select a category'); return; }
   if (!amount) { showToast('Please enter the bill amount'); return; }
   try {
-    var apiRes = await apiCall('POST', '/expenses', {
-      category: category, amount: amount, description: desc, date: new Date().toISOString().split('T')[0],
-      expenseType: 'site_expense', project: project
-    });
+    var fd = new FormData();
+    fd.append('category', category);
+    fd.append('amount', amount);
+    fd.append('description', desc);
+    fd.append('date', new Date().toISOString().split('T')[0]);
+    fd.append('expenseType', 'site_expense');
+    fd.append('project', project);
+    if (billInput && billInput.files && billInput.files[0]) fd.append('bill', billInput.files[0]);
+    var apiRes = await apiUpload('/expenses', fd);
     expenseReimbursements.push({
       id: (apiRes && apiRes.id) || (expenseReimbursements.length + 1),
       empCode: currentUser.code, empName: currentUser.name,
       category: category, amount: amount, description: desc, project: project,
       date: new Date().toISOString().split('T')[0], status: 'Pending',
-      expenseType: 'site_expense'
+      expenseType: 'site_expense', billUrl: apiRes.billUrl || ''
     });
     showToast('Site expense bill submitted for Rs.' + amount.toLocaleString('en-IN'));
     renderSiteExpenseScreen();
@@ -2985,21 +3075,31 @@ async function submitTravelExpenseBill() {
   var days = parseInt((document.getElementById('teBillDays') || {}).value, 10) || 1;
   var desc = (document.getElementById('teBillDesc') || {}).value || '';
   var travelDate = (document.getElementById('teBillDate') || {}).value || new Date().toISOString().split('T')[0];
+  var billInput = document.getElementById('teBillInput');
   if (!from || !to) { showToast('Please enter From and To locations'); return; }
   if (!vehicle) { showToast('Please select mode of travel'); return; }
   if (!amount) { showToast('Please enter the bill amount'); return; }
   try {
-    var apiRes = await apiCall('POST', '/expenses', {
-      category: 'Travel', amount: amount, description: desc, date: travelDate,
-      expenseType: 'travel_expense', travelFrom: from, travelTo: to, vehicle: vehicle,
-      travelKm: km, travelDays: days
-    });
+    var fd = new FormData();
+    fd.append('category', 'Travel');
+    fd.append('amount', amount);
+    fd.append('description', desc);
+    fd.append('date', travelDate);
+    fd.append('expenseType', 'travel_expense');
+    fd.append('travelFrom', from);
+    fd.append('travelTo', to);
+    fd.append('vehicle', vehicle);
+    if (km) fd.append('travelKm', km);
+    fd.append('travelDays', days);
+    if (billInput && billInput.files && billInput.files[0]) fd.append('bill', billInput.files[0]);
+    var apiRes = await apiUpload('/expenses', fd);
     expenseReimbursements.push({
       id: (apiRes && apiRes.id) || (expenseReimbursements.length + 1),
       empCode: currentUser.code, empName: currentUser.name,
       category: 'Travel', amount: amount, description: desc, date: travelDate,
       status: 'Pending', expenseType: 'travel_expense',
-      travelFrom: from, travelTo: to, vehicle: vehicle, travelKm: km, travelDays: days
+      travelFrom: from, travelTo: to, vehicle: vehicle, travelKm: km, travelDays: days,
+      billUrl: apiRes.billUrl || ''
     });
     showToast('Travel expense bill submitted for Rs.' + amount.toLocaleString('en-IN'));
     renderTravelExpenseScreen();
@@ -5422,6 +5522,23 @@ async function apiCall(method, path, body) {
   return data;
 }
 
+async function apiUpload(path, formData) {
+  if (!isOnline) throw new Error('No internet connection');
+  if (!JWT_TOKEN) throw new Error('Not authenticated');
+  var res = await fetch(API_BASE + path, {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + JWT_TOKEN },
+    body: formData
+  });
+  if (res.status === 401) {
+    JWT_TOKEN = null; safeStorage.remove('hrms_jwt'); safeStorage.remove(STORAGE_KEYS.session);
+    doLogout(); throw new Error('Session expired. Please login again.');
+  }
+  var data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Server error');
+  return data;
+}
+
 // =====================================================
 // DB-FIRST: Entity Mappers (snake_case → camelCase)
 // =====================================================
@@ -5519,7 +5636,8 @@ function mapExpense(row) {
     vehicle: row.vehicle || '',
     travelKm: row.travel_km != null ? parseInt(row.travel_km, 10) : (row.travelKm != null ? parseInt(row.travelKm, 10) : null),
     travelDays: row.travel_days != null ? parseInt(row.travel_days, 10) : (row.travelDays != null ? parseInt(row.travelDays, 10) : null),
-    date: row.expense_date ? String(row.expense_date).substring(0, 10) : (row.date || '')
+    date: row.expense_date ? String(row.expense_date).substring(0, 10) : (row.date || ''),
+    billUrl: row.bill_url || row.billUrl || ''
   };
 }
 function mapAsset(row) {
@@ -7309,13 +7427,20 @@ async function submitExpenseReimbursement() {
   var amount = parseFloat(document.getElementById('expAmount').value);
   var desc = document.getElementById('expDesc').value.trim();
   var date = document.getElementById('expDate').value;
+  var billInput = document.getElementById('expBillInput');
   if (!cat || !amount || !date) { showToast('Please fill all required fields'); return; }
   try {
-    var res = await apiCall('POST', '/expenses', { category: cat, amount: amount, description: desc, date: date });
+    var fd = new FormData();
+    fd.append('category', cat);
+    fd.append('amount', amount);
+    fd.append('description', desc);
+    fd.append('date', date);
+    if (billInput && billInput.files && billInput.files[0]) fd.append('bill', billInput.files[0]);
+    var res = await apiUpload('/expenses', fd);
     var exp = {
       id: (res && res.id) || expReimbNextId++, empCode: currentUser.code, empName: currentUser.name, dept: currentUser.dept,
       category: cat, amount: amount, description: desc, date: date, status: 'Pending',
-      submittedOn: new Date().toISOString().split('T')[0]
+      submittedOn: new Date().toISOString().split('T')[0], billUrl: res.billUrl || ''
     };
     expenseReimbursements.push(exp);
     addNotification('Expense claim submitted: Rs.' + amount.toLocaleString('en-IN'), 'expense');
@@ -7367,9 +7492,16 @@ function renderExpenseOverlay() {
     myExps.sort((a,b) => b.id - a.id).forEach(exp => {
       const badgeCls = exp.status === 'Approved' ? 'badge-approved' : exp.status === 'Rejected' ? 'badge-rejected' : 'badge-pending';
       const catIcons = {'Travel':'🚗','Food':'🍽️','Accommodation':'🏨','Equipment':'🔧','Office Supplies':'📎','Medical':'🏥','Fuel':'⛽','Other':'📦'};
-      html += `<div class="expense-item"><div class="expense-cat-icon" style="background:var(--gray-100)">${catIcons[exp.category]||'📦'}</div><div style="flex:1"><div style="font-weight:600;font-size:.82rem">${escapeHTML(exp.category)}</div><div style="font-size:.72rem;color:var(--gray-500)">${escapeHTML(exp.empName)} &middot; ${exp.date}</div>${exp.description?'<div style="font-size:.68rem;color:var(--gray-400);margin-top:2px">'+escapeHTML(exp.description)+'</div>':''}</div><div style="text-align:right"><div class="expense-amount">Rs.${exp.amount.toLocaleString('en-IN')}</div><span class="badge-status ${badgeCls}">${exp.status}</span>`;
-      if (isMdHr && exp.status === 'Pending') {
-        html += `<div style="margin-top:4px;display:flex;gap:4px"><button class="nf-btn nf-btn-success nf-btn-sm" onclick="approveExpense(${exp.id})" aria-label="Approve expense ${exp.id}">✓</button><button class="nf-btn nf-btn-danger nf-btn-sm" onclick="rejectExpense(${exp.id})" aria-label="Reject expense ${exp.id}">✗</button></div>`;
+      html += `<div class="expense-item"><div class="expense-cat-icon" style="background:var(--gray-100)">${catIcons[exp.category]||'📦'}</div><div style="flex:1"><div style="font-weight:600;font-size:.82rem">${escapeHTML(exp.category)}</div><div style="font-size:.72rem;color:var(--gray-500)">${escapeHTML(exp.empName)} &middot; ${exp.date}</div>${exp.description?'<div style="font-size:.68rem;color:var(--gray-400);margin-top:2px">'+escapeHTML(exp.description)+'</div>':''}${exp.billUrl?'<a href="'+escapeHTML(exp.billUrl)+'" target="_blank" style="font-size:.68rem;color:var(--primary);font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:3px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>View Bill</a>':''}</div><div style="text-align:right"><div class="expense-amount">Rs.${exp.amount.toLocaleString('en-IN')}</div><span class="badge-status ${badgeCls}">${exp.status}</span>`;
+      if (isMdHr && (exp.status === 'Pending' || exp.status === 'hr_accepted')) {
+        html += `<div style="margin-top:4px;display:flex;gap:4px">`;
+        if (currentUser.role === 'HR' && exp.status === 'Pending') {
+          html += `<button class="nf-btn nf-btn-warning nf-btn-sm" onclick="hrAcceptExpense(${exp.id})" aria-label="Accept expense ${exp.id}" style="font-size:.6rem">Accept</button>`;
+        }
+        if (currentUser.role === 'MD' || exp.status === 'Pending') {
+          html += `<button class="nf-btn nf-btn-success nf-btn-sm" onclick="approveExpense(${exp.id})" aria-label="Approve expense ${exp.id}">✓</button>`;
+        }
+        html += `<button class="nf-btn nf-btn-danger nf-btn-sm" onclick="rejectExpense(${exp.id})" aria-label="Reject expense ${exp.id}">✗</button></div>`;
       }
       html += '</div></div>';
     });

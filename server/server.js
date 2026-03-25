@@ -143,6 +143,28 @@ app.get('*', (req, res) => {
     // Add HR_Accepted to advance_requests status ENUM
     await pool.query("ALTER TABLE advance_requests MODIFY COLUMN status ENUM('Pending','HR_Accepted','Approved','Rejected') DEFAULT 'Pending'").catch(() => {});
 
+    // Phase 0: Employee extended columns (may not exist from initial schema)
+    await pool.query("ALTER TABLE employees ADD COLUMN dob DATE").catch(() => {});
+    await pool.query("ALTER TABLE employees ADD COLUMN present_address TEXT").catch(() => {});
+    await pool.query("ALTER TABLE employees ADD COLUMN permanent_address TEXT").catch(() => {});
+    await pool.query("ALTER TABLE employees ADD COLUMN father_name VARCHAR(100)").catch(() => {});
+    await pool.query("ALTER TABLE employees ADD COLUMN father_mobile VARCHAR(20)").catch(() => {});
+    await pool.query("ALTER TABLE employees ADD COLUMN mother_name VARCHAR(100)").catch(() => {});
+    await pool.query("ALTER TABLE employees ADD COLUMN mother_mobile VARCHAR(20)").catch(() => {});
+    await pool.query("ALTER TABLE employees ADD COLUMN spouse_name VARCHAR(100)").catch(() => {});
+    await pool.query("ALTER TABLE employees ADD COLUMN spouse_mobile VARCHAR(20)").catch(() => {});
+    await pool.query("ALTER TABLE employees ADD COLUMN blood_group VARCHAR(5)").catch(() => {});
+    await pool.query("ALTER TABLE employees ADD COLUMN pan VARCHAR(20)").catch(() => {});
+    await pool.query("ALTER TABLE employees ADD COLUMN aadhaar VARCHAR(20)").catch(() => {});
+    await pool.query("ALTER TABLE employees ADD COLUMN uan VARCHAR(30)").catch(() => {});
+    await pool.query("ALTER TABLE employees ADD COLUMN qualification VARCHAR(200)").catch(() => {});
+    await pool.query("ALTER TABLE employees ADD COLUMN institution VARCHAR(200)").catch(() => {});
+    await pool.query("ALTER TABLE employees ADD COLUMN year_of_passing VARCHAR(10)").catch(() => {});
+    await pool.query("ALTER TABLE employees ADD COLUMN previous_employer VARCHAR(200)").catch(() => {});
+    await pool.query("ALTER TABLE employees ADD COLUMN previous_role VARCHAR(100)").catch(() => {});
+    await pool.query("ALTER TABLE employees ADD COLUMN years_of_experience DECIMAL(4,1)").catch(() => {});
+    await pool.query("ALTER TABLE employees ADD COLUMN marital_status VARCHAR(20)").catch(() => {});
+
     // Phase A: Attendance logs — add geofence columns
     await pool.query("ALTER TABLE attendance_logs ADD COLUMN location_name VARCHAR(200)").catch(() => {});
     await pool.query("ALTER TABLE attendance_logs ADD COLUMN remark TEXT").catch(() => {});
@@ -214,6 +236,9 @@ app.get('*', (req, res) => {
       remaining DECIMAL(12,2) DEFAULT 0,
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
     )`).catch(() => {});
+
+    // Phase E0: Expense bill attachment column
+    await pool.query("ALTER TABLE expense_reimbursements ADD COLUMN bill_url VARCHAR(500)").catch(() => {});
 
     // Phase E: Expense reimbursements — add expense_type + travel fields + dual approval
     await pool.query("ALTER TABLE expense_reimbursements ADD COLUMN expense_type VARCHAR(30) DEFAULT NULL").catch(() => {});

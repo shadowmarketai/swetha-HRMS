@@ -675,7 +675,7 @@
       <h2>Live Location</h2>
       <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
         <span id="locLastUpdated" style="font-size:.62rem;color:var(--gray-400)">Just now</span>
-        <button class="back-btn" aria-label="Go back" onclick="refreshLocations()" title="Refresh"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
+        <button class="back-btn" aria-label="Refresh locations" onclick="refreshLocations()" title="Refresh" style="background:var(--primary);color:#fff;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
       </div>
     </div>
     <div class="location-tracker">
@@ -729,15 +729,6 @@
         <div class="form-grid">
           <div class="form-row"><label>Fuel Type</label><select id="advFuelType"><option value="N/A">N/A</option><option>Petrol</option><option>Diesel</option><option>CNG</option><option>Electric</option></select></div>
           <div class="form-row"><label>Days of Project</label><input type="number" id="advProjectDays" placeholder="e.g. 5" min="1"></div>
-        </div>
-        <div class="form-row"><label>Advance Received (Rs.)</label><input type="number" id="advReceivedAmt" placeholder="Amount already received" min="0"></div>
-        <div class="form-row"><label>Upload Bills / Receipts</label>
-          <div class="bill-upload-zone" id="advBillUploadZone" onclick="document.getElementById('advBillInput').click()" style="border:2px dashed var(--gray-300);border-radius:var(--radius-sm);padding:20px;text-align:center;cursor:pointer;background:var(--gray-50);transition:border-color .2s">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" stroke-width="1.5" style="margin-bottom:4px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-            <div style="font-size:.72rem;color:var(--gray-500)">Tap to upload bills (images/PDF)</div>
-          </div>
-          <input type="file" id="advBillInput" accept="image/*,.pdf" multiple style="display:none" onchange="handleBillUpload(this)">
-          <div id="advBillPreview" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px"></div>
         </div>
       </div>
       <!-- Common: Details & Urgency -->
