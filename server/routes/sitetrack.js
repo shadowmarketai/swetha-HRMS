@@ -629,12 +629,14 @@ function parseAbstractSheet(ws) {
 
     var descUp = desc.toUpperCase();
     var itemUp = itemNo.toUpperCase();
+    // Combine both columns for skip/stop checks
+    var bothUp = itemUp + ' ' + descUp;
     // Stop at final summary rows
-    if (descUp.indexOf('GRAND TOTAL') !== -1 || itemUp.indexOf('GRAND TOTAL') !== -1) break;
-    if (descUp.indexOf('QUOTED RATE') !== -1 || descUp.indexOf('SAY RS') !== -1 || descUp.indexOf('SAY RUPEES') !== -1) break;
+    if (bothUp.indexOf('GRAND TOTAL') !== -1) break;
+    if (bothUp.indexOf('QUOTED RATE') !== -1 || bothUp.indexOf('SAY RS') !== -1 || bothUp.indexOf('SAY RUPEES') !== -1) break;
     // Skip total/estimated/area rows
-    if (descUp.indexOf('TOTAL') !== -1 || itemUp.indexOf('TOTAL') !== -1) continue;
-    if (descUp.indexOf('AREA OF THE BUILDING') !== -1 || descUp.indexOf('RATE/ SQFT') !== -1 || descUp.indexOf('RATE/SQFT') !== -1) continue;
+    if (bothUp.indexOf('TOTAL') !== -1) continue;
+    if (bothUp.indexOf('AREA OF THE BUILDING') !== -1 || bothUp.indexOf('RATE/ SQFT') !== -1 || bothUp.indexOf('RATE/SQFT') !== -1) continue;
 
     var qty = toFloat(row[colQty]);
 
