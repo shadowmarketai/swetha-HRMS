@@ -66,9 +66,7 @@ router.post('/projects/:pid/wbs', verifyToken, requireRole('MD', 'HR'), async fu
     if (!b.wbsCode || !b.taskName) return res.status(400).json({ error: 'wbsCode and taskName are required' });
 
     var [result] = await pool.query(
-      `INSERT INTO wbs_tasks (project_id, wbs_code, level, task_name, lead, predecessor,
-        start_date, end_date, actual_start, actual_end, planned_days, work_days, progress_pct, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      "INSERT INTO wbs_tasks (project_id, wbs_code, `level`, task_name, `lead`, predecessor, start_date, end_date, actual_start, actual_end, planned_days, work_days, progress_pct, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       [req.params.pid, b.wbsCode, b.level || 1, b.taskName, b.lead || null,
        b.predecessor || null, b.startDate || null, b.endDate || null,
        b.actualStart || null, b.actualEnd || null,
@@ -92,9 +90,9 @@ router.put('/wbs/:id', verifyToken, async function(req, res) {
     var values = [];
 
     if (b.wbsCode !== undefined) { fields.push('wbs_code = ?'); values.push(b.wbsCode); }
-    if (b.level !== undefined) { fields.push('level = ?'); values.push(b.level); }
+    if (b.level !== undefined) { fields.push('`level` = ?'); values.push(b.level); }
     if (b.taskName !== undefined) { fields.push('task_name = ?'); values.push(b.taskName); }
-    if (b.lead !== undefined) { fields.push('lead = ?'); values.push(b.lead); }
+    if (b.lead !== undefined) { fields.push('`lead` = ?'); values.push(b.lead); }
     if (b.predecessor !== undefined) { fields.push('predecessor = ?'); values.push(b.predecessor); }
     if (b.startDate !== undefined) { fields.push('start_date = ?'); values.push(b.startDate || null); }
     if (b.endDate !== undefined) { fields.push('end_date = ?'); values.push(b.endDate || null); }
@@ -688,8 +686,7 @@ router.post('/projects/:pid/import-boq', verifyToken, requireRole('MD', 'HR'), u
       wbsParentNum++;
       var parentCode = String(wbsParentNum);
       await pool.query(
-        `INSERT INTO wbs_tasks (project_id, wbs_code, level, task_name, status)
-         VALUES (?, ?, 1, ?, 'pending')`,
+        "INSERT INTO wbs_tasks (project_id, wbs_code, `level`, task_name, status) VALUES (?, ?, 1, ?, 'pending')",
         [req.params.pid, parentCode, SHEET_TITLES[sheetType]]
       );
 
@@ -710,8 +707,7 @@ router.post('/projects/:pid/import-boq', verifyToken, requireRole('MD', 'HR'), u
           catNum++;
           var childCode = parentCode + '.' + catNum;
           await pool.query(
-            `INSERT INTO wbs_tasks (project_id, wbs_code, level, task_name, status)
-             VALUES (?, ?, 2, ?, 'pending')`,
+            "INSERT INTO wbs_tasks (project_id, wbs_code, `level`, task_name, status) VALUES (?, ?, 2, ?, 'pending')",
             [req.params.pid, childCode, it.description]
           );
         }

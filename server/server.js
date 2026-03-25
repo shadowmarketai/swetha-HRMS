@@ -235,9 +235,9 @@ app.get('*', (req, res) => {
       id INT AUTO_INCREMENT PRIMARY KEY,
       project_id INT NOT NULL,
       wbs_code VARCHAR(50) NOT NULL,
-      level INT DEFAULT 1,
+      \`level\` INT DEFAULT 1,
       task_name VARCHAR(500) NOT NULL,
-      lead VARCHAR(255),
+      \`lead\` VARCHAR(255),
       predecessor VARCHAR(50),
       start_date DATE, end_date DATE,
       actual_start DATE, actual_end DATE,
@@ -248,7 +248,7 @@ app.get('*', (req, res) => {
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
       INDEX ix_wbs_proj_code (project_id, wbs_code)
-    )`).catch(() => {});
+    )`).catch(function(e) { console.error('wbs_tasks migration error:', e.message); });
 
     await pool.query(`CREATE TABLE IF NOT EXISTS boq_sheets (
       id INT AUTO_INCREMENT PRIMARY KEY,
@@ -303,7 +303,7 @@ app.get('*', (req, res) => {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
       INDEX ix_dl_proj_date (project_id, log_date)
-    )`).catch(() => {});
+    )`).catch(function(e) { console.error('daily_work_logs migration error:', e.message); });
 
     console.log('DB migrations applied');
   } catch (e) { console.error('Migration error (non-fatal):', e.message); }
