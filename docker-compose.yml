@@ -20,6 +20,8 @@ services:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - AI_MODEL=${AI_MODEL:-claude-haiku-4-5-20251001}
       - STATIC_DIR=/app/public
+    volumes:
+      - hrms_uploads:/app/server/uploads
     depends_on:
       mysql:
         condition: service_healthy
@@ -47,6 +49,7 @@ services:
 
 volumes:
   hrms_data:
+  hrms_uploads:
 
 networks:
   hrms-net:

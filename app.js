@@ -2746,7 +2746,7 @@ function renderAdvanceRequests(filter) {
       project: e.project || null, category: e.category || null,
       travelFrom: e.travelFrom || null, travelTo: e.travelTo || null,
       vehicle: e.vehicle || null, travelKm: e.travelKm || null,
-      urgency: 'normal', status: mappedStatus,
+      urgency: 'normal', status: mappedStatus, billUrl: e.billUrl || '',
       appliedDate: e.date || '', reviewedBy: e.approvedBy || e.rejectedBy || null,
       reviewDate: e.approvedOn || null, rejectReason: null
     };
@@ -2805,6 +2805,7 @@ function renderAdvanceRequests(filter) {
         Applied: ${formatAdvDate(r.appliedDate)}
         ${r.reviewedBy ? ' &middot; By: ' + escapeHTML(r.reviewedBy) + ' on ' + formatAdvDate(r.reviewDate) : ''}
         ${r.rejectReason ? '<br><span style="color:var(--danger)">Reason: ' + escapeHTML(r.rejectReason) + '</span>' : ''}
+        ${r.billUrl ? '<br><a href="' + escapeHTML(r.billUrl) + '" target="_blank" style="font-size:.72rem;color:var(--primary);font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:3px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>View Attached Bill</a>' : ''}
         ${stepHtml}
       </div>
       ${actionsHtml}
@@ -2916,6 +2917,7 @@ function renderSiteExpenseScreen() {
       html += '<div class="expense-item fade-in"><div style="flex:1"><div style="font-weight:600;font-size:.82rem">' + escapeHTML(b.category || 'Site Bill') + '</div>';
       html += '<div style="font-size:.72rem;color:var(--gray-500)">' + escapeHTML(b.project || '') + ' &middot; ' + (b.date || '') + '</div>';
       if (b.description) html += '<div style="font-size:.68rem;color:var(--gray-400);margin-top:2px">' + escapeHTML(b.description) + '</div>';
+      if (b.billUrl) html += '<a href="' + escapeHTML(b.billUrl) + '" target="_blank" style="font-size:.68rem;color:var(--primary);font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:3px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>View Bill</a>';
       html += '</div><div style="text-align:right"><div class="expense-amount">Rs.' + (b.amount || 0).toLocaleString('en-IN') + '</div>';
       html += '<span class="badge-status ' + badgeCls + '">' + escapeHTML(statusTxt) + '</span></div></div>';
     });
@@ -2942,7 +2944,8 @@ function showSiteExpenseBillForm() {
   html += '<div class="camera-zone fade-in" onclick="document.getElementById(\'seBillInput\').click()" style="padding:14px">';
   html += '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
   html += '<p style="font-size:.78rem">Tap to capture bill photo</p>';
-  html += '<input type="file" id="seBillInput" accept="image/*" capture="environment" style="display:none"></div>';
+  html += '<input type="file" id="seBillInput" accept="image/*,application/pdf" capture="environment" style="display:none" onchange="handleBillPreview(this,\'seBillPreview\')"></div>';
+  html += '<div id="seBillPreview" style="display:none;margin-top:6px"><img style="max-width:100%;border-radius:var(--radius-xs)"></div>';
   html += '<div style="display:flex;gap:8px;margin-top:14px">';
   html += '<button class="nf-btn nf-btn-primary" onclick="submitSiteExpenseBill()" style="flex:1">Submit Bill</button>';
   html += '<button class="nf-btn nf-btn-outline" onclick="document.getElementById(\'siteExpenseBillForm\').style.display=\'none\'">Cancel</button>';
@@ -3027,6 +3030,7 @@ function renderTravelExpenseScreen() {
       html += '<div class="expense-item fade-in"><div style="flex:1"><div style="font-weight:600;font-size:.82rem">' + escapeHTML(b.travelFrom || '') + ' → ' + escapeHTML(b.travelTo || '') + '</div>';
       html += '<div style="font-size:.72rem;color:var(--gray-500)">' + escapeHTML(b.vehicle || '') + (b.travelKm ? ' &middot; ' + b.travelKm + ' km' : '') + ' &middot; ' + (b.date || '') + '</div>';
       if (b.description) html += '<div style="font-size:.68rem;color:var(--gray-400);margin-top:2px">' + escapeHTML(b.description) + '</div>';
+      if (b.billUrl) html += '<a href="' + escapeHTML(b.billUrl) + '" target="_blank" style="font-size:.68rem;color:var(--primary);font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:3px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>View Bill</a>';
       html += '</div><div style="text-align:right"><div class="expense-amount">Rs.' + (b.amount || 0).toLocaleString('en-IN') + '</div>';
       html += '<span class="badge-status ' + badgeCls + '">' + escapeHTML(statusTxt) + '</span></div></div>';
     });
@@ -3058,7 +3062,8 @@ function showTravelExpenseBillForm() {
   html += '<div class="camera-zone fade-in" onclick="document.getElementById(\'teBillInput\').click()" style="padding:14px">';
   html += '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
   html += '<p style="font-size:.78rem">Tap to capture receipt</p>';
-  html += '<input type="file" id="teBillInput" accept="image/*" capture="environment" style="display:none"></div>';
+  html += '<input type="file" id="teBillInput" accept="image/*,application/pdf" capture="environment" style="display:none" onchange="handleBillPreview(this,\'teBillPreview\')"></div>';
+  html += '<div id="teBillPreview" style="display:none;margin-top:6px"><img style="max-width:100%;border-radius:var(--radius-xs)"></div>';
   html += '<div style="display:flex;gap:8px;margin-top:14px">';
   html += '<button class="nf-btn nf-btn-primary" onclick="submitTravelExpenseBill()" style="flex:1">Submit Bill</button>';
   html += '<button class="nf-btn nf-btn-outline" onclick="document.getElementById(\'travelExpenseBillForm\').style.display=\'none\'">Cancel</button>';
@@ -7549,13 +7554,24 @@ function addExpenseLineItem() {
 }
 
 function handleExpBillPreview(input) {
+  handleBillPreview(input, 'expBillPreview');
+}
+function handleBillPreview(input, previewId) {
   if (input.files && input.files[0]) {
-    var reader = new FileReader();
-    reader.onload = function(e) {
-      var preview = document.getElementById('expBillPreview');
-      if (preview) { preview.style.display = 'block'; preview.querySelector('img').src = e.target.result; }
-    };
-    reader.readAsDataURL(input.files[0]);
+    var file = input.files[0];
+    var preview = document.getElementById(previewId);
+    if (!preview) return;
+    if (file.type && file.type.indexOf('image') !== -1) {
+      var reader = new FileReader();
+      reader.onload = function(e) {
+        preview.style.display = 'block';
+        preview.innerHTML = '<img src="' + e.target.result + '" style="max-width:100%;max-height:200px;border-radius:var(--radius-xs)">';
+      };
+      reader.readAsDataURL(file);
+    } else {
+      preview.style.display = 'block';
+      preview.innerHTML = '<div style="display:flex;align-items:center;gap:6px;padding:8px;background:var(--gray-50);border-radius:var(--radius-xs);font-size:.78rem"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>' + escapeHTML(file.name) + '</div>';
+    }
   }
 }
 

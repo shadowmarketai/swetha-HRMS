@@ -17,6 +17,9 @@ COPY assets/ /app/public/assets/
 COPY server/ ./server/
 COPY database/ ./database/
 
+# Ensure uploads directory exists
+RUN mkdir -p /app/server/uploads
+
 # Set static dir explicitly
 ENV STATIC_DIR=/app/public
 
