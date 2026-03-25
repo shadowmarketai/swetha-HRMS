@@ -9557,7 +9557,7 @@ async function loadProjectBOQ(projectId, isMDorHR) {
     mapped.forEach(function(s) {
       var active = currentBOQSheetId === s.id ? ' active' : '';
       if (!currentBOQSheetId && mapped.indexOf(s) === 0) { active = ' active'; currentBOQSheetId = s.id; }
-      html += '<button class="boq-sheet-pill' + active + '" onclick="currentBOQSheetId=' + s.id + ';loadProjectBOQ(' + projectId + ',' + isMDorHR + ')">' + escapeHTML(BOQ_SHEET_LABELS[s.sheetType] || s.title) + '</button>';
+      html += '<button class="boq-sheet-pill' + active + '" onclick="currentBOQSheetId=' + s.id + ';loadProjectBOQ(' + projectId + ',' + isMDorHR + ')">' + escapeHTML(s.title || BOQ_SHEET_LABELS[s.sheetType] || s.sheetType) + '</button>';
     });
     html += '</div>';
 
