@@ -619,7 +619,11 @@ function parseAbstractSheet(ws) {
 
     var descUp = desc.toUpperCase();
     var itemUp = itemNo.toUpperCase();
-    if (['TOTAL', 'QUOTED RATE', 'SAY', 'GRAND'].some(function(kw) { return descUp.indexOf(kw) !== -1 || itemUp.indexOf(kw) !== -1; })) break;
+    // Stop only at final summary rows (GRAND TOTAL, QUOTED RATE PER SQFT, SAY RS)
+    if (descUp.indexOf('GRAND TOTAL') !== -1 || itemUp.indexOf('GRAND TOTAL') !== -1) break;
+    if (descUp.indexOf('QUOTED RATE') !== -1 || descUp.indexOf('SAY RS') !== -1 || descUp.indexOf('SAY RUPEES') !== -1) break;
+    // Skip intermediate total/sub-total rows (don't break — continue to next section)
+    if (descUp.indexOf('TOTAL') !== -1 || itemUp.indexOf('TOTAL') !== -1) continue;
 
     var qty = toFloat(row[colQty]);
     var rate = toFloat(row[colRate]);
