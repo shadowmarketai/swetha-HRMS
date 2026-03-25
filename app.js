@@ -9064,7 +9064,7 @@ function updateMaterialRemaining(input) {
   }
 }
 
-function saveProjectMaterials(projectId) {
+async function saveProjectMaterials(projectId) {
   var container = document.getElementById('projectDetailContent');
   if (!container) return;
   var inputs = container.querySelectorAll('.mat-input');
@@ -9078,10 +9078,12 @@ function saveProjectMaterials(projectId) {
       projectMaterials[idx][field] = inp.value.trim();
     }
   });
-  saveMaterialsData(projectId);
-  showToast('Materials saved');
-  var proj = projects.find(function(p){return p.id===projectId;});
-  if (proj) renderProjectDetailContent(proj);
+  try {
+    var mats = projectMaterials.filter(function(m) { return m.projectId === projectId; });
+    await apiCall('POST', '/projects/' + projectId + '/materials/bulk', { materials: mats });
+    showToast('Materials saved');
+    await refreshProject(projectId);
+  } catch(e) { showToast('Error saving materials'); }
 }
 
 function addMaterialRow(projectId) {
@@ -9090,18 +9092,13 @@ function addMaterialRow(projectId) {
   if (proj) renderProjectDetailContent(proj);
 }
 
-function deleteMaterialRow(idx, projectId) {
+async function deleteMaterialRow(idx, projectId) {
   projectMaterials.splice(idx, 1);
-  saveMaterialsData(projectId);
-  var proj = projects.find(function(p){return p.id===projectId;});
-  if (proj) renderProjectDetailContent(proj);
-}
-
-function saveMaterialsData(projectId) {
-  if (projectId) {
+  try {
     var mats = projectMaterials.filter(function(m) { return m.projectId === projectId; });
-    apiCall('POST', '/projects/' + projectId + '/materials/bulk', { materials: mats }).catch(function(){});
-  }
+    await apiCall('POST', '/projects/' + projectId + '/materials/bulk', { materials: mats });
+    await refreshProject(projectId);
+  } catch(e) { showToast('Error deleting material'); }
 }
 
 function openProjectForm(editId) {
@@ -9159,19 +9156,27 @@ async function saveProject(editId) {
 
   try {
     if (editId) {
-      var proj = projects.find(function(p){return p.id===editId;});
-      if (proj) {
-        await apiCall('PUT', '/projects/' + editId, data);
-        Object.assign(proj, data);
-        showToast('Project updated');
-      }
+      await apiCall('PUT', '/projects/' + editId, data);
+      showToast('Project updated');
     } else {
-      var result = await apiCall('POST', '/projects', data);
-      var newProj = mapProject(result);
-      projects.push(newProj);
-      projectTaskNextIds[newProj.id] = 1;
-      projectNextId = Math.max(projectNextId, newProj.id + 1);
+      await apiCall('POST', '/projects', data);
       showToast('Project created');
+    }
+    // Refresh all projects from DB
+    var projData = await apiCall('GET', '/projects');
+    if (projData && Array.isArray(projData)) {
+      projects.length = 0;
+      projData.map(mapProject).forEach(function(p) { projects.push(p); });
+      projectNextId = projects.reduce(function(mx, p) { return Math.max(mx, p.id || 0); }, 0) + 1;
+      Object.keys(projectTaskNextIds).forEach(function(k) { delete projectTaskNextIds[k]; });
+      projects.forEach(function(p) {
+        var maxTaskId = (p.tasks || []).reduce(function(mx, t) { return Math.max(mx, t.id || 0); }, 0);
+        projectTaskNextIds[p.id] = maxTaskId + 1;
+      });
+      projectMaterials.length = 0;
+      projects.forEach(function(p) {
+        (p.materials || []).forEach(function(m) { projectMaterials.push(m); });
+      });
     }
   } catch (e) {
     showToast('Error saving project');
@@ -9185,22 +9190,51 @@ async function deleteProject(id) {
   if (!confirm('Delete this project permanently?')) return;
   try {
     await apiCall('DELETE', '/projects/' + id);
-  } catch (e) { /* delete locally anyway */ }
-  projects = projects.filter(function(p){return p.id !== id;});
-  projectMaterials = projectMaterials.filter(function(m){return m.projectId !== id;});
-  delete projectTaskNextIds[id];
-  showToast('Project deleted');
+    // Refresh projects from DB
+    var projData = await apiCall('GET', '/projects');
+    if (projData && Array.isArray(projData)) {
+      projects.length = 0;
+      projData.map(mapProject).forEach(function(p) { projects.push(p); });
+      projectMaterials.length = 0;
+      projects.forEach(function(p) {
+        (p.materials || []).forEach(function(m) { projectMaterials.push(m); });
+      });
+    }
+    showToast('Project deleted');
+  } catch (e) { showToast('Error deleting project'); }
   hideOverlay('project-detail');
   renderProgressScreen();
 }
 
-function showProjectDetail(id) {
+// Refresh a single project from DB and re-render detail
+async function refreshProject(projectId) {
+  try {
+    var projData = await apiCall('GET', '/projects');
+    if (projData && Array.isArray(projData)) {
+      projects.length = 0;
+      projData.map(mapProject).forEach(function(p) { projects.push(p); });
+      projectMaterials.length = 0;
+      projects.forEach(function(p) {
+        (p.materials || []).forEach(function(m) { projectMaterials.push(m); });
+      });
+    }
+    var proj = projects.find(function(p){return p.id===projectId;});
+    if (proj) renderProjectDetailContent(proj);
+  } catch(e) {}
+}
+
+async function showProjectDetail(id) {
   var proj = projects.find(function(p){return p.id===id;});
   if (!proj) return;
   document.getElementById('projectDetailTitle').textContent = proj.name;
   currentProjectTab = 'overview';
-  renderProjectDetailContent(proj);
   showOverlay('project-detail');
+  // Always refresh WBS tasks from DB to ensure fresh data
+  try {
+    var wbsData = await apiCall('GET', '/sitetrack/projects/' + id + '/wbs');
+    proj.wbsTasks = (wbsData || []).map(mapWBSTask);
+  } catch(e) {}
+  renderProjectDetailContent(proj);
 }
 
 function renderProjectDetailContent(proj) {
@@ -9390,9 +9424,31 @@ function renderProjectWBS(proj, isMDorHR) {
     html += '</div>';
   }
   html += '<div id="wbsTaskFormArea"></div>';
+  html += '<div id="wbsContent"><div class="nf-empty" style="margin-top:16px"><span class="spinner"></span> Loading WBS...</div></div>';
+  html += '</div>';
+  // Load WBS fresh from DB
+  setTimeout(function() { loadProjectWBS(proj.id, isMDorHR); }, 50);
+  return html;
+}
 
-  if (!proj.wbsTasks || proj.wbsTasks.length === 0) {
-    html += '<div class="nf-empty" style="margin-top:16px">No WBS tasks yet. Add tasks to build the Work Breakdown Structure.</div>';
+async function loadProjectWBS(projectId, isMDorHR) {
+  var container = document.getElementById('wbsContent');
+  if (!container) return;
+  try {
+    var wbsData = await apiCall('GET', '/sitetrack/projects/' + projectId + '/wbs');
+    var proj = projects.find(function(p){return p.id===projectId;});
+    if (proj) proj.wbsTasks = (wbsData || []).map(mapWBSTask);
+    var tasks = proj ? proj.wbsTasks : (wbsData || []).map(mapWBSTask);
+    renderWBSTable(container, tasks, proj, isMDorHR, projectId);
+  } catch(e) {
+    container.innerHTML = '<div class="nf-empty">Error loading WBS data</div>';
+  }
+}
+
+function renderWBSTable(container, tasks, proj, isMDorHR, projectId) {
+  var html = '';
+  if (!tasks || tasks.length === 0) {
+    html += '<div class="nf-empty" style="margin-top:16px">No WBS tasks yet. Add tasks or import from Excel BOQ.</div>';
   } else {
     html += '<div style="overflow-x:auto"><table class="wbs-table" style="width:100%;font-size:.75rem">';
     html += '<thead><tr><th class="wbs-col-code">Code</th><th class="wbs-col-task">Task Name</th><th class="wbs-col-lead">Lead</th><th class="wbs-col-date">Plan Start</th><th class="wbs-col-date">Plan End</th><th class="wbs-col-date">Act. Start</th><th class="wbs-col-date">Act. End</th><th class="wbs-col-days">P.Days</th><th class="wbs-col-days">W.Days</th><th class="wbs-col-prog">Progress</th><th class="wbs-col-status">Status</th>';
@@ -9400,20 +9456,20 @@ function renderProjectWBS(proj, isMDorHR) {
     html += '</tr></thead><tbody>';
 
     var canEdit = currentUser && currentUser.role === 'MD';
-    proj.wbsTasks.forEach(function(t) {
+    tasks.forEach(function(t) {
       var statusColor = t.status === 'completed' ? 'var(--success)' : t.status === 'in_progress' ? 'var(--primary)' : 'var(--warning)';
       var statusLabel = t.status === 'completed' ? 'Done' : t.status === 'in_progress' ? 'In Progress' : 'Pending';
       html += '<tr class="wbs-level-' + t.level + '">';
       html += '<td class="wbs-col-code">' + escapeHTML(t.wbsCode) + '</td>';
       if (canEdit) {
-        html += '<td class="wbs-col-task wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'taskName\',\'text\',' + proj.id + ')">' + escapeHTML(t.taskName) + '</td>';
-        html += '<td class="wbs-col-lead wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'lead\',\'text\',' + proj.id + ')">' + escapeHTML(t.lead || '-') + '</td>';
-        html += '<td class="wbs-col-date wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'startDate\',\'date\',' + proj.id + ')">' + (t.startDate || '-') + '</td>';
-        html += '<td class="wbs-col-date wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'endDate\',\'date\',' + proj.id + ')">' + (t.endDate || '-') + '</td>';
-        html += '<td class="wbs-col-date wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'actualStart\',\'date\',' + proj.id + ')">' + (t.actualStart || '-') + '</td>';
-        html += '<td class="wbs-col-date wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'actualEnd\',\'date\',' + proj.id + ')">' + (t.actualEnd || '-') + '</td>';
-        html += '<td class="wbs-col-days wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'plannedDays\',\'number\',' + proj.id + ')">' + (t.plannedDays || '-') + '</td>';
-        html += '<td class="wbs-col-days wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'workDays\',\'number\',' + proj.id + ')">' + (t.workDays || '-') + '</td>';
+        html += '<td class="wbs-col-task wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'taskName\',\'text\',' + projectId + ')">' + escapeHTML(t.taskName) + '</td>';
+        html += '<td class="wbs-col-lead wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'lead\',\'text\',' + projectId + ')">' + escapeHTML(t.lead || '-') + '</td>';
+        html += '<td class="wbs-col-date wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'startDate\',\'date\',' + projectId + ')">' + (t.startDate || '-') + '</td>';
+        html += '<td class="wbs-col-date wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'endDate\',\'date\',' + projectId + ')">' + (t.endDate || '-') + '</td>';
+        html += '<td class="wbs-col-date wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'actualStart\',\'date\',' + projectId + ')">' + (t.actualStart || '-') + '</td>';
+        html += '<td class="wbs-col-date wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'actualEnd\',\'date\',' + projectId + ')">' + (t.actualEnd || '-') + '</td>';
+        html += '<td class="wbs-col-days wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'plannedDays\',\'number\',' + projectId + ')">' + (t.plannedDays || '-') + '</td>';
+        html += '<td class="wbs-col-days wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'workDays\',\'number\',' + projectId + ')">' + (t.workDays || '-') + '</td>';
       } else {
         html += '<td class="wbs-col-task">' + escapeHTML(t.taskName) + '</td>';
         html += '<td class="wbs-col-lead">' + escapeHTML(t.lead || '-') + '</td>';
@@ -9425,17 +9481,16 @@ function renderProjectWBS(proj, isMDorHR) {
         html += '<td class="wbs-col-days">' + (t.workDays || '-') + '</td>';
       }
       html += '<td class="wbs-col-prog"><div class="progress-bar-bg" style="height:14px;border-radius:7px"><div class="progress-bar-fill" style="width:' + t.progressPct + '%;background:' + statusColor + ';height:100%;border-radius:7px"></div></div>';
-      html += '<div style="text-align:center;font-size:.65rem;margin-top:2px;cursor:pointer" onclick="promptWBSProgress(' + t.id + ',' + t.progressPct + ',' + proj.id + ')">' + Math.round(t.progressPct) + '%</div></td>';
+      html += '<div style="text-align:center;font-size:.65rem;margin-top:2px;cursor:pointer" onclick="promptWBSProgress(' + t.id + ',' + t.progressPct + ',' + projectId + ')">' + Math.round(t.progressPct) + '%</div></td>';
       html += '<td class="wbs-col-status"><span style="font-size:.65rem;padding:2px 8px;border-radius:10px;background:' + statusColor + ';color:#fff">' + statusLabel + '</span></td>';
       if (isMDorHR) {
-        html += '<td class="wbs-col-del"><button style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:.7rem" onclick="deleteWBSTask(' + t.id + ',' + proj.id + ')">Del</button></td>';
+        html += '<td class="wbs-col-del"><button style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:.7rem" onclick="deleteWBSTask(' + t.id + ',' + projectId + ')">Del</button></td>';
       }
       html += '</tr>';
     });
     html += '</tbody></table></div>';
   }
-  html += '</div>';
-  return html;
+  container.innerHTML = html;
 }
 
 function openWBSTaskForm(projectId) {
@@ -9467,7 +9522,7 @@ async function saveWBSTask(projectId) {
   var name = document.getElementById('wbsTaskName').value.trim();
   if (!code || !name) { showToast('WBS code and task name are required'); return; }
   try {
-    var result = await apiCall('POST', '/sitetrack/projects/' + projectId + '/wbs', {
+    await apiCall('POST', '/sitetrack/projects/' + projectId + '/wbs', {
       wbsCode: code,
       level: parseInt(document.getElementById('wbsLevel').value, 10) || 1,
       taskName: name,
@@ -9476,9 +9531,11 @@ async function saveWBSTask(projectId) {
       startDate: document.getElementById('wbsStart').value || null,
       endDate: document.getElementById('wbsEnd').value || null
     });
+    // Refresh WBS from DB
+    var wbsData = await apiCall('GET', '/sitetrack/projects/' + projectId + '/wbs');
     var proj = projects.find(function(p){return p.id===projectId;});
     if (proj) {
-      proj.wbsTasks.push(mapWBSTask(result));
+      proj.wbsTasks = (wbsData || []).map(mapWBSTask);
       showToast('WBS task added');
       renderProjectDetailContent(proj);
     }
@@ -9495,11 +9552,12 @@ function promptWBSProgress(taskId, currentPct, projectId) {
 
 async function updateWBSProgress(taskId, pct, projectId) {
   try {
-    var result = await apiCall('PATCH', '/sitetrack/wbs/' + taskId + '/progress', { progressPct: pct });
+    await apiCall('PATCH', '/sitetrack/wbs/' + taskId + '/progress', { progressPct: pct });
+    // Refresh WBS from DB
+    var wbsData = await apiCall('GET', '/sitetrack/projects/' + projectId + '/wbs');
     var proj = projects.find(function(p){return p.id===projectId;});
     if (proj) {
-      var idx = proj.wbsTasks.findIndex(function(t){return t.id===taskId;});
-      if (idx !== -1) proj.wbsTasks[idx] = mapWBSTask(result);
+      proj.wbsTasks = (wbsData || []).map(mapWBSTask);
       showToast('Progress updated');
       renderProjectDetailContent(proj);
     }
@@ -9510,9 +9568,11 @@ async function deleteWBSTask(taskId, projectId) {
   if (!confirm('Delete this WBS task?')) return;
   try {
     await apiCall('DELETE', '/sitetrack/wbs/' + taskId);
+    // Refresh WBS from DB
+    var wbsData = await apiCall('GET', '/sitetrack/projects/' + projectId + '/wbs');
     var proj = projects.find(function(p){return p.id===projectId;});
     if (proj) {
-      proj.wbsTasks = proj.wbsTasks.filter(function(t){return t.id!==taskId;});
+      proj.wbsTasks = (wbsData || []).map(mapWBSTask);
       showToast('WBS task deleted');
       renderProjectDetailContent(proj);
     }
@@ -9797,12 +9857,15 @@ function _wbsSaveCell(td, newVal, oldVal, taskId, field, projectId) {
   td.textContent = newVal || '-';
   td.style.opacity = '0.6';
   apiCall('PUT', '/sitetrack/wbs/' + taskId, payload)
-    .then(function(result) {
+    .then(function() {
       td.style.opacity = '1';
+      // Refresh WBS from DB
+      return apiCall('GET', '/sitetrack/projects/' + projectId + '/wbs');
+    })
+    .then(function(wbsData) {
       var proj = projects.find(function(p){return p.id===projectId;});
       if (proj) {
-        var idx = proj.wbsTasks.findIndex(function(t){return t.id===taskId;});
-        if (idx !== -1) proj.wbsTasks[idx] = mapWBSTask(result);
+        proj.wbsTasks = (wbsData || []).map(mapWBSTask);
         renderProjectDetailContent(proj);
       }
     })
@@ -10114,9 +10177,6 @@ function openTaskForm(projectId) {
 async function saveProjectTask(projectId) {
   var title = document.getElementById('projTaskTitle').value.trim();
   if (!title) { showToast('Task title is required'); return; }
-  var proj = projects.find(function(p){return p.id===projectId;});
-  if (!proj) return;
-
   var taskData = {
     title: title,
     description: document.getElementById('projTaskDesc').value.trim(),
@@ -10126,31 +10186,25 @@ async function saveProjectTask(projectId) {
     dueDate: document.getElementById('projTaskDue').value
   };
   try {
-    var result = await apiCall('POST', '/projects/' + projectId + '/tasks', taskData);
-    var task = mapProjectTask(result);
-    proj.tasks.push(task);
-    projectTaskNextIds[projectId] = Math.max(projectTaskNextIds[projectId] || 1, task.id + 1);
-  } catch (e) {
-    var taskId = projectTaskNextIds[projectId] || 1;
-    taskData.id = taskId;
-    taskData.createdDate = new Date().toISOString().split('T')[0];
-    proj.tasks.push(taskData);
-    projectTaskNextIds[projectId] = taskId + 1;
-  }
-  showToast('Task added');
-  renderProjectDetailContent(proj);
+    await apiCall('POST', '/projects/' + projectId + '/tasks', taskData);
+    showToast('Task added');
+    await refreshProject(projectId);
+  } catch (e) { showToast('Error adding task'); }
 }
 
-function toggleTaskStatus(projectId, taskId) {
+async function toggleTaskStatus(projectId, taskId) {
   var proj = projects.find(function(p){return p.id===projectId;});
   if (!proj) return;
   var task = proj.tasks.find(function(t){return t.id===taskId;});
   if (!task) return;
-  if (task.status === 'Pending') task.status = 'In Progress';
-  else if (task.status === 'In Progress') task.status = 'Done';
-  else task.status = 'Pending';
-  apiCall('PUT', '/projects/' + projectId + '/tasks/' + taskId, { status: task.status }).catch(function(){});
-  renderProjectDetailContent(proj);
+  var newStatus;
+  if (task.status === 'Pending') newStatus = 'In Progress';
+  else if (task.status === 'In Progress') newStatus = 'Done';
+  else newStatus = 'Pending';
+  try {
+    await apiCall('PUT', '/projects/' + projectId + '/tasks/' + taskId, { status: newStatus });
+    await refreshProject(projectId);
+  } catch(e) { showToast('Error updating task'); }
 }
 
 function openAddMemberUI(projectId) {
@@ -10177,23 +10231,20 @@ function openAddMemberUI(projectId) {
 async function addProjectMember(projectId) {
   var code = document.getElementById('projAddMember').value;
   if (!code) { showToast('Select an employee'); return; }
-  var proj = projects.find(function(p){return p.id===projectId;});
-  if (!proj) return;
-  if (proj.team.indexOf(code) !== -1) { showToast('Already in team'); return; }
-  apiCall('POST', '/projects/' + projectId + '/team', { empCode: code }).catch(function(){});
-  proj.team.push(code);
-  showToast('Member added');
-  renderProjectDetailContent(proj);
+  try {
+    await apiCall('POST', '/projects/' + projectId + '/team', { empCode: code });
+    showToast('Member added');
+    await refreshProject(projectId);
+  } catch(e) { showToast('Error adding member'); }
 }
 
-function removeProjectMember(projectId, empCode) {
-  var proj = projects.find(function(p){return p.id===projectId;});
-  if (!proj) return;
+async function removeProjectMember(projectId, empCode) {
   if (!confirm('Remove this member from the project?')) return;
-  apiCall('DELETE', '/projects/' + projectId + '/team/' + empCode).catch(function(){});
-  proj.team = proj.team.filter(function(c){return c !== empCode;});
-  showToast('Member removed');
-  renderProjectDetailContent(proj);
+  try {
+    await apiCall('DELETE', '/projects/' + projectId + '/team/' + empCode);
+    showToast('Member removed');
+    await refreshProject(projectId);
+  } catch(e) { showToast('Error removing member'); }
 }
 
 function editProject(id) {
