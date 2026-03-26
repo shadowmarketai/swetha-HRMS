@@ -1790,11 +1790,12 @@ textarea.form-control{resize:vertical}
 .boq-table-title h4{font-size:.82rem;font-weight:700;color:var(--text);font-family:var(--font-display)}
 .boq-table{border-collapse:collapse;width:100%;table-layout:auto}
 .boq-table th,.boq-table td{padding:7px 8px;border-bottom:1px solid var(--gray-100);text-align:left;vertical-align:top}
+.boq-table td{color:var(--text);font-size:.72rem}
 .boq-table th{background:linear-gradient(180deg,var(--primary-50),var(--gray-50));font-weight:700;font-size:.62rem;color:var(--primary-dark);text-transform:uppercase;letter-spacing:.04em;position:sticky;top:0;white-space:nowrap;border-bottom:2px solid var(--primary-100)}
 .boq-table tbody tr{transition:background .15s}
 .boq-table tbody tr:hover{background:var(--primary-50)}
 .boq-table .col-sno{width:40px;white-space:nowrap;font-weight:600;color:var(--primary)}
-.boq-table .col-desc{min-width:180px;word-wrap:break-word;white-space:normal;line-height:1.35;font-weight:500}
+.boq-table .col-desc{min-width:140px;max-width:260px;word-wrap:break-word;overflow-wrap:break-word;white-space:normal;line-height:1.35;font-weight:500;color:var(--text)}
 .boq-table .col-unit{width:40px;text-align:center;color:var(--gray-600)}
 .boq-table .col-qty,.boq-table .col-rate,.boq-table .col-used{text-align:right;white-space:nowrap}
 .boq-table .col-amt{text-align:right;white-space:nowrap;font-weight:600;color:var(--text)}
