@@ -129,7 +129,12 @@ app.get('/api/health', async (req, res) => {
   res.status(code).json(health);
 });
 
-// Fallback to frontend
+// 404 for missing uploads — don't serve index.html for file requests
+app.use('/uploads', (req, res) => {
+  res.status(404).json({ error: 'File not found' });
+});
+
+// Fallback to frontend (SPA)
 app.get('*', (req, res) => {
   res.sendFile(path.join(STATIC_DIR, 'index.html'));
 });
