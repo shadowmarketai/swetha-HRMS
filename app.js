@@ -9525,9 +9525,15 @@ function renderProjectTeam(proj, isMDorHR) {
 // =====================================================
 // SITETRACK: WBS TAB
 // =====================================================
+function isCurrentUserWBSLead(task) {
+  if (!currentUser || !task.lead) return false;
+  return task.lead === currentUser.name;
+}
+
 function renderProjectWBS(proj, isMDorHR) {
+  var isMD = currentUser && currentUser.role === 'MD';
   var html = '<div style="padding:0 16px">';
-  if (isMDorHR) {
+  if (isMD) {
     html += '<div style="margin-top:10px;margin-bottom:8px;display:flex;gap:8px">';
     html += '<button class="nf-btn nf-btn-primary nf-btn-sm" onclick="openWBSTaskForm(' + proj.id + ')">+ Add WBS Task</button>';
     html += '</div>';
@@ -9556,6 +9562,7 @@ async function loadProjectWBS(projectId, isMDorHR) {
 
 function renderWBSTable(container, tasks, proj, isMDorHR, projectId) {
   var html = '';
+  var isMD = currentUser && currentUser.role === 'MD';
   if (!tasks || tasks.length === 0) {
     html += '<div class="nf-empty" style="margin-top:16px">No WBS tasks yet. Add tasks or import from Excel BOQ.</div>';
   } else {
@@ -9564,38 +9571,67 @@ function renderWBSTable(container, tasks, proj, isMDorHR, projectId) {
     html += '<div class="wbs-table-title"><h4>Work Breakdown Structure</h4><span class="wbs-count">' + doneCount + ' / ' + tasks.length + ' completed</span></div>';
     html += '<div style="overflow-x:auto"><table class="wbs-table">';
     html += '<thead><tr><th class="wbs-col-code">Code</th><th class="wbs-col-task">Task Name</th><th class="wbs-col-lead">Lead</th><th class="wbs-col-date wbs-col-hide-mobile">Plan Start</th><th class="wbs-col-date wbs-col-hide-mobile">Plan End</th><th class="wbs-col-date wbs-col-hide-mobile">Act. Start</th><th class="wbs-col-date wbs-col-hide-mobile">Act. End</th><th class="wbs-col-days wbs-col-hide-mobile">P.Days</th><th class="wbs-col-days wbs-col-hide-mobile">W.Days</th><th class="wbs-col-prog">Progress</th><th class="wbs-col-status">Status</th>';
-    if (isMDorHR) html += '<th class="wbs-col-del"></th>';
+    if (isMD) html += '<th class="wbs-col-del"></th>';
     html += '</tr></thead><tbody>';
 
-    var canEdit = currentUser && currentUser.role === 'MD';
     tasks.forEach(function(t) {
       var statusColor = t.status === 'completed' ? 'var(--success)' : t.status === 'in_progress' ? 'var(--primary)' : 'var(--warning)';
       var statusLabel = t.status === 'completed' ? 'Done' : t.status === 'in_progress' ? 'In Progress' : 'Pending';
       var statusClass = t.status === 'completed' ? 'status-done' : t.status === 'in_progress' ? 'status-inprogress' : 'status-pending';
+      var isLead = isCurrentUserWBSLead(t);
       html += '<tr class="wbs-level-' + t.level + '">';
+      // Code — always read-only
       html += '<td class="wbs-col-code">' + escapeHTML(t.wbsCode) + '</td>';
-      if (canEdit) {
+      // Task Name — MD editable
+      if (isMD) {
         html += '<td class="wbs-col-task wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'taskName\',\'text\',' + projectId + ')">' + escapeHTML(t.taskName) + '</td>';
-        html += '<td class="wbs-col-lead wbs-editable" onclick="wbsEditLeadCell(this,' + t.id + ',' + projectId + ')">' + escapeHTML(t.lead || '-') + '</td>';
-        html += '<td class="wbs-col-date wbs-col-hide-mobile wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'startDate\',\'date\',' + projectId + ')">' + (t.startDate || '-') + '</td>';
-        html += '<td class="wbs-col-date wbs-col-hide-mobile wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'endDate\',\'date\',' + projectId + ')">' + (t.endDate || '-') + '</td>';
-        html += '<td class="wbs-col-date wbs-col-hide-mobile wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'actualStart\',\'date\',' + projectId + ')">' + (t.actualStart || '-') + '</td>';
-        html += '<td class="wbs-col-date wbs-col-hide-mobile wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'actualEnd\',\'date\',' + projectId + ')">' + (t.actualEnd || '-') + '</td>';
-        html += '<td class="wbs-col-days wbs-col-hide-mobile wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'plannedDays\',\'number\',' + projectId + ')">' + (t.plannedDays || '-') + '</td>';
-        html += '<td class="wbs-col-days wbs-col-hide-mobile wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'workDays\',\'number\',' + projectId + ')">' + (t.workDays || '-') + '</td>';
       } else {
         html += '<td class="wbs-col-task">' + escapeHTML(t.taskName) + '</td>';
+      }
+      // Lead — MD editable (2-stage dept→employee)
+      if (isMD) {
+        html += '<td class="wbs-col-lead wbs-editable" onclick="wbsEditLeadCell(this,' + t.id + ',' + projectId + ')">' + escapeHTML(t.lead || '-') + '</td>';
+      } else {
         html += '<td class="wbs-col-lead">' + escapeHTML(t.lead || '-') + '</td>';
+      }
+      // Plan Start / Plan End — MD editable
+      if (isMD) {
+        html += '<td class="wbs-col-date wbs-col-hide-mobile wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'startDate\',\'date\',' + projectId + ')">' + (t.startDate || '-') + '</td>';
+        html += '<td class="wbs-col-date wbs-col-hide-mobile wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'endDate\',\'date\',' + projectId + ')">' + (t.endDate || '-') + '</td>';
+      } else {
         html += '<td class="wbs-col-date wbs-col-hide-mobile">' + (t.startDate || '-') + '</td>';
         html += '<td class="wbs-col-date wbs-col-hide-mobile">' + (t.endDate || '-') + '</td>';
+      }
+      // Act. Start — Lead editable (one-time, only when empty)
+      if (isLead && !t.actualStart) {
+        html += '<td class="wbs-col-date wbs-col-hide-mobile wbs-lead-editable" onclick="wbsEditCell(this,' + t.id + ',\'actualStart\',\'date\',' + projectId + ')"><span style="opacity:0.5">— tap</span></td>';
+      } else {
         html += '<td class="wbs-col-date wbs-col-hide-mobile">' + (t.actualStart || '-') + '</td>';
+      }
+      // Act. End — Lead editable (one-time, only when empty)
+      if (isLead && !t.actualEnd) {
+        html += '<td class="wbs-col-date wbs-col-hide-mobile wbs-lead-editable" onclick="wbsEditCell(this,' + t.id + ',\'actualEnd\',\'date\',' + projectId + ')"><span style="opacity:0.5">— tap</span></td>';
+      } else {
         html += '<td class="wbs-col-date wbs-col-hide-mobile">' + (t.actualEnd || '-') + '</td>';
+      }
+      // P.Days — Lead editable (one-time, only when empty)
+      if (isLead && !t.plannedDays) {
+        html += '<td class="wbs-col-days wbs-col-hide-mobile wbs-lead-editable" onclick="wbsEditCell(this,' + t.id + ',\'plannedDays\',\'number\',' + projectId + ')"><span style="opacity:0.5">— tap</span></td>';
+      } else {
         html += '<td class="wbs-col-days wbs-col-hide-mobile">' + (t.plannedDays || '-') + '</td>';
+      }
+      // W.Days — Lead editable (one-time, only when empty)
+      if (isLead && !t.workDays) {
+        html += '<td class="wbs-col-days wbs-col-hide-mobile wbs-lead-editable" onclick="wbsEditCell(this,' + t.id + ',\'workDays\',\'number\',' + projectId + ')"><span style="opacity:0.5">— tap</span></td>';
+      } else {
         html += '<td class="wbs-col-days wbs-col-hide-mobile">' + (t.workDays || '-') + '</td>';
       }
+      // Progress — clickable by all
       html += '<td class="wbs-col-prog"><div class="wbs-prog-bar" onclick="promptWBSProgress(' + t.id + ',' + t.progressPct + ',' + projectId + ')" style="cursor:pointer"><div class="wbs-prog-fill" style="width:' + t.progressPct + '%;background:' + statusColor + '"></div><span class="wbs-prog-text">' + Math.round(t.progressPct) + '%</span></div></td>';
+      // Status — read-only
       html += '<td class="wbs-col-status"><span class="wbs-status-badge ' + statusClass + '">' + statusLabel + '</span></td>';
-      if (isMDorHR) {
+      // Delete — MD only
+      if (isMD) {
         html += '<td class="wbs-col-del"><button class="proj-action-btn danger" onclick="deleteWBSTask(' + t.id + ',' + projectId + ')" title="Delete">Del</button></td>';
       }
       html += '</tr>';
