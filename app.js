@@ -9319,17 +9319,60 @@ function renderProjectOverview(proj, pct, isMDorHR, isMD) {
   }
   html += '</div></div>';
 
-  // Task summary
-  var pending = proj.tasks.filter(function(t){return t.status==='Pending';}).length;
-  var inProg = proj.tasks.filter(function(t){return t.status==='In Progress';}).length;
-  var done = proj.tasks.filter(function(t){return t.status==='Done';}).length;
+  // Task summary — show WBS tasks when available, else old tasks
+  var pending, inProg, done, totalTasks, summaryLabel;
+  if (hasWBS) {
+    pending = proj.wbsTasks.filter(function(t){return t.status==='pending';}).length;
+    inProg = proj.wbsTasks.filter(function(t){return t.status==='in_progress';}).length;
+    done = proj.wbsTasks.filter(function(t){return t.status==='completed';}).length;
+    totalTasks = proj.wbsTasks.length;
+    summaryLabel = 'WBS Task Summary';
+  } else {
+    pending = proj.tasks.filter(function(t){return t.status==='Pending';}).length;
+    inProg = proj.tasks.filter(function(t){return t.status==='In Progress';}).length;
+    done = proj.tasks.filter(function(t){return t.status==='Done';}).length;
+    totalTasks = proj.tasks.length;
+    summaryLabel = 'Task Summary';
+  }
   html += '<div class="card" style="padding:14px;margin-top:10px">';
-  html += '<div style="font-weight:600;font-size:.82rem;margin-bottom:8px">Task Summary</div>';
+  html += '<div style="font-weight:600;font-size:.82rem;margin-bottom:8px">' + summaryLabel + ' <span style="font-size:.68rem;color:var(--gray-400);font-weight:400">(' + totalTasks + ' total)</span></div>';
   html += '<div style="display:flex;gap:8px">';
   html += '<div style="flex:1;text-align:center;padding:8px;border-radius:8px;background:var(--bg)"><div style="font-size:1.1rem;font-weight:700;color:var(--warning)">' + pending + '</div><div style="font-size:.65rem;color:var(--gray-400)">Pending</div></div>';
   html += '<div style="flex:1;text-align:center;padding:8px;border-radius:8px;background:var(--bg)"><div style="font-size:1.1rem;font-weight:700;color:var(--primary)">' + inProg + '</div><div style="font-size:.65rem;color:var(--gray-400)">In Progress</div></div>';
-  html += '<div style="flex:1;text-align:center;padding:8px;border-radius:8px;background:var(--bg)"><div style="font-size:1.1rem;font-weight:700;color:var(--success)">' + done + '</div><div style="font-size:.65rem;color:var(--gray-400)">Done</div></div>';
-  html += '</div></div>';
+  html += '<div style="flex:1;text-align:center;padding:8px;border-radius:8px;background:var(--bg)"><div style="font-size:1.1rem;font-weight:700;color:var(--success)">' + done + '</div><div style="font-size:.65rem;color:var(--gray-400)">' + (hasWBS ? 'Completed' : 'Done') + '</div></div>';
+  html += '</div>';
+
+  // WBS level breakdown — show L1 parent tasks with their progress
+  if (hasWBS) {
+    var l1Tasks = proj.wbsTasks.filter(function(t){return t.level === 1;});
+    if (l1Tasks.length > 0) {
+      html += '<div style="margin-top:12px">';
+      html += '<div style="font-size:.72rem;font-weight:600;color:var(--gray-500);margin-bottom:6px">WBS Breakdown</div>';
+      l1Tasks.forEach(function(t) {
+        var statusColor = t.status === 'completed' ? 'var(--success)' : t.status === 'in_progress' ? 'var(--primary)' : 'var(--warning)';
+        var statusLabel = t.status === 'completed' ? 'Done' : t.status === 'in_progress' ? 'Active' : 'Pending';
+        // Count child tasks under this L1
+        var childTasks = proj.wbsTasks.filter(function(c){return c.level > 1 && c.wbsCode.indexOf(t.wbsCode + '.') === 0;});
+        var childDone = childTasks.filter(function(c){return c.status === 'completed';}).length;
+        var avgProgress = childTasks.length > 0
+          ? Math.round(childTasks.reduce(function(s,c){return s+c.progressPct;}, 0) / childTasks.length)
+          : Math.round(t.progressPct);
+
+        html += '<div style="margin-bottom:8px">';
+        html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">';
+        html += '<span style="font-size:.72rem;font-weight:600">' + escapeHTML(t.wbsCode) + ' ' + escapeHTML(t.taskName) + '</span>';
+        html += '<span style="font-size:.62rem;padding:2px 8px;border-radius:10px;background:' + statusColor + ';color:#fff">' + statusLabel + '</span>';
+        html += '</div>';
+        html += '<div class="progress-bar-bg" style="height:10px;border-radius:5px"><div class="progress-bar-fill" style="width:' + avgProgress + '%;background:' + statusColor + ';height:100%;border-radius:5px"></div></div>';
+        html += '<div style="display:flex;justify-content:space-between;font-size:.62rem;color:var(--gray-400);margin-top:2px">';
+        html += '<span>' + avgProgress + '%</span>';
+        if (childTasks.length > 0) html += '<span>' + childDone + '/' + childTasks.length + ' sub-tasks done</span>';
+        html += '</div></div>';
+      });
+      html += '</div>';
+    }
+  }
+  html += '</div>';
 
   // Actions
   if (isMDorHR) {
