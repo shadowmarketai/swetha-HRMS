@@ -50,4 +50,25 @@ router.post('/', verifyToken, [
   }
 });
 
+// POST /api/tax/form12b — submit Form 12B (previous employer details)
+router.post('/form12b', verifyToken, async (req, res) => {
+  try {
+    const { prev_employer, prev_from, prev_to, prev_gross, prev_tds } = req.body;
+    if (!prev_employer) return res.status(400).json({ error: 'Previous employer name is required' });
+    const fy = '2025-26';
+    await pool.query(
+      `INSERT INTO tax_declarations (emp_code, fy, prev_employer, prev_from, prev_to, prev_gross, prev_tds, form12b_submitted_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, CURDATE())
+       ON DUPLICATE KEY UPDATE prev_employer = VALUES(prev_employer), prev_from = VALUES(prev_from),
+        prev_to = VALUES(prev_to), prev_gross = VALUES(prev_gross), prev_tds = VALUES(prev_tds),
+        form12b_submitted_at = VALUES(form12b_submitted_at), updated_at = NOW()`,
+      [req.user.empCode, fy, prev_employer, prev_from || null, prev_to || null, prev_gross || 0, prev_tds || 0]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 module.exports = router;

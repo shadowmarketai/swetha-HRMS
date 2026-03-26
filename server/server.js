@@ -338,6 +338,36 @@ app.get('*', (req, res) => {
       INDEX ix_dl_proj_date (project_id, log_date)
     )`).catch(function(e) { console.error('daily_work_logs migration error:', e.message); });
 
+    // Phase F2: Form 12B columns on tax_declarations
+    await pool.query("ALTER TABLE tax_declarations ADD COLUMN prev_employer VARCHAR(200)").catch(() => {});
+    await pool.query("ALTER TABLE tax_declarations ADD COLUMN prev_from DATE").catch(() => {});
+    await pool.query("ALTER TABLE tax_declarations ADD COLUMN prev_to DATE").catch(() => {});
+    await pool.query("ALTER TABLE tax_declarations ADD COLUMN prev_gross DECIMAL(14,2) DEFAULT 0").catch(() => {});
+    await pool.query("ALTER TABLE tax_declarations ADD COLUMN prev_tds DECIMAL(14,2) DEFAULT 0").catch(() => {});
+    await pool.query("ALTER TABLE tax_declarations ADD COLUMN form12b_submitted_at DATE").catch(() => {});
+
+    // Phase G: Shift types table
+    await pool.query(`CREATE TABLE IF NOT EXISTS shift_types (
+      code VARCHAR(10) PRIMARY KEY,
+      name VARCHAR(100) NOT NULL,
+      start_time VARCHAR(10) NOT NULL DEFAULT '09:00',
+      end_time VARCHAR(10) NOT NULL DEFAULT '18:00',
+      color VARCHAR(10) DEFAULT '#2563EB',
+      is_active TINYINT(1) DEFAULT 1,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    )`).catch(function(e) { console.error('shift_types migration error:', e.message); });
+
+    // Seed default shift types if empty
+    const [stRows] = await pool.query('SELECT COUNT(*) as cnt FROM shift_types').catch(() => [[]]);
+    if (stRows && stRows[0] && stRows[0].cnt === 0) {
+      await pool.query(`INSERT IGNORE INTO shift_types (code, name, start_time, end_time, color) VALUES
+        ('GEN', 'General Shift', '09:00', '18:00', '#2563EB'),
+        ('2ND', 'Second Shift', '14:00', '22:00', '#D97706'),
+        ('3RD', 'Third Shift (Night)', '22:00', '06:00', '#7C3AED')
+      `).catch(() => {});
+    }
+
     console.log('DB migrations applied');
   } catch (e) { console.error('Migration error (non-fatal):', e.message); }
 })();

@@ -983,11 +983,18 @@ function downloadESIReturnFile() {
 }
 
 let activeSalaryMonth = 8; // Dec (0=Apr in FY, so index 8 = Dec)
-const FY_MONTHS = [
-  {m:'Apr',mi:3,y:2025},{m:'May',mi:4,y:2025},{m:'Jun',mi:5,y:2025},{m:'Jul',mi:6,y:2025},
-  {m:'Aug',mi:7,y:2025},{m:'Sep',mi:8,y:2025},{m:'Oct',mi:9,y:2025},{m:'Nov',mi:10,y:2025},
-  {m:'Dec',mi:11,y:2025},{m:'Jan',mi:0,y:2026},{m:'Feb',mi:1,y:2026},{m:'Mar',mi:2,y:2026}
-];
+const FY_MONTHS = (function() {
+  var now = new Date(), curY = now.getFullYear(), curM = now.getMonth();
+  var fyStart = curM >= 3 ? curY : curY - 1; // FY starts in April
+  var names = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var months = [];
+  for (var i = 0; i < 12; i++) {
+    var mi = (3 + i) % 12; // Apr=3, May=4, ... Mar=2
+    var y = mi >= 3 ? fyStart : fyStart + 1;
+    months.push({ m: names[mi], mi: mi, y: y });
+  }
+  return months;
+})();
 
 function selectSalaryMonth(idx) {
   activeSalaryMonth = idx;
@@ -2305,10 +2312,10 @@ function closeLocationTracker() {
 }
 
 function getLocMapType() {
-  return safeStorage.get('locMapType') || 'k';
+  return safeStorage.get(STORAGE_KEYS.mapType) || 'k';
 }
 function setLocMapType(type) {
-  safeStorage.set('locMapType', type);
+  safeStorage.set(STORAGE_KEYS.mapType, type);
   var btns = document.querySelectorAll('.map-type-btn');
   btns.forEach(function(b) { b.classList.toggle('active', b.dataset.type === type); });
 }
@@ -3177,7 +3184,6 @@ function submitSelfRating(empCode) {
   });
   var avg = Math.round(total / inputs.length);
   KPI_DATA[empCode].selfRating = avg;
-  saveLocalOnlyData();
   apiCall('POST', '/kpi/self-rate', { period: new Date().getFullYear() + '-Q' + Math.ceil((new Date().getMonth() + 1) / 3), ratings: ratings }).catch(function(){});
   showToast('Self-rating submitted: ' + avg + '/100');
   renderKpiOverlay();
@@ -3386,18 +3392,24 @@ function renderRecruitmentOverlay() {
   el.dataset.rtab = activeTab;
   el.innerHTML = '<div class="tab-pills" style="margin-bottom:14px">' + pills + '</div>' + content;
 
-  // Attach drag-drop events if resume tab is active
+  // Attach drag-drop events if resume tab is active (clone nodes to prevent duplicates)
   if (activeTab === 'resumes') {
     var dropZone = document.getElementById('resumeDropZone');
     var fileInput = document.getElementById('resumeFileInput');
     if (dropZone) {
+      var newDZ = dropZone.cloneNode(true);
+      dropZone.parentNode.replaceChild(newDZ, dropZone);
+      dropZone = newDZ;
+      fileInput = document.getElementById('resumeFileInput');
       dropZone.addEventListener('dragover', function(e) { e.preventDefault(); dropZone.classList.add('dragover'); });
       dropZone.addEventListener('dragleave', function() { dropZone.classList.remove('dragover'); });
       dropZone.addEventListener('drop', function(e) { e.preventDefault(); dropZone.classList.remove('dragover'); handleResumeUpload(e.dataTransfer.files); });
       dropZone.addEventListener('click', function() { if (fileInput) fileInput.click(); });
     }
     if (fileInput) {
-      fileInput.addEventListener('change', function() { handleResumeUpload(fileInput.files); });
+      var newFI = fileInput.cloneNode(true);
+      fileInput.parentNode.replaceChild(newFI, fileInput);
+      newFI.addEventListener('change', function() { handleResumeUpload(newFI.files); });
     }
   }
 }
@@ -4092,9 +4104,22 @@ function renderAnalyticsOverlay() {
     '</div>';
   }).join('');
 
-  // Attendance rate & extra metrics
-  var rng = seededRandom('attend' + new Date().getMonth() + new Date().getFullYear());
-  var attendRate = Math.round(88 + rng() * 10);
+  // Attendance rate from DB logs
+  var attendRate = (function() {
+    if (!attendanceLogs || attendanceLogs.length === 0) return 0;
+    var now = new Date(), curM = now.getMonth(), curY = now.getFullYear();
+    var monthLogs = attendanceLogs.filter(function(l) { var d = new Date(l.date || l.check_in); return d.getMonth() === curM && d.getFullYear() === curY; });
+    var uniqueEmps = {};
+    monthLogs.forEach(function(l) { var c = l.empCode || l.emp_code; if (c) uniqueEmps[c] = (uniqueEmps[c] || 0) + 1; });
+    var empCount = Object.keys(uniqueEmps).length;
+    if (empCount === 0) return 0;
+    var workingDays = 0;
+    for (var d = 1; d <= now.getDate(); d++) { var dt = new Date(curY, curM, d); if (dt.getDay() !== 0) workingDays++; }
+    if (workingDays === 0) return 0;
+    var totalRate = 0;
+    Object.keys(uniqueEmps).forEach(function(c) { totalRate += Math.min(uniqueEmps[c] / workingDays * 100, 100); });
+    return Math.round(totalRate / empCount);
+  })();
 
   el.innerHTML = '<div class="analytics-grid fade-in">' +
     '<div class="analytics-card">' +
@@ -4232,8 +4257,19 @@ async function initAnalyticsCharts(m) {
   var startIdx = Math.max(0, activeSalaryMonth - 5);
   var last6 = FY_MONTHS.slice(startIdx, activeSalaryMonth + 1);
   var attendanceData = last6.map(function(fm) {
-    var rng2 = seededRandom('attend' + fm.mi + fm.y);
-    return Math.round(88 + rng2() * 10);
+    if (!attendanceLogs || attendanceLogs.length === 0) return 0;
+    var monthLogs = attendanceLogs.filter(function(l) { var d = new Date(l.date || l.check_in); return d.getMonth() === fm.mi && d.getFullYear() === fm.y; });
+    var uniqueEmps = {};
+    monthLogs.forEach(function(l) { var c = l.empCode || l.emp_code; if (c) uniqueEmps[c] = (uniqueEmps[c] || 0) + 1; });
+    var empCount = Object.keys(uniqueEmps).length;
+    if (empCount === 0) return 0;
+    var daysInM = new Date(fm.y, fm.mi + 1, 0).getDate();
+    var workingDays = 0;
+    for (var d = 1; d <= daysInM; d++) { if (new Date(fm.y, fm.mi, d).getDay() !== 0) workingDays++; }
+    if (workingDays === 0) return 0;
+    var totalRate = 0;
+    Object.keys(uniqueEmps).forEach(function(c) { totalRate += Math.min(uniqueEmps[c] / workingDays * 100, 100); });
+    return Math.round(totalRate / empCount);
   });
   var ctx4 = document.getElementById('chartAttendance');
   if (ctx4) {
@@ -4329,11 +4365,17 @@ async function initAnalyticsCharts(m) {
 // LOCALSTORAGE PERSISTENCE
 // =====================================================
 const STORAGE_KEYS = {
-  // Session & preferences (always local — auth/biometric only)
+  // Auth & session
+  jwt: 'hrms_jwt',
   session: 'hrms_session',
+  // Device/UI preferences (always local)
   notifPref: 'hrms_notif_perm',
   biometricEnabled: 'hrms_biometric_enabled',
-  // Local-only data (no backend endpoints yet)
+  darkMode: 'hrms_dark_mode',
+  pushNotif: 'hrms_push_notif',
+  mapType: 'hrms_map_type',
+  captures: 'hrms_captures',
+  // Local-only data (no backend endpoints)
   resumeBank: 'hrms_resume_bank',
   resumeNextId: 'hrms_resume_next_id',
   personalVisions: 'hrms_personal_visions'
@@ -5204,11 +5246,11 @@ function openCameraCapture(targetId) {
       reader.onload = function(e) {
         const base64 = e.target.result;
         // Store captured photo
-        let captures; try { captures = JSON.parse(safeStorage.get('hrms_captures') || '[]'); } catch { captures = []; }
+        let captures; try { captures = JSON.parse(safeStorage.get(STORAGE_KEYS.captures) || '[]'); } catch { captures = []; }
         captures.push({ id: targetId, data: base64, date: new Date().toISOString() });
         // Keep only last 20 captures to manage storage
         if (captures.length > 20) captures.shift();
-        safeStorage.set('hrms_captures', JSON.stringify(captures));
+        safeStorage.set(STORAGE_KEYS.captures, JSON.stringify(captures));
         showToast('Photo captured successfully');
       };
       reader.readAsDataURL(input.files[0]);
@@ -5939,6 +5981,7 @@ async function loadFromBackend() {
       { key: 'exits', url: base + '/exit?limit=200' },
       { key: 'expenses', url: base + '/expenses?limit=500' },
       { key: 'shifts', url: base + '/shifts' },
+      { key: 'shiftTypes', url: base + '/shifts/types' },
       { key: 'tax', url: base + '/tax' },
       { key: 'attendance', url: base + '/attendance?month=' + curMonth },
       { key: 'geofenceSites', url: base + '/geofence/sites' },
@@ -6103,6 +6146,17 @@ async function loadFromBackend() {
           eligible: !!(row.is_eligible !== undefined ? row.is_eligible : true)
         };
       });
+    }
+
+    // 14b. Shift types from DB
+    if (keyIdx.shiftTypes !== undefined) {
+      var stData = getData(keyIdx.shiftTypes);
+      if (stData && Array.isArray(stData) && stData.length > 0) {
+        SHIFT_TYPES.length = 0;
+        stData.forEach(function(row) {
+          SHIFT_TYPES.push({ code: row.code, name: row.name, start: row.start_time || row.start, end: row.end_time || row.end, color: row.color || '#2563EB' });
+        });
+      }
     }
 
     // 15. Tax declaration
@@ -6527,7 +6581,7 @@ function initSettingsToggles() {
   // Push notifications toggle
   var pushToggle = document.getElementById('pushNotifToggle');
   if (pushToggle) {
-    var pushEnabled = safeStorage.get('hrms_push_notif') !== 'off';
+    var pushEnabled = safeStorage.get(STORAGE_KEYS.pushNotif) !== 'off';
     pushToggle.classList.toggle('on', pushEnabled);
   }
   // Notification pref toggles (use existing restoreNotifPrefToggles)
@@ -6537,7 +6591,7 @@ function initSettingsToggles() {
 function togglePushNotifications(btn) {
   btn.classList.toggle('on');
   var isOn = btn.classList.contains('on');
-  safeStorage.set('hrms_push_notif', isOn ? 'on' : 'off');
+  safeStorage.set(STORAGE_KEYS.pushNotif, isOn ? 'on' : 'off');
   if (isOn) requestNotificationPermission();
 }
 
@@ -6560,7 +6614,7 @@ function toggleBiometricSetting(btn) {
 // DARK MODE
 // =====================================================
 function initDarkMode() {
-  const saved = safeStorage.get('hrms_dark_mode');
+  const saved = safeStorage.get(STORAGE_KEYS.darkMode);
   const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
   const isDark = saved !== null ? saved === 'true' : prefersDark;
   if (isDark) {
@@ -6577,12 +6631,12 @@ function toggleDarkMode() {
   if (isDark) {
     html.removeAttribute('data-theme');
     document.querySelector('meta[name="theme-color"]').content = '#E85D04';
-    safeStorage.set('hrms_dark_mode', 'false');
+    safeStorage.set(STORAGE_KEYS.darkMode, 'false');
     if (toggle) toggle.classList.remove('on');
   } else {
     html.setAttribute('data-theme', 'dark');
     document.querySelector('meta[name="theme-color"]').content = '#0F1117';
-    safeStorage.set('hrms_dark_mode', 'true');
+    safeStorage.set(STORAGE_KEYS.darkMode, 'true');
     if (toggle) toggle.classList.add('on');
   }
   // Re-render charts if analytics overlay is visible
@@ -6722,21 +6776,24 @@ async function downloadAttendanceReport() {
   doc.text('ATTENDANCE REPORT — ' + mName + ' ' + yr, pw/2, y, {align:'center'});
   y += 8;
 
-  // Summary
+  // Summary — build from attendanceLogs DB data
   let totalPresent = 0, totalCount = EMPLOYEES.length;
+  const curMonth = now.getMonth(), curYear = yr;
   const empData = EMPLOYEES.map(emp => {
-    const rng = seededRandom(emp.code + now.getMonth() + yr);
-    const present = Math.min(Math.max(workingDays - Math.floor(rng() * 6), workingDays - 5), workingDays);
-    const remaining = workingDays - present;
-    const absent = Math.min(Math.floor(rng() * 3), remaining);
-    const half = Math.min(Math.floor(rng() * 2), remaining - absent);
-    const leave = remaining - absent - half;
+    const empLogs = attendanceLogs.filter(function(l) {
+      var d = new Date(l.date || l.check_in);
+      return (l.empCode || l.emp_code) === emp.code && d.getMonth() === curMonth && d.getFullYear() === curYear;
+    });
+    const present = empLogs.filter(function(l) { return l.status === 'present' || l.status === 'Present' || l.check_in; }).length;
+    const half = empLogs.filter(function(l) { return l.status === 'half' || l.status === 'Half Day'; }).length;
+    const absent = empLogs.filter(function(l) { return l.status === 'absent' || l.status === 'Absent'; }).length;
+    const leave = empLogs.filter(function(l) { return l.status === 'leave' || l.status === 'Leave'; }).length;
     const holiday = daysInMonth - workingDays;
-    const pct = Math.round((present + half * 0.5) / workingDays * 100);
+    const pct = workingDays > 0 ? Math.round((present + half * 0.5) / workingDays * 100) : 0;
     totalPresent += pct;
     return { emp, present, absent, half, leave, holiday, pct };
   });
-  const avgAtt = Math.round(totalPresent / totalCount);
+  const avgAtt = totalCount > 0 ? Math.round(totalPresent / totalCount) : 0;
 
   doc.setFillColor(...light); doc.roundedRect(lm, y, cw, 16, 3, 3, 'F');
   doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...primary);
@@ -7374,7 +7431,7 @@ function openShiftTypeForm(editCode) {
     '</div></div>';
 }
 
-function saveShiftType(editCode) {
+async function saveShiftType(editCode) {
   var code = document.getElementById('shiftCode').value.trim().toUpperCase();
   var name = document.getElementById('shiftName').value.trim();
   var start = document.getElementById('shiftStart').value;
@@ -7383,22 +7440,19 @@ function saveShiftType(editCode) {
 
   if (!code || !name || !start || !end) { showToast('Please fill all required fields'); return; }
 
-  if (editCode) {
-    var shift = SHIFT_TYPES.find(function(s){return s.code===editCode;});
-    if (shift) {
-      shift.name = name;
-      shift.start = start;
-      shift.end = end;
-      shift.color = color;
-      delete shift.time;
+  try {
+    if (editCode) {
+      await apiCall('PUT', '/shifts/types/' + editCode, { name: name, start_time: start, end_time: end, color: color });
+      var shift = SHIFT_TYPES.find(function(s){return s.code===editCode;});
+      if (shift) { shift.name = name; shift.start = start; shift.end = end; shift.color = color; }
       showToast('Shift updated');
+    } else {
+      if (SHIFT_TYPES.find(function(s){return s.code===code;})) { showToast('Shift code already exists'); return; }
+      await apiCall('POST', '/shifts/types', { code: code, name: name, start_time: start, end_time: end, color: color });
+      SHIFT_TYPES.push({code:code, name:name, start:start, end:end, color:color});
+      showToast('Shift created');
     }
-  } else {
-    if (SHIFT_TYPES.find(function(s){return s.code===code;})) { showToast('Shift code already exists'); return; }
-    SHIFT_TYPES.push({code:code, name:name, start:start, end:end, color:color});
-    showToast('Shift created');
-  }
-  saveLocalOnlyData();
+  } catch (e) { showToast('Failed to save shift type'); }
   renderShiftsOverlay();
 }
 
@@ -7406,21 +7460,23 @@ function editShiftType(code) {
   openShiftTypeForm(code);
 }
 
-function deleteShiftType(code) {
+async function deleteShiftType(code) {
   if (isTemporaryMD()) { showToast('Temporary MD does not have delete permissions'); return; }
   if (SHIFT_TYPES.length <= 1) { showToast('Cannot delete the last shift type'); return; }
   var shift = SHIFT_TYPES.find(function(s){return s.code===code;});
   if (!shift) return;
   if (!confirm('Delete shift "' + shift.name + '"? Employees on this shift will be reassigned to the first available shift.')) return;
-  SHIFT_TYPES = SHIFT_TYPES.filter(function(s){return s.code!==code;});
-  var fallback = SHIFT_TYPES[0].code;
-  Object.keys(shiftAssignments).forEach(function(empCode) {
-    if (shiftAssignments[empCode].shiftCode === code) {
-      shiftAssignments[empCode].shiftCode = fallback;
-    }
-  });
-  saveLocalOnlyData();
-  showToast('Shift deleted');
+  try {
+    await apiCall('DELETE', '/shifts/types/' + code);
+    SHIFT_TYPES = SHIFT_TYPES.filter(function(s){return s.code!==code;});
+    var fallback = SHIFT_TYPES[0].code;
+    Object.keys(shiftAssignments).forEach(function(empCode) {
+      if (shiftAssignments[empCode].shiftCode === code) {
+        shiftAssignments[empCode].shiftCode = fallback;
+      }
+    });
+    showToast('Shift deleted');
+  } catch (e) { showToast('Failed to delete shift type'); }
   renderShiftsOverlay();
 }
 
@@ -7835,15 +7891,31 @@ function checkGeofence(lat, lng) {
   }
   return { inside: false, location: null, distance: null };
 }
+var _lastGeoPos = null;
 function getGeofenceStatusHTML() {
-  // Mock coordinates near Head Office
-  const mockLat = 11.0850 + (Math.random() - 0.5) * 0.002;
-  const mockLng = 76.9960 + (Math.random() - 0.5) * 0.002;
-  const result = checkGeofence(mockLat, mockLng);
-  if (result.inside) {
-    return `<span class="geofence-status geofence-inside">📍 ${result.location} (${result.distance}m)</span>`;
+  // Use real GPS — show placeholder then update async
+  if (_lastGeoPos) {
+    var result = checkGeofence(_lastGeoPos.lat, _lastGeoPos.lng);
+    if (result.inside) return '<span class="geofence-status geofence-inside">\ud83d\udccd ' + escapeHTML(result.location) + ' (' + result.distance + 'm)</span>';
+    return '<span class="geofence-status geofence-outside">\u26a0 Outside geofence</span>';
   }
-  return '<span class="geofence-status geofence-outside">⚠ Outside geofence</span>';
+  // Request GPS and update when available
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(function(pos) {
+      _lastGeoPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      var el = document.getElementById('geofenceStatusContainer');
+      if (el) {
+        var r = checkGeofence(_lastGeoPos.lat, _lastGeoPos.lng);
+        el.innerHTML = r.inside
+          ? '<span class="geofence-status geofence-inside">\ud83d\udccd ' + escapeHTML(r.location) + ' (' + r.distance + 'm)</span>'
+          : '<span class="geofence-status geofence-outside">\u26a0 Outside geofence</span>';
+      }
+    }, function() {
+      var el = document.getElementById('geofenceStatusContainer');
+      if (el) el.innerHTML = '<span class="geofence-status geofence-outside">\u26a0 Location unavailable</span>';
+    }, { enableHighAccuracy: true, timeout: 10000 });
+  }
+  return '<span id="geofenceStatusContainer"><span class="geofence-status" style="opacity:.6">\u23f3 Detecting location...</span></span>';
 }
 function getAttendanceStatus(checkInTime) {
   if (!checkInTime) return '';
@@ -10957,7 +11029,7 @@ function calcForm16BTDS() {
   el.innerHTML = '<strong>TDS @1%:</strong> Rs.' + tds.toLocaleString('en-IN') + '<br><span style="font-size:.7rem;color:var(--gray-500)">Applicable under Section 194-IA for property value exceeding Rs.50 Lakhs</span>';
 }
 
-function submitForm12B() {
+async function submitForm12B() {
   var empCode = (currentUser.role === 'MD' || currentUser.role === 'HR') && currentTaxEmpCode ? currentTaxEmpCode : currentUser.code;
   var dec = taxDeclarations[empCode] || {};
   dec.prevEmployer = (document.getElementById('f12bPrevEmp') || {}).value || '';
@@ -10967,8 +11039,13 @@ function submitForm12B() {
   dec.prevTds = parseInt((document.getElementById('f12bTds') || {}).value, 10) || 0;
   dec.form12bSubmitted = new Date().toISOString().split('T')[0];
   taxDeclarations[empCode] = dec;
-  saveLocalOnlyData();
-  showToast('Form 12B declaration saved');
+  try {
+    await apiCall('POST', '/tax/form12b', {
+      prev_employer: dec.prevEmployer, prev_from: dec.prevFrom || null, prev_to: dec.prevTo || null,
+      prev_gross: dec.prevGross, prev_tds: dec.prevTds
+    });
+    showToast('Form 12B declaration saved');
+  } catch (e) { showToast('Failed to save Form 12B'); }
   renderTaxOverlayExtended();
 }
 
