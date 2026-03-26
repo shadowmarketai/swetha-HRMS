@@ -8900,63 +8900,95 @@ function renderCelebrationsOverlay() {
 // =====================================================
 let currentProjectTab = 'overview';
 
+var dailyLogViewMode = 'card';
+
 function renderProgressScreen() {
   const container = document.getElementById('projectsList');
   const grid = document.getElementById('staffDeploymentGrid');
   if (!container) return;
   const isMDorHR = currentUser && (currentUser.role === 'MD' || currentUser.role === 'HR');
+  const isMD = currentUser && currentUser.role === 'MD';
 
-  const statusColors = {'Not Started':'var(--gray-400)','In Progress':'var(--primary)','On Track':'var(--success)','Delayed':'var(--warning)','Completed':'var(--success)'};
   const statusBadge = {'Not Started':'badge-pending','In Progress':'badge-open','On Track':'badge-approved','Delayed':'badge-pending','Completed':'badge-approved'};
   const barColors = {'Not Started':'var(--gray-300)','In Progress':'var(--primary)','On Track':'var(--success)','Delayed':'var(--warning)','Completed':'var(--success)'};
-
   var avatarColors = ['#E85D04','#3B82F6','#10B981','#8B5CF6','#EC4899','#F59E0B'];
-  function buildProjectCard(p) {
-    const pct = getProjectProgress(p);
-    const barColor = barColors[p.status] || 'var(--primary)';
-    const badge = statusBadge[p.status] || 'badge-open';
-    const target = p.targetDate ? new Date(p.targetDate).toLocaleDateString('en-IN', {month:'short',year:'numeric'}) : '';
-    let teamHtml = '<div class="project-team-stack">';
-    const teamSlice = p.team.slice(0, 4);
+
+  // KPI counts
+  var totalCount = projects.length;
+  var activeCount = projects.filter(function(p){return p.status==='In Progress'||p.status==='On Track';}).length;
+  var delayedCount = projects.filter(function(p){return p.status==='Delayed';}).length;
+  var completedCount = projects.filter(function(p){return p.status==='Completed';}).length;
+
+  var html = '';
+
+  // KPI Strip
+  html += '<div class="proj-kpi-strip">';
+  html += '<div class="proj-kpi-card kpi-total"><div class="proj-kpi-value">' + totalCount + '</div><div class="proj-kpi-label">Total</div></div>';
+  html += '<div class="proj-kpi-card kpi-active"><div class="proj-kpi-value">' + activeCount + '</div><div class="proj-kpi-label">Active</div></div>';
+  html += '<div class="proj-kpi-card kpi-delayed"><div class="proj-kpi-value">' + delayedCount + '</div><div class="proj-kpi-label">Delayed</div></div>';
+  html += '<div class="proj-kpi-card kpi-completed"><div class="proj-kpi-value">' + completedCount + '</div><div class="proj-kpi-label">Completed</div></div>';
+  html += '</div>';
+
+  // Filter bar
+  html += '<div class="proj-filter-bar">';
+  html += '<input type="text" id="projSearchInput" placeholder="Search projects..." oninput="filterProjectsTable()">';
+  html += '<select id="projStatusFilter" onchange="filterProjectsTable()"><option value="">All Status</option>';
+  PROJECT_STATUSES.forEach(function(s) { html += '<option value="' + s + '">' + s + '</option>'; });
+  html += '</select></div>';
+
+  function buildProjectRow(p, idx) {
+    var pct = getProjectProgress(p);
+    var barColor = barColors[p.status] || 'var(--primary)';
+    var badge = statusBadge[p.status] || 'badge-open';
+    var target = p.targetDate ? new Date(p.targetDate).toLocaleDateString('en-IN', {day:'numeric',month:'short',year:'numeric'}) : '-';
+    var teamHtml = '<div class="proj-team-mini">';
+    var teamSlice = p.team.slice(0, 3);
     teamSlice.forEach(function(code, i) {
       var emp = EMPLOYEES.find(function(e) { return e.code === code; });
       var init = emp ? emp.name.charAt(0) : '?';
-      teamHtml += '<div class="team-avatar" style="background:' + avatarColors[i % avatarColors.length] + '">' + escapeHTML(init) + '</div>';
+      teamHtml += '<div class="tm-avatar" style="background:' + avatarColors[i % avatarColors.length] + '">' + escapeHTML(init) + '</div>';
     });
-    if (p.team.length > 4) {
-      teamHtml += '<div class="team-avatar" style="background:var(--gray-400)">+' + (p.team.length - 4) + '</div>';
+    if (p.team.length > 3) {
+      teamHtml += '<div class="tm-avatar" style="background:var(--gray-400);font-size:.5rem">+' + (p.team.length - 3) + '</div>';
     }
     teamHtml += '</div>';
-    var cardHtml = '<div class="project-card fade-in" onclick="showProjectDetail(' + p.id + ')">';
-    cardHtml += '<div class="progress-header"><h4>' + escapeHTML(p.name) + '</h4><span class="badge-status ' + badge + '">' + escapeHTML(p.status) + '</span></div>';
-    cardHtml += '<div style="font-size:.72rem;color:var(--gray-500);margin:4px 0">' + escapeHTML(p.client) + ' &middot; ' + escapeHTML(p.location) + '</div>';
-    cardHtml += '<div class="progress-bar-bg"><div class="progress-bar-fill" style="width:' + pct + '%;background:linear-gradient(90deg,' + barColor + ',' + barColor + ')"></div></div>';
-    var hasWBS = p.wbsTasks && p.wbsTasks.length > 0;
-    var progressLabel = hasWBS
-      ? pct + '% WBS Progress (' + p.wbsTasks.filter(function(t){return t.status==='completed';}).length + '/' + p.wbsTasks.length + ' tasks)'
-      : pct + '% Complete (' + p.tasks.filter(function(t){return t.status==='Done';}).length + '/' + p.tasks.length + ' tasks)';
-    cardHtml += '<div class="progress-meta"><span>' + progressLabel + '</span><span>Target: ' + escapeHTML(target) + '</span></div>';
-    cardHtml += teamHtml;
-    cardHtml += '</div>';
-    return cardHtml;
+
+    var row = '<tr class="proj-data-row" data-name="' + escapeHTML(p.name.toLowerCase()) + '" data-status="' + escapeHTML(p.status) + '" onclick="showProjectDetail(' + p.id + ')">';
+    row += '<td style="color:var(--gray-400);font-size:.68rem">' + (idx + 1) + '</td>';
+    row += '<td class="proj-name-cell">' + escapeHTML(p.name) + '</td>';
+    row += '<td class="proj-client-cell col-client">' + escapeHTML(p.client || '-') + '</td>';
+    row += '<td><span class="badge-status ' + badge + '">' + escapeHTML(p.status) + '</span></td>';
+    row += '<td><div class="proj-inline-progress"><div class="progress-bar-bg" style="min-width:50px"><div class="progress-bar-fill" style="width:' + pct + '%;background:' + barColor + '"></div></div><span>' + pct + '%</span></div></td>';
+    row += '<td class="col-team">' + teamHtml + '</td>';
+    row += '<td style="font-size:.7rem;white-space:nowrap">' + escapeHTML(target) + '</td>';
+    row += '<td onclick="event.stopPropagation()">';
+    if (isMDorHR) {
+      row += '<button class="proj-action-btn" onclick="editProject(' + p.id + ')" title="Edit">&#9998;</button>';
+      if (isMD) row += '<button class="proj-action-btn danger" onclick="deleteProject(' + p.id + ')" title="Delete">&#128465;</button>';
+    }
+    row += '</td></tr>';
+    return row;
   }
 
   // Split into My Projects and Other Projects
   var myProjects = projects.filter(function(p) { return currentUser && p.team && p.team.indexOf(currentUser.code) !== -1; });
   var otherProjects = projects.filter(function(p) { return !currentUser || !p.team || p.team.indexOf(currentUser.code) === -1; });
 
-  let html = '';
-  if (myProjects.length > 0) {
-    html += '<div class="section-title" style="margin-top:8px">My Projects</div>';
-    myProjects.forEach(function(p) { html += buildProjectCard(p); });
-  }
-  if (otherProjects.length > 0) {
-    html += '<div class="section-title" style="margin-top:12px">Other Projects</div>';
-    otherProjects.forEach(function(p) { html += buildProjectCard(p); });
-  }
-
   if (projects.length === 0) {
-    html = '<div class="nf-empty" style="margin-top:24px">No projects yet. Click "+ New Project" to get started.</div>';
+    html += '<div class="nf-empty" style="margin-top:24px">No projects yet. Click "+ New Project" to get started.</div>';
+  } else {
+    html += '<div style="overflow-x:auto"><table class="proj-listing-table">';
+    html += '<thead><tr><th>#</th><th>Project</th><th class="col-client">Client</th><th>Status</th><th>Progress</th><th class="col-team">Team</th><th>Target</th><th>Actions</th></tr></thead>';
+    html += '<tbody>';
+    if (myProjects.length > 0) {
+      html += '<tr class="proj-section-row"><td colspan="8">My Projects</td></tr>';
+      myProjects.forEach(function(p, i) { html += buildProjectRow(p, i); });
+    }
+    if (otherProjects.length > 0) {
+      html += '<tr class="proj-section-row"><td colspan="8">Other Projects</td></tr>';
+      otherProjects.forEach(function(p, i) { html += buildProjectRow(p, myProjects.length + i); });
+    }
+    html += '</tbody></table></div>';
   }
   container.innerHTML = html;
 
@@ -8978,7 +9010,19 @@ function renderProgressScreen() {
     gridHtml += '<div class="dept-card garden"><div class="dept-name">Accounts</div><div class="dept-amount">' + (deptCounts['Accounts'] || 0) + '</div><div class="dept-count">Accounts team</div></div>';
     grid.innerHTML = gridHtml;
   }
+}
 
+function filterProjectsTable() {
+  var search = (document.getElementById('projSearchInput').value || '').toLowerCase();
+  var status = document.getElementById('projStatusFilter').value;
+  var rows = document.querySelectorAll('.proj-data-row');
+  rows.forEach(function(row) {
+    var name = row.getAttribute('data-name') || '';
+    var rowStatus = row.getAttribute('data-status') || '';
+    var matchName = !search || name.indexOf(search) !== -1;
+    var matchStatus = !status || rowStatus === status;
+    row.style.display = (matchName && matchStatus) ? '' : 'none';
+  });
 }
 
 // =====================================================
@@ -9019,30 +9063,41 @@ function renderProjectMaterials(proj) {
   if (mats.length === 0) {
     html += '<div class="nf-empty" style="margin-top:16px">No materials tracked for this project</div>';
   } else {
-    html += '<div class="materials-table">';
-    html += '<div class="materials-row materials-header' + (editable ? ' materials-editable' : '') + '"><span>Material</span><span>Unit</span><span>Total</span><span>Used</span><span>Remaining</span>';
-    if (editable) html += '<span></span>';
-    html += '</div>';
+    var totalQty = 0, totalUsed = 0, totalRem = 0;
+    html += '<table class="materials-proper-table">';
+    html += '<thead><tr><th>Material</th><th>Unit</th><th>Total</th><th>Used</th><th>Remaining</th><th>Utilization</th>';
+    if (editable) html += '<th style="width:30px"></th>';
+    html += '</tr></thead><tbody>';
     mats.forEach(function(m) {
       var globalIdx = projectMaterials.indexOf(m);
-      html += '<div class="materials-row' + (editable ? ' materials-editable' : '') + '">';
+      var pctUsed = m.total > 0 ? Math.round((m.used / m.total) * 100) : 0;
+      var barColor = pctUsed > 90 ? 'var(--danger)' : pctUsed > 70 ? 'var(--warning)' : 'var(--success)';
+      totalQty += m.total; totalUsed += m.used; totalRem += m.remaining;
+      html += '<tr>';
       if (editable) {
-        html += '<span><input class="mat-input" value="' + escapeHTML(m.name) + '" data-idx="' + globalIdx + '" data-field="name"></span>';
-        html += '<span><input class="mat-input mat-input-sm" value="' + escapeHTML(m.unit) + '" data-idx="' + globalIdx + '" data-field="unit"></span>';
-        html += '<span><input class="mat-input mat-input-sm" type="number" value="' + m.total + '" data-idx="' + globalIdx + '" data-field="total" onchange="updateMaterialRemaining(this)"></span>';
-        html += '<span><input class="mat-input mat-input-sm" type="number" value="' + m.used + '" data-idx="' + globalIdx + '" data-field="used" onchange="updateMaterialRemaining(this)"></span>';
-        html += '<span class="mat-remaining">' + m.remaining + '</span>';
-        html += '<span><button class="mat-del-btn" onclick="deleteMaterialRow(' + globalIdx + ',' + proj.id + ')">&times;</button></span>';
+        html += '<td><input class="mat-input" value="' + escapeHTML(m.name) + '" data-idx="' + globalIdx + '" data-field="name"></td>';
+        html += '<td><input class="mat-input mat-input-sm" value="' + escapeHTML(m.unit) + '" data-idx="' + globalIdx + '" data-field="unit" style="text-align:left"></td>';
+        html += '<td><input class="mat-input mat-input-sm" type="number" value="' + m.total + '" data-idx="' + globalIdx + '" data-field="total" onchange="updateMaterialRemaining(this)"></td>';
+        html += '<td><input class="mat-input mat-input-sm" type="number" value="' + m.used + '" data-idx="' + globalIdx + '" data-field="used" onchange="updateMaterialRemaining(this)"></td>';
+        html += '<td class="mat-remaining">' + m.remaining + '</td>';
       } else {
-        html += '<span>' + escapeHTML(m.name) + '</span>';
-        html += '<span>' + escapeHTML(m.unit) + '</span>';
-        html += '<span>' + m.total + '</span>';
-        html += '<span>' + m.used + '</span>';
-        html += '<span class="mat-remaining">' + m.remaining + '</span>';
+        html += '<td style="font-weight:500">' + escapeHTML(m.name) + '</td>';
+        html += '<td style="text-align:left">' + escapeHTML(m.unit) + '</td>';
+        html += '<td>' + m.total + '</td>';
+        html += '<td>' + m.used + '</td>';
+        html += '<td class="mat-remaining">' + m.remaining + '</td>';
       }
-      html += '</div>';
+      html += '<td><div style="display:flex;align-items:center;gap:4px;justify-content:flex-end"><span style="font-size:.65rem;min-width:28px;text-align:right">' + pctUsed + '%</span><div class="mat-utilization-bar" style="min-width:40px"><div class="mat-utilization-fill" style="width:' + pctUsed + '%;background:' + barColor + '"></div></div></div></td>';
+      if (editable) {
+        html += '<td><button class="mat-del-btn" onclick="deleteMaterialRow(' + globalIdx + ',' + proj.id + ')">&times;</button></td>';
+      }
+      html += '</tr>';
     });
-    html += '</div>';
+    html += '</tbody>';
+    html += '<tfoot><tr><td style="font-weight:700">Totals</td><td></td><td>' + totalQty + '</td><td>' + totalUsed + '</td><td>' + totalRem + '</td><td></td>';
+    if (editable) html += '<td></td>';
+    html += '</tr></tfoot>';
+    html += '</table>';
     if (editable) {
       html += '<button class="nf-btn nf-btn-primary" style="margin-top:10px" onclick="saveProjectMaterials(' + proj.id + ')">Save Materials</button>';
     }
@@ -9056,8 +9111,8 @@ function updateMaterialRemaining(input) {
   var field = input.getAttribute('data-field');
   projectMaterials[idx][field] = parseFloat(input.value) || 0;
   projectMaterials[idx].remaining = projectMaterials[idx].total - projectMaterials[idx].used;
-  // Update the remaining display
-  var row = input.closest('.materials-row');
+  // Update the remaining display — works with both old .materials-row and new <tr>
+  var row = input.closest('tr') || input.closest('.materials-row');
   if (row) {
     var rem = row.querySelector('.mat-remaining');
     if (rem) rem.textContent = projectMaterials[idx].remaining;
@@ -9247,22 +9302,21 @@ function renderProjectDetailContent(proj) {
   var findProj = 'projects.find(function(p){return p.id===' + proj.id + ';})';
 
   // Tabs
-  var html = '<div class="proj-detail-tabs">';
-  html += '<button class="proj-detail-tab' + (currentProjectTab==='overview'?' active':'') + '" onclick="currentProjectTab=\'overview\';renderProjectDetailContent(' + findProj + ')">Overview</button>';
-  // Show WBS tab if has WBS tasks or user is MD/HR
-  if (hasWBS || isMDorHR) {
-    html += '<button class="proj-detail-tab' + (currentProjectTab==='wbs'?' active':'') + '" onclick="currentProjectTab=\'wbs\';renderProjectDetailContent(' + findProj + ')">WBS' + (hasWBS ? ' (' + proj.wbsTasks.length + ')' : '') + '</button>';
-  }
-  html += '<button class="proj-detail-tab' + (currentProjectTab==='boq'?' active':'') + '" onclick="currentProjectTab=\'boq\';renderProjectDetailContent(' + findProj + ')">BOQ</button>';
-  html += '<button class="proj-detail-tab' + (currentProjectTab==='gantt'?' active':'') + '" onclick="currentProjectTab=\'gantt\';renderProjectDetailContent(' + findProj + ')">Gantt</button>';
-  html += '<button class="proj-detail-tab' + (currentProjectTab==='dailylog'?' active':'') + '" onclick="currentProjectTab=\'dailylog\';renderProjectDetailContent(' + findProj + ')">Daily Log</button>';
-  // Old Tasks tab only when no WBS
-  if (!hasWBS) {
-    html += '<button class="proj-detail-tab' + (currentProjectTab==='tasks'?' active':'') + '" onclick="currentProjectTab=\'tasks\';renderProjectDetailContent(' + findProj + ')">Tasks (' + proj.tasks.length + ')</button>';
-  }
-  html += '<button class="proj-detail-tab' + (currentProjectTab==='team'?' active':'') + '" onclick="currentProjectTab=\'team\';renderProjectDetailContent(' + findProj + ')">Team (' + proj.team.length + ')</button>';
   var matCount = projectMaterials.filter(function(m){return m.projectId===proj.id;}).length;
-  html += '<button class="proj-detail-tab' + (currentProjectTab==='materials'?' active':'') + '" onclick="currentProjectTab=\'materials\';renderProjectDetailContent(' + findProj + ')">Materials (' + matCount + ')</button>';
+  function tabBtn(key, label, count) {
+    var cls = 'proj-detail-tab' + (currentProjectTab===key?' active':'');
+    var countBadge = typeof count === 'number' ? '<span class="tab-count">' + count + '</span>' : '';
+    return '<button class="' + cls + '" onclick="currentProjectTab=\'' + key + '\';renderProjectDetailContent(' + findProj + ')">' + label + countBadge + '</button>';
+  }
+  var html = '<div class="proj-detail-tabs">';
+  html += tabBtn('overview', 'Overview');
+  if (hasWBS || isMDorHR) html += tabBtn('wbs', 'WBS', hasWBS ? proj.wbsTasks.length : undefined);
+  html += tabBtn('boq', 'BOQ');
+  html += tabBtn('gantt', 'Gantt');
+  html += tabBtn('dailylog', 'Daily Log');
+  if (!hasWBS) html += tabBtn('tasks', 'Tasks', proj.tasks.length);
+  html += tabBtn('team', 'Team', proj.team.length);
+  html += tabBtn('materials', 'Materials', matCount);
   html += '</div>';
 
   if (currentProjectTab === 'overview') {
@@ -9290,19 +9344,25 @@ function renderProjectOverview(proj, pct, isMDorHR, isMD) {
   var statusColors = {'Not Started':'var(--gray-400)','In Progress':'var(--primary)','On Track':'var(--success)','Delayed':'var(--warning)','Completed':'var(--success)'};
   var html = '<div style="padding:0 16px">';
 
-  // Info card
+  // Info card — 2-column grid
   html += '<div class="card" style="padding:14px;margin-top:10px">';
-  html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px"><span style="font-weight:700;font-size:.9rem">' + escapeHTML(proj.name) + '</span>';
-  html += '<span class="badge-status" style="background:' + (statusColors[proj.status]||'var(--gray-400)') + ';color:#fff;padding:3px 10px;border-radius:12px;font-size:.68rem">' + escapeHTML(proj.status) + '</span></div>';
-  html += '<div style="font-size:.78rem;color:var(--gray-500);margin-bottom:4px"><strong>Client:</strong> ' + escapeHTML(proj.client || 'N/A') + '</div>';
-  html += '<div style="font-size:.78rem;color:var(--gray-500);margin-bottom:4px"><strong>Location:</strong> ' + escapeHTML(proj.location || 'N/A') + '</div>';
-  if (proj.siteLocation) html += '<div style="font-size:.78rem;color:var(--gray-500);margin-bottom:4px"><strong>Site:</strong> ' + escapeHTML(proj.siteLocation) + '</div>';
-  html += '<div style="font-size:.78rem;color:var(--gray-500);margin-bottom:4px"><strong>Contractor:</strong> ' + escapeHTML(proj.contractorName || 'N/A') + '</div>';
-  if (proj.projectLead) html += '<div style="font-size:.78rem;color:var(--gray-500);margin-bottom:4px"><strong>Lead:</strong> ' + escapeHTML(proj.projectLead) + '</div>';
-  html += '<div style="font-size:.78rem;color:var(--gray-500);margin-bottom:4px"><strong>Budget:</strong> Rs.' + (proj.budget ? proj.budget.toLocaleString('en-IN') : '0') + '</div>';
-  html += '<div style="display:flex;gap:16px;font-size:.72rem;color:var(--gray-400);margin-top:6px">';
-  html += '<span>Start: ' + (proj.startDate || 'TBD') + '</span>';
-  html += '<span>Target: ' + (proj.targetDate || 'TBD') + '</span>';
+  html += '<div class="proj-overview-header">';
+  // Left column: project details
+  html += '<div class="proj-overview-info">';
+  html += '<div style="font-weight:700;font-size:.9rem;margin-bottom:6px">' + escapeHTML(proj.name) + '</div>';
+  html += '<div class="info-row"><strong>Client:</strong> ' + escapeHTML(proj.client || 'N/A') + '</div>';
+  html += '<div class="info-row"><strong>Location:</strong> ' + escapeHTML(proj.location || 'N/A') + '</div>';
+  if (proj.siteLocation) html += '<div class="info-row"><strong>Site:</strong> ' + escapeHTML(proj.siteLocation) + '</div>';
+  html += '<div class="info-row"><strong>Contractor:</strong> ' + escapeHTML(proj.contractorName || 'N/A') + '</div>';
+  if (proj.projectLead) html += '<div class="info-row"><strong>Lead:</strong> ' + escapeHTML(proj.projectLead) + '</div>';
+  html += '</div>';
+  // Right column: numbers
+  html += '<div class="proj-overview-numbers">';
+  html += '<div style="text-align:right"><span class="badge-status" style="background:' + (statusColors[proj.status]||'var(--gray-400)') + ';color:#fff;padding:3px 10px;border-radius:12px;font-size:.68rem">' + escapeHTML(proj.status) + '</span></div>';
+  html += '<div class="info-row" style="justify-content:flex-end"><strong>Budget:</strong> Rs.' + (proj.budget ? proj.budget.toLocaleString('en-IN') : '0') + '</div>';
+  html += '<div class="info-row" style="justify-content:flex-end"><strong>Start:</strong> ' + (proj.startDate || 'TBD') + '</div>';
+  html += '<div class="info-row" style="justify-content:flex-end"><strong>Target:</strong> ' + (proj.targetDate || 'TBD') + '</div>';
+  html += '</div>';
   html += '</div></div>';
 
   // Progress
@@ -9319,7 +9379,7 @@ function renderProjectOverview(proj, pct, isMDorHR, isMD) {
   }
   html += '</div></div>';
 
-  // Task summary — show WBS tasks when available, else old tasks
+  // Task summary — colored stat boxes
   var pending, inProg, done, totalTasks, summaryLabel;
   if (hasWBS) {
     pending = proj.wbsTasks.filter(function(t){return t.status==='pending';}).length;
@@ -9334,12 +9394,12 @@ function renderProjectOverview(proj, pct, isMDorHR, isMD) {
     totalTasks = proj.tasks.length;
     summaryLabel = 'Task Summary';
   }
-  html += '<div class="card" style="padding:14px;margin-top:10px">';
+  html += '<div style="margin-top:10px">';
   html += '<div style="font-weight:600;font-size:.82rem;margin-bottom:8px">' + summaryLabel + ' <span style="font-size:.68rem;color:var(--gray-400);font-weight:400">(' + totalTasks + ' total)</span></div>';
   html += '<div style="display:flex;gap:8px">';
-  html += '<div style="flex:1;text-align:center;padding:8px;border-radius:8px;background:var(--bg)"><div style="font-size:1.1rem;font-weight:700;color:var(--warning)">' + pending + '</div><div style="font-size:.65rem;color:var(--gray-400)">Pending</div></div>';
-  html += '<div style="flex:1;text-align:center;padding:8px;border-radius:8px;background:var(--bg)"><div style="font-size:1.1rem;font-weight:700;color:var(--primary)">' + inProg + '</div><div style="font-size:.65rem;color:var(--gray-400)">In Progress</div></div>';
-  html += '<div style="flex:1;text-align:center;padding:8px;border-radius:8px;background:var(--bg)"><div style="font-size:1.1rem;font-weight:700;color:var(--success)">' + done + '</div><div style="font-size:.65rem;color:var(--gray-400)">' + (hasWBS ? 'Completed' : 'Done') + '</div></div>';
+  html += '<div class="proj-task-stat stat-pending"><div class="stat-num" style="color:var(--warning)">' + pending + '</div><div class="stat-label">Pending</div></div>';
+  html += '<div class="proj-task-stat stat-inprogress"><div class="stat-num" style="color:var(--primary)">' + inProg + '</div><div class="stat-label">In Progress</div></div>';
+  html += '<div class="proj-task-stat stat-done"><div class="stat-num" style="color:var(--success)">' + done + '</div><div class="stat-label">' + (hasWBS ? 'Completed' : 'Done') + '</div></div>';
   html += '</div>';
 
   // WBS level breakdown — show L1 parent tasks with their progress
@@ -9351,14 +9411,13 @@ function renderProjectOverview(proj, pct, isMDorHR, isMD) {
       l1Tasks.forEach(function(t) {
         var statusColor = t.status === 'completed' ? 'var(--success)' : t.status === 'in_progress' ? 'var(--primary)' : 'var(--warning)';
         var statusLabel = t.status === 'completed' ? 'Done' : t.status === 'in_progress' ? 'Active' : 'Pending';
-        // Count child tasks under this L1
         var childTasks = proj.wbsTasks.filter(function(c){return c.level > 1 && c.wbsCode.indexOf(t.wbsCode + '.') === 0;});
         var childDone = childTasks.filter(function(c){return c.status === 'completed';}).length;
         var avgProgress = childTasks.length > 0
           ? Math.round(childTasks.reduce(function(s,c){return s+c.progressPct;}, 0) / childTasks.length)
           : Math.round(t.progressPct);
 
-        html += '<div style="margin-bottom:8px">';
+        html += '<div class="wbs-breakdown-item">';
         html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:3px">';
         html += '<span style="font-size:.72rem;font-weight:600">' + escapeHTML(t.wbsCode) + ' ' + escapeHTML(t.taskName) + '</span>';
         html += '<span style="font-size:.62rem;padding:2px 8px;border-radius:10px;background:' + statusColor + ';color:#fff">' + statusLabel + '</span>';
@@ -9440,17 +9499,24 @@ function renderProjectTeam(proj, isMDorHR) {
   if (proj.team.length === 0) {
     html += '<div class="nf-empty" style="margin-top:16px">No team members assigned</div>';
   } else {
+    html += '<table class="proj-team-table">';
+    html += '<thead><tr><th>Member</th><th>Code</th><th>Department</th><th>Designation</th>';
+    if (isMDorHR) html += '<th>Actions</th>';
+    html += '</tr></thead><tbody>';
     proj.team.forEach(function(code, i) {
       var emp = EMPLOYEES.find(function(e){return e.code === code;});
       if (!emp) return;
-      html += '<div class="project-task-item">';
-      html += '<div class="team-avatar" style="background:' + avatarColors[i % avatarColors.length] + ';margin-left:0">' + escapeHTML(emp.name.charAt(0)) + '</div>';
-      html += '<div class="task-info"><h4>' + escapeHTML(emp.name) + '</h4><p>' + escapeHTML(emp.code) + ' &middot; ' + escapeHTML(emp.dept || '') + ' &middot; ' + escapeHTML(emp.designation || '') + '</p></div>';
+      html += '<tr>';
+      html += '<td><div class="team-cell"><div class="team-avatar" style="width:28px;height:28px;border-radius:50%;font-size:.6rem;font-weight:700;color:#fff;display:flex;align-items:center;justify-content:center;background:' + avatarColors[i % avatarColors.length] + '">' + escapeHTML(emp.name.charAt(0)) + '</div><span style="font-weight:600">' + escapeHTML(emp.name) + '</span></div></td>';
+      html += '<td style="color:var(--gray-500);font-size:.7rem">' + escapeHTML(emp.code) + '</td>';
+      html += '<td>' + escapeHTML(emp.dept || '-') + '</td>';
+      html += '<td style="font-size:.7rem">' + escapeHTML(emp.designation || '-') + '</td>';
       if (isMDorHR) {
-        html += '<button style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:.75rem;font-weight:600" onclick="event.stopPropagation();removeProjectMember(' + proj.id + ',\'' + code + '\')">Remove</button>';
+        html += '<td><button class="proj-action-btn danger" onclick="event.stopPropagation();removeProjectMember(' + proj.id + ',\'' + code + '\')">Remove</button></td>';
       }
-      html += '</div>';
+      html += '</tr>';
     });
+    html += '</tbody></table>';
   }
   html += '</div>';
   return html;
@@ -9494,7 +9560,7 @@ function renderWBSTable(container, tasks, proj, isMDorHR, projectId) {
     html += '<div class="nf-empty" style="margin-top:16px">No WBS tasks yet. Add tasks or import from Excel BOQ.</div>';
   } else {
     html += '<div style="overflow-x:auto"><table class="wbs-table" style="width:100%;font-size:.75rem">';
-    html += '<thead><tr><th class="wbs-col-code">Code</th><th class="wbs-col-task">Task Name</th><th class="wbs-col-lead">Lead</th><th class="wbs-col-date">Plan Start</th><th class="wbs-col-date">Plan End</th><th class="wbs-col-date">Act. Start</th><th class="wbs-col-date">Act. End</th><th class="wbs-col-days">P.Days</th><th class="wbs-col-days">W.Days</th><th class="wbs-col-prog">Progress</th><th class="wbs-col-status">Status</th>';
+    html += '<thead><tr><th class="wbs-col-code">Code</th><th class="wbs-col-task">Task Name</th><th class="wbs-col-lead">Lead</th><th class="wbs-col-date wbs-col-hide-mobile">Plan Start</th><th class="wbs-col-date wbs-col-hide-mobile">Plan End</th><th class="wbs-col-date wbs-col-hide-mobile">Act. Start</th><th class="wbs-col-date wbs-col-hide-mobile">Act. End</th><th class="wbs-col-days wbs-col-hide-mobile">P.Days</th><th class="wbs-col-days wbs-col-hide-mobile">W.Days</th><th class="wbs-col-prog">Progress</th><th class="wbs-col-status">Status</th>';
     if (isMDorHR) html += '<th class="wbs-col-del"></th>';
     html += '</tr></thead><tbody>';
 
@@ -9507,21 +9573,21 @@ function renderWBSTable(container, tasks, proj, isMDorHR, projectId) {
       if (canEdit) {
         html += '<td class="wbs-col-task wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'taskName\',\'text\',' + projectId + ')">' + escapeHTML(t.taskName) + '</td>';
         html += '<td class="wbs-col-lead wbs-editable" onclick="wbsEditLeadCell(this,' + t.id + ',' + projectId + ')">' + escapeHTML(t.lead || '-') + '</td>';
-        html += '<td class="wbs-col-date wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'startDate\',\'date\',' + projectId + ')">' + (t.startDate || '-') + '</td>';
-        html += '<td class="wbs-col-date wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'endDate\',\'date\',' + projectId + ')">' + (t.endDate || '-') + '</td>';
-        html += '<td class="wbs-col-date wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'actualStart\',\'date\',' + projectId + ')">' + (t.actualStart || '-') + '</td>';
-        html += '<td class="wbs-col-date wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'actualEnd\',\'date\',' + projectId + ')">' + (t.actualEnd || '-') + '</td>';
-        html += '<td class="wbs-col-days wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'plannedDays\',\'number\',' + projectId + ')">' + (t.plannedDays || '-') + '</td>';
-        html += '<td class="wbs-col-days wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'workDays\',\'number\',' + projectId + ')">' + (t.workDays || '-') + '</td>';
+        html += '<td class="wbs-col-date wbs-col-hide-mobile wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'startDate\',\'date\',' + projectId + ')">' + (t.startDate || '-') + '</td>';
+        html += '<td class="wbs-col-date wbs-col-hide-mobile wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'endDate\',\'date\',' + projectId + ')">' + (t.endDate || '-') + '</td>';
+        html += '<td class="wbs-col-date wbs-col-hide-mobile wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'actualStart\',\'date\',' + projectId + ')">' + (t.actualStart || '-') + '</td>';
+        html += '<td class="wbs-col-date wbs-col-hide-mobile wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'actualEnd\',\'date\',' + projectId + ')">' + (t.actualEnd || '-') + '</td>';
+        html += '<td class="wbs-col-days wbs-col-hide-mobile wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'plannedDays\',\'number\',' + projectId + ')">' + (t.plannedDays || '-') + '</td>';
+        html += '<td class="wbs-col-days wbs-col-hide-mobile wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'workDays\',\'number\',' + projectId + ')">' + (t.workDays || '-') + '</td>';
       } else {
         html += '<td class="wbs-col-task">' + escapeHTML(t.taskName) + '</td>';
         html += '<td class="wbs-col-lead">' + escapeHTML(t.lead || '-') + '</td>';
-        html += '<td class="wbs-col-date">' + (t.startDate || '-') + '</td>';
-        html += '<td class="wbs-col-date">' + (t.endDate || '-') + '</td>';
-        html += '<td class="wbs-col-date">' + (t.actualStart || '-') + '</td>';
-        html += '<td class="wbs-col-date">' + (t.actualEnd || '-') + '</td>';
-        html += '<td class="wbs-col-days">' + (t.plannedDays || '-') + '</td>';
-        html += '<td class="wbs-col-days">' + (t.workDays || '-') + '</td>';
+        html += '<td class="wbs-col-date wbs-col-hide-mobile">' + (t.startDate || '-') + '</td>';
+        html += '<td class="wbs-col-date wbs-col-hide-mobile">' + (t.endDate || '-') + '</td>';
+        html += '<td class="wbs-col-date wbs-col-hide-mobile">' + (t.actualStart || '-') + '</td>';
+        html += '<td class="wbs-col-date wbs-col-hide-mobile">' + (t.actualEnd || '-') + '</td>';
+        html += '<td class="wbs-col-days wbs-col-hide-mobile">' + (t.plannedDays || '-') + '</td>';
+        html += '<td class="wbs-col-days wbs-col-hide-mobile">' + (t.workDays || '-') + '</td>';
       }
       html += '<td class="wbs-col-prog"><div class="progress-bar-bg" style="height:14px;border-radius:7px"><div class="progress-bar-fill" style="width:' + t.progressPct + '%;background:' + statusColor + ';height:100%;border-radius:7px"></div></div>';
       html += '<div style="text-align:center;font-size:.65rem;margin-top:2px;cursor:pointer" onclick="promptWBSProgress(' + t.id + ',' + t.progressPct + ',' + projectId + ')">' + Math.round(t.progressPct) + '%</div></td>';
@@ -9678,12 +9744,12 @@ async function loadProjectBOQ(projectId, isMDorHR) {
     var mapped = sheets.map(mapBOQSheet);
     var html = '';
 
-    // Sheet sub-tabs
-    html += '<div style="display:flex;gap:6px;flex-wrap:wrap;margin:10px 0">';
+    // Sheet sub-tabs (segmented control)
+    html += '<div class="boq-sheet-tabs">';
     mapped.forEach(function(s) {
       var active = currentBOQSheetId === s.id ? ' active' : '';
       if (!currentBOQSheetId && mapped.indexOf(s) === 0) { active = ' active'; currentBOQSheetId = s.id; }
-      html += '<button class="boq-sheet-pill' + active + '" onclick="currentBOQSheetId=' + s.id + ';loadProjectBOQ(' + projectId + ',' + isMDorHR + ')">' + escapeHTML(s.title || BOQ_SHEET_LABELS[s.sheetType] || s.sheetType) + '</button>';
+      html += '<button class="boq-sheet-tab' + active + '" onclick="currentBOQSheetId=' + s.id + ';loadProjectBOQ(' + projectId + ',' + isMDorHR + ')">' + escapeHTML(s.title || BOQ_SHEET_LABELS[s.sheetType] || s.sheetType) + '</button>';
     });
     html += '</div>';
 
@@ -9700,6 +9766,7 @@ async function loadProjectBOQ(projectId, isMDorHR) {
         html += '<div style="overflow-x:auto"><table class="boq-table" style="font-size:.72rem">';
         html += '<thead><tr><th class="col-sno">S.No</th><th class="col-desc">Description</th><th class="col-unit">Unit</th><th class="col-qty">Qty</th><th class="col-rate">Rate</th><th class="col-amt">Amount</th><th class="col-used">Used</th><th class="col-bal">Balance</th><th class="col-actions">Actions</th></tr></thead>';
         var canEdit = currentUser && currentUser.role === 'MD';
+        var boqTotalPlanned = 0, boqTotalUsed = 0;
         html += '<tbody>';
         activeSheet.items.forEach(function(item) {
           if (item.isCategory) {
@@ -9709,6 +9776,8 @@ async function loadProjectBOQ(projectId, isMDorHR) {
           var balance = item.plannedQty - item.actualQtyUsed;
           var balClass = balance < 0 ? 'delta-over' : balance > 0 ? 'delta-under' : 'delta-exact';
           var isOver = item.plannedQty > 0 && item.actualQtyUsed > item.plannedQty;
+          boqTotalPlanned += item.plannedAmount || 0;
+          boqTotalUsed += (item.actualQtyUsed * item.rate) || 0;
           html += '<tr class="' + (isOver ? 'boq-overuse' : '') + (item.isPending ? ' boq-pending-row' : '') + '">';
           html += '<td class="col-sno">' + escapeHTML(item.itemNo) + '</td>';
           if (canEdit) {
@@ -9732,7 +9801,9 @@ async function loadProjectBOQ(projectId, isMDorHR) {
           }
           html += '</td></tr>';
         });
-        html += '</tbody></table></div>';
+        html += '</tbody>';
+        html += '<tfoot><tr><td colspan="5" style="text-align:right;font-weight:700">Totals</td><td class="col-amt">' + boqTotalPlanned.toLocaleString('en-IN') + '</td><td>' + boqTotalUsed.toLocaleString('en-IN') + '</td><td></td><td></td></tr></tfoot>';
+        html += '</table></div>';
       }
     }
     container.innerHTML = html;
@@ -10067,6 +10138,7 @@ function renderProjectGantt(proj) {
     html += '</div>';
     return html;
   }
+  html += '<div class="gantt-card-wrapper">';
 
   // Find date range
   var allDates = [];
@@ -10122,7 +10194,8 @@ function renderProjectGantt(proj) {
     html += '<div class="gantt-task-row">';
     html += '<div class="gantt-name-col gantt-task-label wbs-level-' + t.level + '">' + escapeHTML(t.wbsCode) + ' ' + escapeHTML(t.taskName.substring(0, 25)) + '</div>';
     html += '<div class="gantt-weeks-col gantt-timeline" style="position:relative">';
-    html += '<div class="gantt-bar-planned" style="left:' + leftPct + '%;width:' + widthPct + '%">';
+    var barTitle = escapeHTML(t.wbsCode + ' ' + t.taskName) + ' | ' + (t.startDate||'?') + ' - ' + (t.endDate||'?') + ' | ' + Math.round(t.progressPct) + '%';
+    html += '<div class="gantt-bar-planned" style="left:' + leftPct + '%;width:' + widthPct + '%" title="' + barTitle + '">';
     html += '<div class="gantt-bar-fill" style="width:' + t.progressPct + '%;background:' + barColor + '"></div>';
     if (t.progressPct > 0) html += '<span class="gantt-bar-pct">' + Math.round(t.progressPct) + '%</span>';
     html += '</div>';
@@ -10155,7 +10228,7 @@ function renderProjectGantt(proj) {
   html += '<span><span style="display:inline-block;width:12px;height:4px;background:var(--warning);border-radius:2px;margin-right:4px"></span>Actual</span>';
   html += '</div>';
 
-  html += '</div></div>';
+  html += '</div></div></div>';
   return html;
 }
 
@@ -10172,6 +10245,11 @@ function renderProjectDailyLogs(proj, isMDorHR) {
   return html;
 }
 
+function toggleDailyLogView(mode, projectId) {
+  dailyLogViewMode = mode;
+  loadDailyLogs(projectId);
+}
+
 async function loadDailyLogs(projectId) {
   var container = document.getElementById('dailyLogContent');
   if (!container) return;
@@ -10185,25 +10263,52 @@ async function loadDailyLogs(projectId) {
     var html = '';
     var weatherIcons = { Sunny:'☀️', Cloudy:'☁️', Rainy:'🌧️', Hot:'🔥', Clear:'🌤️' };
 
-    mapped.forEach(function(log) {
-      var emp = EMPLOYEES.find(function(e){return e.code===log.loggedBy;});
-      var empName = emp ? emp.name : log.loggedBy;
-      var icon = weatherIcons[log.weather] || '';
+    // View toggle
+    html += '<div class="log-view-toggle">';
+    html += '<button class="' + (dailyLogViewMode==='card'?'active':'') + '" onclick="toggleDailyLogView(\'card\',' + projectId + ')">Cards</button>';
+    html += '<button class="' + (dailyLogViewMode==='table'?'active':'') + '" onclick="toggleDailyLogView(\'table\',' + projectId + ')">Table</button>';
+    html += '</div>';
 
-      html += '<div class="log-entry">';
-      html += '<div class="log-header">';
-      html += '<span class="log-date">' + log.logDate + '</span>';
-      if (log.weather) html += '<span style="margin-left:8px">' + icon + ' ' + escapeHTML(log.weather) + '</span>';
-      if (log.workersCount) html += '<span style="margin-left:8px;font-size:.7rem;color:var(--gray-500)">👷 ' + log.workersCount + ' workers</span>';
-      html += '</div>';
-      html += '<div class="log-desc">' + escapeHTML(log.workDescription) + '</div>';
-      if (log.taskName) html += '<div class="log-meta">Task: ' + escapeHTML(log.wbsCode + ' - ' + log.taskName) + '</div>';
-      if (log.progressUpdate) html += '<div class="log-meta">Progress: ' + log.progressUpdate + '%</div>';
-      if (log.materialsNote) html += '<div class="log-meta">Materials: ' + escapeHTML(log.materialsNote) + '</div>';
-      if (log.remarks) html += '<div class="log-meta">Remarks: ' + escapeHTML(log.remarks) + '</div>';
-      html += '<div class="log-by">by ' + escapeHTML(empName) + '</div>';
-      html += '</div>';
-    });
+    if (dailyLogViewMode === 'table') {
+      html += '<div style="overflow-x:auto"><table class="daily-log-table">';
+      html += '<thead><tr><th>Date</th><th class="col-weather">Weather</th><th class="col-workers">Workers</th><th>Description</th><th>Task</th><th>Progress</th><th>By</th></tr></thead>';
+      html += '<tbody>';
+      mapped.forEach(function(log) {
+        var emp = EMPLOYEES.find(function(e){return e.code===log.loggedBy;});
+        var empName = emp ? emp.name : log.loggedBy;
+        var icon = weatherIcons[log.weather] || '';
+        html += '<tr>';
+        html += '<td style="white-space:nowrap;font-weight:600;color:var(--primary)">' + escapeHTML(log.logDate) + '</td>';
+        html += '<td class="col-weather">' + icon + ' ' + escapeHTML(log.weather || '-') + '</td>';
+        html += '<td class="col-workers">' + (log.workersCount || '-') + '</td>';
+        html += '<td>' + escapeHTML(log.workDescription) + '</td>';
+        html += '<td style="font-size:.68rem">' + (log.taskName ? escapeHTML(log.wbsCode + ' - ' + log.taskName) : '-') + '</td>';
+        html += '<td>' + (log.progressUpdate ? log.progressUpdate + '%' : '-') + '</td>';
+        html += '<td style="font-size:.68rem">' + escapeHTML(empName) + '</td>';
+        html += '</tr>';
+      });
+      html += '</tbody></table></div>';
+    } else {
+      mapped.forEach(function(log) {
+        var emp = EMPLOYEES.find(function(e){return e.code===log.loggedBy;});
+        var empName = emp ? emp.name : log.loggedBy;
+        var icon = weatherIcons[log.weather] || '';
+
+        html += '<div class="log-entry">';
+        html += '<div class="log-header">';
+        html += '<span class="log-date">' + log.logDate + '</span>';
+        if (log.weather) html += '<span style="margin-left:8px">' + icon + ' ' + escapeHTML(log.weather) + '</span>';
+        if (log.workersCount) html += '<span style="margin-left:8px;font-size:.7rem;color:var(--gray-500)">Workers: ' + log.workersCount + '</span>';
+        html += '</div>';
+        html += '<div class="log-desc">' + escapeHTML(log.workDescription) + '</div>';
+        if (log.taskName) html += '<div class="log-meta">Task: ' + escapeHTML(log.wbsCode + ' - ' + log.taskName) + '</div>';
+        if (log.progressUpdate) html += '<div class="log-meta">Progress: ' + log.progressUpdate + '%</div>';
+        if (log.materialsNote) html += '<div class="log-meta">Materials: ' + escapeHTML(log.materialsNote) + '</div>';
+        if (log.remarks) html += '<div class="log-meta">Remarks: ' + escapeHTML(log.remarks) + '</div>';
+        html += '<div class="log-by">by ' + escapeHTML(empName) + '</div>';
+        html += '</div>';
+      });
+    }
     container.innerHTML = html;
   } catch (e) {
     container.innerHTML = '<div class="nf-empty">Error loading daily logs</div>';

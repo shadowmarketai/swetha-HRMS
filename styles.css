@@ -1813,6 +1813,132 @@ textarea.boq-inline-input{resize:vertical;min-height:36px}
 .excel-drop-zone:hover,.excel-drop-zone.drag-over{border-color:var(--primary);background:rgba(232,93,4,0.04);color:var(--primary)}
 
 /* =====================================================
+   SITETRACK: Project KPI Strip
+   ===================================================== */
+.proj-kpi-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:10px 0}
+.proj-kpi-card{background:var(--card);border-radius:var(--radius-sm);padding:10px 12px;box-shadow:var(--shadow);border-top:3px solid var(--gray-300);text-align:center}
+.proj-kpi-card.kpi-total{border-top-color:var(--primary)}
+.proj-kpi-card.kpi-active{border-top-color:var(--blue)}
+.proj-kpi-card.kpi-delayed{border-top-color:var(--warning)}
+.proj-kpi-card.kpi-completed{border-top-color:var(--success)}
+.proj-kpi-value{font-size:1.3rem;font-weight:700;font-family:var(--font-display);color:var(--text)}
+.proj-kpi-label{font-size:.65rem;color:var(--gray-500);text-transform:uppercase;letter-spacing:.04em;margin-top:2px}
+
+/* =====================================================
+   SITETRACK: Project Filter Bar
+   ===================================================== */
+.proj-filter-bar{display:flex;gap:8px;margin:8px 0}
+.proj-filter-bar input,.proj-filter-bar select{flex:1;padding:7px 10px;border:1.5px solid var(--gray-200);border-radius:var(--radius-xs);font-size:.75rem;font-family:var(--font-body);color:var(--text);background:var(--card);outline:none;transition:border-color .2s}
+.proj-filter-bar input:focus,.proj-filter-bar select:focus{border-color:var(--primary)}
+
+/* =====================================================
+   SITETRACK: Project Listing Table
+   ===================================================== */
+.proj-listing-table{width:100%;border-collapse:collapse;font-size:.75rem}
+.proj-listing-table th{text-transform:uppercase;font-size:.62rem;font-weight:600;color:var(--gray-500);letter-spacing:.04em;background:var(--gray-50);padding:8px 8px;border-bottom:2px solid var(--gray-200);text-align:left;white-space:nowrap;position:sticky;top:0;z-index:1}
+.proj-listing-table td{padding:8px 8px;border-bottom:1px solid var(--gray-100);vertical-align:middle}
+.proj-listing-table tbody tr{cursor:pointer;transition:background .15s}
+.proj-listing-table tbody tr:hover{background:var(--primary-50)}
+.proj-listing-table tbody tr.proj-section-row{cursor:default}
+.proj-listing-table tbody tr.proj-section-row:hover{background:transparent}
+.proj-section-row td{font-weight:700;font-size:.7rem;color:var(--gray-500);padding:10px 8px 4px;border-bottom:none;text-transform:uppercase;letter-spacing:.03em}
+.proj-inline-progress{display:flex;align-items:center;gap:6px}
+.proj-inline-progress .progress-bar-bg{flex:1;height:8px;border-radius:4px}
+.proj-inline-progress span{font-size:.68rem;font-weight:600;white-space:nowrap;min-width:28px;text-align:right}
+.proj-team-mini{display:flex}
+.proj-team-mini .tm-avatar{width:24px;height:24px;border-radius:50%;font-size:.55rem;font-weight:700;color:#fff;display:flex;align-items:center;justify-content:center;margin-left:-5px;border:2px solid var(--card)}
+.proj-team-mini .tm-avatar:first-child{margin-left:0}
+.proj-action-btn{background:none;border:none;cursor:pointer;padding:2px 4px;font-size:.72rem;color:var(--gray-500);transition:color .15s}
+.proj-action-btn:hover{color:var(--primary)}
+.proj-action-btn.danger:hover{color:var(--danger)}
+.proj-name-cell{font-weight:600;color:var(--text)}
+.proj-client-cell{color:var(--gray-500);font-size:.7rem}
+
+/* =====================================================
+   SITETRACK: Enhanced Detail Tabs
+   ===================================================== */
+.proj-detail-tab .tab-count{display:inline-flex;align-items:center;justify-content:center;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--gray-200);color:var(--gray-600);font-size:.58rem;font-weight:700;margin-left:3px;vertical-align:middle}
+.proj-detail-tab.active .tab-count{background:rgba(255,255,255,.25);color:#fff}
+
+/* =====================================================
+   SITETRACK: Overview Tab
+   ===================================================== */
+.proj-overview-header{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.proj-overview-info{display:flex;flex-direction:column;gap:4px}
+.proj-overview-info .info-row{font-size:.78rem;color:var(--gray-600);display:flex;gap:6px}
+.proj-overview-info .info-row strong{color:var(--text);min-width:65px}
+.proj-overview-numbers{display:flex;flex-direction:column;gap:6px}
+.proj-task-stat{flex:1;text-align:center;padding:10px 8px;border-radius:var(--radius-xs);background:var(--card);border-top:3px solid var(--gray-300);box-shadow:var(--shadow)}
+.proj-task-stat.stat-pending{border-top-color:var(--warning)}
+.proj-task-stat.stat-inprogress{border-top-color:var(--primary)}
+.proj-task-stat.stat-done{border-top-color:var(--success)}
+.proj-task-stat .stat-num{font-size:1.2rem;font-weight:700;font-family:var(--font-display)}
+.proj-task-stat .stat-label{font-size:.62rem;color:var(--gray-400);text-transform:uppercase;letter-spacing:.03em}
+.wbs-breakdown-item{padding:8px 0;border-bottom:1px solid var(--gray-100)}
+.wbs-breakdown-item:nth-child(even){background:var(--gray-50);margin:0 -14px;padding-left:14px;padding-right:14px}
+.wbs-breakdown-item:last-child{border-bottom:none}
+
+/* =====================================================
+   SITETRACK: WBS Table Mobile
+   ===================================================== */
+.wbs-level-1 td{border-left:3px solid var(--primary)}
+.wbs-level-2 td{border-left:3px solid var(--blue)}
+.wbs-level-3 td{border-left:3px solid var(--gray-300)}
+
+/* =====================================================
+   SITETRACK: BOQ Sheet Tabs (segmented)
+   ===================================================== */
+.boq-sheet-tabs{display:inline-flex;border:1px solid var(--gray-200);border-radius:var(--radius-xs);overflow:hidden;margin:10px 0}
+.boq-sheet-tab{padding:6px 14px;border:none;border-right:1px solid var(--gray-200);background:var(--card);font-size:.72rem;font-weight:500;cursor:pointer;font-family:var(--font-body);transition:all .2s;white-space:nowrap;color:var(--text)}
+.boq-sheet-tab:last-child{border-right:none}
+.boq-sheet-tab.active,.boq-sheet-tab:hover{background:var(--primary);color:#fff}
+.boq-table tbody tr:nth-child(even){background:var(--gray-50)}
+.boq-table tfoot td{font-weight:700;border-top:2px solid var(--gray-200);background:var(--gray-50);font-size:.72rem}
+
+/* =====================================================
+   SITETRACK: Daily Log Toggle & Table
+   ===================================================== */
+.log-view-toggle{display:inline-flex;border:1px solid var(--gray-200);border-radius:var(--radius-xs);overflow:hidden;margin-bottom:8px}
+.log-view-toggle button{padding:5px 12px;border:none;border-right:1px solid var(--gray-200);background:var(--card);font-size:.7rem;cursor:pointer;font-family:var(--font-body);transition:all .15s;color:var(--text)}
+.log-view-toggle button:last-child{border-right:none}
+.log-view-toggle button.active{background:var(--primary);color:#fff}
+.daily-log-table{width:100%;border-collapse:collapse;font-size:.72rem}
+.daily-log-table th{background:var(--gray-50);padding:6px 8px;font-weight:600;font-size:.62rem;color:var(--gray-500);text-transform:uppercase;letter-spacing:.04em;text-align:left;border-bottom:2px solid var(--gray-200);white-space:nowrap}
+.daily-log-table td{padding:6px 8px;border-bottom:1px solid var(--gray-100);vertical-align:top}
+.daily-log-table tbody tr:nth-child(even){background:var(--gray-50)}
+.daily-log-table tbody tr:hover{background:var(--primary-50)}
+
+/* =====================================================
+   SITETRACK: Team Table
+   ===================================================== */
+.proj-team-table{width:100%;border-collapse:collapse;font-size:.75rem}
+.proj-team-table th{background:var(--gray-50);padding:8px;font-weight:600;font-size:.62rem;color:var(--gray-500);text-transform:uppercase;letter-spacing:.04em;text-align:left;border-bottom:2px solid var(--gray-200);white-space:nowrap}
+.proj-team-table td{padding:8px;border-bottom:1px solid var(--gray-100);vertical-align:middle}
+.proj-team-table tbody tr:hover{background:var(--primary-50)}
+.proj-team-table .team-cell{display:flex;align-items:center;gap:8px}
+.proj-team-table .team-cell .team-avatar{margin-left:0}
+
+/* =====================================================
+   SITETRACK: Materials Table
+   ===================================================== */
+.materials-proper-table{width:100%;border-collapse:collapse;font-size:.75rem}
+.materials-proper-table th{background:var(--gray-50);padding:8px;font-weight:600;font-size:.62rem;color:var(--gray-500);text-transform:uppercase;letter-spacing:.04em;text-align:left;border-bottom:2px solid var(--gray-200);white-space:nowrap}
+.materials-proper-table td{padding:6px 8px;border-bottom:1px solid var(--gray-100);vertical-align:middle}
+.materials-proper-table tbody tr:nth-child(even){background:var(--gray-50)}
+.materials-proper-table tbody tr:hover{background:var(--primary-50)}
+.materials-proper-table th:nth-child(n+3),.materials-proper-table td:nth-child(n+3){text-align:right}
+.mat-utilization-bar{width:100%;height:6px;background:var(--gray-200);border-radius:3px;overflow:hidden;margin-top:3px}
+.mat-utilization-fill{height:100%;border-radius:3px;transition:width .3s}
+.materials-proper-table tfoot td{font-weight:700;border-top:2px solid var(--gray-200);background:var(--gray-50)}
+
+/* =====================================================
+   SITETRACK: Gantt Card Wrapper
+   ===================================================== */
+.gantt-card-wrapper{background:var(--card);border-radius:var(--radius-sm);padding:12px;box-shadow:var(--shadow);margin-top:10px}
+.gantt-task-row:nth-child(even){background:var(--gray-50)}
+.gantt-task-row:nth-child(even):hover{background:var(--primary-50)}
+
+/* =====================================================
    SITETRACK: Dark Mode
    ===================================================== */
 [data-theme="dark"] .gantt-name-col{border-right-color:var(--gray-700)}
@@ -1829,6 +1955,33 @@ textarea.boq-inline-input{resize:vertical;min-height:36px}
 [data-theme="dark"] .log-entry{background:var(--gray-800);box-shadow:none}
 [data-theme="dark"] .excel-drop-zone{border-color:var(--gray-600)}
 [data-theme="dark"] .excel-drop-zone:hover,[data-theme="dark"] .excel-drop-zone.drag-over{border-color:var(--primary);background:rgba(232,93,4,0.1)}
+[data-theme="dark"] .proj-kpi-card{background:var(--card);box-shadow:none}
+[data-theme="dark"] .proj-listing-table th{background:var(--gray-800);border-bottom-color:var(--gray-700)}
+[data-theme="dark"] .proj-listing-table td{border-bottom-color:var(--gray-700)}
+[data-theme="dark"] .proj-listing-table tbody tr:hover{background:rgba(232,93,4,0.08)}
+[data-theme="dark"] .proj-section-row td{color:var(--gray-400)}
+[data-theme="dark"] .proj-filter-bar input,[data-theme="dark"] .proj-filter-bar select{background:var(--gray-800);border-color:var(--gray-600);color:var(--text)}
+[data-theme="dark"] .proj-task-stat{background:var(--gray-800);box-shadow:none}
+[data-theme="dark"] .wbs-breakdown-item:nth-child(even){background:var(--gray-800)}
+[data-theme="dark"] .boq-sheet-tab{background:var(--gray-800);border-color:var(--gray-600);color:var(--gray-300)}
+[data-theme="dark"] .boq-sheet-tab.active{background:var(--primary);color:#fff}
+[data-theme="dark"] .boq-table tbody tr:nth-child(even){background:var(--gray-800)}
+[data-theme="dark"] .boq-table tfoot td{background:var(--gray-800);border-top-color:var(--gray-600)}
+[data-theme="dark"] .log-view-toggle button{background:var(--gray-800);border-color:var(--gray-600);color:var(--gray-300)}
+[data-theme="dark"] .log-view-toggle button.active{background:var(--primary);color:#fff}
+[data-theme="dark"] .daily-log-table th{background:var(--gray-800);border-bottom-color:var(--gray-700)}
+[data-theme="dark"] .daily-log-table td{border-bottom-color:var(--gray-700)}
+[data-theme="dark"] .daily-log-table tbody tr:nth-child(even){background:var(--gray-800)}
+[data-theme="dark"] .proj-team-table th{background:var(--gray-800);border-bottom-color:var(--gray-700)}
+[data-theme="dark"] .proj-team-table td{border-bottom-color:var(--gray-700)}
+[data-theme="dark"] .proj-team-table tbody tr:hover{background:rgba(232,93,4,0.08)}
+[data-theme="dark"] .materials-proper-table th{background:var(--gray-800);border-bottom-color:var(--gray-700)}
+[data-theme="dark"] .materials-proper-table td{border-bottom-color:var(--gray-700)}
+[data-theme="dark"] .materials-proper-table tbody tr:nth-child(even){background:var(--gray-800)}
+[data-theme="dark"] .materials-proper-table tfoot td{background:var(--gray-800);border-top-color:var(--gray-600)}
+[data-theme="dark"] .gantt-card-wrapper{background:var(--card);box-shadow:none}
+[data-theme="dark"] .gantt-task-row:nth-child(even){background:var(--gray-800)}
+[data-theme="dark"] .proj-detail-tab .tab-count{background:var(--gray-600);color:var(--gray-300)}
 
 /* =====================================================
    SITETRACK: Mobile Responsive
@@ -1841,4 +1994,17 @@ textarea.boq-inline-input{resize:vertical;min-height:36px}
   .boq-table th,.boq-table td,.wbs-table th,.wbs-table td{padding:4px 4px}
   .wbs-table .wbs-col-date{width:78px;font-size:.6rem}
   .log-entry{padding:8px}
+  .proj-kpi-strip{grid-template-columns:1fr 1fr}
+  .proj-filter-bar{flex-direction:column}
+  .col-client,.col-team{display:none}
+  .wbs-col-hide-mobile{display:none}
+  .col-rate,.col-amt{display:none}
+  .col-weather,.col-workers{display:none}
+  .proj-overview-header{grid-template-columns:1fr}
+  .daily-log-table{font-size:.65rem}
+  .daily-log-table th,.daily-log-table td{padding:4px 5px}
+  .proj-team-table{font-size:.68rem}
+  .proj-team-table th,.proj-team-table td{padding:5px 6px}
+  .materials-proper-table{font-size:.68rem}
+  .materials-proper-table th,.materials-proper-table td{padding:5px 6px}
 }
