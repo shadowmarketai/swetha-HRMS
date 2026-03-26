@@ -9559,7 +9559,10 @@ function renderWBSTable(container, tasks, proj, isMDorHR, projectId) {
   if (!tasks || tasks.length === 0) {
     html += '<div class="nf-empty" style="margin-top:16px">No WBS tasks yet. Add tasks or import from Excel BOQ.</div>';
   } else {
-    html += '<div style="overflow-x:auto"><table class="wbs-table" style="width:100%;font-size:.75rem">';
+    var doneCount = tasks.filter(function(t){return t.status==='completed';}).length;
+    html += '<div class="wbs-table-wrap">';
+    html += '<div class="wbs-table-title"><h4>Work Breakdown Structure</h4><span class="wbs-count">' + doneCount + ' / ' + tasks.length + ' completed</span></div>';
+    html += '<div style="overflow-x:auto"><table class="wbs-table">';
     html += '<thead><tr><th class="wbs-col-code">Code</th><th class="wbs-col-task">Task Name</th><th class="wbs-col-lead">Lead</th><th class="wbs-col-date wbs-col-hide-mobile">Plan Start</th><th class="wbs-col-date wbs-col-hide-mobile">Plan End</th><th class="wbs-col-date wbs-col-hide-mobile">Act. Start</th><th class="wbs-col-date wbs-col-hide-mobile">Act. End</th><th class="wbs-col-days wbs-col-hide-mobile">P.Days</th><th class="wbs-col-days wbs-col-hide-mobile">W.Days</th><th class="wbs-col-prog">Progress</th><th class="wbs-col-status">Status</th>';
     if (isMDorHR) html += '<th class="wbs-col-del"></th>';
     html += '</tr></thead><tbody>';
@@ -9568,6 +9571,7 @@ function renderWBSTable(container, tasks, proj, isMDorHR, projectId) {
     tasks.forEach(function(t) {
       var statusColor = t.status === 'completed' ? 'var(--success)' : t.status === 'in_progress' ? 'var(--primary)' : 'var(--warning)';
       var statusLabel = t.status === 'completed' ? 'Done' : t.status === 'in_progress' ? 'In Progress' : 'Pending';
+      var statusClass = t.status === 'completed' ? 'status-done' : t.status === 'in_progress' ? 'status-inprogress' : 'status-pending';
       html += '<tr class="wbs-level-' + t.level + '">';
       html += '<td class="wbs-col-code">' + escapeHTML(t.wbsCode) + '</td>';
       if (canEdit) {
@@ -9589,15 +9593,14 @@ function renderWBSTable(container, tasks, proj, isMDorHR, projectId) {
         html += '<td class="wbs-col-days wbs-col-hide-mobile">' + (t.plannedDays || '-') + '</td>';
         html += '<td class="wbs-col-days wbs-col-hide-mobile">' + (t.workDays || '-') + '</td>';
       }
-      html += '<td class="wbs-col-prog"><div class="progress-bar-bg" style="height:14px;border-radius:7px"><div class="progress-bar-fill" style="width:' + t.progressPct + '%;background:' + statusColor + ';height:100%;border-radius:7px"></div></div>';
-      html += '<div style="text-align:center;font-size:.65rem;margin-top:2px;cursor:pointer" onclick="promptWBSProgress(' + t.id + ',' + t.progressPct + ',' + projectId + ')">' + Math.round(t.progressPct) + '%</div></td>';
-      html += '<td class="wbs-col-status"><span style="font-size:.65rem;padding:2px 8px;border-radius:10px;background:' + statusColor + ';color:#fff">' + statusLabel + '</span></td>';
+      html += '<td class="wbs-col-prog"><div class="wbs-prog-bar" onclick="promptWBSProgress(' + t.id + ',' + t.progressPct + ',' + projectId + ')" style="cursor:pointer"><div class="wbs-prog-fill" style="width:' + t.progressPct + '%;background:' + statusColor + '"></div><span class="wbs-prog-text">' + Math.round(t.progressPct) + '%</span></div></td>';
+      html += '<td class="wbs-col-status"><span class="wbs-status-badge ' + statusClass + '">' + statusLabel + '</span></td>';
       if (isMDorHR) {
-        html += '<td class="wbs-col-del"><button style="background:none;border:none;color:var(--danger);cursor:pointer;font-size:.7rem" onclick="deleteWBSTask(' + t.id + ',' + projectId + ')">Del</button></td>';
+        html += '<td class="wbs-col-del"><button class="proj-action-btn danger" onclick="deleteWBSTask(' + t.id + ',' + projectId + ')" title="Delete">Del</button></td>';
       }
       html += '</tr>';
     });
-    html += '</tbody></table></div>';
+    html += '</tbody></table></div></div>';
   }
   container.innerHTML = html;
 }
@@ -9763,14 +9766,20 @@ async function loadProjectBOQ(projectId, isMDorHR) {
       if (activeSheet.items.length === 0) {
         html += '<div class="nf-empty">No items in this sheet</div>';
       } else {
-        html += '<div style="overflow-x:auto"><table class="boq-table" style="font-size:.72rem">';
-        html += '<thead><tr><th class="col-sno">S.No</th><th class="col-desc">Description</th><th class="col-unit">Unit</th><th class="col-qty">Qty</th><th class="col-rate">Rate</th><th class="col-amt">Amount</th><th class="col-used">Used</th><th class="col-bal">Balance</th><th class="col-actions">Actions</th></tr></thead>';
+        var nonCatItems = activeSheet.items.filter(function(i){return !i.isCategory;});
+        html += '<div class="boq-table-wrap">';
+        html += '<div class="boq-table-title"><h4>' + escapeHTML(activeSheet.title || 'BOQ Sheet') + '</h4><span style="font-size:.68rem;color:var(--gray-400)">' + nonCatItems.length + ' items</span></div>';
+        html += '<div style="overflow-x:auto"><table class="boq-table">';
+        html += '<thead><tr><th class="col-sno">S.No</th><th class="col-desc">Description</th><th class="col-unit">Unit</th><th class="col-qty">Qty</th><th class="col-rate">Rate</th><th class="col-amt">Amount</th><th class="col-used">Used</th><th class="col-bal">Balance</th>';
+        if (isMDorHR) html += '<th class="col-actions">Actions</th>';
+        html += '</tr></thead>';
         var canEdit = currentUser && currentUser.role === 'MD';
         var boqTotalPlanned = 0, boqTotalUsed = 0;
         html += '<tbody>';
         activeSheet.items.forEach(function(item) {
           if (item.isCategory) {
-            html += '<tr class="boq-category"><td colspan="9">' + escapeHTML(item.description) + '</td></tr>';
+            var colSpan = isMDorHR ? 9 : 8;
+            html += '<tr class="boq-category"><td colspan="' + colSpan + '">' + escapeHTML(item.description) + '</td></tr>';
             return;
           }
           var balance = item.plannedQty - item.actualQtyUsed;
@@ -9794,16 +9803,20 @@ async function loadProjectBOQ(projectId, isMDorHR) {
           html += '<td class="col-amt">' + item.plannedAmount.toLocaleString('en-IN') + '</td>';
           html += '<td class="col-used">' + item.actualQtyUsed + '</td>';
           html += '<td class="col-bal"><span class="' + balClass + '">' + balance.toFixed(1) + '</span></td>';
-          html += '<td class="col-actions">';
           if (isMDorHR) {
-            html += '<button class="nf-btn nf-btn-sm" style="font-size:.6rem;padding:2px 6px" onclick="logBOQUsage(' + item.id + ',' + projectId + ')">+Use</button> ';
-            html += '<button class="nf-btn nf-btn-sm" style="font-size:.6rem;padding:2px 6px;background:' + (item.isPending ? 'var(--warning)' : 'var(--gray-300)') + '" onclick="toggleBOQPending(' + item.id + ',' + projectId + ')">' + (item.isPending ? 'Pending' : 'Mark') + '</button>';
+            html += '<td class="col-actions">';
+            html += '<button class="boq-action-btn btn-use" onclick="logBOQUsage(' + item.id + ',' + projectId + ')">+Use</button> ';
+            html += '<button class="boq-action-btn ' + (item.isPending ? 'btn-pending' : 'btn-mark') + '" onclick="toggleBOQPending(' + item.id + ',' + projectId + ')">' + (item.isPending ? 'Pending' : 'Mark') + '</button>';
+            html += '</td>';
           }
-          html += '</td></tr>';
+          html += '</tr>';
         });
         html += '</tbody>';
-        html += '<tfoot><tr><td colspan="5" style="text-align:right;font-weight:700">Totals</td><td class="col-amt">' + boqTotalPlanned.toLocaleString('en-IN') + '</td><td>' + boqTotalUsed.toLocaleString('en-IN') + '</td><td></td><td></td></tr></tfoot>';
-        html += '</table></div>';
+        var footColSpan = isMDorHR ? 5 : 5;
+        html += '<tfoot><tr><td colspan="' + footColSpan + '" style="text-align:right">Totals</td><td class="col-amt">' + boqTotalPlanned.toLocaleString('en-IN') + '</td><td>' + boqTotalUsed.toLocaleString('en-IN') + '</td><td></td>';
+        if (isMDorHR) html += '<td></td>';
+        html += '</tr></tfoot>';
+        html += '</table></div></div>';
       }
     }
     container.innerHTML = html;
