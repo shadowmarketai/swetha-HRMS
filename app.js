@@ -9790,12 +9790,12 @@ async function loadProjectBOQ(projectId, isMDorHR) {
           html += '<tr class="' + (isOver ? 'boq-overuse' : '') + (item.isPending ? ' boq-pending-row' : '') + '">';
           html += '<td class="col-sno">' + escapeHTML(item.itemNo) + '</td>';
           if (canEdit) {
-            html += '<td class="col-desc boq-editable" onclick="boqEditCell(this,' + item.id + ',\'description\',\'text\',' + projectId + ')">' + escapeHTML(item.description) + '</td>';
+            html += '<td class="col-desc boq-editable" style="color:#1F2937" onclick="boqEditCell(this,' + item.id + ',\'description\',\'text\',' + projectId + ')">' + escapeHTML(item.description) + '</td>';
             html += '<td class="col-unit boq-editable" onclick="boqEditCell(this,' + item.id + ',\'unit\',\'text\',' + projectId + ')">' + escapeHTML(item.unit) + '</td>';
             html += '<td class="col-qty boq-editable" onclick="boqEditCell(this,' + item.id + ',\'plannedQty\',\'number\',' + projectId + ')">' + item.plannedQty + '</td>';
             html += '<td class="col-rate boq-editable" onclick="boqEditCell(this,' + item.id + ',\'rate\',\'number\',' + projectId + ')">' + item.rate + '</td>';
           } else {
-            html += '<td class="col-desc">' + escapeHTML(item.description) + '</td>';
+            html += '<td class="col-desc" style="color:#1F2937">' + escapeHTML(item.description) + '</td>';
             html += '<td class="col-unit">' + escapeHTML(item.unit) + '</td>';
             html += '<td class="col-qty">' + item.plannedQty + '</td>';
             html += '<td class="col-rate">' + item.rate + '</td>';
