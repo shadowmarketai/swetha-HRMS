@@ -9506,7 +9506,7 @@ function renderWBSTable(container, tasks, proj, isMDorHR, projectId) {
       html += '<td class="wbs-col-code">' + escapeHTML(t.wbsCode) + '</td>';
       if (canEdit) {
         html += '<td class="wbs-col-task wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'taskName\',\'text\',' + projectId + ')">' + escapeHTML(t.taskName) + '</td>';
-        html += '<td class="wbs-col-lead wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'lead\',\'text\',' + projectId + ')">' + escapeHTML(t.lead || '-') + '</td>';
+        html += '<td class="wbs-col-lead wbs-editable" onclick="wbsEditLeadCell(this,' + t.id + ',' + projectId + ')">' + escapeHTML(t.lead || '-') + '</td>';
         html += '<td class="wbs-col-date wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'startDate\',\'date\',' + projectId + ')">' + (t.startDate || '-') + '</td>';
         html += '<td class="wbs-col-date wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'endDate\',\'date\',' + projectId + ')">' + (t.endDate || '-') + '</td>';
         html += '<td class="wbs-col-date wbs-editable" onclick="wbsEditCell(this,' + t.id + ',\'actualStart\',\'date\',' + projectId + ')">' + (t.actualStart || '-') + '</td>';
@@ -9536,9 +9536,31 @@ function renderWBSTable(container, tasks, proj, isMDorHR, projectId) {
   container.innerHTML = html;
 }
 
+function getWBSDeptOptions() {
+  var depts = {};
+  EMPLOYEES.forEach(function(e) { if (e.status !== 'Inactive' && e.dept) depts[e.dept] = true; });
+  var html = '<option value="">-- Select Dept --</option>';
+  Object.keys(depts).sort().forEach(function(d) { html += '<option value="' + escapeHTML(d) + '">' + escapeHTML(d) + '</option>'; });
+  return html;
+}
+
+function onWBSDeptChange(selectId, empSelectId) {
+  var dept = document.getElementById(selectId).value;
+  var empSel = document.getElementById(empSelectId);
+  if (!empSel) return;
+  var html = '<option value="">-- Select Employee --</option>';
+  if (dept) {
+    EMPLOYEES.filter(function(e) { return e.status !== 'Inactive' && e.dept === dept; })
+      .sort(function(a, b) { return a.name.localeCompare(b.name); })
+      .forEach(function(e) { html += '<option value="' + escapeHTML(e.name) + '">' + escapeHTML(e.name) + ' (' + e.code + ')</option>'; });
+  }
+  empSel.innerHTML = html;
+}
+
 function openWBSTaskForm(projectId) {
   var area = document.getElementById('wbsTaskFormArea');
   if (!area) return;
+  var deptOpts = getWBSDeptOptions();
   area.innerHTML = '<div class="card" style="padding:12px;border-left:4px solid var(--primary);margin-bottom:8px">' +
     '<div class="nf-section-title" style="margin-bottom:8px">Add WBS Task</div>' +
     '<div style="display:flex;gap:8px">' +
@@ -9547,7 +9569,8 @@ function openWBSTaskForm(projectId) {
     '</div>' +
     '<div class="form-group"><label class="form-label">Task Name *</label><input class="form-control" id="wbsTaskName"></div>' +
     '<div style="display:flex;gap:8px">' +
-    '<div class="form-group" style="flex:1"><label class="form-label">Lead</label><input class="form-control" id="wbsLead"></div>' +
+    '<div class="form-group" style="flex:1"><label class="form-label">Lead — Department</label><select class="form-control" id="wbsLeadDept" onchange="onWBSDeptChange(\'wbsLeadDept\',\'wbsLeadEmp\')">' + deptOpts + '</select></div>' +
+    '<div class="form-group" style="flex:1"><label class="form-label">Lead — Employee</label><select class="form-control" id="wbsLeadEmp"><option value="">-- Select Dept first --</option></select></div>' +
     '<div class="form-group" style="flex:1"><label class="form-label">Planned Days</label><input class="form-control" type="number" id="wbsPlannedDays"></div>' +
     '</div>' +
     '<div style="display:flex;gap:8px">' +
@@ -9569,7 +9592,7 @@ async function saveWBSTask(projectId) {
       wbsCode: code,
       level: parseInt(document.getElementById('wbsLevel').value, 10) || 1,
       taskName: name,
-      lead: document.getElementById('wbsLead').value.trim(),
+      lead: document.getElementById('wbsLeadEmp').value || '',
       plannedDays: parseInt(document.getElementById('wbsPlannedDays').value, 10) || null,
       startDate: document.getElementById('wbsStart').value || null,
       endDate: document.getElementById('wbsEnd').value || null
@@ -9913,6 +9936,69 @@ function _wbsSaveCell(td, newVal, oldVal, taskId, field, projectId) {
       }
     })
     .catch(function() { td.textContent = oldVal || '-'; td.style.opacity = '1'; showToast('Error saving'); });
+}
+
+function wbsEditLeadCell(td, taskId, projectId) {
+  if (td.querySelector('select')) return;
+  var oldVal = td.textContent.trim();
+  if (oldVal === '-') oldVal = '';
+  td.innerHTML = '';
+
+  // Build 2-stage: dept select + employee select
+  var wrap = document.createElement('div');
+  wrap.style.cssText = 'display:flex;flex-direction:column;gap:3px';
+
+  var deptSel = document.createElement('select');
+  deptSel.className = 'boq-inline-input';
+  deptSel.style.cssText = 'font-size:.68rem;padding:2px 4px';
+  deptSel.innerHTML = getWBSDeptOptions();
+
+  var empSel = document.createElement('select');
+  empSel.className = 'boq-inline-input';
+  empSel.style.cssText = 'font-size:.68rem;padding:2px 4px';
+  empSel.innerHTML = '<option value="">-- Select Dept first --</option>';
+
+  // If current lead matches an employee, pre-select
+  if (oldVal) {
+    var matchEmp = EMPLOYEES.find(function(e) { return e.name === oldVal && e.status !== 'Inactive'; });
+    if (matchEmp && matchEmp.dept) {
+      deptSel.value = matchEmp.dept;
+      // Populate employees for that dept
+      var html = '<option value="">-- Select Employee --</option>';
+      EMPLOYEES.filter(function(e) { return e.status !== 'Inactive' && e.dept === matchEmp.dept; })
+        .sort(function(a, b) { return a.name.localeCompare(b.name); })
+        .forEach(function(e) { html += '<option value="' + escapeHTML(e.name) + '">' + escapeHTML(e.name) + ' (' + e.code + ')</option>'; });
+      empSel.innerHTML = html;
+      empSel.value = oldVal;
+    }
+  }
+
+  deptSel.addEventListener('change', function() {
+    var dept = deptSel.value;
+    var html = '<option value="">-- Select Employee --</option>';
+    if (dept) {
+      EMPLOYEES.filter(function(e) { return e.status !== 'Inactive' && e.dept === dept; })
+        .sort(function(a, b) { return a.name.localeCompare(b.name); })
+        .forEach(function(e) { html += '<option value="' + escapeHTML(e.name) + '">' + escapeHTML(e.name) + ' (' + e.code + ')</option>'; });
+    }
+    empSel.innerHTML = html;
+  });
+
+  empSel.addEventListener('change', function() {
+    if (empSel.value) {
+      _wbsSaveCell(td, empSel.value, oldVal, taskId, 'lead', projectId);
+    }
+  });
+
+  // Close on Escape
+  wrap.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') { td.textContent = oldVal || '-'; }
+  });
+
+  wrap.appendChild(deptSel);
+  wrap.appendChild(empSel);
+  td.appendChild(wrap);
+  deptSel.focus();
 }
 
 function showExcelUpload(projectId) {
