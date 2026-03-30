@@ -2,45 +2,41 @@ const router = require('express').Router();
 const pool = require('../config/db');
 const { verifyToken, requireRole } = require('../middleware/auth');
 
-// POST /api/attendance/checkin — GPS check-in
+// POST /api/attendance/checkin — GPS check-in (supports multiple sessions per day)
 router.post('/checkin', verifyToken, async (req, res) => {
   try {
     const { lat, lng, location, remark, isWithinGeofence, accuracy } = req.body;
     const today = new Date().toISOString().split('T')[0];
 
-    // Check if already checked in today
-    const [existing] = await pool.query(
-      'SELECT id, check_in FROM attendance_logs WHERE emp_code = ? AND log_date = ?',
+    // Check if there's an active session (checked in but not checked out)
+    const [active] = await pool.query(
+      'SELECT id FROM attendance_logs WHERE emp_code = ? AND log_date = ? AND check_in IS NOT NULL AND check_out IS NULL',
       [req.user.empCode, today]
     );
 
-    if (existing.length > 0 && existing[0].check_in) {
-      return res.status(400).json({ error: 'Already checked in today' });
+    if (active.length > 0) {
+      return res.status(400).json({ error: 'Already checked in. Please check out first.' });
     }
 
-    let rowId;
-    if (existing.length > 0) {
-      await pool.query(
-        `UPDATE attendance_logs SET check_in = NOW(), check_in_lat = ?, check_in_lng = ?,
-         status = "Present", location_name = ?, remark = ?, is_within_geofence = ?, accuracy = ? WHERE id = ?`,
-        [lat || null, lng || null, location || null, remark || null,
-         isWithinGeofence !== undefined ? (isWithinGeofence ? 1 : 0) : 1, accuracy || null, existing[0].id]
-      );
-      rowId = existing[0].id;
-    } else {
-      const [result] = await pool.query(
-        `INSERT INTO attendance_logs (emp_code, check_in, check_in_lat, check_in_lng, status, log_date,
-         location_name, remark, is_within_geofence, accuracy)
-         VALUES (?, NOW(), ?, ?, "Present", ?, ?, ?, ?, ?)`,
-        [req.user.empCode, lat || null, lng || null, today,
-         location || null, remark || null,
-         isWithinGeofence !== undefined ? (isWithinGeofence ? 1 : 0) : 1, accuracy || null]
-      );
-      rowId = result.insertId;
-    }
+    // Create a new check-in session (allows re-checkin after checkout)
+    const [result] = await pool.query(
+      `INSERT INTO attendance_logs (emp_code, check_in, check_in_lat, check_in_lng, status, log_date,
+       location_name, remark, is_within_geofence, accuracy)
+       VALUES (?, NOW(), ?, ?, "Present", ?, ?, ?, ?, ?)`,
+      [req.user.empCode, lat || null, lng || null, today,
+       location || null, remark || null,
+       isWithinGeofence !== undefined ? (isWithinGeofence ? 1 : 0) : 1, accuracy || null]
+    );
 
-    // Return the full inserted/updated row
-    const [rows] = await pool.query('SELECT * FROM attendance_logs WHERE id = ?', [rowId]);
+    const [rows] = await pool.query('SELECT * FROM attendance_logs WHERE id = ?', [result.insertId]);
+    // Real-time: broadcast check-in to MD/HR
+    const io = req.app.get('io');
+    if (io) {
+      io.to('role:MD').to('role:HR').emit('attendance:checkin', {
+        empCode: req.user.empCode, name: req.user.name, location: location || 'Unknown',
+        time: new Date().toISOString(), isWithinGeofence: isWithinGeofence !== false
+      });
+    }
     res.json({ message: 'Checked in successfully', time: new Date().toISOString(), row: rows[0] || null });
   } catch (err) {
     console.error(err);
@@ -48,19 +44,20 @@ router.post('/checkin', verifyToken, async (req, res) => {
   }
 });
 
-// POST /api/attendance/checkout — GPS check-out
+// POST /api/attendance/checkout — GPS check-out (closes latest active session)
 router.post('/checkout', verifyToken, async (req, res) => {
   try {
     const { lat, lng, location, remark, isWithinGeofence } = req.body;
     const today = new Date().toISOString().split('T')[0];
 
-    const [existing] = await pool.query(
-      'SELECT id FROM attendance_logs WHERE emp_code = ? AND log_date = ? AND check_in IS NOT NULL',
+    // Find latest active session (checked in but not checked out)
+    const [active] = await pool.query(
+      'SELECT id FROM attendance_logs WHERE emp_code = ? AND log_date = ? AND check_in IS NOT NULL AND check_out IS NULL ORDER BY check_in DESC LIMIT 1',
       [req.user.empCode, today]
     );
 
-    if (existing.length === 0) {
-      return res.status(400).json({ error: 'Not checked in today' });
+    if (active.length === 0) {
+      return res.status(400).json({ error: 'Not checked in. Please check in first.' });
     }
 
     await pool.query(
@@ -68,11 +65,18 @@ router.post('/checkout', verifyToken, async (req, res) => {
        location_name = COALESCE(?, location_name), remark = COALESCE(?, remark),
        is_within_geofence = ? WHERE id = ?`,
       [lat || null, lng || null, location || null, remark || null,
-       isWithinGeofence !== undefined ? (isWithinGeofence ? 1 : 0) : 1, existing[0].id]
+       isWithinGeofence !== undefined ? (isWithinGeofence ? 1 : 0) : 1, active[0].id]
     );
 
-    // Return the full updated row
-    const [rows] = await pool.query('SELECT * FROM attendance_logs WHERE id = ?', [existing[0].id]);
+    const [rows] = await pool.query('SELECT * FROM attendance_logs WHERE id = ?', [active[0].id]);
+    // Real-time: broadcast checkout to MD/HR
+    const io = req.app.get('io');
+    if (io) {
+      io.to('role:MD').to('role:HR').emit('attendance:checkout', {
+        empCode: req.user.empCode, name: req.user.name, location: location || 'Unknown',
+        time: new Date().toISOString()
+      });
+    }
     res.json({ message: 'Checked out successfully', time: new Date().toISOString(), row: rows[0] || null });
   } catch (err) {
     console.error(err);
@@ -80,15 +84,19 @@ router.post('/checkout', verifyToken, async (req, res) => {
   }
 });
 
-// GET /api/attendance/today — get today's status (MUST be before /:code)
+// GET /api/attendance/today — get today's status (all sessions)
 router.get('/today', verifyToken, async (req, res) => {
   try {
     const today = new Date().toISOString().split('T')[0];
     const [rows] = await pool.query(
-      'SELECT * FROM attendance_logs WHERE emp_code = ? AND log_date = ?',
+      'SELECT * FROM attendance_logs WHERE emp_code = ? AND log_date = ? ORDER BY check_in ASC',
       [req.user.empCode, today]
     );
-    res.json(rows.length > 0 ? rows[0] : { checkedIn: false });
+    if (rows.length === 0) return res.json({ checkedIn: false, sessions: [] });
+    // Latest session determines current status
+    const latest = rows[rows.length - 1];
+    const isActive = latest.check_in && !latest.check_out;
+    res.json({ checkedIn: isActive, sessions: rows, latest: latest, totalSessions: rows.length });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });

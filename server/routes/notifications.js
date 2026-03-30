@@ -28,6 +28,11 @@ router.post('/', verifyToken, async (req, res) => {
       'INSERT INTO notifications (emp_code, title, message, type) VALUES (?, ?, ?, ?)',
       [targetCode, title, body || '', category || 'general']
     );
+    // Real-time push
+    const io = req.app.get('io');
+    if (io) {
+      io.to('user:' + targetCode).emit('notification', { id: result.insertId, title, body: body || '', category: category || 'general', time: new Date().toISOString() });
+    }
     res.status(201).json({ message: 'Notification created', id: result.insertId });
   } catch (err) {
     console.error(err);

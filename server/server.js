@@ -374,8 +374,49 @@ app.get('*', (req, res) => {
   } catch (e) { console.error('Migration error (non-fatal):', e.message); }
 })();
 
-app.listen(PORT, () => {
+// =====================================================
+// SOCKET.IO — Real-time updates
+// =====================================================
+const http = require('http');
+const { Server } = require('socket.io');
+const server = http.createServer(app);
+const io = new Server(server, { cors: { origin: '*' } });
+
+// Track connected users: { empCode: socketId }
+const connectedUsers = {};
+
+io.on('connection', (socket) => {
+  // Client sends auth with empCode after connecting
+  socket.on('auth', (data) => {
+    if (data && data.empCode) {
+      socket.empCode = data.empCode;
+      socket.empRole = data.role;
+      connectedUsers[data.empCode] = socket.id;
+      // Join role-based rooms
+      socket.join('role:' + data.role);
+      socket.join('user:' + data.empCode);
+      socket.join('all');
+      // Notify MD/HR that someone came online
+      io.to('role:MD').to('role:HR').emit('user:online', { empCode: data.empCode, name: data.name, time: new Date().toISOString() });
+      console.log(`[WS] ${data.empCode} connected (${data.role})`);
+    }
+  });
+
+  socket.on('disconnect', () => {
+    if (socket.empCode) {
+      delete connectedUsers[socket.empCode];
+      io.to('role:MD').to('role:HR').emit('user:offline', { empCode: socket.empCode, time: new Date().toISOString() });
+      console.log(`[WS] ${socket.empCode} disconnected`);
+    }
+  });
+});
+
+// Make io accessible in routes
+app.set('io', io);
+
+server.listen(PORT, () => {
   console.log(`HRMS Server running on port ${PORT}`);
   console.log(`Frontend: http://localhost:${PORT}`);
   console.log(`API: http://localhost:${PORT}/api`);
+  console.log(`WebSocket: ws://localhost:${PORT}`);
 });

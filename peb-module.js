@@ -46,13 +46,13 @@ function _pebStat(label, val, color) {
   return '<div class="card" style="padding:14px;text-align:center"><div style="font-size:1.4rem;font-weight:700;color:'+(color||'var(--primary)')+'">'+val+'</div><div style="font-size:.65rem;color:var(--gray-500);text-transform:uppercase;font-weight:600;margin-top:2px">'+escapeHTML(label)+'</div></div>';
 }
 function _pebTbl(cols, rows, minW) {
-  var h='<div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><table style="width:100%;border-collapse:collapse;font-size:.75rem;min-width:'+(minW||'600px')+'">';
-  h+='<thead><tr style="background:#f8f9fa;border-bottom:2px solid #e9ecef">';
-  cols.forEach(function(c){h+='<th style="padding:8px 10px;text-align:left;font-weight:600;font-size:.68rem;text-transform:uppercase;color:#6c757d;white-space:nowrap">'+c+'</th>';});
+  var h='<div class="card" style="border-radius:10px;overflow:hidden;border:1px solid #e5e7eb"><div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><table style="width:100%;border-collapse:collapse;font-size:.78rem;min-width:'+(minW||'600px')+'">';
+  h+='<thead><tr style="background:linear-gradient(135deg,#1e293b,#334155)">';
+  cols.forEach(function(c){h+='<th style="padding:10px 14px;text-align:left;font-weight:600;font-size:.7rem;text-transform:uppercase;letter-spacing:.5px;color:#e2e8f0;white-space:nowrap">'+c+'</th>';});
   h+='</tr></thead><tbody>';
-  if(!rows.length) h+='<tr><td colspan="'+cols.length+'" style="padding:20px;text-align:center;color:var(--gray-400)">No records</td></tr>';
-  rows.forEach(function(r){h+='<tr style="border-bottom:1px solid #f0f0f0">';r.forEach(function(c){h+='<td style="padding:8px 10px;vertical-align:middle">'+c+'</td>';});h+='</tr>';});
-  h+='</tbody></table></div>'; return h;
+  if(!rows.length) h+='<tr><td colspan="'+cols.length+'" style="padding:28px;text-align:center;color:var(--gray-400);font-size:.8rem">No records found</td></tr>';
+  rows.forEach(function(r,idx){h+='<tr style="border-bottom:1px solid #f0f0f0;background:'+(idx%2===0?'#fff':'#fafbfc')+';transition:background .15s" onmouseover="this.style.background=\'#f0f7ff\'" onmouseout="this.style.background=\''+(idx%2===0?'#fff':'#fafbfc')+'\'">';r.forEach(function(c){h+='<td style="padding:10px 14px;vertical-align:middle">'+c+'</td>';});h+='</tr>';});
+  h+='</tbody></table></div></div>'; return h;
 }
 
 // Form helper
@@ -133,14 +133,27 @@ async function _pebDashboard(el) {
 async function _pebStockItems(el) {
   try {
     var items = await _pebApi('/api/peb/store/items');
-    var html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">' +
-      '<span style="font-size:.75rem;color:var(--gray-500)">'+items.length+' items</span>' +
-      '<div style="display:flex;gap:6px"><button class="btn btn-golden" style="font-size:.7rem;padding:5px 12px" onclick="_pebShowAddItem()">+ Add Item</button>' +
-      '<button class="btn btn-white-outline" style="font-size:.7rem;padding:5px 12px" onclick="_pebShowStockTxn()">+ Stock Entry</button></div></div>';
-    html += '<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">' +
-      '<select id="pebCatF" style="padding:6px 10px;border:1px solid var(--gray-200);border-radius:6px;font-size:.75rem" onchange="_pebFilterStock()">' +
+    var lowCount = items.filter(function(i) { return i.min_stock_level > 0 && i.current_stock <= i.min_stock_level; }).length;
+    var totalValue = items.reduce(function(s, i) { return s + (i.current_stock * i.unit_price); }, 0);
+
+    // Summary cards
+    var html = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:16px">';
+    html += _pebStat('Total Items', items.length, '#1e293b');
+    html += _pebStat('Low Stock', lowCount, lowCount > 0 ? '#ef4444' : '#22c55e');
+    html += _pebStat('Stock Value', _pebCurr(totalValue), '#3b82f6');
+    html += '</div>';
+
+    // Action bar
+    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">' +
+      '<div style="display:flex;gap:6px"><button class="btn btn-golden" style="font-size:.72rem;padding:6px 14px;border-radius:8px" onclick="_pebShowAddItem()">+ Add Item</button>' +
+      '<button class="btn btn-white-outline" style="font-size:.72rem;padding:6px 14px;border-radius:8px" onclick="_pebShowStockTxn()">+ Stock Entry</button></div></div>';
+
+    // Filters
+    html += '<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">' +
+      '<select id="pebCatF" style="padding:8px 12px;border:1px solid #e5e7eb;border-radius:8px;font-size:.78rem;background:#fff;color:#374151" onchange="_pebFilterStock()">' +
         '<option value="">All Categories</option><option>RAW MATERIAL</option><option>CONSUMABLE</option><option>TOOL</option><option>HARDWARE</option><option>SAFETY</option><option>OTHER</option></select>' +
-      '<input id="pebSrch" placeholder="Search items..." style="flex:1;min-width:150px;padding:6px 10px;border:1px solid var(--gray-200);border-radius:6px;font-size:.75rem" oninput="_pebFilterStock()"></div>';
+      '<input id="pebSrch" placeholder="Search items..." style="flex:1;min-width:180px;padding:8px 12px;border:1px solid #e5e7eb;border-radius:8px;font-size:.78rem;background:#fff" oninput="_pebFilterStock()"></div>';
+
     html += '<div id="pebStockTbl">' + _pebStockRows(items) + '</div>';
     el.innerHTML = html;
   } catch(e) { el.innerHTML = '<div class="card" style="padding:20px;text-align:center;color:var(--danger)">'+escapeHTML(e.message)+'</div>'; }
@@ -149,12 +162,19 @@ async function _pebStockItems(el) {
 function _pebStockRows(items) {
   return _pebTbl(['Code','Name','Category','Stock','Unit','Min','Status','Actions'], items.map(function(i) {
     var low = i.min_stock_level > 0 && i.current_stock <= i.min_stock_level;
-    return [escapeHTML(i.item_code), escapeHTML(i.item_name), escapeHTML(i.category),
-      '<strong'+(low?' style="color:#ef4444"':'')+'>'+Number(i.current_stock).toLocaleString('en-IN')+'</strong>', escapeHTML(i.unit),
-      ''+i.min_stock_level, low ? _pebBadge('LOW','red') : _pebBadge('OK','green'),
-      '<a href="#" onclick="_pebViewItem('+i.id+');return false" style="font-size:.7rem;color:var(--primary);margin-right:6px">View</a>' +
-      '<a href="#" onclick="_pebEditItem('+i.id+');return false" style="font-size:.7rem;color:var(--primary)">Edit</a>'];
-  }));
+    var stockColor = low ? '#ef4444' : '#16a34a';
+    return [
+      '<span style="font-family:monospace;font-weight:600;font-size:.72rem;color:#475569">' + escapeHTML(i.item_code) + '</span>',
+      '<span style="font-weight:600;color:#1e293b">' + escapeHTML(i.item_name) + '</span>',
+      '<span style="font-size:.7rem;padding:3px 8px;border-radius:6px;background:#f1f5f9;color:#475569">' + escapeHTML(i.category) + '</span>',
+      '<span style="font-weight:700;font-size:.85rem;color:'+stockColor+'">' + Number(i.current_stock).toLocaleString('en-IN') + '</span>',
+      escapeHTML(i.unit),
+      '<span style="color:#6b7280">' + Number(i.min_stock_level).toLocaleString('en-IN') + '</span>',
+      low ? _pebBadge('LOW','red') : _pebBadge('OK','green'),
+      '<div style="display:flex;gap:6px"><button onclick="_pebViewItem('+i.id+')" style="font-size:.68rem;padding:4px 10px;border:1px solid #3b82f6;color:#3b82f6;background:transparent;border-radius:6px;cursor:pointer;transition:all .15s" onmouseover="this.style.background=\'#3b82f6\';this.style.color=\'#fff\'" onmouseout="this.style.background=\'transparent\';this.style.color=\'#3b82f6\'">View</button>' +
+      '<button onclick="_pebEditItem('+i.id+')" style="font-size:.68rem;padding:4px 10px;border:1px solid #6b7280;color:#6b7280;background:transparent;border-radius:6px;cursor:pointer;transition:all .15s" onmouseover="this.style.background=\'#6b7280\';this.style.color=\'#fff\'" onmouseout="this.style.background=\'transparent\';this.style.color=\'#6b7280\'">Edit</button></div>'
+    ];
+  }), '750px');
 }
 
 async function _pebFilterStock() {

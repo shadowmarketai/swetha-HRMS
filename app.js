@@ -173,8 +173,8 @@ const NAV_ICONS = {
   expense:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 20h20"/><path d="M5 20V8l7-5 7 5v12"/><rect x="9" y="12" width="6" height="8"/></svg>',
   recruit:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>',
   profile:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
-  settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.73 12.73 1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>',
-  admin:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1.08 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.604.852.997 1.51 1.08H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1.08z"/></svg>',
+  settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1.08 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.604.852.997 1.51 1.08H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1.08z"/></svg>',
+  admin:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>',
   logout:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>',
   ta:       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>',
   store:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l1-4h16l1 4"/><path d="M3 9v11a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V9"/><path d="M9 21V13h6v8"/><path d="M3 9h18"/></svg>',
@@ -250,6 +250,7 @@ const NAV_CONFIG = {
     ]},
     // Footer
     { id:'hr-profile', label:'Profile', icon:'profile', action:{type:'overlay',target:'profile'}, isFooter:true },
+    { id:'hr-admin', label:'Admin Panel', icon:'admin', action:{type:'overlay',target:'admin'}, isFooter:true },
     { id:'hr-settings', label:'Settings', icon:'settings', action:{type:'overlay',target:'settings'}, isFooter:true },
     { id:'hr-logout', label:'Log Out', icon:'logout', action:{type:'logout'}, isFooter:true, isDanger:true }
   ],
@@ -544,7 +545,8 @@ async function loginAs(empCode) {
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission();
     }
-    // Start periodic notification refresh (every 10 seconds)
+    // Start WebSocket + notification polling
+    initWebSocket();
     startNotifPoll();
     // Ensure badge is updated immediately after data load
     updateNotifBadge();
@@ -563,11 +565,15 @@ function renderProfileOverlay() {
 
   var html = '<div class="card profile-card" style="margin:16px;border-radius:var(--radius)">';
   var photoUrl = emp.photoUrl || emp.photo_url || null;
+  html += '<div style="position:relative;display:inline-block">';
   if (photoUrl) {
-    html += '<div class="profile-avatar" style="background-image:url(\'' + escapeHTML(photoUrl) + '\');background-size:cover;background-position:center"></div>';
+    html += '<div class="profile-avatar" id="profAvatarImg" style="background-image:url(\'' + escapeHTML(photoUrl) + '\');background-size:cover;background-position:center"></div>';
   } else {
-    html += '<div class="profile-avatar">' + escapeHTML(initials) + '</div>';
+    html += '<div class="profile-avatar" id="profAvatarImg">' + escapeHTML(initials) + '</div>';
   }
+  html += '<label for="profPhotoInput" style="position:absolute;bottom:0;right:0;width:28px;height:28px;background:var(--primary);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.2)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></label>';
+  html += '<input type="file" id="profPhotoInput" accept="image/*" style="display:none" onchange="uploadProfilePhoto()">';
+  html += '</div>';
   html += '<h2>' + escapeHTML(emp.name) + '</h2>';
   html += '<div class="designation">' + escapeHTML(emp.designation || emp.dept || '') + '</div>';
   html += '<div class="emp-id">' + escapeHTML(emp.code) + '</div>';
@@ -577,9 +583,10 @@ function renderProfileOverlay() {
   html += '<div class="card profile-section" style="margin:0 16px 12px;border-radius:var(--radius)">';
   html += '<div class="profile-section-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Personal Information</div>';
   html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
-  html += '<div class="ss-form-group"><label>Date of Birth</label><input type="date" id="profDob" value="' + escapeHTML(emp.dob || '') + '"></div>';
+  var dobVal = emp.dob ? (emp.dob.length > 10 ? emp.dob.substring(0,10) : emp.dob) : '';
+  html += '<div class="ss-form-group"><label>Date of Birth</label><input type="date" id="profDob" value="' + escapeHTML(dobVal) + '"></div>';
   html += '<div class="ss-form-group"><label>Phone</label><input type="tel" id="profPhone" value="' + escapeHTML(emp.phone || '') + '" placeholder="Mobile number"></div>';
-  html += '<div class="ss-form-group"><label>Email</label><div class="ss-readonly">' + escapeHTML(emp.email || 'Not set') + '</div></div>';
+  html += '<div class="ss-form-group"><label>Email</label><input type="email" id="profEmail" value="' + escapeHTML(emp.email || '') + '" placeholder="Email address"></div>';
   html += '<div class="ss-form-group"><label>Blood Group</label><select class="nf-select" id="profBloodGroup">';
   var bgs = ['', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
   bgs.forEach(function(bg) { html += '<option value="' + bg + '"' + (emp.bloodGroup === bg ? ' selected' : '') + '>' + (bg || 'Select') + '</option>'; });
@@ -613,29 +620,28 @@ function renderProfileOverlay() {
   html += '<div class="ss-form-group"><label>Emergency Phone</label><input type="tel" id="profEmergencyPhone" value="' + escapeHTML(emp.emergencyPhone || '') + '" placeholder="Emergency number"></div>';
   html += '</div></div>';
 
-  // Section 4: Official Details (read-only)
+  // Section 4: Official Details
   html += '<div class="card profile-section" style="margin:0 16px 12px;border-radius:var(--radius)">';
-  html += '<div class="profile-section-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>Official Details <span class="ss-info-badge">Contact HR to update</span></div>';
+  html += '<div class="profile-section-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>Official Details</div>';
   html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
-  html += '<div class="ss-form-group"><label>Department</label><div class="ss-readonly">' + escapeHTML(emp.dept || '-') + '</div></div>';
-  html += '<div class="ss-form-group"><label>Designation</label><div class="ss-readonly">' + escapeHTML(emp.designation || '-') + '</div></div>';
-  html += '<div class="ss-form-group"><label>Date of Joining</label><div class="ss-readonly">' + escapeHTML(emp.doj || '-') + '</div></div>';
+  html += '<div class="ss-form-group"><label>Department</label><input type="text" id="profDept" value="' + escapeHTML(emp.dept || '') + '" placeholder="Department"></div>';
+  html += '<div class="ss-form-group"><label>Designation</label><input type="text" id="profDesignation" value="' + escapeHTML(emp.designation || '') + '" placeholder="Designation"></div>';
+  var dojVal = emp.doj ? (emp.doj.length > 10 ? emp.doj.substring(0,10) : emp.doj) : '';
+  html += '<div class="ss-form-group"><label>Date of Joining</label><input type="date" id="profDoj" value="' + escapeHTML(dojVal) + '"></div>';
   html += '<div class="ss-form-group"><label>Employee Code</label><div class="ss-readonly">' + escapeHTML(emp.code) + '</div></div>';
-  var salaryDisplay = isMDUser ? 'Rs.' + (emp.salary || 0).toLocaleString('en-IN') : (emp.salary ? 'Rs.****' : '-');
-  html += '<div class="ss-form-group"><label>Monthly Salary</label><div class="ss-readonly">' + escapeHTML(salaryDisplay) + '</div></div>';
+  html += '<div class="ss-form-group"><label>Monthly Salary</label><input type="number" id="profSalary" value="' + (emp.salary || '') + '" placeholder="Salary"></div>';
   html += '<div class="ss-form-group"><label>Payment Mode</label><div class="ss-readonly">NEFT</div></div>';
   html += '</div></div>';
 
-  // Section 5: Bank & Identity (read-only)
+  // Section 5: Bank & Identity
   html += '<div class="card profile-section" style="margin:0 16px 12px;border-radius:var(--radius)">';
-  html += '<div class="profile-section-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>Bank & Identity <span class="ss-info-badge">Contact HR to update</span></div>';
+  html += '<div class="profile-section-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>Bank & Identity</div>';
   html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
-  html += '<div class="ss-form-group"><label>Bank</label><div class="ss-readonly">' + escapeHTML(emp.bank || '-') + '</div></div>';
-  var accDisplay = emp.accNo ? (isHrMd ? emp.accNo : emp.accNo.replace(/.(?=.{4})/g, 'X')) : '-';
-  html += '<div class="ss-form-group"><label>Account No</label><div class="ss-readonly">' + escapeHTML(accDisplay) + '</div></div>';
-  html += '<div class="ss-form-group"><label>PAN</label><div class="ss-readonly">' + escapeHTML(emp.pan || '-') + '</div></div>';
-  html += '<div class="ss-form-group"><label>Aadhaar</label><div class="ss-readonly">' + escapeHTML(emp.aadhaar ? (isHrMd ? emp.aadhaar : emp.aadhaar.replace(/.(?=.{4})/g, 'X')) : '-') + '</div></div>';
-  html += '<div class="ss-form-group"><label>UAN</label><div class="ss-readonly">' + escapeHTML(emp.uan || '-') + '</div></div>';
+  html += '<div class="ss-form-group"><label>Bank</label><input type="text" id="profBank" value="' + escapeHTML(emp.bank || '') + '" placeholder="Bank name"></div>';
+  html += '<div class="ss-form-group"><label>Account No</label><input type="text" id="profAccNo" value="' + escapeHTML(emp.accNo || '') + '" placeholder="Account number"></div>';
+  html += '<div class="ss-form-group"><label>PAN</label><input type="text" id="profPan" value="' + escapeHTML(emp.pan || '') + '" placeholder="PAN number" maxlength="10"></div>';
+  html += '<div class="ss-form-group"><label>Aadhaar</label><input type="text" id="profAadhaar" value="' + escapeHTML(emp.aadhaar || '') + '" placeholder="Aadhaar number" maxlength="12"></div>';
+  html += '<div class="ss-form-group"><label>UAN</label><input type="text" id="profUan" value="' + escapeHTML(emp.uan || '') + '" placeholder="UAN number"></div>';
   html += '</div></div>';
 
   // Section 6: Qualification & Experience (editable, always shown)
@@ -650,8 +656,8 @@ function renderProfileOverlay() {
   html += '<div class="ss-form-group"><label>Previous Role</label><input type="text" id="profPrevRole" value="' + escapeHTML(emp.previousRole || '') + '" placeholder="Last designation"></div>';
   html += '</div></div>';
 
-  // Save button
-  html += '<div style="padding:0 16px 12px"><button class="nf-btn nf-btn-primary ss-save-btn w-full" id="profSaveBtn" style="border-radius:var(--radius)" onclick="saveProfileDetails()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>Save Changes</button></div>';
+  // Save button (centered)
+  html += '<div style="padding:12px 16px;text-align:center"><button class="nf-btn nf-btn-primary ss-save-btn" id="profSaveBtn" style="border-radius:var(--radius);min-width:200px;padding:12px 32px;font-size:.85rem" onclick="saveProfileDetails()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:6px"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>Save Changes</button><div id="profSaveMsg" style="margin-top:8px;font-size:.78rem;font-weight:600;display:none"></div></div>';
 
   // Actions
   html += '<div style="padding:0 16px 8px"><button class="payroll-report-btn" onclick="downloadIDCard()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>Download ID Card (PDF)</button></div>';
@@ -662,9 +668,58 @@ function renderProfileOverlay() {
 function saveProfileDetails() {
   if (!currentUser) return;
   var g = function(id) { var el = document.getElementById(id); return el ? (el.value || '').trim() : ''; };
+
+  // Validate required fields
+  var required = [
+    {id:'profDob', label:'Date of Birth'},
+    {id:'profPhone', label:'Phone'},
+    {id:'profEmail', label:'Email'},
+    {id:'profBloodGroup', label:'Blood Group'},
+    {id:'profMaritalStatus', label:'Marital Status'},
+    {id:'profPresentAddress', label:'Present Address'},
+    {id:'profPermanentAddress', label:'Permanent Address'},
+    {id:'profFatherName', label:"Father's Name"},
+    {id:'profFatherMobile', label:"Father's Mobile"},
+    {id:'profMotherName', label:"Mother's Name"},
+    {id:'profMotherMobile', label:"Mother's Mobile"},
+    {id:'profEmergency', label:'Emergency Contact'},
+    {id:'profEmergencyPhone', label:'Emergency Phone'},
+    {id:'profDept', label:'Department'},
+    {id:'profDesignation', label:'Designation'},
+    {id:'profDoj', label:'Date of Joining'},
+    {id:'profBank', label:'Bank'},
+    {id:'profAccNo', label:'Account No'},
+    {id:'profPan', label:'PAN'},
+    {id:'profAadhaar', label:'Aadhaar'},
+    {id:'profQualification', label:'Qualification'},
+    {id:'profInstitution', label:'Institution'},
+    {id:'profYearOfPassing', label:'Year of Passing'}
+  ];
+
+  var missing = [];
+  required.forEach(function(f) {
+    var val = g(f.id);
+    if (!val) {
+      missing.push(f.label);
+      var el = document.getElementById(f.id);
+      if (el) { el.style.border = '2px solid var(--danger)'; el.addEventListener('input', function() { this.style.border = ''; }, {once:true}); el.addEventListener('change', function() { this.style.border = ''; }, {once:true}); }
+    }
+  });
+
+  if (missing.length > 0) {
+    showToast('Please fill: ' + missing.slice(0, 3).join(', ') + (missing.length > 3 ? ' and ' + (missing.length - 3) + ' more' : ''), 'error');
+    // Scroll to first empty field
+    var firstEmpty = document.getElementById(required.find(function(f) { return !g(f.id); }).id);
+    if (firstEmpty) firstEmpty.scrollIntoView({behavior:'smooth', block:'center'});
+    return;
+  }
+
   var payload = {
-    phone: g('profPhone'),
     dob: g('profDob'),
+    phone: g('profPhone'),
+    email: g('profEmail'),
+    bloodGroup: g('profBloodGroup'),
+    maritalStatus: g('profMaritalStatus'),
     presentAddress: g('profPresentAddress'),
     permanentAddress: g('profPermanentAddress'),
     fatherName: g('profFatherName'),
@@ -673,10 +728,17 @@ function saveProfileDetails() {
     motherMobile: g('profMotherMobile'),
     spouseName: g('profSpouseName'),
     spouseMobile: g('profSpouseMobile'),
-    bloodGroup: g('profBloodGroup'),
-    maritalStatus: g('profMaritalStatus'),
     emergencyContact: g('profEmergency'),
     emergencyPhone: g('profEmergencyPhone'),
+    dept: g('profDept'),
+    designation: g('profDesignation'),
+    doj: g('profDoj'),
+    salary: g('profSalary'),
+    bank: g('profBank'),
+    accNo: g('profAccNo'),
+    pan: g('profPan'),
+    aadhaar: g('profAadhaar'),
+    uan: g('profUan'),
     qualification: g('profQualification'),
     institution: g('profInstitution'),
     yearOfPassing: g('profYearOfPassing'),
@@ -684,21 +746,91 @@ function saveProfileDetails() {
     previousRole: g('profPrevRole'),
     yearsOfExperience: g('profYearsExp')
   };
-  var emp = EMPLOYEES.find(function(e) { return e.code === currentUser.code; });
-  if (emp) {
-    Object.keys(payload).forEach(function(k) { emp[k] = payload[k]; });
-    currentUser = Object.assign({}, currentUser, payload);
-  }
   var btn = document.getElementById('profSaveBtn');
   apiCall('PUT', '/employees/' + currentUser.code + '/self', payload).then(function() {
-    showToast('Profile updated successfully');
-    if (btn) { btn.textContent = 'Saved'; btn.style.background = 'var(--success)'; setTimeout(function() { btn.textContent = 'Save Changes'; btn.style.background = ''; }, 1500); }
+    // Refresh employee data from DB
+    return apiCall('GET', '/employees');
+  }).then(function(resp) {
+    var freshData = resp && resp.data ? resp.data : (Array.isArray(resp) ? resp : []);
+    freshData.forEach(function(dbEmp) {
+      // Map snake_case DB fields to camelCase used in frontend
+      dbEmp.accNo = dbEmp.acc_no || dbEmp.accNo;
+      dbEmp.photoUrl = dbEmp.photo_url || dbEmp.photoUrl;
+      dbEmp.presentAddress = dbEmp.present_address || dbEmp.presentAddress;
+      dbEmp.permanentAddress = dbEmp.permanent_address || dbEmp.permanentAddress;
+      dbEmp.fatherName = dbEmp.father_name || dbEmp.fatherName;
+      dbEmp.fatherMobile = dbEmp.father_mobile || dbEmp.fatherMobile;
+      dbEmp.motherName = dbEmp.mother_name || dbEmp.motherName;
+      dbEmp.motherMobile = dbEmp.mother_mobile || dbEmp.motherMobile;
+      dbEmp.spouseName = dbEmp.spouse_name || dbEmp.spouseName;
+      dbEmp.spouseMobile = dbEmp.spouse_mobile || dbEmp.spouseMobile;
+      dbEmp.bloodGroup = dbEmp.blood_group || dbEmp.bloodGroup;
+      dbEmp.maritalStatus = dbEmp.marital_status || dbEmp.maritalStatus;
+      dbEmp.emergencyContact = dbEmp.emergency_contact || dbEmp.emergencyContact;
+      dbEmp.emergencyPhone = dbEmp.emergency_phone || dbEmp.emergencyPhone;
+      dbEmp.yearOfPassing = dbEmp.year_of_passing || dbEmp.yearOfPassing;
+      dbEmp.previousEmployer = dbEmp.previous_employer || dbEmp.previousEmployer;
+      dbEmp.previousRole = dbEmp.previous_role || dbEmp.previousRole;
+      dbEmp.yearsOfExperience = dbEmp.years_of_experience || dbEmp.yearsOfExperience;
+      // Update EMPLOYEES array
+      var idx = EMPLOYEES.findIndex(function(e) { return e.code === dbEmp.code; });
+      if (idx >= 0) Object.assign(EMPLOYEES[idx], dbEmp);
+    });
+    var emp = EMPLOYEES.find(function(e) { return e.code === currentUser.code; });
+    if (emp) currentUser = Object.assign({}, currentUser, emp);
+    renderProfileOverlay();
+    // Show success message after re-render
+    setTimeout(function() {
+      var msg = document.getElementById('profSaveMsg');
+      var b = document.getElementById('profSaveBtn');
+      if (msg) { msg.style.display = 'block'; msg.style.color = 'var(--success)'; msg.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="vertical-align:middle;margin-right:4px"><polyline points="20 6 9 17 4 12"/></svg>Saved successfully'; }
+      if (b) { b.style.background = 'var(--success)'; b.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:6px"><polyline points="20 6 9 17 4 12"/></svg>Saved'; setTimeout(function() { if (document.getElementById('profSaveBtn')) { b.style.background = ''; b.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:6px"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>Save Changes'; } }, 3000); }
+      if (msg) setTimeout(function() { if (msg) msg.style.display = 'none'; }, 4000);
+    }, 100);
   }).catch(function(err) {
-    showToast('Failed to save: ' + (err.message || 'Server error'));
-    if (btn) { btn.textContent = 'Save Changes'; btn.style.background = ''; }
+    var msg = document.getElementById('profSaveMsg');
+    if (msg) { msg.style.display = 'block'; msg.style.color = 'var(--danger)'; msg.textContent = 'Failed to save: ' + (err.message || 'Server error'); }
+    if (btn) { btn.textContent = 'Save Changes'; btn.style.background = ''; btn.disabled = false; }
   });
-  if (btn) { btn.textContent = 'Saving...'; btn.disabled = true; setTimeout(function() { if (btn) btn.disabled = false; }, 2000); }
+  if (btn) { btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:6px;animation:spin 1s linear infinite"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>Saving...'; btn.disabled = true; setTimeout(function() { if (btn) btn.disabled = false; }, 5000); }
 }
+function uploadProfilePhoto() {
+  var fileInput = document.getElementById('profPhotoInput');
+  if (!fileInput || !fileInput.files[0] || !currentUser) return;
+  var formData = new FormData();
+  formData.append('photo', fileInput.files[0]);
+  var token = JWT_TOKEN || safeStorage.get('hrms_jwt');
+  fetch('/api/employees/' + currentUser.code + '/photo', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + token },
+    body: formData
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    if (data.photo_url) {
+      currentUser.photo_url = data.photo_url;
+      var emp = EMPLOYEES.find(function(e) { return e.code === currentUser.code; });
+      if (emp) emp.photo_url = data.photo_url;
+      var avatar = document.getElementById('profAvatarImg');
+      if (avatar) {
+        avatar.style.backgroundImage = 'url(' + data.photo_url + ')';
+        avatar.style.backgroundSize = 'cover';
+        avatar.style.backgroundPosition = 'center';
+        avatar.textContent = '';
+      }
+      // Update header avatar too
+      var headerAv = document.getElementById('headerAvatar');
+      if (headerAv) {
+        headerAv.textContent = '';
+        headerAv.style.backgroundImage = 'url(' + data.photo_url + ')';
+        headerAv.style.backgroundSize = 'cover';
+        headerAv.style.backgroundPosition = 'center';
+      }
+      showToast('Photo uploaded');
+    } else {
+      showToast(data.error || 'Upload failed', 'error');
+    }
+  }).catch(function(e) { showToast('Upload failed: ' + e.message, 'error'); });
+}
+
 function handleProfileSameAddress() {
   var cb = document.getElementById('profSameAddress');
   var permEl = document.getElementById('profPermanentAddress');
@@ -727,6 +859,7 @@ function doLogout() {
   if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
   if (idleWarningTimer) { clearTimeout(idleWarningTimer); idleWarningTimer = null; }
   stopNotifPoll();
+  disconnectWebSocket();
   // Prevent Google auto-login after logout
   try { if (typeof google !== 'undefined' && google.accounts && google.accounts.id) google.accounts.id.disableAutoSelect(); } catch (e) {}
   document.getElementById('loginScreen').classList.remove('hidden');
@@ -810,12 +943,23 @@ function applyRole() {
   badge.textContent = isTempMD ? 'Temp MD' : role;
   badge.className = 'role-badge ' + role.toLowerCase();
 
-  // Header avatar
+  // Header avatar — show profile photo if available, else initials
   const initials = currentUser.name.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
-  document.getElementById('headerAvatar').textContent = initials;
+  var headerAv = document.getElementById('headerAvatar');
+  var emp = EMPLOYEES.find(function(e) { return e.code === currentUser.code; });
+  var avatarPhoto = currentUser.photo_url || (emp && (emp.photo_url || emp.photoUrl)) || null;
+  if (avatarPhoto) {
+    headerAv.textContent = '';
+    headerAv.style.backgroundImage = 'url(' + avatarPhoto + ')';
+    headerAv.style.backgroundSize = 'cover';
+    headerAv.style.backgroundPosition = 'center';
+  } else {
+    headerAv.textContent = initials;
+    headerAv.style.backgroundImage = '';
+  }
 
-  // Admin button (MD only — primary MD always, temp MD gets view/edit but no delete)
-  document.getElementById('adminBtn').style.display = isMD ? '' : 'none';
+  // Admin button (MD and HR)
+  document.getElementById('adminBtn').style.display = (isMD || currentUser.role === 'HR') ? '' : 'none';
   // Settings button (all roles including MD)
   document.getElementById('settingsBtn').style.display = '';
 
@@ -1225,7 +1369,7 @@ function switchTab(id, el, _fromPopstate) {
 }
 let _overlayPreviousFocus = [];
 function showOverlay(id) {
-  if (id === 'admin' && currentUser.role !== 'MD') return;
+  if (id === 'admin' && currentUser.role !== 'MD' && currentUser.role !== 'HR') return;
   if (id === 'location' && currentUser.role !== 'MD') return;
   if (id === 'peb' && currentUser.role !== 'MD') return;
   if (id === 'onboarding' && currentUser.role !== 'MD' && currentUser.role !== 'HR' && currentUser.role !== 'Manager') return;
@@ -5230,13 +5374,14 @@ function updateCheckinStatus(type) {
   if (type === 'checkin') {
     if (statusText) statusText.textContent = 'Checked In';
     if (dot) { dot.style.background = 'var(--success)'; dot.style.animation = 'pulse 2s infinite'; }
-    if (checkinBtn) { checkinBtn.className = 'btn btn-white-outline'; }
-    if (checkoutBtn) { checkoutBtn.className = 'btn btn-golden'; }
+    if (checkinBtn) { checkinBtn.className = 'btn btn-white-outline'; checkinBtn.disabled = true; checkinBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Checked In'; }
+    if (checkoutBtn) { checkoutBtn.className = 'btn btn-golden'; checkoutBtn.disabled = false; checkoutBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Check Out'; }
   } else {
-    if (statusText) statusText.textContent = 'Checked Out';
+    if (statusText) statusText.textContent = 'Checked Out — Re-check in anytime';
     if (dot) { dot.style.background = '#F59E0B'; dot.style.animation = 'none'; }
-    if (checkinBtn) { checkinBtn.className = 'btn btn-golden'; }
-    if (checkoutBtn) { checkoutBtn.className = 'btn btn-white-outline'; }
+    // After checkout, allow re-checkin
+    if (checkinBtn) { checkinBtn.className = 'btn btn-golden'; checkinBtn.disabled = false; checkinBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Re-Check In'; }
+    if (checkoutBtn) { checkoutBtn.className = 'btn btn-white-outline'; checkoutBtn.disabled = true; checkoutBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Checked Out'; }
   }
 }
 
@@ -6963,10 +7108,118 @@ function refreshNotifications() {
 function startNotifPoll() {
   stopNotifPoll();
   refreshNotifications();
-  _notifPollTimer = setInterval(refreshNotifications, 5000);
+  // Use WebSocket if available, fallback to polling at longer interval
+  if (window._hrmsSocket && window._hrmsSocket.connected) {
+    _notifPollTimer = setInterval(refreshNotifications, 30000); // 30s fallback only
+  } else {
+    _notifPollTimer = setInterval(refreshNotifications, 5000);
+  }
 }
 function stopNotifPoll() {
   if (_notifPollTimer) { clearInterval(_notifPollTimer); _notifPollTimer = null; }
+}
+
+// =====================================================
+// WEBSOCKET — Real-time updates via Socket.io
+// =====================================================
+var _hrmsSocket = null;
+
+function initWebSocket() {
+  if (!window.io || !currentUser) return;
+  if (_hrmsSocket) _hrmsSocket.disconnect();
+
+  _hrmsSocket = io();
+  window._hrmsSocket = _hrmsSocket;
+
+  // Authenticate with server
+  _hrmsSocket.on('connect', function() {
+    console.log('[WS] Connected');
+    _hrmsSocket.emit('auth', { empCode: currentUser.code, role: currentUser.role, name: currentUser.name });
+    // Switch polling to longer interval since we have real-time
+    stopNotifPoll();
+    _notifPollTimer = setInterval(refreshNotifications, 30000);
+  });
+
+  _hrmsSocket.on('disconnect', function() {
+    console.log('[WS] Disconnected — falling back to polling');
+    stopNotifPoll();
+    _notifPollTimer = setInterval(refreshNotifications, 5000);
+  });
+
+  // ── Real-time notification ──
+  _hrmsSocket.on('notification', function(data) {
+    NOTIF_HISTORY.unshift({ id: data.id, title: data.title, body: data.body, category: data.category, read: false, date: data.time || new Date().toISOString() });
+    updateNotifBadge();
+    showNotifPopup(data.title, data.body);
+    sendNotification(data.title, data.body, data.category + '-' + data.id);
+    var overlay = document.getElementById('overlay-notifications');
+    if (overlay && overlay.classList.contains('active')) renderNotifications();
+  });
+
+  // ── Attendance: someone checked in ──
+  _hrmsSocket.on('attendance:checkin', function(data) {
+    showToast(data.name + ' checked in at ' + data.location, 'info');
+    // Refresh live location if open
+    if (typeof renderLiveLocationCards === 'function') renderLiveLocationCards();
+  });
+
+  // ── Attendance: someone checked out ──
+  _hrmsSocket.on('attendance:checkout', function(data) {
+    showToast(data.name + ' checked out', 'info');
+    if (typeof renderLiveLocationCards === 'function') renderLiveLocationCards();
+  });
+
+  // ── Leave: approved ──
+  _hrmsSocket.on('leave:approved', function(data) {
+    showToast('Your ' + data.type + ' leave (' + data.days + ' days) has been approved!', 'success');
+    showNotifPopup('Leave Approved', 'Your ' + data.type + ' leave has been approved');
+    refreshNotifications();
+    if (typeof renderLeaveScreen === 'function') renderLeaveScreen();
+  });
+
+  // ── Leave: HR accepted ──
+  _hrmsSocket.on('leave:hr_accepted', function(data) {
+    showToast('Your ' + data.type + ' leave has been accepted by HR, awaiting MD approval', 'info');
+    refreshNotifications();
+    if (typeof renderLeaveScreen === 'function') renderLeaveScreen();
+  });
+
+  // ── Leave: rejected ──
+  _hrmsSocket.on('leave:rejected', function(data) {
+    showToast('Your ' + data.type + ' leave has been rejected', 'error');
+    showNotifPopup('Leave Rejected', 'Your ' + data.type + ' leave was rejected');
+    refreshNotifications();
+    if (typeof renderLeaveScreen === 'function') renderLeaveScreen();
+  });
+
+  // ── Leave: pending for MD ──
+  _hrmsSocket.on('leave:pending_approval', function(data) {
+    showToast(data.empName + ' has a leave pending your approval', 'info');
+    refreshNotifications();
+    if (typeof renderLeaveScreen === 'function') renderLeaveScreen();
+  });
+
+  // ── Leave: any update (for MD/HR dashboard refresh) ──
+  _hrmsSocket.on('leave:updated', function() {
+    if (typeof renderLeaveScreen === 'function') renderLeaveScreen();
+  });
+
+  // ── User online/offline (for MD live tracking) ──
+  _hrmsSocket.on('user:online', function(data) {
+    if (currentUser.role === 'MD' || currentUser.role === 'HR') {
+      console.log('[WS] ' + data.empCode + ' came online');
+    }
+  });
+
+  _hrmsSocket.on('user:offline', function(data) {
+    if (currentUser.role === 'MD' || currentUser.role === 'HR') {
+      console.log('[WS] ' + data.empCode + ' went offline');
+    }
+  });
+}
+
+function disconnectWebSocket() {
+  if (_hrmsSocket) { _hrmsSocket.disconnect(); _hrmsSocket = null; window._hrmsSocket = null; }
 }
 
 function updateNotifBadge() {
@@ -7067,12 +7320,16 @@ function openLeaveForm() {
   if (currentUser && currentUser.role === 'MD') { showToast('MD does not apply for leave'); return; }
   document.getElementById('leaveFormOverlay').classList.add('active');
   selectedLeaveType = 'casual';
-  // Update leave balance badge
+  // Update leave balance badge with monthly policy info
   var balText = document.getElementById('leaveBalText');
   if (balText && currentUser) {
     var bal = getLeaveBalance(currentUser.code);
     var rem = bal.casual || 0;
-    balText.textContent = 'Casual Leave: ' + rem + ' days remaining';
+    var usedThisMonth = getCasualLeavesUsedThisMonth(currentUser.code);
+    var monthlyPaid = Math.max(0, 1 - usedThisMonth);
+    balText.innerHTML = 'Casual Leave: <strong>' + rem + '</strong> of 12 remaining this year' +
+      '<br><span style="font-size:.7rem;color:' + (monthlyPaid > 0 ? 'var(--success)' : 'var(--danger)') + '">' +
+      (monthlyPaid > 0 ? '1 paid leave available this month' : 'Paid leave used this month — additional leave will be LOP (salary deducted)') + '</span>';
   }
   document.querySelectorAll('#leaveTypePills .lt-pill').forEach((p,i) => p.classList.toggle('active', i===0));
   var today = new Date().toISOString().split('T')[0];
@@ -7128,6 +7385,20 @@ function selectLeaveType(type, el) {
   el.classList.add('active');
 }
 
+// Check how many casual leaves used this month
+function getCasualLeavesUsedThisMonth(empCode) {
+  var now = new Date();
+  var month = now.getMonth();
+  var year = now.getFullYear();
+  return leaveApplications.filter(function(a) {
+    if (a.empCode !== empCode) return false;
+    if (a.type !== 'casual') return false;
+    if (a.status === 'rejected') return false;
+    var d = new Date(a.from);
+    return d.getMonth() === month && d.getFullYear() === year;
+  }).reduce(function(sum, a) { return sum + (a.days || 1); }, 0);
+}
+
 async function submitLeave() {
   if (!currentUser) return;
   const from = document.getElementById('leaveFromDate').value;
@@ -7143,26 +7414,53 @@ async function submitLeave() {
   var isHalfDay = halfDayToggle && halfDayToggle.classList.contains('on');
   const days = isHalfDay ? 0.5 : Math.ceil((new Date(to) - new Date(from)) / 86400000) + 1;
   const bal = getLeaveBalance(currentUser.code);
-  const typeMap = { casual: 'casual', comp: 'comp' };
-  const balKey = typeMap[selectedLeaveType];
-  if (bal[balKey] < days) { showToast('Insufficient ' + selectedLeaveType + ' leave balance (' + bal[balKey] + ' remaining)'); return; }
+
+  // Leave policy: 1 casual leave per month (paid), extra = LOP (salary deducted)
+  var casualUsedThisMonth = getCasualLeavesUsedThisMonth(currentUser.code);
+  var paidAvailable = Math.max(0, 1 - casualUsedThisMonth); // 1 per month
+  var leaveType = selectedLeaveType;
+  var isLOP = false;
+
+  if (leaveType === 'casual') {
+    if (bal.casual <= 0) {
+      // No casual balance left — entire request is LOP
+      isLOP = true;
+      if (!confirm('You have exhausted all 12 casual leaves for this year.\n\nThis leave will be Loss of Pay (LOP) — salary for ' + days + ' day(s) will be deducted.\n\nDo you want to proceed?')) return;
+    } else if (days > paidAvailable) {
+      // Partially paid, partially LOP
+      var lopDays = days - paidAvailable;
+      if (!confirm('You have used your 1 paid casual leave for this month.\n\n' + (paidAvailable > 0 ? paidAvailable + ' day(s) will be paid leave.\n' : '') + lopDays + ' day(s) will be Loss of Pay (LOP) — salary will be deducted for those days.\n\nDo you want to proceed?')) return;
+      isLOP = lopDays > 0;
+    }
+    // Check yearly balance
+    if (bal.casual < days && !isLOP) {
+      if (!confirm('You only have ' + bal.casual + ' casual leave(s) remaining this year.\n\n' + (days - bal.casual) + ' day(s) will be Loss of Pay (LOP) — salary will be deducted.\n\nDo you want to proceed?')) return;
+      isLOP = true;
+    }
+  }
 
   try {
-    var apiRes = await apiCall('POST', '/leaves', { type: selectedLeaveType, from: from, to: to, reason: reason });
+    var lopFlag = isLOP || (leaveType === 'casual' && days > paidAvailable);
+    var apiRes = await apiCall('POST', '/leaves', { type: leaveType, from: from, to: to, reason: reason, isLOP: lopFlag });
     var app = {
       id: (apiRes && apiRes.id) || leaveNextId++,
       empCode: currentUser.code,
       empName: currentUser.name,
       dept: currentUser.dept,
-      type: selectedLeaveType,
+      type: leaveType,
       from: from, to: to, days: days, reason: reason,
       status: 'pending',
+      isLOP: lopFlag,
       date: new Date().toISOString()
     };
     leaveApplications.push(app);
     closeLeaveForm();
     renderLeaveScreen();
-    showToast('Leave application submitted');
+    if (lopFlag) {
+      showToast('Leave submitted — salary deduction will apply for LOP days');
+    } else {
+      showToast('Leave application submitted (paid leave)');
+    }
     refreshNotifications();
   } catch (e) { showToast(e.message || 'Error submitting leave'); }
 }
@@ -7265,7 +7563,8 @@ function renderLeaveScreen() {
         const statusLabel = a.status === 'hr_accepted' ? 'HR Accepted' : a.status.charAt(0).toUpperCase()+a.status.slice(1);
         const fromD = new Date(a.from).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
         const toD = new Date(a.to).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
-        return `<div class="request-item"><div class="req-icon" style="background:#FFF7ED;color:#E85D04"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/></svg></div><div class="req-info"><h4>${a.type.charAt(0).toUpperCase()+a.type.slice(1)} Leave</h4><p>${fromD} — ${toD} &middot; ${a.days} day(s)</p></div><div class="req-meta"><span class="badge-status ${badgeCls}"${badgeStyle}>${statusLabel}</span></div></div>`;
+        var lopBadge = a.isLOP ? '<span style="display:inline-block;font-size:.55rem;padding:1px 5px;border-radius:4px;background:#FEE2E2;color:#DC2626;margin-left:4px;font-weight:600">LOP</span>' : '<span style="display:inline-block;font-size:.55rem;padding:1px 5px;border-radius:4px;background:#DCFCE7;color:#16A34A;margin-left:4px;font-weight:600">PAID</span>';
+        return `<div class="request-item"><div class="req-icon" style="background:#FFF7ED;color:#E85D04"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/></svg></div><div class="req-info"><h4>${a.type.charAt(0).toUpperCase()+a.type.slice(1)} Leave${lopBadge}</h4><p>${fromD} — ${toD} &middot; ${a.days} day(s)</p></div><div class="req-meta"><span class="badge-status ${badgeCls}"${badgeStyle}>${statusLabel}</span></div></div>`;
       }).join('');
     }
   }

@@ -124,6 +124,13 @@ router.patch('/:id/approve', verifyToken, requireRole('MD'), auditLog('approve',
     // Notify the employee that their leave was approved
     await notifyUsers(pool, [app.emp_code], 'Leave Approved', 'Your ' + app.leave_type + ' leave (' + app.days + ' days) has been approved', 'leave');
 
+    // Real-time: notify employee instantly
+    const io = req.app.get('io');
+    if (io) {
+      io.to('user:' + app.emp_code).emit('leave:approved', { id: app.id, type: app.leave_type, days: app.days, from: app.from_date, to: app.to_date });
+      io.to('role:MD').to('role:HR').emit('leave:updated', { id: app.id, empCode: app.emp_code, status: 'approved' });
+    }
+
     res.json({ message: 'Leave approved' });
   } catch (err) {
     console.error(err);
@@ -148,6 +155,13 @@ router.patch('/:id/hr-accept', verifyToken, requireRole('HR'), auditLog('hr-acce
     const targets = [apps[0].emp_code, ...mdUsers].filter(c => c !== req.user.empCode);
     await notifyUsers(pool, targets, 'Leave Accepted by HR', apps[0].emp_name + '\'s ' + apps[0].leave_type + ' leave accepted by HR, awaiting MD confirmation', 'leave');
 
+    // Real-time
+    const io = req.app.get('io');
+    if (io) {
+      io.to('user:' + apps[0].emp_code).emit('leave:hr_accepted', { id: apps[0].id, type: apps[0].leave_type });
+      io.to('role:MD').emit('leave:pending_approval', { id: apps[0].id, empCode: apps[0].emp_code, empName: apps[0].emp_name, type: apps[0].leave_type, days: apps[0].days });
+    }
+
     res.json({ message: 'Leave accepted by HR' });
   } catch (err) {
     console.error(err);
@@ -169,6 +183,13 @@ router.patch('/:id/reject', verifyToken, requireRole('MD', 'HR'), auditLog('reje
 
     // Notify the employee that their leave was rejected
     await notifyUsers(pool, [apps[0].emp_code], 'Leave Rejected', 'Your ' + apps[0].leave_type + ' leave has been rejected', 'leave');
+
+    // Real-time
+    const io = req.app.get('io');
+    if (io) {
+      io.to('user:' + apps[0].emp_code).emit('leave:rejected', { id: apps[0].id, type: apps[0].leave_type });
+      io.to('role:MD').to('role:HR').emit('leave:updated', { id: apps[0].id, empCode: apps[0].emp_code, status: 'rejected' });
+    }
 
     res.json({ message: 'Leave rejected' });
   } catch (err) {
