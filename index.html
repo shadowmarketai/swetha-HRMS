@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#ffffff">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="HRMS">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<title>Swetha Structures — HRMS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<meta name="google-client-id" content="245239484935-upileff5mt7bahinfmm62a4tpfakpg9i.apps.googleusercontent.com">
+<script>
+// Capture Google OAuth2 redirect token IMMEDIATELY before SW/cached JS can lose it
+(function(){var h=location.hash;if(h&&h.indexOf('access_token')>-1){sessionStorage.setItem('hrms_google_token',h.substring(1));history.replaceState(null,'',location.pathname+location.search)}})();
+</script>
+<link rel="stylesheet" href="styles.css?v=138">
+</head>
+<body>
+<div class="phone-frame" id="app">
+  <!-- LOGIN SCREEN -->
+  <div class="login-screen" id="loginScreen">
+    <div class="login-left">
+      <div class="login-brand">
+        <div class="login-brand-row">
+          <div class="login-logo"><img src="swetha_new_logo.png" alt="Swetha Structures"></div>
+          <div class="login-title">SWETHA STRUCTURES</div>
+        </div>
+        <div class="login-tagline">Steel Building Specialist</div>
+      </div>
+      <div class="login-hero-img"><img src="assets/construction-scene.png" alt="Construction Site"></div>
+    </div>
+    <div class="login-right">
+      <div class="login-form">
+        <div class="login-form-header">
+          <div class="login-form-logo"><img src="swetha_new_logo.png" alt="SS"></div>
+          <h2 class="login-welcome">Welcome Back!</h2>
+          <p class="login-welcome-sub">Sign in to your HRMS account</p>
+        </div>
+        <div class="login-field"><label>Employee Code / Phone</label><div class="login-input-wrap"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg><input type="text" id="loginId" placeholder="e.g. MD001, SS001" maxlength="50" autocomplete="username"></div></div>
+        <div class="login-field"><label>Password</label><div class="login-input-wrap"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><input type="password" id="loginPass" placeholder="Enter password" maxlength="128" autocomplete="current-password"><button type="button" class="pwd-toggle" onclick="togglePwdVisibility('loginPass',this)" aria-label="Show password"><svg class="eye-open" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg><svg class="eye-closed" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display:none"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg></button></div></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <label style="display:flex;align-items:center;gap:6px;font-size:.75rem;color:var(--gray-500);cursor:pointer"><input type="checkbox" id="rememberMe" style="accent-color:var(--primary);width:15px;height:15px">Remember me</label>
+          <a href="#" id="forgotPwdLink" onclick="showForgotPassword();return false" style="font-size:.75rem;color:var(--primary);text-decoration:none;font-weight:500">Forgot Password?</a>
+        </div>
+        <button class="login-btn" id="signInBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:6px"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>Sign In</button>
+        <div class="login-divider"><span>OR</span></div>
+        <button class="login-btn login-btn-outline" id="biometricBtn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px"><path d="M12 11c0-1.1.9-2 2-2s2 .9 2 2-2 4-2 4"/><path d="M8 11a4 4 0 0 1 8 0c0 2.5-2 5-4 6.5"/><path d="M6 11a6 6 0 0 1 12 0c0 4-3 7-6 9"/></svg>Biometric Login</button>
+        <div class="login-error" id="loginError"></div>
+      </div>
+      <div class="login-right-decor"><img src="assets/construction-scene.png" alt=""></div>
+    </div>
+  </div>
+
+  <header class="app-header" id="appHeader" style="display:none">
+    <div class="header-logo" onclick="switchTab('home',document.querySelector('[data-tab=home]'))" style="cursor:pointer">
+      <img src="swetha_new_logo.png" alt="Swetha Structures" class="header-logo-img">
+    </div>
+    <div class="header-actions">
+      <span class="role-badge" id="roleBadge"></span>
+      <button class="header-btn md-only" id="locationBtn" onclick="showOverlay('location')" style="display:none"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></button>
+      <button class="header-btn" onclick="showOverlay('notifications')"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><span class="badge"></span></button>
+      <button class="header-btn" id="adminBtn" onclick="showOverlay('admin')" style="display:none"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+      <button class="header-btn" id="settingsBtn" onclick="showOverlay('settings')"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.73 12.73 1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg></button>
+      <div class="avatar-sm" id="headerAvatar" onclick="showOverlay('profile')">VK</div>
+    </div>
+  </header>
+
+  <div id="loadingSpinner" class="loading-overlay hidden" role="status" aria-live="polite">
+    <div class="loading-content"><div class="spinner"></div>
+    <p id="loadingMessage">Loading your data...</p></div>
+  </div>
+
+  <div class="app-content" id="appContent" role="main" style="display:none">
+    <!-- HOME -->
+    <div class="screen active" id="screen-home">
+      <div class="greeting fade-in">
+        <div class="time-label" id="timeLabel">Good Morning</div>
+        <h1 id="greetingName">Welcome <span class="wave">&#128075;</span></h1>
+      </div>
+      <div class="checkin-hero fade-in">
+        <div class="checkin-hero-content">
+          <div class="checkin-status"><span class="dot"></span> <span id="checkinStatusText">Check In</span></div>
+          <div class="checkin-time" id="currentTime">09:12 AM</div>
+          <div class="checkin-date" id="currentDate">Friday, 07 March 2026</div>
+          <div class="checkin-actions">
+            <button class="btn btn-golden" id="gpsCheckinBtn" onclick="gpsCheckIn()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Check In</button>
+            <button class="btn btn-white-outline" id="gpsCheckoutBtn" onclick="gpsCheckOut()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Check Out</button>
+          </div>
+        </div>
+        <div class="checkin-hero-img"><img src="assets/hero-construction.jpg" alt=""></div>
+      </div>
+
+      <div class="home-grid">
+        <div class="home-grid-col">
+          <div id="homeMyTasks"></div>
+          <div id="homeMyProjects"></div>
+          <div id="recentActivityList" class="card fade-in"></div>
+        </div>
+        <div class="home-grid-col">
+          <div id="dashboardAnnouncements"></div>
+          <div id="dashboardCelebrations"></div>
+          <div id="homeQuickStats"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SITE ADVANCE & EXPENSES -->
+    <div class="screen" id="screen-site">
+      <button class="adv-pending-banner md-hr-only hidden" id="sitePendingBanner" onclick="showOverlay('advance-requests')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span id="sitePendingText">Pending Requests</span>
+        <span class="count-badge" id="sitePendingCount">0</span>
+      </button>
+      <div class="section-title" style="margin-top:4px">Advance &amp; Expense</div>
+      <div class="location-bar fade-in">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        <div class="loc-text"><p>Location: Porur, Chennai</p><small>GPS tracking active &middot; 13.0382&#176;N, 80.1582&#176;E</small></div>
+        <div class="loc-live"></div>
+      </div>
+      <div class="md-hr-only">
+      <div class="summary-grid fade-in">
+        <div class="summary-card total"><div class="amount">&#8377;1.25L</div><div class="label">Total Advance</div></div>
+        <div class="summary-card approved"><div class="amount">&#8377;85K</div><div class="label">Settled</div></div>
+        <div class="summary-card pending"><div class="amount">&#8377;40K</div><div class="label">Pending</div></div>
+      </div>
+      <div class="section-title">Recent Expenses</div>
+      <div class="expense-item fade-in">
+        <div class="expense-icon" style="background:var(--orange-light);color:var(--orange-dark)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 20h20"/><path d="M5 20V8l7-5 7 5v12"/></svg></div>
+        <div class="expense-info"><h4>Cement &amp; Steel — Porur Site</h4><p>Material &middot; Bill attached</p></div>
+        <div class="expense-amount"><div class="value">&#8377;45,000</div><div class="date">05 Mar</div></div>
+      </div>
+      <div class="expense-item fade-in">
+        <div class="expense-icon" style="background:#DBEAFE;color:#2563EB"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="6" width="22" height="12" rx="2"/><path d="M1 10h22"/></svg></div>
+        <div class="expense-info"><h4>Labour Payment — Daily Wages</h4><p>Site Labour &middot; 8 workers</p></div>
+        <div class="expense-amount"><div class="value">&#8377;18,400</div><div class="date">04 Mar</div></div>
+      </div>
+      <div class="expense-item fade-in">
+        <div class="expense-icon" style="background:var(--success-light);color:var(--success-dark)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg></div>
+        <div class="expense-info"><h4>Equipment Rental — JCB</h4><p>Machinery &middot; 2 days</p></div>
+        <div class="expense-amount"><div class="value">&#8377;12,000</div><div class="date">02 Mar</div></div>
+      </div>
+      </div>
+      <div style="margin-top:12px">
+        <button class="btn btn-primary w-full" style="border-radius:var(--radius)" id="newExpenseBtn" onclick="showInlineExpenseForm()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New Expense</button>
+      </div>
+      <div id="inlineExpenseForm" style="display:none"></div>
+      <div class="my-requests-section" id="mySiteRequests"></div>
+    </div>
+
+    <!-- SITE EXPENSE (tally advance vs bills) -->
+    <div class="screen" id="screen-site-expense">
+      <div class="section-title" style="margin-top:4px">Site Expense — Advance Tally</div>
+      <div id="siteExpenseContent"></div>
+    </div>
+
+    <!-- TRAVEL EXPENSE (tally advance vs bills) -->
+    <div class="screen" id="screen-travel-expense">
+      <div class="section-title" style="margin-top:4px">Travel Expense — Advance Tally</div>
+      <div id="travelExpenseContent"></div>
+    </div>
+
+    <!-- SALARY ADVANCE -->
+    <div class="screen" id="screen-advance">
+      <button class="adv-pending-banner md-hr-only hidden" id="advPendingBanner" onclick="showOverlay('advance-requests')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span id="advPendingText">Pending Requests</span>
+        <span class="count-badge" id="advPendingCount">0</span>
+      </button>
+      <div class="md-hr-only">
+      <div class="section-title" style="margin-top:4px">Salary Advance Tracker</div>
+      <div class="adv-tracker fade-in">
+        <div class="adv-tracker-header"><h4>Balasubramaninam</h4><div class="total">&#8377;1,05,000</div></div>
+        <div style="font-size:.7rem;color:var(--gray-400);margin-bottom:8px">Total Advance: &#8377;1,07,000 &middot; Deducted: &#8377;2,000 &middot; Bal: &#8377;1,05,000</div>
+        <div style="font-size:.72rem;color:var(--primary);font-weight:600;margin-bottom:8px">Deducted from next month salary</div>
+        <div class="adv-row"><span class="month">Apr 2026 (Upcoming)</span><span class="amt due">&#8377;1,05,000</span></div>
+      </div>
+      <div class="adv-tracker fade-in">
+        <div class="adv-tracker-header"><h4>Yuvaraja</h4><div class="total">&#8377;7,500</div></div>
+        <div style="font-size:.7rem;color:var(--gray-400);margin-bottom:8px">Total Advance: &#8377;7,500 &middot; Deducted: &#8377;5,000 (Dec) &middot; Bal: &#8377;0</div>
+        <div class="adv-row"><span class="month">Dec 2025 (Deducted)</span><span class="amt paid">&#8377;5,000</span></div>
+        <div class="adv-row"><span class="month">Remaining</span><span class="amt" style="color:var(--gray-500)">&#8377;0</span></div>
+      </div>
+      <div class="adv-tracker fade-in">
+        <div class="adv-tracker-header"><h4>Sankavai</h4><div class="total">&#8377;15,000</div></div>
+        <div style="font-size:.7rem;color:var(--gray-400);margin-bottom:8px">Advance: &#8377;15,000 &middot; Deducted from next month salary</div>
+        <div class="adv-row"><span class="month">Apr 2026 (Upcoming)</span><span class="amt due">&#8377;15,000</span></div>
+      </div>
+      <div class="adv-tracker fade-in">
+        <div class="adv-tracker-header"><h4>Praveen</h4><div class="total">&#8377;15,000</div></div>
+        <div style="font-size:.7rem;color:var(--gray-400);margin-bottom:8px">Cash Advance: &#8377;15,000 &middot; Deducted from Dec salary</div>
+        <div class="adv-row"><span class="month">Dec 2025 (Adjusted)</span><span class="amt paid">-&#8377;15,000</span></div>
+        <div class="adv-row"><span class="month">Net Salary</span><span class="amt" style="color:var(--gray-800)">&#8377;32,581</span></div>
+      </div>
+      <div class="adv-tracker fade-in">
+        <div class="adv-tracker-header"><h4>Manikandan (PEB)</h4><div class="total">&#8377;5,000</div></div>
+        <div style="font-size:.7rem;color:var(--gray-400);margin-bottom:8px">Cash Advance: &#8377;5,000 &middot; Deducted from Dec salary</div>
+        <div class="adv-row"><span class="month">Dec 2025 (Adjusted)</span><span class="amt paid">-&#8377;5,000</span></div>
+        <div class="adv-row"><span class="month">Net Salary</span><span class="amt" style="color:var(--gray-800)">&#8377;15,323</span></div>
+      </div>
+      </div>
+      <div style="margin-top:12px">
+        <button class="btn btn-primary w-full" style="border-radius:var(--radius)" onclick="openAdvanceApplyForm('salary')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New Salary Advance</button>
+      </div>
+      <div class="my-requests-section" id="myAdvanceRequests"></div>
+    </div>
+
+    <!-- TA - BIKE, CAR & OTHER -->
+    <div class="screen" id="screen-ta">
+      <button class="adv-pending-banner md-hr-only hidden" id="taPendingBanner" onclick="showOverlay('advance-requests')">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        <span id="taPendingText">Pending Requests</span>
+        <span class="count-badge" id="taPendingCount">0</span>
+      </button>
+      <div class="section-title" style="margin-top:4px">Travel Allowance — Dec 2025</div>
+      <div class="location-bar fade-in">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        <div class="loc-text"><p>Live Tracking Enabled</p><small>Auto-calculates distance for TA claims</small></div>
+        <div class="loc-live"></div>
+      </div>
+      <div class="md-hr-only">
+      <div class="summary-grid fade-in">
+        <div class="summary-card total"><div class="amount">&#8377;3,550</div><div class="label">Total TA</div></div>
+        <div class="summary-card approved"><div class="amount">8</div><div class="label">Staff Claims</div></div>
+        <div class="summary-card pending"><div class="amount">&#8377;539</div><div class="label">Highest</div></div>
+      </div>
+      <div class="section-title">TA by Employee (Factory)</div>
+      <div class="ta-type-card fade-in">
+        <div class="ta-icon" style="background:#FEF3C7;color:#D97706">&#128661;</div>
+        <div class="ta-info"><h4>Krishna Gowri Sankar.S</h4><p>Bike &middot; Tambaram to Factory</p></div>
+        <div class="ta-amount" style="color:var(--success-dark)">&#8377;539</div>
+      </div>
+      <div class="ta-type-card fade-in">
+        <div class="ta-icon" style="background:#DBEAFE;color:#2563EB">&#128661;</div>
+        <div class="ta-info"><h4>Shanmugam.G</h4><p>Bike &middot; Daily commute</p></div>
+        <div class="ta-amount" style="color:var(--success-dark)">&#8377;461</div>
+      </div>
+      <div class="ta-type-card fade-in">
+        <div class="ta-icon" style="background:#FFF7ED;color:#E85D04">&#128661;</div>
+        <div class="ta-info"><h4>Karthikeyan</h4><p>Bike &middot; Site visit travel</p></div>
+        <div class="ta-amount" style="color:var(--success-dark)">&#8377;390</div>
+      </div>
+      <div class="ta-type-card fade-in">
+        <div class="ta-icon" style="background:var(--danger-light);color:var(--danger)">&#128661;</div>
+        <div class="ta-info"><h4>Vijaya Kumar</h4><p>Bike &middot; Multi-site travel</p></div>
+        <div class="ta-amount" style="color:var(--success-dark)">&#8377;585</div>
+      </div>
+      <div class="ta-type-card fade-in">
+        <div class="ta-icon" style="background:var(--success-light);color:var(--success-dark)">&#128661;</div>
+        <div class="ta-info"><h4>Govarthanan</h4><p>Bike &middot; Factory commute</p></div>
+        <div class="ta-amount" style="color:var(--success-dark)">&#8377;1,014</div>
+      </div>
+      <div class="ta-type-card fade-in">
+        <div class="ta-icon" style="background:var(--orange-light);color:var(--orange-dark)">&#128661;</div>
+        <div class="ta-info"><h4>Lingeswaran</h4><p>Bike &middot; Daily</p></div>
+        <div class="ta-amount" style="color:var(--success-dark)">&#8377;396</div>
+      </div>
+      <div class="ta-type-card fade-in">
+        <div class="ta-icon" style="background:var(--teal-light);color:var(--teal-dark)">&#128661;</div>
+        <div class="ta-info"><h4>Udhaya Shankar</h4><p>Bike &middot; Factory travel</p></div>
+        <div class="ta-amount" style="color:var(--success-dark)">&#8377;165</div>
+      </div>
+      </div>
+      <div style="margin-top:12px">
+        <button class="btn btn-primary w-full" style="border-radius:var(--radius)" onclick="openAdvanceApplyForm('travel')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New TA Claim</button>
+      </div>
+      <div class="my-requests-section" id="myTravelRequests"></div>
+    </div>
+
+    <!-- PROGRESS REPORT -->
+    <div class="screen" id="screen-progress">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:4px">
+        <div class="section-title" style="margin:0">Projects</div>
+        <button class="nf-btn nf-btn-primary nf-btn-sm md-hr-only" onclick="openProjectForm()">+ New Project</button>
+      </div>
+      <div id="projectsList"></div>
+      <div class="section-title">Staff Deployment</div>
+      <div class="dept-grid fade-in" id="staffDeploymentGrid"></div>
+    </div>
+
+    <!-- ATTENDANCE -->
+    <div class="screen" id="screen-attendance">
+      <div class="section-title" style="margin-top:4px"><span id="calMonthTitle">March 2026</span></div>
+      <div class="card calendar-card fade-in" id="calendarCard">
+        <div class="cal-header"><h3>Attendance Calendar</h3><div class="cal-nav"><button onclick="changeCalendarMonth(-1)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button><button onclick="changeCalendarMonth(1)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg></button></div></div>
+        <div class="cal-days" id="calDays"></div>
+        <div class="cal-legend">
+          <div class="cal-legend-item"><span class="cal-status-badge cal-badge-present">P</span>Present</div>
+          <div class="cal-legend-item"><span class="cal-status-badge cal-badge-absent">A</span>Absent</div>
+          <div class="cal-legend-item"><span class="cal-status-badge cal-badge-half">&frac12;</span>Half Day</div>
+          <div class="cal-legend-item"><span class="cal-status-badge cal-badge-leave">L</span>Leave</div>
+          <div class="cal-legend-item"><span class="cal-status-badge cal-badge-holiday">H</span>Holiday</div>
+        </div>
+      </div>
+      <div class="md-hr-only"><button class="payroll-report-btn" onclick="downloadAttendanceReport()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download Attendance Report (PDF)</button></div>
+      <div class="section-title">My Attendance Log</div>
+      <div id="attendanceLogList" class="card fade-in"></div>
+    </div>
+
+    <!-- LEAVES -->
+    <div class="screen" id="screen-leaves">
+      <div id="leaveBalanceGrid"></div>
+      <div class="tab-pills" id="leaveTabPills"><button class="tab-pill active" data-ltab="my" onclick="switchLeaveTab('my',this)">My Leaves</button><button class="tab-pill" data-ltab="team" onclick="switchLeaveTab('team',this)">Team Leaves</button><button class="tab-pill" data-ltab="holidays" onclick="switchLeaveTab('holidays',this)">Holidays</button></div>
+      <div id="myLeavesTab" class="card fade-in"></div>
+      <div id="teamLeavesTab" class="card fade-in" style="display:none"></div>
+      <div id="holidaysTab" style="display:none"><div class="card fade-in">
+        <div class="holiday-item"><div class="holiday-date-box"><span class="day">14</span><span class="month">Mar</span></div><div class="holiday-info"><h4>Holi</h4><p>Saturday &middot; Gazetted Holiday</p></div></div>
+        <div class="holiday-item"><div class="holiday-date-box"><span class="day">30</span><span class="month">Mar</span></div><div class="holiday-info"><h4>Id-ul-Fitr</h4><p>Monday &middot; Gazetted Holiday</p></div></div>
+        <div class="holiday-item"><div class="holiday-date-box"><span class="day">14</span><span class="month">Apr</span></div><div class="holiday-info"><h4>Dr. Ambedkar Jayanti</h4><p>Tuesday &middot; Gazetted Holiday</p></div></div>
+      </div></div>
+      <div id="applyLeaveBtn" style="margin-top:12px"><button class="btn btn-primary w-full" style="border-radius:var(--radius)" onclick="openLeaveForm()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>Apply for Leave</button></div>
+    </div>
+
+    <!-- EXPENSES -->
+    <div class="screen" id="screen-expenses">
+      <div class="section-title" style="margin-top:4px">December 2025 — Overall</div>
+      <div class="summary-grid fade-in">
+        <div class="summary-card total"><div class="amount">&#8377;12.52L</div><div class="label">Total Salary</div></div>
+        <div class="summary-card approved"><div class="amount">&#8377;9.07L</div><div class="label">NEFT</div></div>
+        <div class="summary-card pending"><div class="amount">&#8377;3.41L</div><div class="label">Other A/c</div></div>
+      </div>
+      <div class="advance-card fade-in" style="margin-bottom:8px"><div><h4>Cash Payment</h4><p>Garden labour — Cash component</p></div><div class="advance-amount">&#8377;4,000</div></div>
+      <div class="section-title">Department Breakdown</div>
+      <div class="dept-grid fade-in">
+        <div class="dept-card office"><div class="dept-name">Office</div><div class="dept-amount">&#8377;5,15,774</div><div class="dept-count">17 staff &middot; NEFT</div></div>
+        <div class="dept-card site"><div class="dept-name">Site</div><div class="dept-amount">&#8377;3,47,323</div><div class="dept-count">15 staff &middot; NEFT</div></div>
+        <div class="dept-card factory"><div class="dept-name">Factory</div><div class="dept-amount">&#8377;3,55,098</div><div class="dept-count">14 staff &middot; NEFT</div></div>
+        <div class="dept-card garden"><div class="dept-name">Garden</div><div class="dept-amount">&#8377;34,250</div><div class="dept-count">5 labour &middot; NEFT+Cash</div></div>
+      </div>
+      <div class="md-hr-only"><button class="payroll-report-btn" onclick="downloadPayrollReport()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download Payroll Report (PDF)</button></div>
+      <div class="md-hr-only" style="display:flex;flex-direction:column;gap:8px;margin-top:8px">
+        <button class="payroll-report-btn" style="background:linear-gradient(135deg,#14B8A6,#0F766E)" onclick="downloadBankNEFTFile()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>Download Bank NEFT File (CSV)</button>
+        <button class="payroll-report-btn" style="background:linear-gradient(135deg,#3B82F6,#1D4ED8)" onclick="downloadPFECRFile()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Download PF ECR File</button>
+        <button class="payroll-report-btn" style="background:linear-gradient(135deg,#8B5CF6,#6D28D9)" onclick="downloadESIReturnFile()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Download ESI Return (CSV)</button>
+      </div>
+    </div>
+
+    <!-- SALARY -->
+    <div class="screen" id="screen-salary">
+      <div id="salaryContent"></div>
+    </div>
+
+    <!-- HR HUB -->
+    <div class="screen" id="screen-hr">
+      <div class="section-title" style="margin-top:4px">HR Hub</div>
+      <div class="hr-hub-grid">
+        <button class="hr-hub-card" onclick="showOverlay('hr-kpi')">
+          <div class="hc-icon" style="background:linear-gradient(135deg,#FFF7ED,#FFEDD5);color:#E85D04">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          </div>
+          <span>KPI &amp; Performance</span>
+        </button>
+        <button class="hr-hub-card md-hr-only" onclick="showOverlay('hr-recruit')">
+          <div class="hc-icon" style="background:linear-gradient(135deg,#DBEAFE,#BFDBFE);color:#2563EB">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="23" y1="11" x2="17" y2="11"/></svg>
+          </div>
+          <span>Hiring Activity</span>
+        </button>
+        <button class="hr-hub-card" onclick="showOverlay('hr-documents')">
+          <div class="hc-icon" style="background:linear-gradient(135deg,#D1FAE5,#A7F3D0);color:#059669">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+          </div>
+          <span>Legal Docs</span>
+        </button>
+        <button class="hr-hub-card" onclick="showOverlay('hr-tasks')">
+          <div class="hc-icon" style="background:linear-gradient(135deg,#FFEDD5,#FED7AA);color:#C2410C">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          </div>
+          <span>Tasks &amp; To-Do</span>
+        </button>
+        <button class="hr-hub-card" onclick="showOverlay('hr-vision')">
+          <div class="hc-icon" style="background:linear-gradient(135deg,#CCFBF1,#99F6E4);color:#0F766E">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+          </div>
+          <span>Vision</span>
+        </button>
+        <button class="hr-hub-card md-hr-only" onclick="showOverlay('hr-analytics')">
+          <div class="hc-icon" style="background:linear-gradient(135deg,#FFF7ED,#FFEDD5);color:#E85D04">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+          </div>
+          <span>HR Analytics</span>
+        </button>
+        <button class="hr-hub-card md-hr-only" onclick="showOverlay('hr-shifts')">
+          <div class="hc-icon" style="background:linear-gradient(135deg,#EDE9FE,#DDD6FE);color:#7C3AED">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+          </div>
+          <span>Shifts</span>
+        </button>
+        <button class="hr-hub-card" onclick="showOverlay('hr-expenses')">
+          <div class="hc-icon" style="background:linear-gradient(135deg,#CCFBF1,#99F6E4);color:#0F766E">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+          </div>
+          <span>Expenses</span>
+        </button>
+        <button class="hr-hub-card" onclick="showOverlay('hr-tax')">
+          <div class="hc-icon" style="background:linear-gradient(135deg,#DBEAFE,#BFDBFE);color:#2563EB">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+          </div>
+          <span>Form 16 &amp; Tax</span>
+        </button>
+        <button class="hr-hub-card md-hr-only" onclick="showOverlay('hr-compliance')">
+          <div class="hc-icon" style="background:linear-gradient(135deg,#FEE2E2,#FECACA);color:#DC2626">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <span>Compliance</span>
+        </button>
+        <button class="hr-hub-card md-hr-only" onclick="showOverlay('hr-assets')">
+          <div class="hc-icon" style="background:linear-gradient(135deg,#FEF3C7,#FDE68A);color:#D97706">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a4 4 0 0 0-8 0v2"/></svg>
+          </div>
+          <span>Assets</span>
+        </button>
+        <button class="hr-hub-card md-hr-only" onclick="showOverlay('hr-exit')">
+          <div class="hc-icon" style="background:linear-gradient(135deg,#FCE7F3,#FBCFE8);color:#BE185D">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          </div>
+          <span>Exit &amp; F&amp;F</span>
+        </button>
+        <button class="hr-hub-card" onclick="showOverlay('hr-announcements')">
+          <div class="hc-icon" style="background:linear-gradient(135deg,#FFEDD5,#FED7AA);color:#C2410C">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 17H2a3 3 0 0 0 3-3V9a7 7 0 0 1 14 0v5a3 3 0 0 0 3 3zm-8.27 4a2 2 0 0 1-3.46 0"/></svg>
+          </div>
+          <span>Announcements</span>
+        </button>
+        <button class="hr-hub-card" onclick="showOverlay('hr-celebrations')">
+          <div class="hc-icon" style="background:linear-gradient(135deg,#FFF7ED,#FFEDD5);color:#E85D04">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </div>
+          <span>Celebrations</span>
+        </button>
+      </div>
+      <div class="section-title">Quick Links</div>
+      <div class="quick-links fade-in">
+        <button class="quick-link" onclick="showOverlay('hr-kpi')"><div class="ql-icon" style="background:linear-gradient(135deg,#FFF7ED,#FFEDD5);color:#E85D04"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg></div><span>My KPI</span></button>
+        <button class="quick-link" onclick="showOverlay('hr-tasks')"><div class="ql-icon" style="background:linear-gradient(135deg,#FFEDD5,#FED7AA);color:#C2410C"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div><span>Tasks</span></button>
+        <button class="quick-link" onclick="showOverlay('hr-announcements')"><div class="ql-icon" style="background:linear-gradient(135deg,#FEF3C7,#FDE68A);color:#D97706"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div><span>Notices</span></button>
+        <button class="quick-link md-hr-only" onclick="showOverlay('hr-analytics')"><div class="ql-icon" style="background:linear-gradient(135deg,#DBEAFE,#BFDBFE);color:#2563EB"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div><span>Analytics</span></button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- OVERLAYS -->
+  <div class="overlay-screen" id="overlay-profile" role="dialog" aria-modal="true" aria-label="Profile">
+    <div class="overlay-header"><button class="back-btn" aria-label="Go back" onclick="hideOverlay('profile')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button><h2>My Profile</h2></div>
+    <div id="profileContent"></div>
+  </div>
+
+  <div class="overlay-screen" id="overlay-notifications" role="dialog" aria-modal="true" aria-label="Notifications">
+    <div class="overlay-header"><button class="back-btn" aria-label="Go back" onclick="hideOverlay('notifications')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button><h2>Notifications</h2><div style="margin-left:auto;font-size:.72rem;color:var(--primary);font-weight:600;cursor:pointer" onclick="markAllNotifRead()">Mark all read</div></div>
+    <div id="notifListContainer"></div>
+  </div>
+
+  <!-- LEAVE FORM BOTTOM SHEET -->
+  <div class="leave-form-overlay" id="leaveFormOverlay" onclick="if(event.target===this)closeLeaveForm()">
+    <div class="leave-form-sheet">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <h3 style="font-family:var(--font-display);font-size:1rem;font-weight:700">Apply for Leave</h3>
+        <button style="background:none;border:none;cursor:pointer;font-size:1.2rem;color:var(--gray-400)" onclick="closeLeaveForm()">&times;</button>
+      </div>
+      <div id="leaveBalanceBadge" style="display:flex;align-items:center;gap:8px;background:var(--primary-50);padding:10px 14px;border-radius:var(--radius-sm);margin-bottom:10px;border:1px solid var(--primary-100)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><div><div style="font-size:.82rem;font-weight:700;color:var(--primary)" id="leaveBalText">Casual Leave: 12 days remaining</div><div style="font-size:.65rem;color:var(--gray-500)">Balance will be deducted on approval</div></div></div>
+      <div class="leave-type-pills" id="leaveTypePills">
+        <div class="lt-pill active" onclick="selectLeaveType('casual',this)">Casual Leave</div>
+      </div>
+      <div class="form-row"><label>From Date</label><input type="date" id="leaveFromDate" onclick="this.showPicker&&this.showPicker()"></div>
+      <div class="form-row"><label>To Date</label><input type="date" id="leaveToDate" onclick="this.showPicker&&this.showPicker()"></div>
+      <div class="form-row" style="display:flex;align-items:center;gap:10px;margin:8px 0">
+        <label style="margin:0;font-size:.78rem;font-weight:600">Half Day Leave</label>
+        <button class="toggle" id="halfDayToggle" onclick="toggleHalfDay()"></button>
+      </div>
+      <div id="halfDayTimeFields" style="display:none">
+        <div style="display:flex;gap:8px">
+          <div class="form-row" style="flex:1"><label>From Time</label><select id="leaveFromTime"></select></div>
+          <div class="form-row" style="flex:1"><label>To Time</label><select id="leaveToTime"></select></div>
+        </div>
+      </div>
+      <div class="form-row"><label>Reason</label><textarea id="leaveReason" placeholder="Enter reason for leave..." rows="3"></textarea></div>
+      <button class="btn btn-primary w-full" style="border-radius:var(--radius-sm);margin-top:8px" onclick="submitLeave()">Submit Leave Application</button>
+    </div>
+  </div>
+
+  <div class="overlay-screen" id="overlay-settings" role="dialog" aria-modal="true" aria-label="Settings">
+    <div class="overlay-header"><button class="back-btn" aria-label="Go back" onclick="hideOverlay('settings')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button><h2>Settings</h2></div>
+    <div style="padding:16px">
+      <div class="section-title" style="margin-top:4px">Preferences</div>
+      <div class="setting-row"><div class="setting-info"><h4>Dark Mode</h4><p>Switch to dark color scheme</p></div><button class="toggle" id="darkModeToggle" onclick="toggleDarkMode()"></button></div>
+      <div class="setting-row"><div class="setting-info"><h4>Push Notifications</h4><p>Alerts for approvals, salary, advances</p></div><button class="toggle" id="pushNotifToggle" onclick="togglePushNotifications(this)"></button></div>
+      <div class="setting-row"><div class="setting-info"><h4>Location Tracking</h4><p>GPS tracking for site expenses &amp; TA</p></div><button class="toggle on" onclick="this.classList.toggle('on')"></button></div>
+      <div class="setting-row"><div class="setting-info"><h4>Biometric Login</h4><p>Use fingerprint or face ID</p></div><button class="toggle" id="biometricToggle" onclick="toggleBiometricSetting(this)"></button></div>
+
+      <div class="section-title">Notification Preferences</div>
+      <div class="setting-row"><div class="setting-info"><h4>Salary Slip Alerts</h4><p>Notify on salary slip download</p></div><button class="toggle on" id="notifPrefSalary" onclick="toggleNotifPref('salary',this)"></button></div>
+      <div class="setting-row"><div class="setting-info"><h4>Leave Alerts</h4><p>Notify on leave submit/approve</p></div><button class="toggle on" id="notifPrefLeave" onclick="toggleNotifPref('leave',this)"></button></div>
+      <div class="setting-row"><div class="setting-info"><h4>Advance Alerts</h4><p>Notify on advance approve/reject</p></div><button class="toggle on" id="notifPrefAdvance" onclick="toggleNotifPref('advance',this)"></button></div>
+      <div class="setting-row"><div class="setting-info"><h4>Payroll Alerts</h4><p>Notify on payroll report generation</p></div><button class="toggle on" id="notifPrefPayroll" onclick="toggleNotifPref('payroll',this)"></button></div>
+
+      <div class="section-title">Change Password</div>
+      <div class="card fade-in" style="padding:14px;margin-bottom:12px">
+        <div class="form-row"><label>Current Password</label><input type="password" id="chgOldPass" placeholder="Enter current password"></div>
+        <div class="form-row"><label>New Password</label><input type="password" id="chgNewPass" placeholder="Enter new password"></div>
+        <div class="form-row"><label>Confirm New Password</label><input type="password" id="chgConfirmPass" placeholder="Confirm new password"></div>
+        <button class="btn btn-primary w-full" style="border-radius:var(--radius-sm);margin-top:8px" onclick="changePassword()">Update Password</button>
+      </div>
+
+      <div class="md-hr-only">
+      <div class="section-title">Export Data</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+        <button class="btn btn-sm btn-outline" onclick="exportEmployeeList()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Employees</button>
+        <button class="btn btn-sm btn-outline" onclick="exportKPIReport()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> KPI Scores</button>
+        <button class="btn btn-sm btn-outline" onclick="exportSalaryReport()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Salary</button>
+        <button class="btn btn-sm btn-outline" onclick="exportAttendanceReport()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Attendance</button>
+        <button class="btn btn-sm btn-outline" onclick="exportTaskReport()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Tasks</button>
+        <button class="btn btn-sm btn-outline" onclick="exportAdvanceReport()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Advances</button>
+        <button class="btn btn-sm btn-outline" onclick="exportAnalyticsReport()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Analytics</button>
+        <button class="btn btn-sm btn-outline" onclick="exportIncentiveReport()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Incentives</button>
+      </div>
+
+      <div class="section-title">Data Management</div>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <button class="btn" style="flex:1;background:var(--primary-50);color:var(--primary);border-radius:var(--radius-sm)" onclick="exportAllData()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Export Data</button>
+        <button class="btn" style="flex:1;background:var(--success-light);color:var(--success-dark);border-radius:var(--radius-sm)" onclick="importAllData()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Import Data</button>
+      </div>
+      <button class="btn w-full" style="background:var(--danger-light);color:var(--danger-dark);border-radius:var(--radius-sm);margin-bottom:8px" onclick="clearAllData()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Reset All Data to Defaults</button>
+      </div>
+
+      <div style="margin-top:24px;text-align:center"><div style="font-size:.72rem;color:var(--gray-400)">Swetha Structures HRMS v3.0</div><div style="font-size:.65rem;color:var(--gray-300);margin-top:2px">Swetha Structures Private Limited</div></div>
+    </div>
+  </div>
+
+  <!-- ONBOARDING WIZARD OVERLAY -->
+  <div class="overlay-screen" id="overlay-onboarding" role="dialog" aria-modal="true" aria-label="Onboarding">
+    <div class="overlay-header"><button class="back-btn" aria-label="Go back" onclick="hideOverlay('onboarding')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button><h2>Add New Employee</h2></div>
+    <div class="wizard-steps" id="wizardSteps">
+      <div class="wizard-step active" data-step="1"><div class="step-dot">1</div><div class="step-label">Personal</div></div>
+      <div class="wizard-step" data-step="2"><div class="step-dot">2</div><div class="step-label">Company</div></div>
+      <div class="wizard-step" data-step="3"><div class="step-dot">3</div><div class="step-label">Salary</div></div>
+      <div class="wizard-step" data-step="4"><div class="step-dot">4</div><div class="step-label">Emergency</div></div>
+      <div class="wizard-step" data-step="5"><div class="step-dot">5</div><div class="step-label">Documents</div></div>
+    </div>
+    <div id="wizardContent">
+      <!-- Step 1: Personal -->
+      <div class="wizard-body" id="wizStep1">
+        <div class="section-label">Personal Information</div>
+        <div class="photo-upload" id="photoUploadBox" onclick="document.getElementById('empPhotoInput').click()"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg><span>Photo</span></div>
+        <input type="file" id="empPhotoInput" accept="image/*" style="display:none" onchange="previewEmpPhoto(this)">
+        <div class="form-row"><label>Full Name *</label><input type="text" id="obName" placeholder="Enter full name"></div>
+        <div class="form-grid">
+          <div class="form-row"><label>Phone *</label><input type="tel" id="obPhone" placeholder="Mobile number"></div>
+          <div class="form-row"><label>Email</label><input type="email" id="obEmail" placeholder="Email address"></div>
+        </div>
+        <div class="form-grid">
+          <div class="form-row"><label>Date of Birth</label><input type="date" id="obDob"></div>
+          <div class="form-row"><label>Gender</label><select id="obGender"><option value="">Select</option><option>Male</option><option>Female</option><option>Other</option></select></div>
+        </div>
+        <div class="form-row"><label>Address</label><textarea id="obAddress" placeholder="Full address"></textarea></div>
+        <div class="form-grid">
+          <div class="form-row"><label>Aadhaar No.</label><input type="text" id="obAadhaar" placeholder="12 digit Aadhaar" maxlength="12"></div>
+          <div class="form-row"><label>PAN No.</label><input type="text" id="obPan" placeholder="e.g. ABCDE1234F" maxlength="10"></div>
+        </div>
+      </div>
+      <!-- Step 2: Company -->
+      <div class="wizard-body hidden" id="wizStep2">
+        <div class="section-label">Company Details</div>
+        <div class="form-grid">
+          <div class="form-row"><label>Employee Code *</label><input type="text" id="obCode" placeholder="Auto: SSC/SSM"></div>
+          <div class="form-row"><label>Department *</label><select id="obDept"><option value="">Select Dept</option><option>Office</option><option>Site</option><option>Factory</option><option>Garden</option><option>PEB</option></select></div>
+        </div>
+        <div class="form-grid">
+          <div class="form-row"><label>Designation *</label><input type="text" id="obDesignation" placeholder="e.g. Site Engineer"></div>
+          <div class="form-row"><label>Sub-department</label><input type="text" id="obSubDept" placeholder="Optional"></div>
+        </div>
+        <div class="form-grid">
+          <div class="form-row"><label>Date of Joining *</label><input type="date" id="obDoj"></div>
+          <div class="form-row"><label>Reporting Manager</label><select id="obManager"><option value="">Select Manager</option><option>Selvam (MD)</option><option>N.Hari Haran</option><option>Priyanka (HR)</option><option>Sankar Guru.P</option></select></div>
+        </div>
+        <div class="form-grid">
+          <div class="form-row"><label>Login Password</label><input type="text" id="obPassword" placeholder="Default: emp123" value="emp123"></div>
+          <div class="form-row"><label>Role</label><select id="obRole"><option value="Employee">Employee</option><option value="HR">HR</option></select></div>
+        </div>
+      </div>
+      <!-- Step 3: Salary & Bank -->
+      <div class="wizard-body hidden" id="wizStep3">
+        <div class="section-label">Salary &amp; Bank Details</div>
+        <div class="form-row"><label>Monthly Salary (CTC) *</label><input type="number" id="obSalary" placeholder="e.g. 25000"></div>
+        <div class="form-grid">
+          <div class="form-row"><label>Bank Name *</label><input type="text" id="obBank" placeholder="e.g. UOB, SBI"></div>
+          <div class="form-row"><label>Account Number *</label><input type="text" id="obAccNo" placeholder="Account number"></div>
+        </div>
+        <div class="form-grid">
+          <div class="form-row"><label>IFSC Code</label><input type="text" id="obIfsc" placeholder="e.g. UBIN0123456"></div>
+          <div class="form-row"><label>Payment Mode</label><select id="obPayMode"><option>NEFT</option><option>Cash</option><option>UPI</option></select></div>
+        </div>
+      </div>
+      <!-- Step 4: Emergency -->
+      <div class="wizard-body hidden" id="wizStep4">
+        <div class="section-label">Emergency Contact</div>
+        <div class="form-row"><label>Contact Name *</label><input type="text" id="obEmgName" placeholder="Emergency contact person"></div>
+        <div class="form-grid">
+          <div class="form-row"><label>Relation</label><select id="obEmgRelation"><option>Father</option><option>Mother</option><option>Spouse</option><option>Sibling</option><option>Other</option></select></div>
+          <div class="form-row"><label>Phone Number *</label><input type="tel" id="obEmgPhone" placeholder="Contact phone"></div>
+        </div>
+      </div>
+      <!-- Step 5: Documents -->
+      <div class="wizard-body hidden" id="wizStep5">
+        <div class="section-label">Upload Documents</div>
+        <div class="doc-upload-zone" onclick="this.querySelector('input').click()"><div class="doc-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></div><div class="doc-info"><h4>Aadhaar Card</h4><p>Upload front &amp; back</p></div><span class="doc-status"></span><input type="file" accept="image/*,.pdf" style="display:none" onchange="this.parentNode.querySelector('.doc-status').textContent='Uploaded'"></div>
+        <div class="doc-upload-zone" onclick="this.querySelector('input').click()"><div class="doc-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></div><div class="doc-info"><h4>PAN Card</h4><p>Upload clear copy</p></div><span class="doc-status"></span><input type="file" accept="image/*,.pdf" style="display:none" onchange="this.parentNode.querySelector('.doc-status').textContent='Uploaded'"></div>
+        <div class="doc-upload-zone" onclick="this.querySelector('input').click()"><div class="doc-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></div><div class="doc-info"><h4>Photo ID</h4><p>Passport / Driving Licence</p></div><span class="doc-status"></span><input type="file" accept="image/*,.pdf" style="display:none" onchange="this.parentNode.querySelector('.doc-status').textContent='Uploaded'"></div>
+        <div class="doc-upload-zone" onclick="this.querySelector('input').click()"><div class="doc-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></div><div class="doc-info"><h4>Other Documents</h4><p>Certificates, offer letter, etc.</p></div><span class="doc-status"></span><input type="file" accept="image/*,.pdf" style="display:none" onchange="this.parentNode.querySelector('.doc-status').textContent='Uploaded'" multiple></div>
+        <div class="section-label" style="margin-top:12px">Educational Certificates</div>
+        <div class="doc-upload-zone" onclick="this.querySelector('input').click()"><div class="doc-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></div><div class="doc-info"><h4>10th Certificate</h4><p>SSLC / 10th Mark Sheet</p></div><span class="doc-status"></span><input type="file" accept="image/*,.pdf" style="display:none" onchange="this.parentNode.querySelector('.doc-status').textContent='Uploaded'"></div>
+        <div class="doc-upload-zone" onclick="this.querySelector('input').click()"><div class="doc-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></div><div class="doc-info"><h4>12th Certificate</h4><p>HSC / 12th Mark Sheet</p></div><span class="doc-status"></span><input type="file" accept="image/*,.pdf" style="display:none" onchange="this.parentNode.querySelector('.doc-status').textContent='Uploaded'"></div>
+        <div class="doc-upload-zone" onclick="this.querySelector('input').click()"><div class="doc-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></div><div class="doc-info"><h4>Degree Certificate</h4><p>UG / PG / Diploma</p></div><span class="doc-status"></span><input type="file" accept="image/*,.pdf" style="display:none" onchange="this.parentNode.querySelector('.doc-status').textContent='Uploaded'"></div>
+        <div class="doc-upload-zone" onclick="this.querySelector('input').click()"><div class="doc-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></div><div class="doc-info"><h4>Experience Certificate</h4><p>Previous employer</p></div><span class="doc-status"></span><input type="file" accept="image/*,.pdf" style="display:none" onchange="this.parentNode.querySelector('.doc-status').textContent='Uploaded'"></div>
+        <div class="doc-upload-zone" onclick="this.querySelector('input').click()"><div class="doc-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></div><div class="doc-info"><h4>Bank Passbook</h4><p>Front page with account details</p></div><span class="doc-status"></span><input type="file" accept="image/*,.pdf" style="display:none" onchange="this.parentNode.querySelector('.doc-status').textContent='Uploaded'"></div>
+      </div>
+    </div>
+    <div class="wizard-nav">
+      <button class="btn btn-outline" id="wizPrevBtn" onclick="wizardNav(-1)" disabled>Previous</button>
+      <button class="btn btn-primary" id="wizNextBtn" onclick="wizardNav(1)">Next Step</button>
+    </div>
+  </div>
+
+  <!-- ADMIN PANEL OVERLAY (MD Only) -->
+  <div class="overlay-screen" id="overlay-admin" role="dialog" aria-modal="true" aria-label="Admin Panel">
+    <div class="overlay-header"><button class="back-btn" aria-label="Go back" onclick="hideOverlay('admin')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button><h2>Admin Panel</h2><span class="role-badge md" style="margin-left:auto">MD</span></div>
+    <div class="admin-tabs">
+      <button class="admin-tab active" onclick="switchAdminTab('roles',this)">Manage Roles</button>
+      <button class="admin-tab" onclick="switchAdminTab('depts',this)">Departments</button>
+      <button class="admin-tab" onclick="switchAdminTab('emplist',this)">All Employees</button>
+      <button class="admin-tab" onclick="switchAdminTab('geofence',this)">Geofence Sites</button>
+    </div>
+    <div class="admin-section" id="adminRoles">
+      <div class="section-title">Assign Employee Roles</div>
+      <div id="rolesList"></div>
+    </div>
+    <div class="admin-section hidden" id="adminDepts">
+      <div class="section-title">Manage Departments</div>
+      <div id="deptsList"></div>
+      <div class="section-title">Add New Department</div>
+      <div class="add-dept-row"><input type="text" id="newDeptName" placeholder="Department name"><button onclick="addDepartment()">Add</button></div>
+    </div>
+    <div class="admin-section hidden" id="adminEmpList">
+      <div class="section-title">All Employees (by Department)</div>
+      <div id="allEmpList"></div>
+    </div>
+    <div class="admin-section hidden" id="adminGeofence">
+      <div class="section-title">Geofence Site Locations</div>
+      <div id="geofenceSiteList"></div>
+      <div class="section-title" style="margin-top:16px">Add New Site</div>
+      <div class="card" style="padding:12px;display:flex;flex-direction:column;gap:8px">
+        <div class="form-row"><label>Site Name *</label><input type="text" id="geoSiteName" placeholder="e.g. New Office - Gandhipuram"></div>
+        <div style="display:flex;gap:8px"><div class="form-row" style="flex:1"><label>Latitude *</label><input type="number" step="any" id="geoSiteLat" placeholder="e.g. 11.0168"></div><div class="form-row" style="flex:1"><label>Longitude *</label><input type="number" step="any" id="geoSiteLng" placeholder="e.g. 76.9558"></div></div>
+        <div class="form-row"><label>Radius (meters) *</label><input type="number" id="geoSiteRadius" placeholder="e.g. 200" value="200"></div>
+        <button class="btn btn-primary" style="border-radius:var(--radius);margin-top:4px" onclick="addGeofenceSiteFromForm()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> Add Site</button>
+        <button class="btn" style="border-radius:var(--radius);background:var(--gray-100);color:var(--gray-700);font-size:.75rem" onclick="useCurrentLocationForGeo()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg> Use Current GPS Location</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- EMPLOYEE DETAIL MODAL (from Roles tab) -->
+  <div class="overlay-screen" id="overlay-emp-detail" role="dialog" aria-modal="true" aria-label="Employee Details">
+    <div class="overlay-header"><button class="back-btn" aria-label="Go back" onclick="hideOverlay('emp-detail')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button><h2>Employee Details</h2></div>
+    <div id="empDetailModalContent" style="padding:16px"></div>
+  </div>
+
+  <!-- LIVE LOCATION OVERLAY (MD Only) -->
+  <div class="overlay-screen" id="overlay-location" role="dialog" aria-modal="true" aria-label="Location">
+    <div class="overlay-header">
+      <button class="back-btn" aria-label="Go back" onclick="closeLocationTracker()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2>Live Location</h2>
+      <div style="margin-left:auto;display:flex;align-items:center;gap:8px">
+        <span id="locLastUpdated" style="font-size:.62rem;color:var(--gray-400)">Just now</span>
+        <button class="back-btn" aria-label="Refresh locations" onclick="refreshLocations()" title="Refresh" style="background:var(--primary);color:#fff;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg></button>
+      </div>
+    </div>
+    <div class="location-tracker">
+      <div class="loc-map-area" id="locMapArea">
+        <div class="map-bg"><div class="map-grid"></div></div>
+        <div class="map-label">Chennai Metro Area</div>
+      </div>
+      <div class="loc-summary-bar" id="locSummary"></div>
+      <div style="display:flex;align-items:center;gap:4px;margin:8px 12px 4px;justify-content:center">
+        <span style="font-size:.65rem;color:var(--gray-400);margin-right:4px">Map view:</span>
+        <button class="map-type-btn active" data-type="k" onclick="setLocMapType('k')" style="font-size:.62rem;padding:3px 8px;border-radius:10px;border:1px solid var(--gray-200);background:var(--gray-100);cursor:pointer">Satellite</button>
+        <button class="map-type-btn" data-type="m" onclick="setLocMapType('m')" style="font-size:.62rem;padding:3px 8px;border-radius:10px;border:1px solid var(--gray-200);background:var(--gray-100);cursor:pointer">Map</button>
+        <button class="map-type-btn" data-type="p" onclick="setLocMapType('p')" style="font-size:.62rem;padding:3px 8px;border-radius:10px;border:1px solid var(--gray-200);background:var(--gray-100);cursor:pointer">Terrain</button>
+      </div>
+      <button class="btn-view-all-map" onclick="viewAllOnGoogleMaps()" style="display:flex;align-items:center;justify-content:center;gap:6px;width:calc(100% - 24px);margin:4px 12px 8px;padding:10px;background:var(--primary);color:white;border:none;border-radius:var(--radius-sm);font-weight:600;font-size:.75rem;cursor:pointer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>View All on Google Maps</button>
+      <div class="loc-filter-bar" id="locFilters"></div>
+      <div class="loc-refresh-info"><span id="locEmpCount"></span><span style="font-size:.6rem;color:var(--gray-400);margin-left:6px">Tap employee to open on Google Maps</span></div>
+      <div id="locEmpList"></div>
+    </div>
+  </div>
+
+  <!-- UNIFIED ADVANCE APPLY OVERLAY -->
+  <div class="overlay-screen" id="overlay-advance-apply" role="dialog" aria-modal="true" aria-label="Apply for Advance">
+    <div class="overlay-header"><button class="back-btn" aria-label="Go back" onclick="hideOverlay('advance-apply')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button><h2 id="advApplyTitle">New Salary Advance Request</h2></div>
+    <div style="padding:16px">
+      <!-- Salary limit info -->
+      <div id="advSalaryLimitInfo" style="font-size:.75rem;color:var(--gray-500);margin-bottom:8px;background:var(--gray-50);padding:8px 10px;border-radius:var(--radius-xs)"></div>
+      <!-- Common: Amount -->
+      <div class="form-row"><label>Amount (&#8377;) *</label><input type="number" id="advAmount" placeholder="e.g. 25000" oninput="updateEmiCalc()"></div>
+      <!-- Deduction notice -->
+      <div style="font-size:.78rem;color:#fff;font-weight:600;margin:8px 0 12px;background:var(--primary);padding:10px 12px;border-radius:var(--radius-xs);display:flex;align-items:center;gap:8px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>Submit the bills to avoid misleads</div>
+      <!-- Site fields (hidden) -->
+      <div id="advFieldsSite" style="display:none">
+        <div class="form-row"><label>Project / Site *</label><select id="advSiteProject"><option value="">Select project</option><option>Porur Villa Project</option><option>Tambaram Warehouse</option><option>PEB Factory Extension</option><option>Guduvanchery Residence</option><option>Other</option></select></div>
+        <div class="form-row"><label>Category *</label><select id="advSiteCategory"><option value="">Select category</option><option>Material</option><option>Labour</option><option>Equipment</option><option>Transport</option><option>Other</option></select></div>
+      </div>
+      <!-- Salary fields (shown by default) -->
+      <div id="advFieldsSalary">
+        <div class="form-row"><label>Reason *</label><select id="advReason"><option value="">Select reason</option><option>Medical</option><option>Education</option><option>Marriage</option><option>Housing</option><option>Emergency</option><option>Personal</option><option>Other</option></select></div>
+      </div>
+      <!-- Travel fields -->
+      <div id="advFieldsTravel" style="display:none">
+        <div class="form-grid">
+          <div class="form-row"><label>From *</label><input type="text" id="advTravelFrom" placeholder="e.g. Porur"></div>
+          <div class="form-row"><label>To *</label><input type="text" id="advTravelTo" placeholder="e.g. Tambaram"></div>
+        </div>
+        <div class="form-grid">
+          <div class="form-row"><label>Vehicle *</label><select id="advTravelVehicle"><option value="">Select</option><option>Bike</option><option>Car</option><option>Auto</option><option>Bus</option><option>Train</option><option>Other</option></select></div>
+          <div class="form-row"><label>Distance (km)</label><input type="number" id="advTravelKm" placeholder="e.g. 25"></div>
+        </div>
+        <div class="form-grid">
+          <div class="form-row"><label>Fuel Type</label><select id="advFuelType"><option value="N/A">N/A</option><option>Petrol</option><option>Diesel</option><option>CNG</option><option>Electric</option></select></div>
+          <div class="form-row"><label>Days of Project</label><input type="number" id="advProjectDays" placeholder="e.g. 5" min="1"></div>
+        </div>
+      </div>
+      <!-- Common: Details & Urgency -->
+      <div class="form-row"><label>Details (optional)</label><textarea id="advDetails" placeholder="Brief explanation..." rows="2"></textarea></div>
+      <div class="form-row"><label>Urgency</label>
+        <div style="display:flex;gap:8px;margin-top:4px">
+          <button type="button" class="tab-pill active" id="advUrgNormal" onclick="setAdvUrgency('normal')">Normal</button>
+          <button type="button" class="tab-pill" id="advUrgUrgent" onclick="setAdvUrgency('urgent')">Urgent</button>
+        </div>
+      </div>
+      <button class="btn btn-primary w-full" style="border-radius:var(--radius);margin-top:16px" onclick="submitAdvanceRequest()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Submit Request</button>
+    </div>
+  </div>
+
+  <!-- ADVANCE REQUESTS REVIEW OVERLAY (MD/HR) -->
+  <div class="overlay-screen" id="overlay-advance-requests" role="dialog" aria-modal="true" aria-label="Advance & Expense Requests">
+    <div class="overlay-header"><button class="back-btn" aria-label="Go back" onclick="hideOverlay('advance-requests')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button><h2>Approve Requests</h2></div>
+    <div style="padding:16px">
+      <div class="tab-pills" id="advReqTabs">
+        <button class="tab-pill active" onclick="switchAdvReqTab('pending',this)">Pending</button>
+        <button class="tab-pill" onclick="switchAdvReqTab('approved',this)">Approved</button>
+        <button class="tab-pill" onclick="switchAdvReqTab('rejected',this)">Rejected</button>
+        <button class="tab-pill" onclick="switchAdvReqTab('all',this)">All</button>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px" id="advReqTypeFilter">
+        <button class="loc-filter-chip active" onclick="filterAdvReqByType('all',this)">All</button>
+        <button class="loc-filter-chip" onclick="filterAdvReqByType('site',this)">Site Adv</button>
+        <button class="loc-filter-chip" onclick="filterAdvReqByType('salary',this)">Salary Adv</button>
+        <button class="loc-filter-chip" onclick="filterAdvReqByType('travel',this)">Travel Adv</button>
+        <button class="loc-filter-chip" onclick="filterAdvReqByType('site_expense',this)">Site Exp</button>
+        <button class="loc-filter-chip" onclick="filterAdvReqByType('travel_expense',this)">Travel Exp</button>
+      </div>
+      <div id="advReqList"></div>
+    </div>
+  </div>
+
+  <!-- HR KPI & PERFORMANCE OVERLAY -->
+  <div class="overlay-screen" id="overlay-hr-kpi" role="dialog" aria-modal="true" aria-label="KPI Dashboard">
+    <div class="overlay-header">
+      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('hr-kpi')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2>KPI &amp; Performance</h2>
+    </div>
+    <div class="hr-overlay-body" id="hrKpiContent"></div>
+  </div>
+
+  <!-- HR RECRUITMENT OVERLAY -->
+  <div class="overlay-screen" id="overlay-hr-recruit" role="dialog" aria-modal="true" aria-label="Hiring Activity">
+    <div class="overlay-header">
+      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('hr-recruit')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2>Hiring Activity</h2>
+    </div>
+    <div class="hr-overlay-body" id="hrRecruitContent"></div>
+  </div>
+
+  <!-- HR LEGAL DOCUMENTS OVERLAY -->
+  <div class="overlay-screen" id="overlay-hr-documents" role="dialog" aria-modal="true" aria-label="Documents">
+    <div class="overlay-header">
+      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('hr-documents')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2>Legal Documents</h2>
+    </div>
+    <div class="hr-overlay-body" id="hrDocumentsContent"></div>
+  </div>
+
+
+  <!-- HR TASKS OVERLAY -->
+  <div class="overlay-screen" id="overlay-hr-tasks" role="dialog" aria-modal="true" aria-label="Tasks">
+    <div class="overlay-header">
+      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('hr-tasks')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2>Tasks &amp; To-Do</h2>
+    </div>
+    <div class="hr-overlay-body" id="hrTasksContent"></div>
+  </div>
+
+
+  <!-- HR VISION OVERLAY -->
+  <div class="overlay-screen" id="overlay-hr-vision" role="dialog" aria-modal="true" aria-label="Personal Vision">
+    <div class="overlay-header">
+      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('hr-vision')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2>Vision &amp; Purpose</h2>
+    </div>
+    <div class="hr-overlay-body" id="hrVisionContent"></div>
+  </div>
+
+
+  <!-- HR ANALYTICS OVERLAY -->
+  <div class="overlay-screen" id="overlay-hr-analytics" role="dialog" aria-modal="true" aria-label="Analytics">
+    <div class="overlay-header">
+      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('hr-analytics')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2>HR Analytics</h2>
+    </div>
+    <div class="hr-overlay-body" id="hrAnalyticsContent"></div>
+  </div>
+
+  <!-- F1: SHIFT MANAGEMENT OVERLAY -->
+  <div class="overlay-screen" id="overlay-hr-shifts" role="dialog" aria-modal="true" aria-label="Shift Management">
+    <div class="overlay-header">
+      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('hr-shifts')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2>Shift Management</h2>
+    </div>
+    <div class="new-feature-body" id="shiftsContent"></div>
+  </div>
+
+  <!-- F2: EXPENSE REIMBURSEMENT OVERLAY -->
+  <div class="overlay-screen" id="overlay-hr-expenses" role="dialog" aria-modal="true" aria-label="Expense Reimbursement">
+    <div class="overlay-header">
+      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('hr-expenses')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2>Expense Reimbursement</h2>
+    </div>
+    <div class="new-feature-body" id="expensesContent"></div>
+  </div>
+
+  <!-- F3: SELF SERVICE OVERLAY -->
+  <div class="overlay-screen" id="overlay-self-service" role="dialog" aria-modal="true" aria-label="Employee Self Service">
+    <div class="overlay-header">
+      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('self-service')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2>Self Service Portal</h2>
+    </div>
+    <div class="new-feature-body" id="selfServiceContent"></div>
+  </div>
+
+  <!-- F4: ATTENDANCE LOG OVERLAY -->
+  <div class="overlay-screen" id="overlay-attendance-log" role="dialog" aria-modal="true" aria-label="Attendance Log">
+    <div class="overlay-header">
+      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('attendance-log')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2>Attendance Log</h2>
+    </div>
+    <div class="new-feature-body" id="attendanceLogContent"></div>
+  </div>
+
+  <!-- F5: FORM 16 / TAX OVERLAY -->
+  <div class="overlay-screen" id="overlay-hr-tax" role="dialog" aria-modal="true" aria-label="Tax Declaration">
+    <div class="overlay-header">
+      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('hr-tax')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2>Form 16 &amp; Tax</h2>
+    </div>
+    <div class="tax-tabs" id="taxTabs" style="flex-wrap:wrap;gap:4px">
+      <button class="tax-tab active" onclick="switchTaxTab('declaration')">Declaration</button>
+      <button class="tax-tab" onclick="switchTaxTab('summary')">Tax Summary</button>
+      <button class="tax-tab" onclick="switchTaxTab('form16')">Form 16</button>
+      <button class="tax-tab" onclick="switchTaxTab('form16b')">Form 16B</button>
+      <button class="tax-tab" onclick="switchTaxTab('form12b')">Form 12B</button>
+      <button class="tax-tab" onclick="switchTaxTab('calculator')">Calculator</button>
+    </div>
+    <div class="new-feature-body" id="taxContent"></div>
+  </div>
+
+  <!-- F6: COMPLIANCE OVERLAY -->
+  <div class="overlay-screen" id="overlay-hr-compliance" role="dialog" aria-modal="true" aria-label="Labour Compliance">
+    <div class="overlay-header">
+      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('hr-compliance')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2>Compliance Dashboard</h2>
+    </div>
+    <div class="compliance-tabs" id="complianceTabs">
+      <button class="compliance-tab active" onclick="switchComplianceTab('filing')">Filings</button>
+      <button class="compliance-tab" onclick="switchComplianceTab('calendar')">Calendar</button>
+      <button class="compliance-tab" onclick="switchComplianceTab('wages')">Min Wage</button>
+      <button class="compliance-tab" onclick="switchComplianceTab('clra')">CLRA</button>
+    </div>
+    <div class="new-feature-body" id="complianceContent"></div>
+  </div>
+
+  <!-- F7: ASSET MANAGEMENT OVERLAY -->
+  <div class="overlay-screen" id="overlay-hr-assets" role="dialog" aria-modal="true" aria-label="Asset Management">
+    <div class="overlay-header">
+      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('hr-assets')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2>Asset Management</h2>
+    </div>
+    <div class="new-feature-body" id="assetsContent"></div>
+  </div>
+
+  <!-- F8: EXIT & F&F OVERLAY -->
+  <div class="overlay-screen" id="overlay-hr-exit" role="dialog" aria-modal="true" aria-label="Employee Exit">
+    <div class="overlay-header">
+      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('hr-exit')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2>Exit &amp; Full &amp; Final</h2>
+    </div>
+    <div class="new-feature-body" id="exitContent"></div>
+  </div>
+
+  <!-- F10: ANNOUNCEMENTS OVERLAY -->
+  <div class="overlay-screen" id="overlay-hr-announcements" role="dialog" aria-modal="true" aria-label="Announcements">
+    <div class="overlay-header">
+      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('hr-announcements')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2>Announcements</h2>
+    </div>
+    <div class="new-feature-body" id="announcementsContent"></div>
+  </div>
+
+  <!-- F11: CELEBRATIONS OVERLAY -->
+  <div class="overlay-screen" id="overlay-hr-celebrations" role="dialog" aria-modal="true" aria-label="Celebrations">
+    <div class="overlay-header">
+      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('hr-celebrations')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2>Celebrations</h2>
+    </div>
+    <div class="new-feature-body" id="celebrationsContent"></div>
+  </div>
+
+  <div class="overlay-screen" id="overlay-project-detail" role="dialog" aria-modal="true" aria-label="Project Details">
+    <div class="overlay-header">
+      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('project-detail')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2 id="projectDetailTitle">Project</h2>
+    </div>
+    <div class="new-feature-body" id="projectDetailContent"></div>
+  </div>
+
+  <!-- PEB Overlay (MD only) — Dashboard, Inventory, Procurement -->
+  <div class="overlay-screen" id="overlay-peb" role="dialog" aria-modal="true" aria-label="PEB Module">
+    <div class="overlay-header">
+      <button class="back-btn" aria-label="Go back" onclick="hideOverlay('peb')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button>
+      <h2 id="pebOverlayTitle">PEB Dashboard</h2>
+    </div>
+    <div class="new-feature-body" id="pebContent" style="padding:12px"></div>
+  </div>
+
+  <!-- Bottom Tabs (dynamically populated by renderNavigation()) -->
+  <nav class="bottom-tabs" id="bottomTabs" role="navigation" aria-label="Main navigation" style="display:none"></nav>
+</div>
+
+
+<script>
+// Prevent login screen flash on refresh if session exists
+try{var s=localStorage.getItem('hrms_session');if(s){var p=JSON.parse(s);if(p&&p.token&&p.token.includes('.')&&Date.now()<p.expiry){document.getElementById('loginScreen').classList.add('hidden');}}}catch(e){}
+</script>
+<script src="peb-module.js?v=1"></script>
+<script src="app.js?v=139"></script>
+</body>
+</html>

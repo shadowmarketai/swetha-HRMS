@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="102" fill="url(#g)"/>
+  <defs><linearGradient id="g" x1="0" y1="0" x2="512" y2="512"><stop stop-color="#4C51BF"/><stop offset="1" stop-color="#6366F1"/></linearGradient></defs>
+  <path d="M148 264c0-64.8 52.5-117.3 117.3-117.3S382.6 199.2 382.6 264h-45.3c0-39.7-32.2-72-72-72s-72 32.2-72 72 32.2 72 72 72v45.3C199.5 381.3 148 328.8 148 264z" fill="white" opacity=".9"/>
+  <circle cx="320" cy="264" r="36" fill="white"/>
+  <text x="256" y="424" text-anchor="middle" font-family="sans-serif" font-weight="700" font-size="72" fill="rgba(255,255,255,0.9)">HRMS</text>
+</svg>
