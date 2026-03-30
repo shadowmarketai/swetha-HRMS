@@ -270,6 +270,140 @@ async function seed() {
     console.log('   Created 2 daily work logs');
   }
 
+  // ========================================
+  // 13. Seed PEB Module Data (Store, Procurement)
+  // ========================================
+  console.log('\n13. Seeding PEB module data...');
+  try {
+    const mysql = require('mysql2/promise');
+    const pebConn = await mysql.createConnection({
+      host: process.env.DB_HOST || 'localhost',
+      port: parseInt(process.env.DB_PORT) || 3306,
+      user: process.env.DB_USER || 'root',
+      password: process.env.DB_PASSWORD || '',
+      database: process.env.DB_NAME || 'hrms',
+      multipleStatements: true
+    });
+
+    // Wait for auto-migration to create tables (server must be running)
+    await new Promise(r => setTimeout(r, 2000));
+
+    // Stock Items (20)
+    await pebConn.query("ALTER TABLE peb_stock_items MODIFY COLUMN category VARCHAR(50) NOT NULL").catch(() => {});
+    await pebConn.query(`INSERT IGNORE INTO peb_stock_items (item_code,item_name,category,unit,current_stock,min_stock_level,max_stock_level,unit_price,location) VALUES
+      ('PEB-ITEM-001','C Purlin 150x65','RAW MATERIAL','METER',650,100,1000,85,'Warehouse A'),
+      ('PEB-ITEM-002','GI Sheet 0.5mm','RAW MATERIAL','KG',2000,500,5000,72,'Warehouse A'),
+      ('PEB-ITEM-003','GI Sheet 0.8mm','RAW MATERIAL','KG',1500,100,3000,78,'Warehouse A'),
+      ('PEB-ITEM-004','MS Angle 50x50x6','RAW MATERIAL','METER',550,200,2000,65,'Warehouse B'),
+      ('PEB-ITEM-005','MS Angle 75x75x8','RAW MATERIAL','METER',420,150,1500,95,'Warehouse B'),
+      ('PEB-ITEM-006','Hex Bolt M16x50','HARDWARE','PIECE',3700,500,10000,12,'Rack H1'),
+      ('PEB-ITEM-007','Hex Bolt M20x60','HARDWARE','PIECE',80,300,5000,18,'Rack H1'),
+      ('PEB-ITEM-008','Grinding Disc 4in','TOOL','PIECE',125,50,200,45,'Tool Room'),
+      ('PEB-ITEM-009','Cutting Disc 14in','TOOL','PIECE',55,20,100,120,'Tool Room'),
+      ('PEB-ITEM-010','Polycarbonate Sheet 6mm','RAW MATERIAL','SQ_METER',65,30,200,250,'Warehouse C'),
+      ('PEB-ITEM-011','Primer Paint 20L','CONSUMABLE','PIECE',12,10,50,1200,'Store'),
+      ('PEB-ITEM-012','Welding Rod E7018 4mm','CONSUMABLE','KG',45,80,300,95,'Store'),
+      ('PEB-ITEM-013','Ridge Cap Flashing','RAW MATERIAL','METER',180,50,500,110,'Warehouse A'),
+      ('PEB-ITEM-014','J Bolt 12x150','HARDWARE','PIECE',850,200,5000,8,'Rack H2'),
+      ('PEB-ITEM-015','Self Drilling Screw 12x35','HARDWARE','PIECE',5200,1000,20000,3,'Rack H3'),
+      ('PEB-ITEM-016','Turbo Ventilator 24in','OTHER','PIECE',8,5,20,2800,'Warehouse C'),
+      ('PEB-ITEM-017','Insulation Sheet 50mm','RAW MATERIAL','SQ_METER',45,100,500,180,'Warehouse B'),
+      ('PEB-ITEM-018','Gutter PVC 6in','OTHER','METER',60,40,200,320,'Warehouse C'),
+      ('PEB-ITEM-019','Safety Harness Full Body','SAFETY','PIECE',15,10,50,1500,'Safety Store'),
+      ('PEB-ITEM-020','Base Plate 300x300x12','RAW MATERIAL','PIECE',30,50,200,420,'Warehouse B')`);
+
+    // Stock Transactions
+    await pebConn.query(`INSERT IGNORE INTO peb_stock_transactions (type,item_id,quantity,unit_cost,notes,created_by,created_at) VALUES
+      ('GRN',1,200,85,'From JSW Steel',1,'2026-03-25 10:00:00'),
+      ('GRN',2,500,72,'From Tata Steel',1,'2026-03-25 11:00:00'),
+      ('MIS',6,150,12,'Issued to Site A',1,'2026-03-26 09:00:00'),
+      ('MIS',7,80,18,'Issued to Site B',1,'2026-03-26 10:00:00'),
+      ('GRN',12,100,95,'Welding rod restock',1,'2026-03-27 08:30:00'),
+      ('MIS',4,100,65,'Site C requirement',1,'2026-03-27 14:00:00'),
+      ('MIS',8,25,45,'Grinding disc for Site A',1,'2026-03-28 09:00:00'),
+      ('MRT',1,50,85,'Excess return from Site B',1,'2026-03-28 16:00:00')`);
+
+    // Vendors (6)
+    await pebConn.query("ALTER TABLE peb_vendors ADD COLUMN status VARCHAR(20) DEFAULT 'ACTIVE'").catch(() => {});
+    await pebConn.query(`INSERT IGNORE INTO peb_vendors (vendor_code,company_name,contact_person,phone,gst_number,pan_number,rating,status) VALUES
+      ('VND-001','JSW Steel Dealers','Arun Kumar','9100000001','33AABCZ1234A1Z5','AABCZ1234A',4.5,'ACTIVE'),
+      ('VND-002','Sri Balaji Hardware','Balaji S','9100000002','33ABCS5678B1Z9','ABCS5678B1',4.2,'ACTIVE'),
+      ('VND-003','Metro Roofing Supplies','Venkat R','9100000003','33AABCM912C1Z3','AABCM912C1',3.8,'ACTIVE'),
+      ('VND-004','Kumar Fasteners Pvt Ltd','Santhi K','9100000004','33AABCK345G1Z7','AABCK345G1',4.0,'ACTIVE'),
+      ('VND-005','Chennai Welding Works','Prakash M','9100000005','33AABCT890E1Z1','AABCT890E1',3.5,'ACTIVE'),
+      ('VND-006','Tata Structure Dealers','Ramesh N','9100000006','33AABCT111F1Z5','AABCT111F1',4.8,'ACTIVE')`);
+
+    // GRN
+    await pebConn.query(`INSERT IGNORE INTO peb_grn (grn_number,vendor_id,invoice_number,received_date,quality_status,created_by) VALUES
+      ('GRN-2026-0001',1,'INV-JSW-4523','2026-03-12','PASSED',1),
+      ('GRN-2026-0002',2,'INV-SBH-1102','2026-03-16','PASSED',1),
+      ('GRN-2026-0003',4,'INV-KF-7788','2026-03-20','PARTIAL',1),
+      ('GRN-2026-0004',6,'INV-TATA-3303','2026-03-23','PASSED',1)`);
+    await pebConn.query(`INSERT IGNORE INTO peb_grn_items (grn_id,item_id,received_qty,accepted_qty,unit_cost) VALUES
+      (1,1,200,200,85),(1,4,100,100,65),(2,6,500,500,12),(2,7,300,300,18),(3,14,1000,950,8),(4,2,1000,1000,72)`);
+
+    // Material Requests
+    await pebConn.query(`INSERT IGNORE INTO peb_material_requests (request_code,requested_by,site_name,urgency,stage,purpose) VALUES
+      ('MRQ-2026-0001',1,'Site A - Kamarajar Port','URGENT','DISPATCHED','Roofing material for bay 3'),
+      ('MRQ-2026-0002',1,'Site B - Ambattur','NORMAL','APPROVED','Foundation bolts'),
+      ('MRQ-2026-0003',1,'Site B - Ambattur','URGENT','DISPATCHED','Emergency welding rods'),
+      ('MRQ-2026-0004',1,'Site C - Sriperumbudur','NORMAL','REQUESTED','Insulation sheets'),
+      ('MRQ-2026-0005',1,'Site A - Kamarajar Port','NORMAL','CLOSED','Safety equipment')`);
+    await pebConn.query(`INSERT IGNORE INTO peb_material_request_items (request_id,item_id,requested_qty,approved_qty,issued_qty) VALUES
+      (1,2,200,200,200),(1,13,50,50,50),(2,6,500,500,0),(2,14,200,200,0),(3,12,50,50,50),(4,17,100,NULL,0),(5,19,5,5,5)`);
+
+    // Material Returns
+    await pebConn.query(`INSERT IGNORE INTO peb_material_returns (mrn_code,site_name,returned_by,returned_by_name,return_date,status) VALUES
+      ('MRN-2026-0001','Site A - Kamarajar Port',1,'Site Supervisor A','2026-03-25','VERIFIED'),
+      ('MRN-2026-0002','Site B - Ambattur',1,'Site Supervisor B','2026-03-26','PENDING')`);
+
+    // Scrap
+    await pebConn.query(`INSERT IGNORE INTO peb_scrap_batches (batch_code,total_weight,status,sale_amount,created_by) VALUES
+      ('SCR-2026-0001',250,'COLLECTED',0,1),('SCR-2026-0002',180,'SOLD',14400,1)`);
+
+    // Purchase Indents
+    await pebConn.query(`INSERT IGNORE INTO peb_purchase_indents (indent_code,requested_by,requested_by_name,urgency,reason,status) VALUES
+      ('PI-2026-0001',1,'Admin (MD)','URGENT','MS Angles running low','PO_CREATED'),
+      ('PI-2026-0002',1,'Admin (MD)','ROUTINE','Regular restock of hardware','GM_APPROVED'),
+      ('PI-2026-0003',1,'Admin (MD)','CRITICAL','Welding rods critically low','COMPARISON_READY'),
+      ('PI-2026-0004',1,'Admin (MD)','ROUTINE','Insulation for roofing project','QUOTATION_PENDING')`);
+    await pebConn.query(`INSERT IGNORE INTO peb_indent_items (indent_id,item_id,qty,specification,estimated_cost,current_stock_qty) VALUES
+      (1,4,500,'50x50x6mm',32500,550),(1,5,300,'75x75x8mm',28500,420),
+      (2,6,2000,'M16x50 Grade 8.8',24000,3700),(2,14,1000,'J Bolt 12x150',8000,850),
+      (3,12,200,'E7018 4mm AWS',19000,45),(4,17,300,'50mm thick PUF',54000,45)`);
+
+    // Vendor Quotations for indent 3
+    await pebConn.query(`INSERT IGNORE INTO peb_vendor_quotations (indent_id,vendor_id,quotation_date,delivery_lead_days,payment_terms,total_value,transport_cost,landed_cost,transport_included) VALUES
+      (3,5,'2026-03-25',7,'Net 15',19000,1500,20500,0),
+      (3,1,'2026-03-25',10,'Net 30',18500,2000,20500,0),
+      (3,4,'2026-03-25',5,'Advance',21000,0,21000,1)`);
+
+    // Purchase Orders
+    await pebConn.query(`INSERT IGNORE INTO peb_purchase_orders (po_number,indent_id,vendor_id,total_amount,total_paid,balance_due,status,created_by) VALUES
+      ('PO-2026-0001',1,6,121000,50000,71000,'SENT',1),
+      ('PO-2026-0002',NULL,1,85000,85000,0,'SENT',1)`);
+    await pebConn.query(`INSERT IGNORE INTO peb_po_items (po_id,item_id,qty,unit_price,total_price) VALUES
+      (1,4,500,65,32500),(1,5,300,95,28500),(1,1,200,85,17000),(1,2,500,72,36000),(1,13,100,70,7000),
+      (2,2,1000,72,72000),(2,3,200,78,15600)`);
+    await pebConn.query(`INSERT IGNORE INTO peb_po_payments (po_id,amount,payment_date,mode,reference,recorded_by) VALUES
+      (1,50000,'2026-03-21','BANK_TRANSFER','UTR-2026-001',1),
+      (2,50000,'2026-03-18','BANK_TRANSFER','UTR-2026-002',1),
+      (2,35000,'2026-03-23','UPI','UPI-TX-A001',1)`);
+
+    // Transport
+    await pebConn.query(`INSERT IGNORE INTO peb_transport_requests (request_code,requested_by,type,origin_name,destination_name,scheduled_date,vehicle_type,status,vehicle_number,driver_name,driver_phone,actual_km,transport_cost,delivery_condition) VALUES
+      ('TRQ-2026-0001',1,'COMPANY_TO_SITE','Head Office Store','Site A - Kamarajar Port','2026-03-25','LORRY','DELIVERED','TN-01-AB-1234','Murugan','9876543210',45,3500,'GOOD'),
+      ('TRQ-2026-0002',1,'SITE_TO_COMPANY','Site A - Kamarajar Port','Head Office Store','2026-03-24','MINI_TRUCK','IN_TRANSIT','TN-01-CD-5678','Ravi','9876543211',NULL,NULL,NULL),
+      ('TRQ-2026-0003',1,'COMPANY_TO_SITE','Head Office Store','Site B - Ambattur','2026-03-28','LORRY','APPROVED','TN-09-EF-9012','Kumar','9876543212',NULL,NULL,NULL),
+      ('TRQ-2026-0004',1,'SITE_TO_SITE','Site A - Kamarajar Port','Site D - Hosur','2026-04-01','TRAILER','REQUESTED',NULL,NULL,NULL,NULL,NULL,NULL),
+      ('TRQ-2026-0005',1,'SITE_TO_SCRAP','Site A - Kamarajar Port','Chennai Scrap Yard','2026-04-05','PICKUP','REQUESTED',NULL,NULL,NULL,NULL,NULL,NULL)`);
+
+    await pebConn.end();
+    console.log('   PEB data seeded: 20 stock items, 6 vendors, 4 GRNs, 5 material requests, 4 indents, 2 POs, 5 transport requests');
+  } catch (pebErr) {
+    console.log('   PEB seed skipped (tables may not exist yet):', pebErr.message.substring(0, 80));
+  }
+
   console.log('\nSeed complete! Database is ready.');
   console.log('Login credentials:');
   console.log('  MD:       MD001 / admin123');
