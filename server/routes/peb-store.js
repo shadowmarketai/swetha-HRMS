@@ -168,6 +168,59 @@ async function generateSimpleCode(prefix, table, column) {
     )`);
 
     console.log('[PEB-STORE] All tables ready');
+
+    // Auto-seed if empty
+    const [[{ cnt }]] = await db.query('SELECT COUNT(*) as cnt FROM peb_stock_items');
+    if (cnt === 0) {
+      console.log('[PEB-STORE] Empty tables — auto-seeding...');
+      await db.query(`INSERT INTO peb_stock_items (item_code,item_name,category,unit,current_stock,min_stock_level,max_stock_level,unit_price,location) VALUES
+        ('PEB-ITEM-001','C Purlin 150x65','RAW MATERIAL','METER',650,100,1000,85,'Warehouse A'),
+        ('PEB-ITEM-002','GI Sheet 0.5mm','RAW MATERIAL','KG',2000,500,5000,72,'Warehouse A'),
+        ('PEB-ITEM-003','GI Sheet 0.8mm','RAW MATERIAL','KG',1500,100,3000,78,'Warehouse A'),
+        ('PEB-ITEM-004','MS Angle 50x50x6','RAW MATERIAL','METER',550,200,2000,65,'Warehouse B'),
+        ('PEB-ITEM-005','MS Angle 75x75x8','RAW MATERIAL','METER',420,150,1500,95,'Warehouse B'),
+        ('PEB-ITEM-006','Hex Bolt M16x50','HARDWARE','PIECE',3700,500,10000,12,'Rack H1'),
+        ('PEB-ITEM-007','Hex Bolt M20x60','HARDWARE','PIECE',80,300,5000,18,'Rack H1'),
+        ('PEB-ITEM-008','Grinding Disc 4in','TOOL','PIECE',125,50,200,45,'Tool Room'),
+        ('PEB-ITEM-009','Cutting Disc 14in','TOOL','PIECE',55,20,100,120,'Tool Room'),
+        ('PEB-ITEM-010','Polycarbonate Sheet 6mm','RAW MATERIAL','SQ_METER',65,30,200,250,'Warehouse C'),
+        ('PEB-ITEM-011','Primer Paint 20L','CONSUMABLE','PIECE',12,10,50,1200,'Store'),
+        ('PEB-ITEM-012','Welding Rod E7018 4mm','CONSUMABLE','KG',45,80,300,95,'Store'),
+        ('PEB-ITEM-013','Ridge Cap Flashing','RAW MATERIAL','METER',180,50,500,110,'Warehouse A'),
+        ('PEB-ITEM-014','J Bolt 12x150','HARDWARE','PIECE',850,200,5000,8,'Rack H2'),
+        ('PEB-ITEM-015','Self Drilling Screw 12x35','HARDWARE','PIECE',5200,1000,20000,3,'Rack H3'),
+        ('PEB-ITEM-016','Turbo Ventilator 24in','OTHER','PIECE',8,5,20,2800,'Warehouse C'),
+        ('PEB-ITEM-017','Insulation Sheet 50mm','RAW MATERIAL','SQ_METER',45,100,500,180,'Warehouse B'),
+        ('PEB-ITEM-018','Gutter PVC 6in','OTHER','METER',60,40,200,320,'Warehouse C'),
+        ('PEB-ITEM-019','Safety Harness Full Body','SAFETY','PIECE',15,10,50,1500,'Safety Store'),
+        ('PEB-ITEM-020','Base Plate 300x300x12','RAW MATERIAL','PIECE',30,50,200,420,'Warehouse B')`);
+      await db.query(`INSERT INTO peb_stock_transactions (type,item_id,quantity,unit_cost,notes,created_by,created_at) VALUES
+        ('GRN',1,200,85,'From JSW Steel',1,NOW()-INTERVAL 5 DAY),('GRN',2,500,72,'From Tata Steel',1,NOW()-INTERVAL 5 DAY),
+        ('MIS',6,150,12,'Issued to Site A',1,NOW()-INTERVAL 4 DAY),('MIS',7,80,18,'Issued to Site B',1,NOW()-INTERVAL 4 DAY),
+        ('GRN',12,100,95,'Welding rod restock',1,NOW()-INTERVAL 3 DAY),('MIS',4,100,65,'Site C requirement',1,NOW()-INTERVAL 3 DAY),
+        ('MIS',8,25,45,'Grinding disc for Site A',1,NOW()-INTERVAL 2 DAY),('MRT',1,50,85,'Excess return from Site B',1,NOW()-INTERVAL 2 DAY)`);
+      await db.query(`INSERT INTO peb_grn (grn_number,vendor_id,invoice_number,received_date,quality_status,created_by) VALUES
+        ('GRN-2026-0001',1,'INV-JSW-4523',CURDATE()-INTERVAL 18 DAY,'PASSED',1),
+        ('GRN-2026-0002',2,'INV-SBH-1102',CURDATE()-INTERVAL 14 DAY,'PASSED',1),
+        ('GRN-2026-0003',4,'INV-KF-7788',CURDATE()-INTERVAL 10 DAY,'PARTIAL',1),
+        ('GRN-2026-0004',6,'INV-TATA-3303',CURDATE()-INTERVAL 7 DAY,'PASSED',1)`).catch(()=>{});
+      await db.query(`INSERT INTO peb_grn_items (grn_id,item_id,received_qty,accepted_qty,unit_cost) VALUES
+        (1,1,200,200,85),(1,4,100,100,65),(2,6,500,500,12),(2,7,300,300,18),(3,14,1000,950,8),(4,2,1000,1000,72)`).catch(()=>{});
+      await db.query(`INSERT INTO peb_material_requests (request_code,requested_by,site_name,urgency,stage,purpose) VALUES
+        ('MRQ-2026-0001',1,'Site A - Kamarajar Port','URGENT','DISPATCHED','Roofing material for bay 3'),
+        ('MRQ-2026-0002',1,'Site B - Ambattur','NORMAL','APPROVED','Foundation bolts'),
+        ('MRQ-2026-0003',1,'Site B - Ambattur','URGENT','DISPATCHED','Emergency welding rods'),
+        ('MRQ-2026-0004',1,'Site C - Sriperumbudur','NORMAL','REQUESTED','Insulation sheets'),
+        ('MRQ-2026-0005',1,'Site A - Kamarajar Port','NORMAL','CLOSED','Safety equipment')`).catch(()=>{});
+      await db.query(`INSERT INTO peb_material_request_items (request_id,item_id,requested_qty,approved_qty,issued_qty) VALUES
+        (1,2,200,200,200),(1,13,50,50,50),(2,6,500,500,0),(2,14,200,200,0),(3,12,50,50,50),(4,17,100,NULL,0),(5,19,5,5,5)`).catch(()=>{});
+      await db.query(`INSERT INTO peb_material_returns (mrn_code,site_name,returned_by,returned_by_name,return_date,status) VALUES
+        ('MRN-2026-0001','Site A',1,'Supervisor A',CURDATE()-INTERVAL 5 DAY,'VERIFIED'),
+        ('MRN-2026-0002','Site B',1,'Supervisor B',CURDATE()-INTERVAL 4 DAY,'PENDING')`).catch(()=>{});
+      await db.query(`INSERT INTO peb_scrap_batches (batch_code,total_weight,status,sale_amount,created_by) VALUES
+        ('SCR-2026-0001',250,'COLLECTED',0,1),('SCR-2026-0002',180,'SOLD',14400,1)`).catch(()=>{});
+      console.log('[PEB-STORE] Auto-seed complete');
+    }
   } catch (e) {
     console.error('[PEB-STORE] Migration:', e.message);
   }

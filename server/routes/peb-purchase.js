@@ -177,6 +177,49 @@ async function generateSimpleCode(prefix, table, column) {
     )`);
 
     console.log('[PEB-PURCHASE] All tables ready');
+
+    // Auto-seed if empty
+    const [[{ cnt }]] = await db.query('SELECT COUNT(*) as cnt FROM peb_vendors');
+    if (cnt === 0) {
+      console.log('[PEB-PURCHASE] Empty tables — auto-seeding...');
+      await db.query(`INSERT INTO peb_vendors (vendor_code,company_name,contact_person,phone,gst_number,pan_number,rating,status) VALUES
+        ('VND-001','JSW Steel Dealers','Arun Kumar','9100000001','33AABCZ1234A1Z5','AABCZ1234A',4.5,'ACTIVE'),
+        ('VND-002','Sri Balaji Hardware','Balaji S','9100000002','33ABCS5678B1Z9','ABCS5678B1',4.2,'ACTIVE'),
+        ('VND-003','Metro Roofing Supplies','Venkat R','9100000003','33AABCM912C1Z3','AABCM912C1',3.8,'ACTIVE'),
+        ('VND-004','Kumar Fasteners Pvt Ltd','Santhi K','9100000004','33AABCK345G1Z7','AABCK345G1',4.0,'ACTIVE'),
+        ('VND-005','Chennai Welding Works','Prakash M','9100000005','33AABCT890E1Z1','AABCT890E1',3.5,'ACTIVE'),
+        ('VND-006','Tata Structure Dealers','Ramesh N','9100000006','33AABCT111F1Z5','AABCT111F1',4.8,'ACTIVE')`);
+      await db.query(`INSERT INTO peb_purchase_indents (indent_code,requested_by,requested_by_name,urgency,reason,status) VALUES
+        ('PI-2026-0001',1,'Admin (MD)','URGENT','MS Angles running low','PO_CREATED'),
+        ('PI-2026-0002',1,'Admin (MD)','ROUTINE','Regular restock of hardware','GM_APPROVED'),
+        ('PI-2026-0003',1,'Admin (MD)','CRITICAL','Welding rods critically low','COMPARISON_READY'),
+        ('PI-2026-0004',1,'Admin (MD)','ROUTINE','Insulation for roofing project','QUOTATION_PENDING')`).catch(()=>{});
+      await db.query(`INSERT INTO peb_indent_items (indent_id,item_id,qty,specification,estimated_cost,current_stock_qty) VALUES
+        (1,4,500,'50x50x6mm',32500,550),(1,5,300,'75x75x8mm',28500,420),
+        (2,6,2000,'M16x50 Grade 8.8',24000,3700),(2,14,1000,'J Bolt 12x150',8000,850),
+        (3,12,200,'E7018 4mm AWS',19000,45),(4,17,300,'50mm thick PUF',54000,45)`).catch(()=>{});
+      await db.query(`INSERT INTO peb_vendor_quotations (indent_id,vendor_id,quotation_date,delivery_lead_days,payment_terms,total_value,transport_cost,landed_cost,transport_included) VALUES
+        (3,5,CURDATE()-INTERVAL 5 DAY,7,'Net 15',19000,1500,20500,0),
+        (3,1,CURDATE()-INTERVAL 5 DAY,10,'Net 30',18500,2000,20500,0),
+        (3,4,CURDATE()-INTERVAL 5 DAY,5,'Advance',21000,0,21000,1)`).catch(()=>{});
+      await db.query(`INSERT INTO peb_purchase_orders (po_number,indent_id,vendor_id,total_amount,total_paid,balance_due,status,created_by) VALUES
+        ('PO-2026-0001',1,6,121000,50000,71000,'SENT',1),
+        ('PO-2026-0002',NULL,1,85000,85000,0,'SENT',1)`).catch(()=>{});
+      await db.query(`INSERT INTO peb_po_items (po_id,item_id,qty,unit_price,total_price) VALUES
+        (1,4,500,65,32500),(1,5,300,95,28500),(1,1,200,85,17000),(1,2,500,72,36000),(1,13,100,70,7000),
+        (2,2,1000,72,72000),(2,3,200,78,15600)`).catch(()=>{});
+      await db.query(`INSERT INTO peb_po_payments (po_id,amount,payment_date,mode,reference,recorded_by) VALUES
+        (1,50000,CURDATE()-INTERVAL 9 DAY,'BANK_TRANSFER','UTR-2026-001',1),
+        (2,50000,CURDATE()-INTERVAL 12 DAY,'BANK_TRANSFER','UTR-2026-002',1),
+        (2,35000,CURDATE()-INTERVAL 7 DAY,'UPI','UPI-TX-A001',1)`).catch(()=>{});
+      await db.query(`INSERT INTO peb_transport_requests (request_code,requested_by,type,origin_name,destination_name,scheduled_date,vehicle_type,status,vehicle_number,driver_name,driver_phone,actual_km,transport_cost,delivery_condition) VALUES
+        ('TRQ-2026-0001',1,'COMPANY_TO_SITE','Head Office Store','Site A - Kamarajar Port',CURDATE()-INTERVAL 5 DAY,'LORRY','DELIVERED','TN-01-AB-1234','Murugan','9876543210',45,3500,'GOOD'),
+        ('TRQ-2026-0002',1,'SITE_TO_COMPANY','Site A - Kamarajar Port','Head Office Store',CURDATE()-INTERVAL 6 DAY,'MINI_TRUCK','IN_TRANSIT','TN-01-CD-5678','Ravi','9876543211',NULL,NULL,NULL),
+        ('TRQ-2026-0003',1,'COMPANY_TO_SITE','Head Office Store','Site B - Ambattur',CURDATE()-INTERVAL 2 DAY,'LORRY','APPROVED','TN-09-EF-9012','Kumar','9876543212',NULL,NULL,NULL),
+        ('TRQ-2026-0004',1,'SITE_TO_SITE','Site A - Kamarajar Port','Site D - Hosur',CURDATE()+INTERVAL 2 DAY,'TRAILER','REQUESTED',NULL,NULL,NULL,NULL,NULL,NULL),
+        ('TRQ-2026-0005',1,'SITE_TO_SCRAP','Site A - Kamarajar Port','Chennai Scrap Yard',CURDATE()+INTERVAL 6 DAY,'PICKUP','REQUESTED',NULL,NULL,NULL,NULL,NULL,NULL)`).catch(()=>{});
+      console.log('[PEB-PURCHASE] Auto-seed complete');
+    }
   } catch (e) {
     console.error('[PEB-PURCHASE] Migration:', e.message);
   }
