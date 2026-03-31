@@ -8,6 +8,7 @@ require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const IS_TEST = process.env.NODE_ENV === 'test' || process.env.PLAYWRIGHT === '1';
 
 // Trust reverse proxy (Traefik/Nginx) for rate limiting + IP detection
 app.set('trust proxy', 1);
@@ -51,7 +52,7 @@ app.use(cors({
 // Rate limiting on login (5 attempts per 15 min per IP)
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 5,
+  max: IS_TEST ? 10000 : 5,
   message: { error: 'Too many login attempts. Please try again after 15 minutes.' },
   standardHeaders: true,
   legacyHeaders: false
@@ -61,7 +62,7 @@ app.use('/api/auth/login', loginLimiter);
 // Rate limiting on password change (3 attempts per 15 min)
 const passwordChangeLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 3,
+  max: IS_TEST ? 10000 : 3,
   message: { error: 'Too many password change attempts. Please try again after 15 minutes.' },
   standardHeaders: true,
   legacyHeaders: false
@@ -71,7 +72,7 @@ app.use('/api/auth/change-password', passwordChangeLimiter);
 // Rate limiting on forgot-password (3 attempts per 15 min)
 const forgotPasswordLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 3,
+  max: IS_TEST ? 10000 : 3,
   message: { error: 'Too many password reset attempts. Please try again after 15 minutes.' },
   standardHeaders: true,
   legacyHeaders: false
@@ -81,7 +82,7 @@ app.use('/api/auth/forgot-password', forgotPasswordLimiter);
 // Rate limiting on biometric endpoints (5 attempts per 15 min)
 const biometricLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 5,
+  max: IS_TEST ? 10000 : 5,
   message: { error: 'Too many biometric login attempts. Please try again after 15 minutes.' },
   standardHeaders: true,
   legacyHeaders: false
@@ -92,7 +93,7 @@ app.use('/api/auth/biometric-login', biometricLimiter);
 // General read rate limiter (100 req/min on GET)
 const readLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 100,
+  max: IS_TEST ? 10000 : 100,
   message: { error: 'Too many requests. Please slow down.' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -103,7 +104,7 @@ app.use('/api/', readLimiter);
 // General mutation rate limiter (30 req/min on POST/PUT/PATCH/DELETE)
 const mutationLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 30,
+  max: IS_TEST ? 10000 : 30,
   message: { error: 'Too many requests. Please slow down.' },
   standardHeaders: true,
   legacyHeaders: false,
