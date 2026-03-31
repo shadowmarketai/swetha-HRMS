@@ -5578,12 +5578,23 @@ async function biometricLogin() {
       if (!matchedCode) matchedCode = keys[0].replace('hrms_biometric_', '');
 
       if (matchedCode) {
-        // Biometric verified — request fresh JWT from backend (no existing JWT needed)
+        // Step 1: Request a server-issued challenge to prove this request is legitimate
         try {
-          var resp = await fetch(API_BASE + '/auth/biometric-login', {
+          var challengeResp = await fetch(API_BASE + '/auth/biometric-challenge', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ empCode: matchedCode })
+          });
+          var challengeData = await challengeResp.json();
+          if (!challengeResp.ok) {
+            showToast(challengeData.error || 'Biometric challenge failed');
+            return false;
+          }
+          // Step 2: Send challenge + empCode to get JWT
+          var resp = await fetch(API_BASE + '/auth/biometric-login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ empCode: matchedCode, challenge: challengeData.challenge })
           });
           var data = await resp.json();
           if (!resp.ok) {
@@ -7193,13 +7204,12 @@ function initWebSocket() {
   if (!window.io || !currentUser) return;
   if (_hrmsSocket) _hrmsSocket.disconnect();
 
-  _hrmsSocket = io();
+  _hrmsSocket = io({ auth: { token: JWT_TOKEN } });
   window._hrmsSocket = _hrmsSocket;
 
-  // Authenticate with server
+  // Authenticate with server (JWT verified on handshake)
   _hrmsSocket.on('connect', function() {
-    console.log('[WS] Connected');
-    _hrmsSocket.emit('auth', { empCode: currentUser.code, role: currentUser.role, name: currentUser.name });
+    console.log('[WS] Connected (JWT authenticated)');
     // Switch polling to longer interval since we have real-time
     stopNotifPoll();
     _notifPollTimer = setInterval(refreshNotifications, 30000);

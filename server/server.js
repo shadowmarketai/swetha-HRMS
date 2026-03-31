@@ -78,7 +78,7 @@ const forgotPasswordLimiter = rateLimit({
 });
 app.use('/api/auth/forgot-password', forgotPasswordLimiter);
 
-// Rate limiting on biometric login (5 attempts per 15 min)
+// Rate limiting on biometric endpoints (5 attempts per 15 min)
 const biometricLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 5,
@@ -86,6 +86,7 @@ const biometricLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false
 });
+app.use('/api/auth/biometric-challenge', biometricLimiter);
 app.use('/api/auth/biometric-login', biometricLimiter);
 
 // General read rate limiter (100 req/min on GET)
@@ -110,11 +111,17 @@ const mutationLimiter = rateLimit({
 });
 app.use('/api/', mutationLimiter);
 
-// Request logging
-app.use(morgan('combined'));
+// Request logging — redact JWT tokens from access logs
+app.use(morgan('combined', {
+  stream: {
+    write: (message) => {
+      process.stdout.write(message.replace(/Bearer [A-Za-z0-9\-_\.]+/g, 'Bearer [REDACTED]'));
+    }
+  }
+}));
 
-// Body parsing
-app.use(express.json({ limit: '10mb' }));
+// Body parsing — 100kb default sufficient for all form data
+app.use(express.json({ limit: '100kb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // Serve static files (frontend)
@@ -122,8 +129,22 @@ const STATIC_DIR = process.env.STATIC_DIR || path.join(__dirname, '..');
 console.log('Serving static files from:', STATIC_DIR);
 app.use(express.static(STATIC_DIR));
 
-// Serve uploads
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Serve uploads — authenticated, force download, prevent path traversal
+const { verifyToken: verifyUploadToken } = require('./middleware/auth');
+app.use('/uploads', verifyUploadToken, (req, res) => {
+  const requestedFile = path.basename(req.path);
+  const uploadsDir = path.resolve(path.join(__dirname, 'uploads'));
+  const filePath = path.resolve(path.join(uploadsDir, requestedFile));
+  // Prevent path traversal
+  if (!filePath.startsWith(uploadsDir)) {
+    return res.status(400).json({ error: 'Invalid path' });
+  }
+  res.setHeader('Content-Disposition', 'attachment');
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.sendFile(filePath, (err) => {
+    if (err && !res.headersSent) res.status(404).json({ error: 'File not found' });
+  });
+});
 
 // API Routes
 app.use('/api/auth', require('./routes/auth'));
@@ -426,23 +447,35 @@ const io = new Server(server, { cors: { origin: corsOrigins, credentials: true }
 
 // Track connected users: { empCode: socketId }
 const connectedUsers = {};
+const jwt = require('jsonwebtoken');
+
+// Socket.IO JWT authentication middleware — verify token on handshake
+io.use((socket, next) => {
+  try {
+    const token = socket.handshake.auth?.token || socket.handshake.headers?.authorization?.split(' ')[1];
+    if (!token) return next(new Error('Authentication required'));
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // Identity comes from verified JWT, not from client data
+    socket.empCode = decoded.empCode;
+    socket.empRole = decoded.role;
+    socket.empName = decoded.name;
+    next();
+  } catch (err) {
+    next(new Error('Invalid or expired token'));
+  }
+});
 
 io.on('connection', (socket) => {
-  // Client sends auth with empCode after connecting
-  socket.on('auth', (data) => {
-    if (data && data.empCode) {
-      socket.empCode = data.empCode;
-      socket.empRole = data.role;
-      connectedUsers[data.empCode] = socket.id;
-      // Join role-based rooms
-      socket.join('role:' + data.role);
-      socket.join('user:' + data.empCode);
-      socket.join('all');
-      // Notify MD/HR that someone came online
-      io.to('role:MD').to('role:HR').emit('user:online', { empCode: data.empCode, name: data.name, time: new Date().toISOString() });
-      console.log(`[WS] ${data.empCode} connected (${data.role})`);
-    }
-  });
+  // Identity already verified via JWT middleware — join rooms based on verified role
+  connectedUsers[socket.empCode] = socket.id;
+  socket.join('role:' + socket.empRole);
+  socket.join('user:' + socket.empCode);
+  socket.join('all');
+  io.to('role:MD').to('role:HR').emit('user:online', { empCode: socket.empCode, name: socket.empName, time: new Date().toISOString() });
+  console.log(`[WS] ${socket.empCode} connected (${socket.empRole})`);
+
+  // Legacy 'auth' event — ignored since identity is from JWT, but kept for client compat
+  socket.on('auth', () => {});
 
   socket.on('disconnect', () => {
     if (socket.empCode) {

@@ -4,16 +4,23 @@ function formatDate(date) {
   return d.toISOString().split('T')[0];
 }
 
+// Characters that spreadsheet apps interpret as formula prefixes
+const CSV_FORMULA_PREFIXES = ['=', '+', '-', '@', '\t', '\r'];
+
+function sanitizeCSVCell(val) {
+  let s = String(val === null || val === undefined ? '' : val);
+  // Prevent CSV formula injection by prefixing with a tab
+  if (CSV_FORMULA_PREFIXES.some(p => s.startsWith(p))) {
+    s = '\t' + s;
+  }
+  return '"' + s.replace(/"/g, '""') + '"';
+}
+
 function generateCSV(rows, columns) {
   const bom = '\uFEFF';
-  const header = columns.map(c => c.label || c.key).join(',');
+  const header = columns.map(c => sanitizeCSVCell(c.label || c.key)).join(',');
   const body = rows.map(row =>
-    columns.map(c => {
-      let val = row[c.key];
-      if (val === null || val === undefined) val = '';
-      val = String(val).replace(/"/g, '""');
-      return `"${val}"`;
-    }).join(',')
+    columns.map(c => sanitizeCSVCell(row[c.key])).join(',')
   ).join('\n');
   return bom + header + '\n' + body;
 }

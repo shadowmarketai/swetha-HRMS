@@ -93,8 +93,8 @@ var WBS_FIELD_MAP = {
 // Nullable date fields that should be coerced to null when falsy
 var WBS_DATE_FIELDS = ['startDate', 'endDate', 'actualStart', 'actualEnd'];
 
-// PUT /wbs/:id — Update WBS task
-router.put('/wbs/:id', verifyToken, async function(req, res) {
+// PUT /wbs/:id — Update WBS task (MD/HR only)
+router.put('/wbs/:id', verifyToken, requireRole('MD', 'HR'), async function(req, res) {
   try {
     var b = req.body;
     var fields = [];
@@ -120,8 +120,8 @@ router.put('/wbs/:id', verifyToken, async function(req, res) {
   }
 });
 
-// PATCH /wbs/:id/progress — Update progress + auto-status
-router.patch('/wbs/:id/progress', verifyToken, async function(req, res) {
+// PATCH /wbs/:id/progress — Update progress + auto-status (MD/HR only)
+router.patch('/wbs/:id/progress', verifyToken, requireRole('MD', 'HR'), async function(req, res) {
   try {
     var pct = parseFloat(req.body.progressPct);
     if (isNaN(pct) || pct < 0 || pct > 100) return res.status(400).json({ error: 'progressPct must be 0-100' });
@@ -259,8 +259,8 @@ router.delete('/boq/:sheetId', verifyToken, requireRole('MD', 'HR'), async funct
   }
 });
 
-// POST /boq/:sheetId/items — Create item
-router.post('/boq/:sheetId/items', verifyToken, async function(req, res) {
+// POST /boq/:sheetId/items — Create item (MD/HR only)
+router.post('/boq/:sheetId/items', verifyToken, requireRole('MD', 'HR'), async function(req, res) {
   try {
     var b = req.body;
     // Look up the sheet to get project_id
@@ -294,8 +294,8 @@ router.post('/boq/:sheetId/items', verifyToken, async function(req, res) {
 // Allowed fields for BOQ item updates (whitelist)
 var BOQ_ITEM_ALLOWED_FIELDS = ['itemNo', 'isCategory', 'description', 'unit', 'plannedQty', 'rate', 'plannedAmount', 'isPending'];
 
-// PUT /boq-items/:id — Update item
-router.put('/boq-items/:id', verifyToken, async function(req, res) {
+// PUT /boq-items/:id — Update item (MD/HR only)
+router.put('/boq-items/:id', verifyToken, requireRole('MD', 'HR'), async function(req, res) {
   try {
     var b = req.body;
     var fields = [];
@@ -353,8 +353,8 @@ router.delete('/boq-items/:id', verifyToken, requireRole('MD', 'HR'), async func
   }
 });
 
-// PATCH /boq-items/:id/pending — Toggle is_pending
-router.patch('/boq-items/:id/pending', verifyToken, async function(req, res) {
+// PATCH /boq-items/:id/pending — Toggle is_pending (MD/HR only)
+router.patch('/boq-items/:id/pending', verifyToken, requireRole('MD', 'HR'), async function(req, res) {
   try {
     var [existing] = await pool.query('SELECT is_pending FROM boq_items WHERE id = ?', [req.params.id]);
     if (!existing.length) return res.status(404).json({ error: 'Item not found' });
@@ -372,8 +372,8 @@ router.patch('/boq-items/:id/pending', verifyToken, async function(req, res) {
 // USAGE LOGS
 // =====================================================
 
-// POST /boq-items/:id/usage — Log usage
-router.post('/boq-items/:id/usage', verifyToken, async function(req, res) {
+// POST /boq-items/:id/usage — Log usage (MD/HR only)
+router.post('/boq-items/:id/usage', verifyToken, requireRole('MD', 'HR'), async function(req, res) {
   try {
     var b = req.body;
     var qtyUsed = parseFloat(b.qtyUsed);
@@ -488,8 +488,8 @@ router.get('/projects/:pid/daily-logs', verifyToken, async function(req, res) {
   }
 });
 
-// POST /projects/:pid/daily-logs — Create log
-router.post('/projects/:pid/daily-logs', verifyToken, async function(req, res) {
+// POST /projects/:pid/daily-logs — Create log (MD/HR only)
+router.post('/projects/:pid/daily-logs', verifyToken, requireRole('MD', 'HR'), async function(req, res) {
   try {
     var b = req.body;
     if (!b.workDescription) return res.status(400).json({ error: 'workDescription is required' });

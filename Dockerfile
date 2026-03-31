@@ -20,6 +20,11 @@ COPY database/ ./database/
 # Ensure uploads directory exists
 RUN mkdir -p /app/server/uploads
 
+# Create non-root user for security
+RUN addgroup -S hrmsgroup && adduser -S hrmsuser -G hrmsgroup
+RUN chown -R hrmsuser:hrmsgroup /app
+USER hrmsuser
+
 # Set static dir explicitly
 ENV STATIC_DIR=/app/public
 

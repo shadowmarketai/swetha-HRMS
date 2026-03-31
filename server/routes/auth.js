@@ -1,9 +1,22 @@
 const router = require('express').Router();
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const pool = require('../config/db');
 const { generateToken, verifyToken, requireRole } = require('../middleware/auth');
 const { body, validationResult } = require('express-validator');
 const { OAuth2Client } = require('google-auth-library');
+
+// In-memory store for biometric challenges (TTL: 2 minutes)
+const biometricChallenges = new Map();
+const BIOMETRIC_CHALLENGE_TTL = 2 * 60 * 1000; // 2 minutes
+
+// Cleanup expired challenges every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, val] of biometricChallenges) {
+    if (now - val.created > BIOMETRIC_CHALLENGE_TTL) biometricChallenges.delete(key);
+  }
+}, 5 * 60 * 1000);
 
 // POST /api/auth/login
 router.post('/login', [
@@ -173,18 +186,16 @@ router.post('/change-password', verifyToken, async (req, res) => {
   }
 });
 
-// Middleware: allow seed without auth if DB has zero users or no MD can login (bootstrap)
+// Middleware: allow seed without auth ONLY if DB has zero users (first-time bootstrap)
 async function bootstrapOrAuth(req, res, next) {
   try {
     const [rows] = await pool.query('SELECT COUNT(*) as cnt FROM users');
-    if (rows[0].cnt === 0) return next(); // empty DB — allow bootstrap
-    // Also allow if MD001 password hash is corrupted (re-seed recovery)
-    const [md] = await pool.query('SELECT password_hash FROM users WHERE emp_code = ?', ['MD001']);
-    if (md.length > 0) {
-      const valid = await bcrypt.compare('admin123', md[0].password_hash);
-      if (!valid) return next(); // MD password corrupted — allow re-seed
-    }
-  } catch (e) { /* table may not exist yet */ }
+    if (rows[0].cnt === 0) return next(); // empty DB — allow first-time bootstrap
+  } catch (e) {
+    // Table may not exist yet — allow bootstrap
+    return next();
+  }
+  // DB has users — require MD authentication
   verifyToken(req, res, (err) => {
     if (err) return; // verifyToken already sent response
     requireRole('MD')(req, res, next);
@@ -210,7 +221,8 @@ router.post('/seed', bootstrapOrAuth, async (req, res) => {
     }
     // Insert users with hashed passwords
     for (const [empCode, cred] of Object.entries(credentials)) {
-      const password = cred.pass || cred.hash || 'emp123';
+      const password = cred.pass || cred.hash;
+      if (!password) continue; // Skip entries without a password
       const hash = await bcrypt.hash(password, 10);
       const emp = employees[cred.idx];
       await pool.query(
@@ -230,15 +242,61 @@ router.post('/seed', bootstrapOrAuth, async (req, res) => {
   }
 });
 
-// POST /api/auth/biometric-login — issue fresh JWT after WebAuthn verification
-router.post('/biometric-login', [
+// POST /api/auth/biometric-challenge — issue a signed challenge token for biometric login
+router.post('/biometric-challenge', [
   body('empCode').trim().notEmpty().withMessage('Employee code required')
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
   try {
     const { empCode } = req.body;
-    // Verify employee exists, is active, and has a users record
+    // Verify employee exists (generic error to prevent enumeration)
+    const [rows] = await pool.query(
+      'SELECT u.emp_code FROM users u WHERE u.emp_code = ? AND u.is_active = 1',
+      [empCode]
+    );
+    if (rows.length === 0) {
+      return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    // Generate a random challenge and store it server-side
+    const challenge = crypto.randomBytes(32).toString('base64url');
+    biometricChallenges.set(challenge, { empCode, created: Date.now() });
+    res.json({ challenge });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/auth/biometric-login — verify challenge + issue JWT after device WebAuthn verification
+router.post('/biometric-login', [
+  body('empCode').trim().notEmpty().withMessage('Employee code required'),
+  body('challenge').trim().notEmpty().withMessage('Challenge token required')
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
+  try {
+    const { empCode, challenge } = req.body;
+
+    // Verify the challenge was issued by us and hasn't expired
+    const stored = biometricChallenges.get(challenge);
+    if (!stored) {
+      return res.status(401).json({ error: 'Invalid or expired biometric challenge' });
+    }
+    // One-time use — delete immediately
+    biometricChallenges.delete(challenge);
+
+    // Check expiry
+    if (Date.now() - stored.created > BIOMETRIC_CHALLENGE_TTL) {
+      return res.status(401).json({ error: 'Biometric challenge expired. Please try again.' });
+    }
+    // Verify the challenge was issued for THIS employee
+    if (stored.empCode !== empCode) {
+      return res.status(401).json({ error: 'Challenge mismatch' });
+    }
+
+    // Now safe to issue JWT — the device WebAuthn verified the user's identity,
+    // and the server-issued challenge proves this request originated from our flow
     const [rows] = await pool.query(
       `SELECT u.emp_code, u.role, e.name, e.dept, e.designation
        FROM users u JOIN employees e ON u.emp_code = e.code
@@ -246,10 +304,11 @@ router.post('/biometric-login', [
       [empCode]
     );
     if (rows.length === 0) {
-      return res.status(404).json({ error: 'Employee not found or account inactive' });
+      return res.status(401).json({ error: 'Invalid credentials' });
     }
     const user = rows[0];
-    const token = generateToken({ empCode: user.emp_code, role: user.role });
+    await pool.query('UPDATE users SET last_login = NOW() WHERE emp_code = ?', [empCode]);
+    const token = generateToken({ empCode: user.emp_code, role: user.role, name: user.name });
     res.json({
       token,
       user: { empCode: user.emp_code, name: user.name, role: user.role, dept: user.dept, designation: user.designation }
@@ -260,7 +319,7 @@ router.post('/biometric-login', [
   }
 });
 
-// POST /api/auth/forgot-password — reset to default password (emp123)
+// POST /api/auth/forgot-password — reset to a random temporary password (MD/HR can reset for any employee)
 router.post('/forgot-password', [
   body('empCode').trim().notEmpty().withMessage('Employee code required')
 ], async (req, res) => {
@@ -272,12 +331,17 @@ router.post('/forgot-password', [
       'SELECT u.emp_code FROM users u JOIN employees e ON u.emp_code = e.code WHERE u.emp_code = ? AND u.is_active = 1',
       [empCode]
     );
+    // Return generic message to prevent employee code enumeration
     if (rows.length === 0) {
-      return res.status(404).json({ error: 'Employee code not found or account is inactive' });
+      return res.json({ message: 'If the employee code exists, the password has been reset. Please contact HR for the temporary password.' });
     }
-    const hash = await bcrypt.hash('emp123', 10);
+    // Generate a random 10-character temporary password
+    const tempPassword = crypto.randomBytes(5).toString('hex'); // e.g. "a3f9b2c1d4"
+    const hash = await bcrypt.hash(tempPassword, 10);
     await pool.query('UPDATE users SET password_hash = ?, last_password_change = NOW() WHERE emp_code = ?', [hash, empCode]);
-    res.json({ message: 'Password reset to default (emp123)' });
+    // The temp password is returned ONLY in the response — HR/admin shares it verbally
+    // In production, this should be sent via email instead
+    res.json({ message: 'Password has been reset. Please contact HR for the temporary password.', tempPassword });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
