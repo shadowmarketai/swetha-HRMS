@@ -13,18 +13,18 @@ var _pebSection = 'dashboard';
 var _pebTitles = {'dashboard':'PEB Dashboard','stock-items':'Stock Items','grn':'Goods Receipt Notes','material-requests':'Material Requests','returns-scrap':'Returns & Scrap','vendors':'Vendors','purchase-indents':'Purchase Indents','purchase-orders':'Purchase Orders','transport':'Transport Requests'};
 
 // ========== API HELPERS ==========
-function _pebToken() { try { return JWT_TOKEN || safeStorage.get('hrms_jwt') || localStorage.getItem('token') || JSON.parse(localStorage.getItem('hrms_session')||'{}').token; } catch(e) { return ''; } }
+// Use main app's apiCall — strips /api prefix since apiCall adds it
 async function _pebApi(path) {
-  var r = await fetch(path, { headers: { 'Authorization': 'Bearer ' + _pebToken() } });
-  if (!r.ok) { var e = await r.json(); throw new Error(e.error || 'Request failed'); } return r.json();
+  var cleanPath = path.replace(/^\/api/, '');
+  return apiCall('GET', cleanPath);
 }
 async function _pebPost(path, data) {
-  var r = await fetch(path, { method: 'POST', headers: { 'Authorization': 'Bearer ' + _pebToken(), 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-  var j = await r.json(); if (!r.ok) throw new Error(j.error || 'Request failed'); return j;
+  var cleanPath = path.replace(/^\/api/, '');
+  return apiCall('POST', cleanPath, data);
 }
 async function _pebPut(path, data) {
-  var r = await fetch(path, { method: 'PUT', headers: { 'Authorization': 'Bearer ' + _pebToken(), 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-  var j = await r.json(); if (!r.ok) throw new Error(j.error || 'Request failed'); return j;
+  var cleanPath = path.replace(/^\/api/, '');
+  return apiCall('PUT', cleanPath, data);
 }
 
 // ========== UI HELPERS ==========
