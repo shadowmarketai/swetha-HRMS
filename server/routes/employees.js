@@ -12,7 +12,8 @@ router.get('/', verifyToken, async (req, res) => {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(200, Math.max(1, parseInt(req.query.limit) || 20));
     const offset = (page - 1) * limit;
-    const [[{ total }]] = await pool.query('SELECT COUNT(*) as total FROM employees WHERE is_active = 1');
+    const [countResult] = await pool.query('SELECT COUNT(*) as total FROM employees WHERE is_active = 1');
+    const total = (countResult && countResult[0]) ? countResult[0].total : 0;
     if (['MD', 'HR'].includes(req.user.role)) {
       const [rows] = await pool.query('SELECT * FROM employees WHERE is_active = 1 ORDER BY dept, name LIMIT ? OFFSET ?', [limit, offset]);
       return res.json({ data: rows, total, page, limit });
@@ -85,13 +86,12 @@ router.put('/:code/self', verifyToken, auditLog('update', 'employee'), async (re
     const b = req.body;
     // Helper: use new value if provided (non-empty), else keep current
     const v = (newVal, curVal) => (newVal !== undefined && newVal !== null && newVal !== '') ? newVal : curVal;
-    // All profile fields
+    // Personal profile fields only — employees CANNOT change dept, designation, doj, salary, role
     await pool.query(
       `UPDATE employees SET phone=?, dob=?, email=?, blood_group=?, marital_status=?,
        present_address=?, permanent_address=?,
        father_name=?, father_mobile=?, mother_name=?, mother_mobile=?,
        spouse_name=?, spouse_mobile=?, emergency_contact=?, emergency_phone=?,
-       dept=?, designation=?, doj=?, salary=?,
        bank=?, acc_no=?, pan=?, aadhaar=?, uan=?,
        qualification=?, institution=?, year_of_passing=?,
        previous_employer=?, previous_role=?, years_of_experience=? WHERE code=?`,
@@ -103,7 +103,6 @@ router.put('/:code/self', verifyToken, auditLog('update', 'employee'), async (re
         v(b.motherName, cur.mother_name), v(b.motherMobile, cur.mother_mobile),
         v(b.spouseName, cur.spouse_name), v(b.spouseMobile, cur.spouse_mobile),
         v(b.emergencyContact, cur.emergency_contact), v(b.emergencyPhone, cur.emergency_phone),
-        v(b.dept, cur.dept), v(b.designation, cur.designation), v(b.doj, cur.doj), v(b.salary, cur.salary),
         v(b.bank, cur.bank), v(b.accNo, cur.acc_no), v(b.pan, cur.pan), v(b.aadhaar, cur.aadhaar), v(b.uan, cur.uan),
         v(b.qualification, cur.qualification), v(b.institution, cur.institution),
         v(b.yearOfPassing, cur.year_of_passing),
@@ -126,10 +125,11 @@ router.post('/upload-doc', verifyToken, upload.single('document'), async (req, r
     // Optionally save to employee record if docType specified
     const { docType } = req.body || {};
     if (docType && req.user.empCode) {
-      const colMap = { aadhaar_photo: 'aadhaar_photo_url', pan_photo: 'pan_photo_url' };
-      const col = colMap[docType];
-      if (col) {
-        await pool.query(`UPDATE employees SET ${col} = ? WHERE code = ?`, [url, req.user.empCode]).catch(() => {});
+      // Whitelist docType to prevent column injection
+      if (docType === 'aadhaar_photo') {
+        await pool.query('UPDATE employees SET aadhaar_photo_url = ? WHERE code = ?', [url, req.user.empCode]).catch(() => {});
+      } else if (docType === 'pan_photo') {
+        await pool.query('UPDATE employees SET pan_photo_url = ? WHERE code = ?', [url, req.user.empCode]).catch(() => {});
       }
     }
     res.json({ url, filename: req.file.filename, message: 'Document uploaded' });

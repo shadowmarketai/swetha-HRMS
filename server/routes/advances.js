@@ -27,11 +27,13 @@ router.get('/', verifyToken, async (req, res) => {
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
     const offset = (page - 1) * limit;
     if (!['MD', 'HR'].includes(req.user.role)) {
-      const [[{ total }]] = await pool.query('SELECT COUNT(*) as total FROM advance_requests WHERE emp_code = ?', [req.user.empCode]);
+      const [countResult1] = await pool.query('SELECT COUNT(*) as total FROM advance_requests WHERE emp_code = ?', [req.user.empCode]);
+      const empTotal = (countResult1 && countResult1[0]) ? countResult1[0].total : 0;
       const [rows] = await pool.query('SELECT * FROM advance_requests WHERE emp_code = ? ORDER BY applied_date DESC LIMIT ? OFFSET ?', [req.user.empCode, limit, offset]);
-      return res.json({ data: rows, total, page, limit });
+      return res.json({ data: rows, total: empTotal, page, limit });
     }
-    const [[{ total }]] = await pool.query('SELECT COUNT(*) as total FROM advance_requests');
+    const [countResult2] = await pool.query('SELECT COUNT(*) as total FROM advance_requests');
+    const total = (countResult2 && countResult2[0]) ? countResult2[0].total : 0;
     const [rows] = await pool.query('SELECT * FROM advance_requests ORDER BY applied_date DESC LIMIT ? OFFSET ?', [limit, offset]);
     res.json({ data: rows, total, page, limit });
   } catch (err) {
@@ -43,7 +45,10 @@ router.get('/', verifyToken, async (req, res) => {
 // POST /api/advances — create advance request
 router.post('/', verifyToken, [
   body('type').trim().isIn(['site', 'salary', 'travel']).withMessage('Invalid advance type'),
-  body('amount').isNumeric().withMessage('Amount must be a number')
+  body('amount').isFloat({ min: 1 }).withMessage('Amount must be a positive number'),
+  body('travelKm').optional().isFloat({ min: 0, max: 100000 }).withMessage('Travel km must be between 0 and 100000'),
+  body('emiAmount').optional().isFloat({ min: 0 }).withMessage('EMI amount must be non-negative'),
+  body('emiMonths').optional().isInt({ min: 1, max: 60 }).withMessage('EMI months must be between 1 and 60')
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });

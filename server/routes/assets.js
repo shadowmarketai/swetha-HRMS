@@ -9,7 +9,8 @@ router.get('/', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
     const offset = (page - 1) * limit;
-    const [[{ total }]] = await pool.query('SELECT COUNT(*) as total FROM asset_inventory');
+    const [countResult] = await pool.query('SELECT COUNT(*) as total FROM asset_inventory');
+    const total = (countResult && countResult[0]) ? countResult[0].total : 0;
     const [rows] = await pool.query(
       `SELECT a.*, e.name AS assigned_name FROM asset_inventory a
        LEFT JOIN employees e ON a.assigned_to = e.code

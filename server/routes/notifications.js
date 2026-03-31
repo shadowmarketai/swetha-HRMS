@@ -40,6 +40,20 @@ router.post('/', verifyToken, async (req, res) => {
   }
 });
 
+// PATCH /api/notifications/read-all — mark all as read (MUST be before /:id/read to avoid route conflict)
+router.patch('/read-all', verifyToken, async (req, res) => {
+  try {
+    await pool.query(
+      'UPDATE notifications SET is_read = 1 WHERE emp_code = ?',
+      [req.user.empCode]
+    );
+    res.json({ message: 'All notifications marked as read' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // PATCH /api/notifications/:id/read — mark as read
 router.patch('/:id/read', verifyToken, async (req, res) => {
   try {
@@ -48,20 +62,6 @@ router.patch('/:id/read', verifyToken, async (req, res) => {
       [req.params.id, req.user.empCode]
     );
     res.json({ message: 'Notification marked as read' });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// PATCH /api/notifications/read-all — mark all as read
-router.patch('/read-all', verifyToken, async (req, res) => {
-  try {
-    await pool.query(
-      'UPDATE notifications SET is_read = 1 WHERE emp_code = ?',
-      [req.user.empCode]
-    );
-    res.json({ message: 'All notifications marked as read' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });

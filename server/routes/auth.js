@@ -133,6 +133,9 @@ router.post('/register', verifyToken, requireRole('MD', 'HR'), async (req, res) 
     if (!empCode || !password) {
       return res.status(400).json({ error: 'Employee code and password required' });
     }
+    if (password.length < 8) {
+      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    }
     const hash = await bcrypt.hash(password, 10);
     await pool.query(
       'INSERT INTO users (emp_code, password_hash, role) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE password_hash = ?, role = ?',
@@ -151,6 +154,9 @@ router.post('/change-password', verifyToken, async (req, res) => {
     const { oldPassword, newPassword } = req.body;
     if (!oldPassword || !newPassword) {
       return res.status(400).json({ error: 'Old and new passwords required' });
+    }
+    if (newPassword.length < 8) {
+      return res.status(400).json({ error: 'New password must be at least 8 characters' });
     }
     const [rows] = await pool.query('SELECT password_hash FROM users WHERE emp_code = ?', [req.user.empCode]);
     if (rows.length === 0) return res.status(404).json({ error: 'User not found' });

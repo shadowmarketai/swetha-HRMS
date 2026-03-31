@@ -13,11 +13,24 @@ const storage = multer.diskStorage({
   }
 });
 
+const ALLOWED_EXTENSIONS = ['.jpeg', '.jpg', '.png', '.gif', '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.csv'];
+const ALLOWED_MIMES = [
+  'image/jpeg', 'image/png', 'image/gif',
+  'application/pdf',
+  'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/csv'
+];
+
 const fileFilter = (req, file, cb) => {
-  const allowed = /jpeg|jpg|png|gif|pdf|doc|docx|xls|xlsx|csv/;
-  const ext = allowed.test(path.extname(file.originalname).toLowerCase());
-  const mime = allowed.test(file.mimetype);
-  cb(null, ext && mime);
+  const ext = path.extname(file.originalname).toLowerCase();
+  const extOk = ALLOWED_EXTENSIONS.includes(ext);
+  const mimeOk = ALLOWED_MIMES.includes(file.mimetype);
+  if (extOk && mimeOk) {
+    cb(null, true);
+  } else {
+    cb(new Error('File type not allowed. Accepted: ' + ALLOWED_EXTENSIONS.join(', ')), false);
+  }
 };
 
 const upload = multer({

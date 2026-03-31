@@ -82,6 +82,17 @@ router.post('/projects/:pid/wbs', verifyToken, requireRole('MD', 'HR'), async fu
   }
 });
 
+// Allowed field mappings for WBS task updates (whitelist)
+var WBS_FIELD_MAP = {
+  wbsCode: 'wbs_code', level: '`level`', taskName: 'task_name', lead: '`lead`',
+  predecessor: 'predecessor', startDate: 'start_date', endDate: 'end_date',
+  actualStart: 'actual_start', actualEnd: 'actual_end', plannedDays: 'planned_days',
+  workDays: 'work_days', progressPct: 'progress_pct', status: 'status'
+};
+
+// Nullable date fields that should be coerced to null when falsy
+var WBS_DATE_FIELDS = ['startDate', 'endDate', 'actualStart', 'actualEnd'];
+
 // PUT /wbs/:id — Update WBS task
 router.put('/wbs/:id', verifyToken, async function(req, res) {
   try {
@@ -89,19 +100,12 @@ router.put('/wbs/:id', verifyToken, async function(req, res) {
     var fields = [];
     var values = [];
 
-    if (b.wbsCode !== undefined) { fields.push('wbs_code = ?'); values.push(b.wbsCode); }
-    if (b.level !== undefined) { fields.push('`level` = ?'); values.push(b.level); }
-    if (b.taskName !== undefined) { fields.push('task_name = ?'); values.push(b.taskName); }
-    if (b.lead !== undefined) { fields.push('`lead` = ?'); values.push(b.lead); }
-    if (b.predecessor !== undefined) { fields.push('predecessor = ?'); values.push(b.predecessor); }
-    if (b.startDate !== undefined) { fields.push('start_date = ?'); values.push(b.startDate || null); }
-    if (b.endDate !== undefined) { fields.push('end_date = ?'); values.push(b.endDate || null); }
-    if (b.actualStart !== undefined) { fields.push('actual_start = ?'); values.push(b.actualStart || null); }
-    if (b.actualEnd !== undefined) { fields.push('actual_end = ?'); values.push(b.actualEnd || null); }
-    if (b.plannedDays !== undefined) { fields.push('planned_days = ?'); values.push(b.plannedDays); }
-    if (b.workDays !== undefined) { fields.push('work_days = ?'); values.push(b.workDays); }
-    if (b.progressPct !== undefined) { fields.push('progress_pct = ?'); values.push(b.progressPct); }
-    if (b.status !== undefined) { fields.push('status = ?'); values.push(b.status); }
+    Object.keys(WBS_FIELD_MAP).forEach(function(key) {
+      if (b[key] !== undefined) {
+        fields.push(WBS_FIELD_MAP[key] + ' = ?');
+        values.push(WBS_DATE_FIELDS.indexOf(key) !== -1 ? (b[key] || null) : b[key]);
+      }
+    });
 
     if (fields.length === 0) return res.status(400).json({ error: 'No fields to update' });
 
@@ -214,16 +218,23 @@ router.get('/boq/:sheetId', verifyToken, async function(req, res) {
   }
 });
 
+// Allowed field mappings for BOQ sheet updates (whitelist)
+var BOQ_SHEET_FIELD_MAP = {
+  title: 'title', sheetType: 'sheet_type', areaSqft: 'area_sqft', quotedRate: 'quoted_rate_per_sqft'
+};
+
 // PUT /boq/:sheetId — Update sheet
 router.put('/boq/:sheetId', verifyToken, requireRole('MD', 'HR'), async function(req, res) {
   try {
     var b = req.body;
     var fields = [];
     var values = [];
-    if (b.title !== undefined) { fields.push('title = ?'); values.push(b.title); }
-    if (b.sheetType !== undefined) { fields.push('sheet_type = ?'); values.push(b.sheetType); }
-    if (b.areaSqft !== undefined) { fields.push('area_sqft = ?'); values.push(b.areaSqft); }
-    if (b.quotedRate !== undefined) { fields.push('quoted_rate_per_sqft = ?'); values.push(b.quotedRate); }
+    Object.keys(BOQ_SHEET_FIELD_MAP).forEach(function(key) {
+      if (b[key] !== undefined) {
+        fields.push(BOQ_SHEET_FIELD_MAP[key] + ' = ?');
+        values.push(b[key]);
+      }
+    });
 
     if (fields.length === 0) return res.status(400).json({ error: 'No fields to update' });
     values.push(req.params.sheetId);
@@ -280,6 +291,9 @@ router.post('/boq/:sheetId/items', verifyToken, async function(req, res) {
   }
 });
 
+// Allowed fields for BOQ item updates (whitelist)
+var BOQ_ITEM_ALLOWED_FIELDS = ['itemNo', 'isCategory', 'description', 'unit', 'plannedQty', 'rate', 'plannedAmount', 'isPending'];
+
 // PUT /boq-items/:id — Update item
 router.put('/boq-items/:id', verifyToken, async function(req, res) {
   try {
@@ -287,14 +301,14 @@ router.put('/boq-items/:id', verifyToken, async function(req, res) {
     var fields = [];
     var values = [];
 
-    if (b.itemNo !== undefined) { fields.push('item_no = ?'); values.push(b.itemNo); }
-    if (b.isCategory !== undefined) { fields.push('is_category = ?'); values.push(b.isCategory ? 1 : 0); }
-    if (b.description !== undefined) { fields.push('description = ?'); values.push(b.description); }
-    if (b.unit !== undefined) { fields.push('unit = ?'); values.push(b.unit); }
-    if (b.plannedQty !== undefined) { fields.push('planned_qty = ?'); values.push(parseFloat(b.plannedQty) || 0); }
-    if (b.rate !== undefined) { fields.push('rate = ?'); values.push(parseFloat(b.rate) || 0); }
-    if (b.plannedAmount !== undefined) { fields.push('planned_amount = ?'); values.push(parseFloat(b.plannedAmount) || 0); }
-    if (b.isPending !== undefined) { fields.push('is_pending = ?'); values.push(b.isPending ? 1 : 0); }
+    if (b.itemNo !== undefined && BOQ_ITEM_ALLOWED_FIELDS.indexOf('itemNo') !== -1) { fields.push('item_no = ?'); values.push(b.itemNo); }
+    if (b.isCategory !== undefined && BOQ_ITEM_ALLOWED_FIELDS.indexOf('isCategory') !== -1) { fields.push('is_category = ?'); values.push(b.isCategory ? 1 : 0); }
+    if (b.description !== undefined && BOQ_ITEM_ALLOWED_FIELDS.indexOf('description') !== -1) { fields.push('description = ?'); values.push(b.description); }
+    if (b.unit !== undefined && BOQ_ITEM_ALLOWED_FIELDS.indexOf('unit') !== -1) { fields.push('unit = ?'); values.push(b.unit); }
+    if (b.plannedQty !== undefined && BOQ_ITEM_ALLOWED_FIELDS.indexOf('plannedQty') !== -1) { fields.push('planned_qty = ?'); values.push(parseFloat(b.plannedQty) || 0); }
+    if (b.rate !== undefined && BOQ_ITEM_ALLOWED_FIELDS.indexOf('rate') !== -1) { fields.push('rate = ?'); values.push(parseFloat(b.rate) || 0); }
+    if (b.plannedAmount !== undefined && BOQ_ITEM_ALLOWED_FIELDS.indexOf('plannedAmount') !== -1) { fields.push('planned_amount = ?'); values.push(parseFloat(b.plannedAmount) || 0); }
+    if (b.isPending !== undefined && BOQ_ITEM_ALLOWED_FIELDS.indexOf('isPending') !== -1) { fields.push('is_pending = ?'); values.push(b.isPending ? 1 : 0); }
 
     if (fields.length === 0) return res.status(400).json({ error: 'No fields to update' });
 

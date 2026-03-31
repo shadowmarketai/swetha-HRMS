@@ -222,7 +222,8 @@ router.post('/', verifyToken, async (req, res) => {
     // ── TOTAL EMPLOYEES (HR/MD) ──
     if (/total employee|how many employee|employee count|headcount/.test(q)) {
       if (!isMDorHR) return res.json({ reply: RESTRICTED });
-      const [[{ total }]] = await pool.query('SELECT COUNT(*) as total FROM employees WHERE is_active = 1');
+      const [totalRows] = await pool.query('SELECT COUNT(*) as total FROM employees WHERE is_active = 1');
+      const total = (totalRows && totalRows[0]) ? totalRows[0].total : 0;
       const [byRole] = await pool.query('SELECT role, COUNT(*) as count FROM employees WHERE is_active = 1 GROUP BY role');
       let reply = `**Total active employees: ${total}**\n`;
       byRole.forEach(r => { reply += `- ${r.role}: ${r.count}\n`; });
@@ -279,17 +280,23 @@ router.post('/', verifyToken, async (req, res) => {
     // ── STOCK VALUE (MD only) ──
     if (/stock value|inventory value|total stock/.test(q)) {
       if (!isMD) return res.json({ reply: "Stock information is restricted to MD only." });
-      const [[{ total, count }]] = await pool.query('SELECT COUNT(*) as count, COALESCE(SUM(current_stock * unit_price), 0) as total FROM peb_stock_items');
-      return res.json({ reply: `**Stock summary:**\n- Total items: **${count}**\n- Total value: **Rs.${Number(total).toLocaleString('en-IN')}**` });
+      const [stockRows] = await pool.query('SELECT COUNT(*) as count, COALESCE(SUM(current_stock * unit_price), 0) as total FROM peb_stock_items');
+      const stockTotal = (stockRows && stockRows[0]) ? stockRows[0].total : 0;
+      const stockCount = (stockRows && stockRows[0]) ? stockRows[0].count : 0;
+      return res.json({ reply: `**Stock summary:**\n- Total items: **${stockCount}**\n- Total value: **Rs.${Number(stockTotal).toLocaleString('en-IN')}**` });
     }
 
     // ── PENDING APPROVALS (HR/MD) ──
     if (/pending approval|what.?s pending|approvals?/.test(q)) {
       if (!isMDorHR) return res.json({ reply: RESTRICTED });
-      const [[{ leaves }]] = await pool.query("SELECT COUNT(*) as leaves FROM leave_applications WHERE status IN ('pending','hr_accepted')");
-      const [[{ advances }]] = await pool.query("SELECT COUNT(*) as advances FROM advance_requests WHERE status IN ('Pending','HR_Accepted')");
-      const [[{ transport }]] = await pool.query("SELECT COUNT(*) as transport FROM peb_transport_requests WHERE status = 'REQUESTED'").catch(() => [{transport:0}]);
-      const [[{ indents }]] = await pool.query("SELECT COUNT(*) as indents FROM peb_purchase_indents WHERE status IN ('COMPARISON_READY','GM_APPROVED')").catch(() => [{indents:0}]);
+      const [leavesRows] = await pool.query("SELECT COUNT(*) as leaves FROM leave_applications WHERE status IN ('pending','hr_accepted')");
+      const leaves = (leavesRows && leavesRows[0]) ? leavesRows[0].leaves : 0;
+      const [advancesRows] = await pool.query("SELECT COUNT(*) as advances FROM advance_requests WHERE status IN ('Pending','HR_Accepted')");
+      const advances = (advancesRows && advancesRows[0]) ? advancesRows[0].advances : 0;
+      const [transportRows] = await pool.query("SELECT COUNT(*) as transport FROM peb_transport_requests WHERE status = 'REQUESTED'").catch(() => [[{transport:0}]]);
+      const transport = (transportRows && transportRows[0]) ? transportRows[0].transport : 0;
+      const [indentsRows] = await pool.query("SELECT COUNT(*) as indents FROM peb_purchase_indents WHERE status IN ('COMPARISON_READY','GM_APPROVED')").catch(() => [[{indents:0}]]);
+      const indents = (indentsRows && indentsRows[0]) ? indentsRows[0].indents : 0;
       const total = (leaves||0) + (advances||0) + (transport||0) + (indents||0);
       return res.json({ reply: `**Pending approvals (${total}):**\n- Leave requests: **${leaves||0}**\n- Advance requests: **${advances||0}**\n- Transport requests: **${transport||0}**\n- Purchase indents: **${indents||0}**` });
     }

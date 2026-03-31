@@ -38,7 +38,8 @@ router.get('/', verifyToken, async (req, res) => {
       dataQuery = 'SELECT * FROM leave_applications WHERE emp_code = ? ORDER BY created_at DESC LIMIT ? OFFSET ?';
       params = [req.user.empCode, limit, offset];
     }
-    const [[{ total }]] = await pool.query(countQuery, ['MD', 'HR'].includes(req.user.role) ? [] : [req.user.empCode]);
+    const [countResult] = await pool.query(countQuery, ['MD', 'HR'].includes(req.user.role) ? [] : [req.user.empCode]);
+    const total = (countResult && countResult[0]) ? countResult[0].total : 0;
     const [rows] = await pool.query(dataQuery, params);
     res.json({ data: rows, total, page, limit });
   } catch (err) {
@@ -61,11 +62,11 @@ router.post('/', verifyToken, [
     if (!type || !from || !to) return res.status(400).json({ error: 'Type, from and to dates required' });
     if (!VALID_LEAVE_TYPES.includes(type)) return res.status(400).json({ error: 'Invalid leave type' });
 
-    const fromDate = new Date(from);
-    const toDate = new Date(to);
+    const fromDate = new Date(from + 'T00:00:00');
+    const toDate = new Date(to + 'T00:00:00');
     if (toDate < fromDate) return res.status(400).json({ error: 'End date must be after start date' });
 
-    const days = Math.ceil((toDate - fromDate) / 86400000) + 1;
+    const days = Math.round((toDate - fromDate) / 86400000) + 1;
 
     // Check balance
     const [bal] = await pool.query('SELECT * FROM leave_balances WHERE emp_code = ?', [req.user.empCode]);

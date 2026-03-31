@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const pool = require('../config/db');
 const { verifyToken, requireRole } = require('../middleware/auth');
+const { auditLog } = require('../middleware/audit');
 
 // GET /api/shifts — list shift assignments
 router.get('/', verifyToken, async (req, res) => {
@@ -81,7 +82,7 @@ async function getValidShiftCodes() {
 }
 
 // PUT /api/shifts/:empCode — assign/update shift
-router.put('/:empCode', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
+router.put('/:empCode', verifyToken, requireRole('MD', 'HR'), auditLog('assign', 'shift'), async (req, res) => {
   try {
     const { shift_code, is_eligible } = req.body;
     if (shift_code) {

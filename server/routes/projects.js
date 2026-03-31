@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const pool = require('../config/db');
 const { verifyToken, requireRole } = require('../middleware/auth');
+const { auditLog } = require('../middleware/audit');
 
 // GET /api/projects — list all with nested tasks, team, materials, wbs
 router.get('/', verifyToken, async (req, res) => {
@@ -27,7 +28,7 @@ router.get('/', verifyToken, async (req, res) => {
 });
 
 // POST /api/projects — create (MD/HR)
-router.post('/', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
+router.post('/', verifyToken, requireRole('MD', 'HR'), auditLog('create', 'project'), async (req, res) => {
   try {
     const { name, client, location, budget, status, startDate, targetDate, contractorName, siteLocation, projectLead } = req.body;
     if (!name) return res.status(400).json({ error: 'Project name is required' });
@@ -54,7 +55,7 @@ router.post('/', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
 });
 
 // PUT /api/projects/:id — update
-router.put('/:id', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
+router.put('/:id', verifyToken, requireRole('MD', 'HR'), auditLog('update', 'project'), async (req, res) => {
   try {
     const { name, client, location, budget, status, startDate, targetDate, contractorName, siteLocation, projectLead } = req.body;
     await pool.query(
@@ -74,7 +75,7 @@ router.put('/:id', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
 });
 
 // DELETE /api/projects/:id — delete (MD only)
-router.delete('/:id', verifyToken, requireRole('MD'), async (req, res) => {
+router.delete('/:id', verifyToken, requireRole('MD'), auditLog('delete', 'project'), async (req, res) => {
   try {
     // Cascade deletes handled by FK
     await pool.query('DELETE FROM project_materials WHERE project_id = ?', [req.params.id]);

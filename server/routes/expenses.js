@@ -20,7 +20,8 @@ router.get('/', verifyToken, async (req, res) => {
       dataQuery = 'SELECT * FROM expense_reimbursements WHERE emp_code = ? ORDER BY submitted_at DESC LIMIT ? OFFSET ?';
       params = [req.user.empCode, limit, offset];
     }
-    const [[{ total }]] = await pool.query(countQuery, ['MD', 'HR'].includes(req.user.role) ? [] : [req.user.empCode]);
+    const [countResult] = await pool.query(countQuery, ['MD', 'HR'].includes(req.user.role) ? [] : [req.user.empCode]);
+    const total = (countResult && countResult[0]) ? countResult[0].total : 0;
     const [rows] = await pool.query(dataQuery, params);
     res.json({ data: rows, total, page, limit });
   } catch (err) {

@@ -32,7 +32,11 @@ app.use(helmet({
     }
   },
   crossOriginEmbedderPolicy: false,
-  strictTransportSecurity: false
+  strictTransportSecurity: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true
+  }
 }));
 
 // CORS whitelist
@@ -44,6 +48,16 @@ app.use(cors({
 }));
 
 
+// Rate limiting on login (5 attempts per 15 min per IP)
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { error: 'Too many login attempts. Please try again after 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+app.use('/api/auth/login', loginLimiter);
+
 // Rate limiting on password change (3 attempts per 15 min)
 const passwordChangeLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -54,6 +68,16 @@ const passwordChangeLimiter = rateLimit({
 });
 app.use('/api/auth/change-password', passwordChangeLimiter);
 
+// Rate limiting on forgot-password (3 attempts per 15 min)
+const forgotPasswordLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 3,
+  message: { error: 'Too many password reset attempts. Please try again after 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+app.use('/api/auth/forgot-password', forgotPasswordLimiter);
+
 // Rate limiting on biometric login (5 attempts per 15 min)
 const biometricLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -63,6 +87,17 @@ const biometricLimiter = rateLimit({
   legacyHeaders: false
 });
 app.use('/api/auth/biometric-login', biometricLimiter);
+
+// General read rate limiter (100 req/min on GET)
+const readLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 100,
+  message: { error: 'Too many requests. Please slow down.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => req.method !== 'GET'
+});
+app.use('/api/', readLimiter);
 
 // General mutation rate limiter (30 req/min on POST/PUT/PATCH/DELETE)
 const mutationLimiter = rateLimit({
@@ -384,7 +419,10 @@ app.get('*', (req, res) => {
 const http = require('http');
 const { Server } = require('socket.io');
 const server = http.createServer(app);
-const io = new Server(server, { cors: { origin: '*' } });
+const corsOrigins = process.env.CORS_ORIGINS
+  ? process.env.CORS_ORIGINS.split(',').map(o => o.trim())
+  : ['http://localhost:3000'];
+const io = new Server(server, { cors: { origin: corsOrigins, credentials: true } });
 
 // Track connected users: { empCode: socketId }
 const connectedUsers = {};

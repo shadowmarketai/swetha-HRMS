@@ -45,8 +45,10 @@ router.get('/home', verifyToken, async (req, res) => {
 
       // Attendance summary today
       const today = new Date().toISOString().split('T')[0];
-      const [[{ totalActive }]] = await pool.query("SELECT COUNT(*) as totalActive FROM employees WHERE is_active = 1 AND role != 'MD'");
-      const [[{ presentToday }]] = await pool.query('SELECT COUNT(DISTINCT emp_code) as presentToday FROM attendance_logs WHERE log_date = ?', [today]);
+      const [totalActiveRows] = await pool.query("SELECT COUNT(*) as totalActive FROM employees WHERE is_active = 1 AND role != 'MD'");
+      const totalActive = (totalActiveRows && totalActiveRows[0]) ? totalActiveRows[0].totalActive : 0;
+      const [presentTodayRows] = await pool.query('SELECT COUNT(DISTINCT emp_code) as presentToday FROM attendance_logs WHERE log_date = ?', [today]);
+      const presentToday = (presentTodayRows && presentTodayRows[0]) ? presentTodayRows[0].presentToday : 0;
       data.attendanceToday = { total: totalActive, present: presentToday, absent: totalActive - presentToday };
 
       // Monthly attendance trend (last 6 months)
@@ -99,9 +101,10 @@ router.get('/home', verifyToken, async (req, res) => {
       data.stockConsumption = stockConsumption;
 
       // Advance exposure
-      const [[{ totalAdvanceOut }]] = await pool.query(
+      const [advRows] = await pool.query(
         "SELECT COALESCE(SUM(amount), 0) as totalAdvanceOut FROM advance_requests WHERE status IN ('Approved','HR_Accepted') AND settled = 0"
       ).catch(() => [[{totalAdvanceOut: 0}]]);
+      const totalAdvanceOut = (advRows && advRows[0]) ? advRows[0].totalAdvanceOut : 0;
       data.totalAdvanceOut = totalAdvanceOut;
 
       // Monthly expense trend

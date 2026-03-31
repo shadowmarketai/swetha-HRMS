@@ -10,9 +10,9 @@ services:
       - DB_HOST=mysql
       - DB_PORT=3306
       - DB_USER=root
-      - DB_PASSWORD=${MYSQL_ROOT_PASSWORD:-hrms2026}
+      - DB_PASSWORD=${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD must be set in .env}
       - DB_NAME=hrms
-      - JWT_SECRET=${JWT_SECRET:-change-this-in-production}
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set in .env}
       - JWT_EXPIRY=24h
       - CORS_ORIGINS=${CORS_ORIGINS:-https://hrms.swethastructures.com}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
@@ -33,13 +33,13 @@ services:
     container_name: hrms-mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-hrms2026}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD must be set in .env}
       MYSQL_DATABASE: hrms
     volumes:
       - hrms_data:/var/lib/mysql
       - ./database/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-hrms2026}"]
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
       interval: 10s
       timeout: 5s
       retries: 5
