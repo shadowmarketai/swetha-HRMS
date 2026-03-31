@@ -485,12 +485,12 @@ router.post('/projects/:pid/daily-logs', verifyToken, async function(req, res) {
 
     var [result] = await pool.query(
       `INSERT INTO daily_work_logs (project_id, task_id, log_date, logged_by, workers_count,
-        weather, work_description, materials_note, progress_update, remarks)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        weather, work_description, materials_note, progress_update, remarks, photo_url)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [req.params.pid, b.taskId || null, logDate, loggedBy,
        b.workersCount || null, b.weather || null,
-       b.workDescription, b.materialsNote || null,
-       b.progressUpdate || null, b.remarks || null]
+       b.workDescription || b.work_description || '', b.materialsNote || null,
+       b.progressUpdate || null, b.remarks || null, b.photo_url || null]
     );
 
     // Auto-update task progress if provided

@@ -309,6 +309,8 @@ async function _pebShowAddGRN() {
         {type:'row',fields:[{label:'Vendor',id:'pGRN_vnd',type:'select',required:true,options:'<option value="">Select</option>'+vendorOpts},{label:'Received Date',id:'pGRN_date',type:'date',value:new Date().toISOString().split('T')[0]}]},
         {type:'row',fields:[{label:'Invoice Number',id:'pGRN_inv'},{label:'Quality Status',id:'pGRN_qual',type:'select',options:'<option value="PASSED">Passed</option><option value="PARTIAL">Partial</option><option value="REJECTED">Rejected</option>'}]}
       ]) +
+      '<div style="margin:10px 0"><label style="font-size:.7rem;font-weight:600;display:block;margin-bottom:4px">Invoice Photo</label>' +
+      '<div style="display:flex;gap:8px;align-items:center"><button class="btn btn-white-outline" style="font-size:.68rem;padding:5px 10px" onclick="scanAndUploadGeneric(function(url){document.getElementById(\'pGRN_invoiceUrl\').value=url;document.getElementById(\'pGRN_invoicePreview\').innerHTML=\'<a href=\\\'\'+url+\'\\\' target=\\\'_blank\\\' style=\\\'font-size:.7rem;color:var(--primary)\\\'>View uploaded</a>\';})"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>Scan Invoice</button><span id="pGRN_invoicePreview" style="font-size:.7rem;color:var(--gray-400)">No file</span><input type="hidden" id="pGRN_invoiceUrl"></div></div>' +
       '<h4 style="margin:14px 0 8px;font-size:.78rem;font-weight:600">Items</h4>' +
       '<div id="pGRN_items"></div>' +
       '<button class="btn btn-white-outline" style="font-size:.65rem;padding:4px 10px;margin-bottom:12px" onclick="_pebAddGRNRow()">+ Add Item</button>' +
@@ -341,7 +343,7 @@ async function _pebSaveGRN() {
   });
   if (items.length === 0) { showToast('Add at least one item','error'); return; }
   try {
-    await _pebPost('/api/peb/store/grn', {vendor_id:+document.getElementById('pGRN_vnd').value, received_date:document.getElementById('pGRN_date').value, invoice_number:document.getElementById('pGRN_inv').value||null, quality_status:document.getElementById('pGRN_qual').value, items:items});
+    await _pebPost('/api/peb/store/grn', {vendor_id:+document.getElementById('pGRN_vnd').value, received_date:document.getElementById('pGRN_date').value, invoice_number:document.getElementById('pGRN_inv').value||null, quality_status:document.getElementById('pGRN_qual').value, invoice_photo_url:(document.getElementById('pGRN_invoiceUrl')||{}).value||null, items:items});
     showToast('GRN created — stock updated','success');
     _pebGRN(_p());
   } catch(e) { showToast(e.message,'error'); }

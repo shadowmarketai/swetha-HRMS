@@ -71,6 +71,7 @@ async function generateSimpleCode(prefix, table, column) {
       received_date DATE,
       quality_status VARCHAR(20) DEFAULT 'PASSED',
       quality_remarks TEXT,
+      invoice_photo_url VARCHAR(500),
       created_by INT,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`);
@@ -364,13 +365,13 @@ router.post('/grn', verifyToken, requireRole('MD'), async (req, res) => {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
-    const { vendor_id, po_id, invoice_number, invoice_date, received_date, quality_status, quality_remarks, items } = req.body;
+    const { vendor_id, po_id, invoice_number, invoice_date, received_date, quality_status, quality_remarks, invoice_photo_url, items } = req.body;
     if (!vendor_id || !received_date || !items || items.length === 0) return res.status(400).json({ error: 'vendor_id, received_date, items required' });
 
     const grn_number = await generateCode('GRN', 'peb_grn', 'grn_number');
     const [grnResult] = await conn.query(
-      'INSERT INTO peb_grn (grn_number,po_id,vendor_id,invoice_number,invoice_date,received_date,quality_status,quality_remarks,created_by) VALUES (?,?,?,?,?,?,?,?,?)',
-      [grn_number, po_id||null, vendor_id, invoice_number||null, invoice_date||null, received_date, quality_status||'PASSED', quality_remarks||null, req.user.id]
+      'INSERT INTO peb_grn (grn_number,po_id,vendor_id,invoice_number,invoice_date,received_date,quality_status,quality_remarks,invoice_photo_url,created_by) VALUES (?,?,?,?,?,?,?,?,?,?)',
+      [grn_number, po_id||null, vendor_id, invoice_number||null, invoice_date||null, received_date, quality_status||'PASSED', quality_remarks||null, invoice_photo_url||null, req.user.id]
     );
 
     for (const item of items) {

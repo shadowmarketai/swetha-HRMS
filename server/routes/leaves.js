@@ -90,6 +90,11 @@ router.post('/', verifyToken, [
     const targets = managers.filter(c => c !== req.user.empCode);
     await notifyUsers(pool, targets, 'Leave Request', empName + ' applied for ' + days + ' day(s) ' + type + ' leave', 'leave');
 
+    // Real-time: notify MD/HR instantly
+    const io = req.app.get('io');
+    if (io) {
+      io.to('role:MD').to('role:HR').emit('leave:new', { empCode: req.user.empCode, empName, type, days, from: fromDate, to: toDate });
+    }
     res.status(201).json({ message: 'Leave application submitted', id: result.insertId });
   } catch (err) {
     console.error(err);

@@ -71,6 +71,11 @@ router.post('/', verifyToken, [
     const targets = managers.filter(c => c !== req.user.empCode);
     await notifyUsers(pool, targets, 'Advance Request', empName + ' submitted ' + typeLabel + ' for Rs.' + Number(amount).toLocaleString('en-IN'), 'advance');
 
+    // Real-time: notify MD/HR instantly
+    const io = req.app.get('io');
+    if (io) {
+      io.to('role:MD').to('role:HR').emit('advance:new', { empCode: req.user.empCode, empName, type: typeLabel, amount });
+    }
     res.status(201).json({ message: 'Advance request submitted', id: result.insertId });
   } catch (err) {
     console.error(err);

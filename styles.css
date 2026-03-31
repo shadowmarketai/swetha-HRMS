@@ -2068,3 +2068,47 @@ textarea.boq-inline-input{resize:vertical;min-height:36px}
   .materials-proper-table{font-size:.68rem}
   .materials-proper-table th,.materials-proper-table td{padding:5px 6px}
 }
+
+/* ═══ Analytics & Reports Dashboard ═══ */
+#homeAnalytics .analytics-section{margin:0;padding:4px 0}
+#homeAnalytics .analytics-header{margin-bottom:18px;padding:16px 18px;background:linear-gradient(135deg,#1e293b,#0f172a);border-radius:14px;color:#fff}
+#homeAnalytics .analytics-title{font-family:var(--font-display);font-size:1.1rem;font-weight:700;color:#fff;margin:0;display:flex;align-items:center}
+#homeAnalytics .analytics-title svg{stroke:#f59e0b}
+#homeAnalytics .analytics-subtitle{font-size:.75rem;color:rgba(255,255,255,.6);margin:4px 0 0;padding-left:26px}
+#homeAnalytics .analytics-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+#homeAnalytics .analytics-card{background:var(--card-bg,#fff);border-radius:16px;border:1px solid rgba(0,0,0,.05);overflow:hidden;transition:box-shadow .25s,transform .25s;box-shadow:0 1px 4px rgba(0,0,0,.04)}
+#homeAnalytics .analytics-card:hover{box-shadow:0 8px 28px rgba(0,0,0,.1);transform:translateY(-2px)}
+#homeAnalytics .analytics-card-wide{grid-column:1/-1}
+#homeAnalytics .analytics-card-header{display:flex;align-items:center;gap:10px;padding:16px 18px 4px}
+#homeAnalytics .analytics-card-icon{width:36px;height:36px;border-radius:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+#homeAnalytics .analytics-card:nth-child(6n+1) .analytics-card-icon{background:linear-gradient(135deg,rgba(59,130,246,.12),rgba(59,130,246,.04))}
+#homeAnalytics .analytics-card:nth-child(6n+2) .analytics-card-icon{background:linear-gradient(135deg,rgba(139,92,246,.12),rgba(139,92,246,.04))}
+#homeAnalytics .analytics-card:nth-child(6n+3) .analytics-card-icon{background:linear-gradient(135deg,rgba(34,197,94,.12),rgba(34,197,94,.04))}
+#homeAnalytics .analytics-card:nth-child(6n+4) .analytics-card-icon{background:linear-gradient(135deg,rgba(245,158,11,.12),rgba(245,158,11,.04))}
+#homeAnalytics .analytics-card:nth-child(6n+5) .analytics-card-icon{background:linear-gradient(135deg,rgba(239,68,68,.12),rgba(239,68,68,.04))}
+#homeAnalytics .analytics-card:nth-child(6n+6) .analytics-card-icon{background:linear-gradient(135deg,rgba(232,93,4,.12),rgba(232,93,4,.04))}
+#homeAnalytics .analytics-card-title{font-size:.82rem;font-weight:700;color:var(--text-primary);margin:0;letter-spacing:-.01em}
+#homeAnalytics .analytics-card-body{padding:10px 18px 18px}
+#homeAnalytics .analytics-table{width:100%;border-collapse:separate;border-spacing:0;font-size:.78rem;border-radius:10px;overflow:hidden}
+#homeAnalytics .analytics-table thead tr{background:linear-gradient(135deg,#1e293b,#334155)}
+#homeAnalytics .analytics-table th{padding:11px 16px;text-align:left;font-weight:600;font-size:.68rem;text-transform:uppercase;letter-spacing:.6px;color:#e2e8f0;white-space:nowrap}
+#homeAnalytics .analytics-table th:first-child{border-radius:10px 0 0 0}
+#homeAnalytics .analytics-table th:last-child{border-radius:0 10px 0 0}
+#homeAnalytics .analytics-table td{padding:11px 16px;border-bottom:1px solid #f3f4f6;vertical-align:middle}
+#homeAnalytics .analytics-table tbody tr{transition:background .15s}
+#homeAnalytics .analytics-table tbody tr:nth-child(even){background:#fafbfc}
+#homeAnalytics .analytics-table tbody tr:hover{background:#eff6ff}
+#homeAnalytics .analytics-table tbody tr:last-child td{border-bottom:none}
+[data-theme="dark"] #homeAnalytics .analytics-header{background:linear-gradient(135deg,rgba(30,41,59,.9),rgba(15,23,42,.9));border:1px solid rgba(255,255,255,.06)}
+[data-theme="dark"] #homeAnalytics .analytics-card{background:var(--card-bg);border-color:rgba(255,255,255,.06)}
+[data-theme="dark"] #homeAnalytics .analytics-card:hover{box-shadow:0 8px 28px rgba(0,0,0,.4)}
+[data-theme="dark"] #homeAnalytics .analytics-table tbody tr:nth-child(even){background:rgba(255,255,255,.02)}
+[data-theme="dark"] #homeAnalytics .analytics-table tbody tr:hover{background:rgba(255,255,255,.04)}
+@media(max-width:767px){
+  #homeAnalytics .analytics-grid{grid-template-columns:1fr;gap:12px}
+  #homeAnalytics .analytics-card-body{padding:8px 14px 14px}
+  #homeAnalytics .analytics-header{padding:14px 16px;border-radius:12px}
+}
+@media(min-width:1200px){
+  #homeAnalytics .analytics-grid{grid-template-columns:repeat(3,1fr);gap:18px}
+}

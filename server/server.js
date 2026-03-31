@@ -115,6 +115,8 @@ app.use('/api/announcements', require('./routes/announcements'));
 app.use('/api/geofence', require('./routes/geofence'));
 app.use('/api/projects', require('./routes/projects'));
 app.use('/api/sitetrack', require('./routes/sitetrack'));
+app.use('/api/chatbot', require('./routes/chatbot'));
+app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api/peb/store', require('./routes/peb-store'));
 app.use('/api/peb/purchase', require('./routes/peb-purchase'));
 // Health check — verifies app + DB connectivity
@@ -164,6 +166,8 @@ app.get('*', (req, res) => {
     await pool.query("ALTER TABLE employees ADD COLUMN pan VARCHAR(20)").catch(() => {});
     await pool.query("ALTER TABLE employees ADD COLUMN aadhaar VARCHAR(20)").catch(() => {});
     await pool.query("ALTER TABLE employees ADD COLUMN uan VARCHAR(30)").catch(() => {});
+    await pool.query("ALTER TABLE employees ADD COLUMN aadhaar_photo_url VARCHAR(255)").catch(() => {});
+    await pool.query("ALTER TABLE employees ADD COLUMN pan_photo_url VARCHAR(255)").catch(() => {});
     await pool.query("ALTER TABLE employees ADD COLUMN qualification VARCHAR(200)").catch(() => {});
     await pool.query("ALTER TABLE employees ADD COLUMN institution VARCHAR(200)").catch(() => {});
     await pool.query("ALTER TABLE employees ADD COLUMN year_of_passing VARCHAR(10)").catch(() => {});

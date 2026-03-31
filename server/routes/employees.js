@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const { verifyToken, requireRole } = require('../middleware/auth');
 const { body, validationResult } = require('express-validator');
 const { auditLog } = require('../middleware/audit');
+const upload = require('../middleware/upload');
 
 // GET /api/employees — list all (MD/HR gets full details, Employee gets directory + own full record)
 router.get('/', verifyToken, async (req, res) => {
@@ -117,8 +118,28 @@ router.put('/:code/self', verifyToken, auditLog('update', 'employee'), async (re
   }
 });
 
+// POST /api/employees/upload-doc — generic document upload (returns URL)
+router.post('/upload-doc', verifyToken, upload.single('document'), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+    const url = '/uploads/' + req.file.filename;
+    // Optionally save to employee record if docType specified
+    const { docType } = req.body || {};
+    if (docType && req.user.empCode) {
+      const colMap = { aadhaar_photo: 'aadhaar_photo_url', pan_photo: 'pan_photo_url' };
+      const col = colMap[docType];
+      if (col) {
+        await pool.query(`UPDATE employees SET ${col} = ? WHERE code = ?`, [url, req.user.empCode]).catch(() => {});
+      }
+    }
+    res.json({ url, filename: req.file.filename, message: 'Document uploaded' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Upload failed' });
+  }
+});
+
 // POST /api/employees/:code/photo — upload profile photo
-const upload = require('../middleware/upload');
 router.post('/:code/photo', verifyToken, upload.single('photo'), async (req, res) => {
   try {
     if (req.user.empCode !== req.params.code && req.user.role !== 'MD' && req.user.role !== 'HR') {

@@ -189,10 +189,7 @@ const NAV_CONFIG = {
       { id:'md-att-report', label:'Employee Attendance', action:{type:'tab',target:'attendance'} },
       { id:'md-att-leave', label:'Employee Leave Request', action:{type:'tab',target:'leaves'} }
     ]},
-    { id:'md-advance', label:'Advance & Expense', icon:'advance', children:[
-      { id:'md-adv-history', label:'All Requests', action:{type:'tab',target:'advance'} },
-      { id:'md-adv-requests', label:'Approve Requests', action:{type:'overlay',target:'advance-requests'} }
-    ]},
+    { id:'md-advance', label:'Advance & Expense', icon:'advance', action:{type:'overlay',target:'advance-requests'} },
     { id:'md-location', label:'Live Location', icon:'location', action:{type:'overlay',target:'location'} },
     { id:'md-progress', label:'Progress', icon:'progress', action:{type:'tab',target:'progress'} },
     { id:'md-performance', label:'Employee Performance', icon:'performance', children:[
@@ -539,15 +536,28 @@ async function loginAs(empCode) {
     updateGreeting();
     buildCalendar();
     initLeaveTabs();
-    history.replaceState({ tab: 'home' }, '');
+
+    // Restore last page on reload
+    var savedTab = sessionStorage.getItem('hrms_current_tab');
+    var savedOverlay = sessionStorage.getItem('hrms_current_overlay');
+    var savedNavId = sessionStorage.getItem('hrms_current_navId');
+    if (savedNavId) _activeNavId = savedNavId;
+    if (savedTab && savedTab !== 'home') {
+      switchTab(savedTab, null, true);
+    }
+    if (savedOverlay) {
+      showOverlay(savedOverlay);
+    }
+    history.replaceState({ tab: savedTab || 'home' }, '');
 
     // Request browser notification permission
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission();
     }
-    // Start WebSocket + notification polling
+    // Start WebSocket + notification polling + chatbot
     initWebSocket();
     startNotifPoll();
+    showChatbot();
     // Ensure badge is updated immediately after data load
     updateNotifBadge();
 
@@ -642,7 +652,41 @@ function renderProfileOverlay() {
   html += '<div class="ss-form-group"><label>PAN</label><input type="text" id="profPan" value="' + escapeHTML(emp.pan || '') + '" placeholder="PAN number" maxlength="10"></div>';
   html += '<div class="ss-form-group"><label>Aadhaar</label><input type="text" id="profAadhaar" value="' + escapeHTML(emp.aadhaar || '') + '" placeholder="Aadhaar number" maxlength="12"></div>';
   html += '<div class="ss-form-group"><label>UAN</label><input type="text" id="profUan" value="' + escapeHTML(emp.uan || '') + '" placeholder="UAN number"></div>';
-  html += '</div></div>';
+  html += '</div>';
+  // Document photo uploads
+  html += '<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--gray-200)">';
+  html += '<div style="font-size:.72rem;font-weight:600;color:var(--gray-600);margin-bottom:8px">Document Uploads</div>';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+
+  // Aadhaar card
+  html += '<div style="border:1.5px dashed ' + (emp.aadhaar_photo_url ? '#22c55e' : 'var(--gray-200)') + ';border-radius:10px;padding:12px;text-align:center;background:var(--gray-50,#f9fafb)">';
+  if (emp.aadhaar_photo_url) {
+    html += '<a href="' + escapeHTML(emp.aadhaar_photo_url) + '" target="_blank" style="display:block;margin-bottom:8px">' +
+      '<img src="' + escapeHTML(emp.aadhaar_photo_url) + '" style="width:100%;max-height:100px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb"></a>';
+    html += '<div style="font-size:.65rem;color:#22c55e;font-weight:600;margin-bottom:6px"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="vertical-align:middle;margin-right:2px"><polyline points="20 6 9 17 4 12"/></svg>Aadhaar Uploaded</div>';
+  } else {
+    html += '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.5" style="margin-bottom:6px"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><circle cx="8" cy="15" r="2"/><path d="M14 13h4m-4 3h4"/></svg>';
+    html += '<div style="font-size:.72rem;font-weight:600;color:var(--gray-500);margin-bottom:6px">Aadhaar Card</div>';
+  }
+  html += '<button onclick="scanAndUploadDoc(\'aadhaar_photo\')" style="font-size:.68rem;padding:6px 14px;border:1px solid var(--primary);color:var(--primary);background:transparent;border-radius:8px;cursor:pointer;transition:all .15s" onmouseover="this.style.background=\'var(--primary)\';this.style.color=\'#fff\'" onmouseout="this.style.background=\'transparent\';this.style.color=\'var(--primary)\'">';
+  html += '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
+  html += (emp.aadhaar_photo_url ? 'Re-scan' : 'Scan & Upload') + '</button></div>';
+
+  // PAN card
+  html += '<div style="border:1.5px dashed ' + (emp.pan_photo_url ? '#22c55e' : 'var(--gray-200)') + ';border-radius:10px;padding:12px;text-align:center;background:var(--gray-50,#f9fafb)">';
+  if (emp.pan_photo_url) {
+    html += '<a href="' + escapeHTML(emp.pan_photo_url) + '" target="_blank" style="display:block;margin-bottom:8px">' +
+      '<img src="' + escapeHTML(emp.pan_photo_url) + '" style="width:100%;max-height:100px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb"></a>';
+    html += '<div style="font-size:.65rem;color:#22c55e;font-weight:600;margin-bottom:6px"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="vertical-align:middle;margin-right:2px"><polyline points="20 6 9 17 4 12"/></svg>PAN Uploaded</div>';
+  } else {
+    html += '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.5" style="margin-bottom:6px"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M7 9h10M7 13h6"/></svg>';
+    html += '<div style="font-size:.72rem;font-weight:600;color:var(--gray-500);margin-bottom:6px">PAN Card</div>';
+  }
+  html += '<button onclick="scanAndUploadDoc(\'pan_photo\')" style="font-size:.68rem;padding:6px 14px;border:1px solid var(--primary);color:var(--primary);background:transparent;border-radius:8px;cursor:pointer;transition:all .15s" onmouseover="this.style.background=\'var(--primary)\';this.style.color=\'#fff\'" onmouseout="this.style.background=\'transparent\';this.style.color=\'var(--primary)\'">';
+  html += '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
+  html += (emp.pan_photo_url ? 'Re-scan' : 'Scan & Upload') + '</button></div>';
+
+  html += '</div></div></div>';
 
   // Section 6: Qualification & Experience (editable, always shown)
   html += '<div class="card profile-section" style="margin:0 16px 12px;border-radius:var(--radius)">';
@@ -860,6 +904,10 @@ function doLogout() {
   if (idleWarningTimer) { clearTimeout(idleWarningTimer); idleWarningTimer = null; }
   stopNotifPoll();
   disconnectWebSocket();
+  hideChatbot();
+  sessionStorage.removeItem('hrms_current_tab');
+  sessionStorage.removeItem('hrms_current_overlay');
+  sessionStorage.removeItem('hrms_current_navId');
   // Prevent Google auto-login after logout
   try { if (typeof google !== 'undefined' && google.accounts && google.accounts.id) google.accounts.id.disableAutoSelect(); } catch (e) {}
   document.getElementById('loginScreen').classList.remove('hidden');
@@ -998,6 +1046,9 @@ function applyRole() {
 
   // Home quick stats
   renderHomeQuickStats();
+
+  // Analytics charts
+  renderHomeAnalytics();
 
   // Advance requests
   renderAdvancePendingBanner();
@@ -1358,6 +1409,10 @@ function switchTab(id, el, _fromPopstate) {
       history.pushState({ tab: id }, '');
     }
   }
+  // Save current page for reload persistence
+  sessionStorage.setItem('hrms_current_tab', id);
+  sessionStorage.removeItem('hrms_current_overlay');
+  sessionStorage.setItem('hrms_current_navId', _activeNavId);
   if (id === 'advance' || id === 'site' || id === 'ta') { renderAllMyRequests(); renderAllPendingBanners(); }
   if (id === 'site-expense') renderSiteExpenseScreen();
   if (id === 'travel-expense') renderTravelExpenseScreen();
@@ -1404,6 +1459,9 @@ function showOverlay(id) {
   el.classList.add('active');
   // Force full-screen inline styles — prevents split-screen on all devices
   _forceOverlayFullScreen(el);
+  // Save for reload persistence
+  sessionStorage.setItem('hrms_current_overlay', id);
+  sessionStorage.setItem('hrms_current_navId', _activeNavId);
   try { history.pushState({ overlay: id }, ''); } catch(e) { /* ignore */ }
   // Focus first focusable element
   var focusable = el.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
@@ -1441,6 +1499,7 @@ function hideOverlay(id, _fromPopstate) {
     el.classList.remove('active');
     el.removeAttribute('style');
   }
+  sessionStorage.removeItem('hrms_current_overlay');
   const prev = _overlayPreviousFocus.pop();
   if (prev && prev.focus) prev.focus();
   // If called from UI back button (not popstate), go back in history to consume the pushState entry
@@ -1752,12 +1811,13 @@ function renderRolesList() {
         <p>${e.code} &middot; ${escapeHTML(e.dept)} &middot; ${escapeHTML(e.designation)}</p>
       </div>
       ${isMD001 ? '<span class="role-badge md" style="font-size:.65rem">Primary MD</span>' :
+        (currentUser && currentUser.role === 'MD' ?
         `<select class="emp-role-select" onclick="event.stopPropagation()" onchange="changeRole('${e.code}',this.value)">
         <option value="Employee"${e.role==='Employee'?' selected':''}>Employee</option>
         <option value="HR"${e.role==='HR'?' selected':''}>HR</option>
         <option value="Manager"${e.role==='Manager'?' selected':''}>Manager</option>
         <option value="MD"${e.role==='MD'?' selected':''}>MD</option>
-      </select>`}
+      </select>` : `<span class="role-badge ${e.role.toLowerCase()}" style="font-size:.65rem">${e.role}</span>`)}
     </div>`;
   }).join('');
 }
@@ -3109,10 +3169,15 @@ function showSiteExpenseBillForm() {
   html += '<div class="form-row"><label>Amount (Rs.) *</label><input type="number" id="seBillAmount" placeholder="e.g. 5000"></div>';
   html += '<div class="form-row"><label>Description</label><textarea id="seBillDesc" rows="2" placeholder="Brief explanation..." style="width:100%;padding:8px;border:1.5px solid var(--gray-200);border-radius:var(--radius-xs);font-family:var(--font-body);font-size:.82rem"></textarea></div>';
   html += '<div class="section-title" style="font-size:.72rem;margin-bottom:6px">Attach Bill Photo *</div>';
-  html += '<div class="camera-zone fade-in" onclick="document.getElementById(\'seBillInput\').click()" style="padding:14px">';
+  html += '<div style="display:flex;gap:8px;flex-wrap:wrap">';
+  html += '<div class="camera-zone fade-in" onclick="document.getElementById(\'seBillInput\').click()" style="padding:14px;flex:1;min-width:120px">';
   html += '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
-  html += '<p style="font-size:.78rem">Tap to capture bill photo</p>';
+  html += '<p style="font-size:.78rem">Tap to capture</p>';
   html += '<input type="file" id="seBillInput" accept="image/*,application/pdf" capture="environment" style="display:none" onchange="handleBillPreview(this,\'seBillPreview\')"></div>';
+  html += '<button class="btn btn-white-outline" style="padding:14px;flex:1;min-width:120px;display:flex;flex-direction:column;align-items:center;gap:6px" onclick="scanAndUploadGeneric(function(url){document.getElementById(\'seBillUrl\').value=url;document.getElementById(\'seBillPreview\').style.display=\'block\';document.getElementById(\'seBillPreview\').innerHTML=\'<a href=\\\'\'+url+\'\\\' target=\\\'_blank\\\' style=\\\'color:var(--primary);font-size:.75rem\\\'>View uploaded bill</a>\'})">';
+  html += '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><line x1="9" y1="15" x2="15" y2="15"/></svg>';
+  html += '<span style="font-size:.78rem">Scan & Upload</span></button></div>';
+  html += '<input type="hidden" id="seBillUrl">';
   html += '<div id="seBillPreview" style="display:none;margin-top:6px"><img style="max-width:100%;border-radius:var(--radius-xs)"></div>';
   html += '<div style="display:flex;gap:8px;margin-top:14px">';
   html += '<button class="nf-btn nf-btn-primary" onclick="submitSiteExpenseBill()" style="flex:1">Submit Bill</button>';
@@ -7159,14 +7224,23 @@ function initWebSocket() {
   // ── Attendance: someone checked in ──
   _hrmsSocket.on('attendance:checkin', function(data) {
     showToast(data.name + ' checked in at ' + data.location, 'info');
-    // Refresh live location if open
     if (typeof renderLiveLocationCards === 'function') renderLiveLocationCards();
+    renderRecentActivity(); // Instant home update
   });
 
   // ── Attendance: someone checked out ──
   _hrmsSocket.on('attendance:checkout', function(data) {
     showToast(data.name + ' checked out', 'info');
     if (typeof renderLiveLocationCards === 'function') renderLiveLocationCards();
+    renderRecentActivity(); // Instant home update
+  });
+
+  // ── Leave: new request submitted ──
+  _hrmsSocket.on('leave:new', function(data) {
+    showToast(data.empName + ' applied for ' + data.days + ' day(s) ' + data.type + ' leave', 'info');
+    renderRecentActivity();
+    renderHomeQuickStats();
+    if (typeof renderLeaveScreen === 'function') renderLeaveScreen();
   });
 
   // ── Leave: approved ──
@@ -7175,6 +7249,8 @@ function initWebSocket() {
     showNotifPopup('Leave Approved', 'Your ' + data.type + ' leave has been approved');
     refreshNotifications();
     if (typeof renderLeaveScreen === 'function') renderLeaveScreen();
+    renderRecentActivity();
+    renderHomeQuickStats();
   });
 
   // ── Leave: HR accepted ──
@@ -7182,6 +7258,7 @@ function initWebSocket() {
     showToast('Your ' + data.type + ' leave has been accepted by HR, awaiting MD approval', 'info');
     refreshNotifications();
     if (typeof renderLeaveScreen === 'function') renderLeaveScreen();
+    renderRecentActivity();
   });
 
   // ── Leave: rejected ──
@@ -7190,6 +7267,7 @@ function initWebSocket() {
     showNotifPopup('Leave Rejected', 'Your ' + data.type + ' leave was rejected');
     refreshNotifications();
     if (typeof renderLeaveScreen === 'function') renderLeaveScreen();
+    renderRecentActivity();
   });
 
   // ── Leave: pending for MD ──
@@ -7197,11 +7275,21 @@ function initWebSocket() {
     showToast(data.empName + ' has a leave pending your approval', 'info');
     refreshNotifications();
     if (typeof renderLeaveScreen === 'function') renderLeaveScreen();
+    renderRecentActivity();
+    renderHomeQuickStats();
   });
 
   // ── Leave: any update (for MD/HR dashboard refresh) ──
   _hrmsSocket.on('leave:updated', function() {
     if (typeof renderLeaveScreen === 'function') renderLeaveScreen();
+    renderRecentActivity();
+  });
+
+  // ── Advance request submitted ──
+  _hrmsSocket.on('advance:new', function(data) {
+    showToast(data.empName + ' submitted ' + data.type + ' advance for Rs.' + Number(data.amount).toLocaleString('en-IN'), 'info');
+    renderRecentActivity();
+    renderHomeQuickStats();
   });
 
   // ── User online/offline (for MD live tracking) ──
@@ -7220,6 +7308,294 @@ function initWebSocket() {
 
 function disconnectWebSocket() {
   if (_hrmsSocket) { _hrmsSocket.disconnect(); _hrmsSocket = null; window._hrmsSocket = null; }
+}
+
+// =====================================================
+// PWA: OFFLINE SYNC + BACKGROUND SYNC
+// =====================================================
+// Listen for SW messages (token request for background sync)
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('message', function(event) {
+    if (event.data && event.data.type === 'GET_TOKEN') {
+      var token = JWT_TOKEN || safeStorage.get('hrms_jwt');
+      event.ports[0].postMessage({ token: token });
+    }
+  });
+}
+
+// Detect online/offline status
+window.addEventListener('online', function() {
+  showToast('Back online — syncing data...', 'success');
+  // Trigger background sync
+  if ('serviceWorker' in navigator && 'SyncManager' in window) {
+    navigator.serviceWorker.ready.then(function(reg) {
+      reg.sync.register('sync-attendance');
+    });
+  }
+  // Refresh data
+  if (typeof refreshNotifications === 'function') refreshNotifications();
+});
+
+window.addEventListener('offline', function() {
+  showToast('You are offline. Check-in/checkout will sync when connected.', 'info');
+});
+
+// =====================================================
+// PWA: CAMERA DOCUMENT SCANNER
+// =====================================================
+function scanDocument(callback) {
+  var input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.capture = 'environment';
+  input.onchange = function() {
+    if (!input.files || !input.files[0]) return;
+    var file = input.files[0];
+    // Compress if too large (>2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      compressImage(file, function(compressed) {
+        if (callback) callback(compressed);
+      });
+    } else {
+      if (callback) callback(file);
+    }
+  };
+  input.click();
+}
+
+function compressImage(file, callback) {
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var img = new Image();
+    img.onload = function() {
+      var canvas = document.createElement('canvas');
+      var maxSize = 1200;
+      var w = img.width, h = img.height;
+      if (w > maxSize || h > maxSize) {
+        if (w > h) { h = h * maxSize / w; w = maxSize; }
+        else { w = w * maxSize / h; h = maxSize; }
+      }
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      canvas.toBlob(function(blob) {
+        callback(new File([blob], file.name, { type: 'image/jpeg' }));
+      }, 'image/jpeg', 0.8);
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// Upload scanned document to server
+function uploadScannedDocument(file, docType) {
+  var formData = new FormData();
+  formData.append('document', file);
+  if (docType) formData.append('docType', docType);
+  var token = JWT_TOKEN || safeStorage.get('hrms_jwt');
+  return fetch('/api/employees/upload-doc', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + token },
+    body: formData
+  }).then(function(r) { return r.json(); });
+}
+
+// Scan & upload for Profile (Aadhaar/PAN)
+function scanAndUploadDoc(docType) {
+  scanDocument(function(file) {
+    showToast('Uploading...', 'info');
+    uploadScannedDocument(file, docType).then(function(data) {
+      if (data.url) {
+        // Update local employee data so re-render shows the image
+        var emp = EMPLOYEES.find(function(e) { return e.code === currentUser.code; });
+        if (emp) {
+          if (docType === 'aadhaar_photo') emp.aadhaar_photo_url = data.url;
+          if (docType === 'pan_photo') emp.pan_photo_url = data.url;
+        }
+        showToast('Document uploaded', 'success');
+        renderProfileOverlay();
+      } else {
+        showToast(data.error || 'Upload failed', 'error');
+      }
+    }).catch(function(e) { showToast('Upload error: ' + e.message, 'error'); });
+  });
+}
+
+// Upload site progress photo
+function uploadSitePhoto(projectId) {
+  scanDocument(function(file) {
+    showToast('Uploading site photo...', 'info');
+    uploadScannedDocument(file).then(function(data) {
+      if (data.url) {
+        // Save photo URL as a daily log note
+        var proj = projects.find(function(p) { return p.id === projectId; });
+        var projName = proj ? proj.name : 'Project #' + projectId;
+        apiCall('POST', '/sitetrack/projects/' + projectId + '/daily-logs', {
+          logDate: new Date().toISOString().split('T')[0],
+          workDescription: 'Site progress photo',
+          weather: '',
+          workersCount: 0,
+          photo_url: data.url
+        }).then(function() {
+          showToast('Site photo uploaded for ' + projName, 'success');
+          loadDailyLogs(projectId);
+        }).catch(function() {
+          showToast('Photo saved at ' + data.url + ' but log entry failed', 'info');
+        });
+      } else {
+        showToast(data.error || 'Upload failed', 'error');
+      }
+    }).catch(function(e) { showToast('Error: ' + e.message, 'error'); });
+  });
+}
+
+// Generic scan & upload — returns URL via callback
+function scanAndUploadGeneric(callback) {
+  scanDocument(function(file) {
+    showToast('Uploading...', 'info');
+    uploadScannedDocument(file).then(function(data) {
+      if (data.url) {
+        showToast('Uploaded', 'success');
+        if (callback) callback(data.url);
+      } else {
+        showToast(data.error || 'Upload failed', 'error');
+      }
+    }).catch(function(e) { showToast('Error: ' + e.message, 'error'); });
+  });
+}
+
+
+// =====================================================
+// CHATBOT — Rule-based HR Assistant
+// =====================================================
+function toggleChatbot() {
+  var win = document.getElementById('chatbotWindow');
+  if (!win) return;
+  var isOpen = win.style.display === 'flex';
+  win.style.display = isOpen ? 'none' : 'flex';
+  if (!isOpen) {
+    var input = document.getElementById('chatInput');
+    if (input) setTimeout(function() { input.focus(); }, 100);
+  }
+}
+
+function sendChatMessage() {
+  var input = document.getElementById('chatInput');
+  if (!input) return;
+  var msg = input.value.trim();
+  if (!msg) return;
+  input.value = '';
+
+  var container = document.getElementById('chatMessages');
+  // Add user message
+  container.innerHTML += '<div class="chat-msg user"><div class="chat-bubble user">' + escapeHTML(msg) + '</div></div>';
+  // Add typing indicator
+  container.innerHTML += '<div class="chat-msg bot" id="chatTyping"><div class="chat-typing"><span></span><span></span><span></span></div></div>';
+  container.scrollTop = container.scrollHeight;
+
+  // Call API
+  var token = JWT_TOKEN || safeStorage.get('hrms_jwt');
+  fetch('/api/chatbot', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message: msg })
+  }).then(function(r) { return r.json(); }).then(function(data) {
+    var typing = document.getElementById('chatTyping');
+    if (typing) typing.remove();
+    var reply = (data.reply || 'No response').replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>');
+    container.innerHTML += '<div class="chat-msg bot"><div class="chat-bubble bot">' + reply + '</div></div>';
+    container.scrollTop = container.scrollHeight;
+  }).catch(function(e) {
+    var typing = document.getElementById('chatTyping');
+    if (typing) typing.remove();
+    container.innerHTML += '<div class="chat-msg bot"><div class="chat-bubble bot" style="color:#ef4444">Sorry, something went wrong. Please try again.</div></div>';
+    container.scrollTop = container.scrollHeight;
+  });
+}
+
+// Voice input using Web Speech API (free, built into browser)
+var _voiceRecognition = null;
+
+function startVoiceInput() {
+  var SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) { showToast('Voice input not supported in this browser. Use Chrome or Edge.', 'error'); return; }
+
+  var micBtn = document.getElementById('chatMicBtn');
+
+  // If already listening, stop
+  if (_voiceRecognition) {
+    _voiceRecognition.stop();
+    _voiceRecognition = null;
+    if (micBtn) { micBtn.style.background = '#f1f5f9'; micBtn.style.color = '#475569'; }
+    return;
+  }
+
+  _voiceRecognition = new SpeechRecognition();
+  _voiceRecognition.lang = 'en-IN';
+  _voiceRecognition.interimResults = true;
+  _voiceRecognition.maxAlternatives = 1;
+
+  // Show listening state
+  if (micBtn) { micBtn.style.background = '#ef4444'; micBtn.style.color = '#fff'; }
+  var input = document.getElementById('chatInput');
+  if (input) input.placeholder = 'Listening...';
+
+  // Add listening indicator to chat
+  var container = document.getElementById('chatMessages');
+  container.innerHTML += '<div class="chat-msg bot" id="voiceListening"><div class="chat-bubble bot" style="color:#ef4444"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:4px;animation:chatBounce .6s infinite alternate"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/></svg>Listening... speak now</div></div>';
+  container.scrollTop = container.scrollHeight;
+
+  _voiceRecognition.onresult = function(event) {
+    var transcript = '';
+    for (var i = event.resultIndex; i < event.results.length; i++) {
+      transcript += event.results[i][0].transcript;
+    }
+    if (input) input.value = transcript;
+
+    // If final result, auto-send
+    if (event.results[event.results.length - 1].isFinal) {
+      var listening = document.getElementById('voiceListening');
+      if (listening) listening.remove();
+      if (transcript.trim()) {
+        sendChatMessage();
+      }
+    }
+  };
+
+  _voiceRecognition.onend = function() {
+    _voiceRecognition = null;
+    if (micBtn) { micBtn.style.background = '#f1f5f9'; micBtn.style.color = '#475569'; }
+    if (input) input.placeholder = 'Type your question...';
+    var listening = document.getElementById('voiceListening');
+    if (listening) listening.remove();
+  };
+
+  _voiceRecognition.onerror = function(event) {
+    _voiceRecognition = null;
+    if (micBtn) { micBtn.style.background = '#f1f5f9'; micBtn.style.color = '#475569'; }
+    if (input) input.placeholder = 'Type your question...';
+    var listening = document.getElementById('voiceListening');
+    if (listening) listening.remove();
+    if (event.error === 'not-allowed') {
+      showToast('Microphone access denied. Allow microphone in browser settings.', 'error');
+    } else if (event.error !== 'aborted') {
+      showToast('Voice error: ' + event.error, 'error');
+    }
+  };
+
+  _voiceRecognition.start();
+}
+
+// Show chatbot button after login
+function showChatbot() {
+  var btn = document.getElementById('chatbotBtn');
+  if (btn) btn.style.display = 'flex';
+}
+function hideChatbot() {
+  var btn = document.getElementById('chatbotBtn');
+  var win = document.getElementById('chatbotWindow');
+  if (btn) btn.style.display = 'none';
+  if (win) win.style.display = 'none';
 }
 
 function updateNotifBadge() {
@@ -8362,102 +8738,121 @@ function renderHomeProjects() {
 }
 
 // =====================================================
-// RECENT ACTIVITY (role-filtered)
+// RECENT ACTIVITY (role-filtered, live from DB + local)
 // =====================================================
 function renderRecentActivity() {
   var c = document.getElementById('recentActivityList');
   if (!c || !currentUser) return;
-  var isMDorHR = currentUser.role === 'MD' || currentUser.role === 'HR';
-  var items = [];
 
-  // Advance requests
-  var advReqs = (typeof advanceRequests !== 'undefined' ? advanceRequests : []);
-  var filteredAdv = isMDorHR ? advReqs : advReqs.filter(function(r) { return r.empCode === currentUser.code; });
-  filteredAdv.slice(-5).reverse().forEach(function(r) {
-    items.push({
-      icon: '<div class="req-icon" style="background:var(--teal-light);color:var(--teal-dark)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>',
-      title: escapeHTML((r.type || 'Salary') + ' Advance' + (isMDorHR && r.empName ? ' — ' + r.empName : '')),
-      sub: '&#8377;' + (r.amount || 0).toLocaleString('en-IN'),
-      date: r.date || '',
-      status: r.status || 'Pending',
-      sortDate: r.date || ''
-    });
-  });
-
-  // Leave applications
-  var leaves = (typeof leaveApplications !== 'undefined' ? leaveApplications : []);
-  var filteredLeaves = isMDorHR ? leaves : leaves.filter(function(l) { return l.empCode === currentUser.code; });
-  filteredLeaves.slice(-5).reverse().forEach(function(l) {
-    items.push({
-      icon: '<div class="req-icon" style="background:#DBEAFE;color:#2563EB"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/></svg></div>',
-      title: escapeHTML((l.leaveType || 'Leave') + (isMDorHR && l.empName ? ' — ' + l.empName : '')),
-      sub: escapeHTML((l.startDate || '') + ' to ' + (l.endDate || '')),
-      date: l.appliedDate || l.startDate || '',
-      status: l.status || 'Pending',
-      sortDate: l.appliedDate || l.startDate || ''
-    });
-  });
-
-  // Expense reimbursements
-  var expenses = (typeof expenseReimbursements !== 'undefined' ? expenseReimbursements : []);
-  var filteredExp = isMDorHR ? expenses : expenses.filter(function(e) { return e.empCode === currentUser.code; });
-  filteredExp.slice(-3).reverse().forEach(function(e) {
-    items.push({
-      icon: '<div class="req-icon" style="background:#FCE7F3;color:#BE185D"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></div>',
-      title: escapeHTML((e.category || 'Expense') + (isMDorHR && e.empName ? ' — ' + e.empName : '')),
-      sub: '&#8377;' + (e.amount || 0).toLocaleString('en-IN'),
-      date: e.date || '',
-      status: e.status || 'Pending',
-      sortDate: e.date || ''
-    });
-  });
-
-  // Today's attendance logs
-  var todayStr = new Date().toISOString().split('T')[0];
-  var todayLogs = (typeof attendanceLogs !== 'undefined' ? attendanceLogs : []).filter(function(l) {
-    return l.empCode === currentUser.code && l.timestamp && l.timestamp.startsWith(todayStr);
-  });
-  todayLogs.forEach(function(l) {
-    var time = new Date(l.timestamp).toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'});
-    items.push({
-      icon: '<div class="req-icon" style="background:var(--success-light);color:var(--success-dark)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>',
-      title: escapeHTML(l.type === 'checkin' ? 'GPS Check-In' : 'GPS Check-Out'),
-      sub: escapeHTML(time + (l.location ? ' · ' + l.location : '')),
-      date: 'Today',
-      status: l.type === 'checkin' ? 'Checked In' : 'Checked Out',
-      sortDate: l.timestamp || ''
-    });
-  });
-
-  // Sort by date desc, limit to 5
-  items.sort(function(a, b) { return (b.sortDate || '').localeCompare(a.sortDate || ''); });
-  items = items.slice(0, 5);
-
-  if (items.length === 0) {
-    c.innerHTML = '<div style="padding:16px;text-align:center;color:var(--gray-400);font-size:.8rem">No recent activity</div>';
-    return;
+  // Show loading only on first render
+  if (!c.dataset.loaded) {
+    c.innerHTML = '<div style="padding:12px;text-align:center;color:var(--gray-400);font-size:.75rem">Loading activity...</div>';
   }
 
-  var badgeClass = function(st) {
-    var s = (st || '').toLowerCase();
-    if (s === 'approved' || s === 'checked in' || s === 'checked out') return 'badge-approved';
-    if (s === 'rejected') return 'badge-danger';
-    if (s === 'paid' || s === 'active') return 'badge-paid';
-    return 'badge-pending';
-  };
+  // Fetch fresh data from DB
+  Promise.all([
+    apiCall('GET', '/leaves').catch(function() { return []; }),
+    apiCall('GET', '/advances').catch(function() { return []; }),
+    apiCall('GET', '/notifications?limit=10').catch(function() { return []; }),
+    apiCall('GET', '/attendance/today').catch(function() { return { sessions: [] }; })
+  ]).then(function(results) {
+    var dbLeaves = Array.isArray(results[0]) ? results[0] : (results[0] && results[0].data ? results[0].data : []);
+    var dbAdvances = Array.isArray(results[1]) ? results[1] : (results[1] && results[1].data ? results[1].data : []);
+    var dbNotifs = Array.isArray(results[2]) ? results[2] : [];
+    var todaySessions = results[3] && results[3].sessions ? results[3].sessions : [];
 
-  var html = '<div class="section-title" style="margin-top:0">Recent Activity</div>';
-  items.forEach(function(it) {
-    var shortDate = it.date;
-    if (shortDate && shortDate.length > 6) {
-      try { shortDate = new Date(shortDate + 'T00:00:00').toLocaleDateString('en-IN', {day:'2-digit',month:'short'}); } catch(e) {}
+    var isMDorHR = currentUser.role === 'MD' || currentUser.role === 'HR';
+    var items = [];
+
+    // DB Leave applications
+    dbLeaves.slice(0, 8).forEach(function(l) {
+      items.push({
+        icon: '<div class="req-icon" style="background:#DBEAFE;color:#2563EB"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/></svg></div>',
+        title: escapeHTML((l.leave_type || l.type || 'Leave') + (isMDorHR && l.emp_name ? ' — ' + l.emp_name : '')),
+        sub: escapeHTML((l.from_date || l.from || '') + ' to ' + (l.to_date || l.to || '')) + ' &middot; ' + (l.days || 1) + ' day(s)',
+        date: l.created_at || l.from_date || '',
+        status: l.status || 'pending',
+        sortDate: l.created_at || ''
+      });
+    });
+
+    // DB Advance requests
+    dbAdvances.slice(0, 5).forEach(function(r) {
+      items.push({
+        icon: '<div class="req-icon" style="background:var(--teal-light,#CCFBF1);color:var(--teal-dark,#0F766E)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>',
+        title: escapeHTML((r.type || 'Salary') + ' Advance' + (isMDorHR && r.emp_name ? ' — ' + r.emp_name : '')),
+        sub: 'Rs.' + Number(r.amount || 0).toLocaleString('en-IN'),
+        date: r.created_at || '',
+        status: r.status || 'Pending',
+        sortDate: r.created_at || ''
+      });
+    });
+
+    // Today's attendance
+    todaySessions.forEach(function(s) {
+      if (s.check_in) {
+        var time = new Date(s.check_in).toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'});
+        items.push({
+          icon: '<div class="req-icon" style="background:var(--success-light,#DCFCE7);color:var(--success-dark,#15803D)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>',
+          title: 'GPS Check-In',
+          sub: escapeHTML(time + (s.location_name ? ' · ' + s.location_name : '')),
+          date: 'Today', status: s.check_out ? 'Checked Out' : 'Checked In',
+          sortDate: s.check_in || ''
+        });
+      }
+    });
+
+    // Also include local data that may not be in DB yet
+    var localAdvReqs = (typeof advanceRequests !== 'undefined' ? advanceRequests : []);
+    var filteredLocalAdv = isMDorHR ? localAdvReqs : localAdvReqs.filter(function(r) { return r.empCode === currentUser.code; });
+    filteredLocalAdv.slice(-3).reverse().forEach(function(r) {
+      // Skip if already in DB results
+      if (dbAdvances.some(function(d) { return d.id === r.id; })) return;
+      items.push({
+        icon: '<div class="req-icon" style="background:var(--teal-light,#CCFBF1);color:var(--teal-dark,#0F766E)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>',
+        title: escapeHTML((r.type || 'Salary') + ' Advance' + (isMDorHR && r.empName ? ' — ' + r.empName : '')),
+        sub: 'Rs.' + (r.amount || 0).toLocaleString('en-IN'),
+        date: r.date || '', status: r.status || 'Pending', sortDate: r.date || ''
+      });
+    });
+
+    // Sort by date desc, limit to 8
+    items.sort(function(a, b) { return (b.sortDate || '').localeCompare(a.sortDate || ''); });
+    items = items.slice(0, 8);
+
+    if (items.length === 0) {
+      c.innerHTML = '<div style="padding:16px;text-align:center;color:var(--gray-400);font-size:.8rem">No recent activity</div>';
+      c.dataset.loaded = '1';
+      return;
     }
-    html += '<div class="request-item">' + it.icon;
-    html += '<div class="req-info"><h4>' + it.title + '</h4><p>' + it.sub + '</p></div>';
-    html += '<div class="req-meta"><div class="date">' + escapeHTML(shortDate) + '</div><span class="badge-status ' + badgeClass(it.status) + '">' + escapeHTML(it.status) + '</span></div>';
-    html += '</div>';
+
+    var badgeClass = function(st) {
+      var s = (st || '').toLowerCase();
+      if (s === 'approved' || s === 'checked in' || s === 'checked out') return 'badge-approved';
+      if (s === 'rejected') return 'badge-danger';
+      if (s === 'hr_accepted') return 'badge-pending';
+      if (s === 'paid' || s === 'active') return 'badge-paid';
+      return 'badge-pending';
+    };
+    var statusLabel = function(st) {
+      var map = { pending:'Pending', approved:'Approved', rejected:'Rejected', hr_accepted:'HR Accepted', Pending:'Pending', Approved:'Approved', HR_Accepted:'HR Accepted' };
+      return map[st] || st || 'Pending';
+    };
+
+    var html = '<div class="section-title" style="margin-top:0">Recent Activity</div>';
+    items.forEach(function(it) {
+      var shortDate = it.date;
+      if (shortDate && shortDate !== 'Today' && shortDate.length > 6) {
+        try { shortDate = new Date(shortDate).toLocaleDateString('en-IN', {day:'2-digit',month:'short'}); } catch(e) {}
+      }
+      html += '<div class="request-item">' + it.icon;
+      html += '<div class="req-info"><h4>' + it.title + '</h4><p>' + it.sub + '</p></div>';
+      html += '<div class="req-meta"><div class="date">' + escapeHTML(shortDate) + '</div><span class="badge-status ' + badgeClass(it.status) + '">' + escapeHTML(statusLabel(it.status)) + '</span></div>';
+      html += '</div>';
+    });
+    c.innerHTML = html;
+    c.dataset.loaded = '1';
   });
-  c.innerHTML = html;
 }
 
 // =====================================================
@@ -8493,6 +8888,184 @@ function renderHomeQuickStats() {
   html += '<div class="home-stat-card stat-expense"><div class="home-stat-value" style="color:var(--purple)">' + pendingLeaves + '</div><div class="home-stat-label">Pending Leaves</div></div>';
   html += '</div>';
   c.innerHTML = html;
+}
+
+// =====================================================
+// ANALYTICS & REPORTS DASHBOARD (role-based charts)
+// =====================================================
+function loadChartJS(cb) {
+  if (window.Chart) { cb(); return; }
+  var s = document.createElement('script');
+  s.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js';
+  s.onload = cb; document.head.appendChild(s);
+}
+
+function _chartCard(id, title, icon, height) {
+  return '<div class="analytics-card"><div class="analytics-card-header">' +
+    '<div class="analytics-card-icon">' + icon + '</div>' +
+    '<h4 class="analytics-card-title">' + title + '</h4></div>' +
+    '<div class="analytics-card-body"><canvas id="' + id + '" height="' + (height || 180) + '"></canvas></div></div>';
+}
+
+function renderHomeAnalytics() {
+  var c = document.getElementById('homeAnalytics');
+  if (!c || !currentUser) return;
+
+  apiCall('GET', '/analytics/home').then(function(data) {
+    var role = currentUser.role;
+
+    // Section header
+    var html = '<div class="analytics-section">';
+    html += '<div class="analytics-header">';
+    html += '<div><h3 class="analytics-title"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:6px"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>Analytics & Reports</h3>';
+    html += '<p class="analytics-subtitle">Real-time insights based on your role</p></div></div>';
+
+    html += '<div class="analytics-grid">';
+
+    // ── Employee/HR/Manager: My charts ──
+    if (role !== 'MD') {
+      html += _chartCard('chartMyAttendance', 'My Attendance This Month',
+        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M9 16l2 2 4-4"/></svg>', 170);
+      html += _chartCard('chartMyLeaves', 'My Leave Usage',
+        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8b5cf6" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>', 170);
+    }
+
+    // ── HR/Manager/MD: Team charts ──
+    if (role === 'HR' || role === 'MD' || role === 'Manager') {
+      html += _chartCard('chartAttendanceToday', "Today's Attendance",
+        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/></svg>', 170);
+      html += _chartCard('chartDeptDist', 'Department Distribution',
+        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2"><path d="M2 20h20"/><path d="M5 20V8l7-5 7 5v12"/></svg>', 170);
+      html += _chartCard('chartMonthlyAttendance', 'Monthly Attendance Trend',
+        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>', 170);
+      html += _chartCard('chartLeaveStats', 'Leave Requests This Month',
+        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/></svg>', 170);
+    }
+
+    // ── MD ONLY: Financial charts ──
+    if (role === 'MD') {
+      html += _chartCard('chartStockCategory', 'PEB Stock Value by Category',
+        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e85d04" stroke-width="2"><path d="M3 9l1-4h16l1 4"/><path d="M3 9v11a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V9"/></svg>', 180);
+      html += _chartCard('chartStockConsumption', 'Stock Consumption Trend',
+        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>', 180);
+    }
+
+    // Close the chart grid
+    html += '</div>';
+
+    // ── HR/MD: Attendance heatmap (below charts, full width) ──
+    if ((role === 'HR' || role === 'MD') && data.topAbsentees && data.topAbsentees.length > 0) {
+      var workDays = new Date().getDate();
+      html += '<div class="analytics-card" style="margin-top:16px"><div class="analytics-card-header">' +
+        '<div class="analytics-card-icon" style="background:linear-gradient(135deg,rgba(239,68,68,.12),rgba(239,68,68,.04))"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>' +
+        '<h4 class="analytics-card-title">Attendance Heatmap — Least Present</h4></div>' +
+        '<div class="analytics-card-body">';
+      html += '<div style="overflow-x:auto"><table class="analytics-table">';
+      html += '<thead><tr><th>Employee</th><th>Dept</th><th>Days Present</th><th>Attendance Rate</th></tr></thead><tbody>';
+      data.topAbsentees.forEach(function(e) {
+        var present = e.days_present || 0;
+        var pct = workDays > 0 ? Math.round(present / workDays * 100) : 0;
+        var barColor = pct >= 80 ? '#22c55e' : pct >= 50 ? '#f59e0b' : '#ef4444';
+        var bgColor = pct >= 80 ? '#f0fdf4' : pct >= 50 ? '#fffbeb' : '#fef2f2';
+        html += '<tr><td><strong>' + escapeHTML(e.name) + '</strong> <span style="color:#9ca3af">(' + escapeHTML(e.code) + ')</span></td>';
+        html += '<td>' + escapeHTML(e.dept || '-') + '</td>';
+        html += '<td style="text-align:center"><span style="font-weight:700;color:' + barColor + '">' + present + '</span> / ' + workDays + '</td>';
+        html += '<td><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;background:#f0f0f0;border-radius:6px;height:10px;min-width:80px;overflow:hidden"><div style="background:' + barColor + ';height:100%;border-radius:6px;width:' + pct + '%;transition:width .5s"></div></div><span style="font-size:.7rem;font-weight:600;color:' + barColor + ';min-width:35px;padding:2px 6px;background:' + bgColor + ';border-radius:4px;text-align:center">' + pct + '%</span></div></td></tr>';
+      });
+      html += '</tbody></table></div></div></div>';
+    }
+
+    html += '</div>';
+    c.innerHTML = html;
+
+    // ── Render charts ──
+    loadChartJS(function() {
+      Chart.defaults.font.family = "'DM Sans', sans-serif";
+      Chart.defaults.plugins.legend.labels.usePointStyle = true;
+      Chart.defaults.plugins.legend.labels.pointStyle = 'circle';
+      var palette = ['#3b82f6','#22c55e','#f59e0b','#ef4444','#8b5cf6','#ec4899','#14b8a6','#e85d04'];
+      var gradientBlue, gradientRed;
+
+      function makeGradient(ctx, color1, color2) {
+        var g = ctx.createLinearGradient(0, 0, 0, ctx.canvas.height);
+        g.addColorStop(0, color1); g.addColorStop(1, color2); return g;
+      }
+
+      // My Attendance
+      var myAtt = data.myAttendance || [];
+      var a1 = document.getElementById('chartMyAttendance');
+      if (a1 && myAtt.length > 0) {
+        gradientBlue = makeGradient(a1.getContext('2d'), 'rgba(59,130,246,.8)', 'rgba(59,130,246,.2)');
+        new Chart(a1, { type:'bar', data:{ labels:myAtt.map(function(d){return d.day?new Date(d.day).getDate()+'':'';}), datasets:[{label:'Sessions',data:myAtt.map(function(d){return d.sessions;}),backgroundColor:gradientBlue,borderRadius:6,borderSkipped:false}] },
+          options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,ticks:{stepSize:1},grid:{color:'rgba(0,0,0,.04)'}},x:{grid:{display:false}}}} });
+      }
+
+      // My Leaves
+      var myLv = data.myLeaveUsage || [];
+      var a2 = document.getElementById('chartMyLeaves');
+      if (a2) {
+        var lbl = myLv.length > 0 ? myLv.map(function(l){return l.leave_type||'Other';}) : ['Unused'];
+        var vals = myLv.length > 0 ? myLv.map(function(l){return l.total_days||0;}) : [12];
+        new Chart(a2, { type:'doughnut', data:{ labels:lbl, datasets:[{data:vals,backgroundColor:palette.slice(0,lbl.length),borderWidth:0,hoverOffset:6}] },
+          options:{responsive:true,cutout:'65%',plugins:{legend:{position:'bottom',labels:{font:{size:11},padding:12}}}} });
+      }
+
+      // Today's attendance
+      var at = data.attendanceToday || {};
+      var a3 = document.getElementById('chartAttendanceToday');
+      if (a3) {
+        new Chart(a3, { type:'doughnut', data:{ labels:['Present ('+at.present+')','Absent ('+at.absent+')'], datasets:[{data:[at.present||0,at.absent||0],backgroundColor:['#22c55e','#fee2e2'],borderColor:['#22c55e','#ef4444'],borderWidth:2,hoverOffset:6}] },
+          options:{responsive:true,cutout:'65%',plugins:{legend:{position:'bottom',labels:{font:{size:11},padding:12}}}} });
+      }
+
+      // Dept distribution
+      var dd = data.deptDistribution || [];
+      var a4 = document.getElementById('chartDeptDist');
+      if (a4 && dd.length > 0) {
+        new Chart(a4, { type:'bar', data:{ labels:dd.map(function(d){return d.dept||'N/A';}), datasets:[{label:'Count',data:dd.map(function(d){return d.count;}),backgroundColor:palette,borderRadius:6,borderSkipped:false}] },
+          options:{responsive:true,indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{beginAtZero:true,ticks:{stepSize:1},grid:{color:'rgba(0,0,0,.04)'}},y:{grid:{display:false}}}} });
+      }
+
+      // Monthly attendance trend
+      var ma = data.monthlyAttendance || [];
+      var a5 = document.getElementById('chartMonthlyAttendance');
+      if (a5 && ma.length > 0) {
+        var ctx5 = a5.getContext('2d');
+        gradientBlue = makeGradient(ctx5, 'rgba(59,130,246,.3)', 'rgba(59,130,246,.02)');
+        new Chart(a5, { type:'line', data:{ labels:ma.map(function(d){return d.month;}), datasets:[{label:'Unique Check-ins',data:ma.map(function(d){return d.unique_checkins;}),borderColor:'#3b82f6',borderWidth:2.5,tension:.4,fill:true,backgroundColor:gradientBlue,pointBackgroundColor:'#3b82f6',pointRadius:4,pointHoverRadius:6}] },
+          options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'rgba(0,0,0,.04)'}},x:{grid:{display:false}}}} });
+      }
+
+      // Leave stats
+      var ls = data.leaveStats || [];
+      var a6 = document.getElementById('chartLeaveStats');
+      if (a6) {
+        var lsL = ls.length > 0 ? ls.map(function(l){return (l.status||'').replace(/_/g,' ');}) : ['None'];
+        var lsD = ls.length > 0 ? ls.map(function(l){return l.count;}) : [0];
+        var lsC = ls.length > 0 ? ls.map(function(l){var s=l.status;return s==='approved'?'#22c55e':s==='rejected'?'#ef4444':s==='hr_accepted'?'#3b82f6':'#f59e0b';}) : ['#e5e7eb'];
+        new Chart(a6, { type:'doughnut', data:{ labels:lsL, datasets:[{data:lsD,backgroundColor:lsC,borderWidth:0,hoverOffset:6}] },
+          options:{responsive:true,cutout:'65%',plugins:{legend:{position:'bottom',labels:{font:{size:11},padding:12}}}} });
+      }
+
+      // MD: Stock by category
+      var sc = data.stockByCategory || [];
+      var a8 = document.getElementById('chartStockCategory');
+      if (a8 && sc.length > 0) {
+        new Chart(a8, { type:'doughnut', data:{ labels:sc.map(function(d){return d.category;}), datasets:[{data:sc.map(function(d){return d.value;}),backgroundColor:palette,borderWidth:0,hoverOffset:6}] },
+          options:{responsive:true,cutout:'65%',plugins:{legend:{position:'bottom',labels:{font:{size:10},padding:10}},tooltip:{callbacks:{label:function(ctx){return ctx.label+': Rs.'+Number(ctx.raw).toLocaleString('en-IN');}}}}} });
+      }
+
+      // MD: Stock consumption
+      var scon = data.stockConsumption || [];
+      var a9 = document.getElementById('chartStockConsumption');
+      if (a9 && scon.length > 0) {
+        var ctx9 = a9.getContext('2d');
+        gradientRed = makeGradient(ctx9, 'rgba(239,68,68,.3)', 'rgba(239,68,68,.02)');
+        new Chart(a9, { type:'line', data:{ labels:scon.map(function(d){return d.month;}), datasets:[{label:'Material Issued',data:scon.map(function(d){return d.total_issued;}),borderColor:'#ef4444',borderWidth:2.5,tension:.4,fill:true,backgroundColor:gradientRed,pointBackgroundColor:'#ef4444',pointRadius:4,pointHoverRadius:6}] },
+          options:{responsive:true,plugins:{legend:{display:false}},scales:{y:{beginAtZero:true,grid:{color:'rgba(0,0,0,.04)'}},x:{grid:{display:false}}}} });
+      }
+    });
+  }).catch(function() { c.innerHTML = ''; });
 }
 
 // =====================================================
@@ -10674,7 +11247,9 @@ function renderProjectGantt(proj) {
 // =====================================================
 function renderProjectDailyLogs(proj, isMDorHR) {
   var html = '<div style="padding:0 16px">';
-  html += '<div style="margin-top:10px;margin-bottom:8px"><button class="nf-btn nf-btn-primary nf-btn-sm" onclick="openDailyLogForm(' + proj.id + ')">+ Add Log Entry</button></div>';
+  html += '<div style="margin-top:10px;margin-bottom:8px;display:flex;gap:8px;flex-wrap:wrap">' +
+    '<button class="nf-btn nf-btn-primary nf-btn-sm" onclick="openDailyLogForm(' + proj.id + ')">+ Add Log Entry</button>' +
+    '<button class="nf-btn nf-btn-secondary nf-btn-sm" onclick="uploadSitePhoto(' + proj.id + ')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>Upload Site Photo</button></div>';
   html += '<div id="dailyLogFormArea"></div>';
   html += '<div id="dailyLogContent"><div class="nf-empty" style="margin-top:16px"><span class="spinner"></span> Loading logs...</div></div>';
   html += '</div>';
