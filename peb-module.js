@@ -13,7 +13,7 @@ var _pebSection = 'dashboard';
 var _pebTitles = {'dashboard':'PEB Dashboard','stock-items':'Stock Items','grn':'Goods Receipt Notes','material-requests':'Material Requests','returns-scrap':'Returns & Scrap','vendors':'Vendors','purchase-indents':'Purchase Indents','purchase-orders':'Purchase Orders','transport':'Transport Requests'};
 
 // ========== API HELPERS ==========
-function _pebToken() { try { return localStorage.getItem('token') || JSON.parse(localStorage.getItem('hrms_session')||'{}').token; } catch(e) { return ''; } }
+function _pebToken() { try { return JWT_TOKEN || safeStorage.get('hrms_jwt') || localStorage.getItem('token') || JSON.parse(localStorage.getItem('hrms_session')||'{}').token; } catch(e) { return ''; } }
 async function _pebApi(path) {
   var r = await fetch(path, { headers: { 'Authorization': 'Bearer ' + _pebToken() } });
   if (!r.ok) { var e = await r.json(); throw new Error(e.error || 'Request failed'); } return r.json();

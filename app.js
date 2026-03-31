@@ -954,7 +954,7 @@ async function processForgotPassword() {
     });
     var data = await res.json();
     if (!res.ok) { result.textContent = data.error || 'Password reset failed'; return; }
-    result.innerHTML = 'Password has been reset for <b>' + escapeHTML(code) + '</b>.<br><br>Your new password is <b>emp123</b>. Please change it after login.';
+    result.innerHTML = 'Password has been reset for <b>' + escapeHTML(code) + '</b>.<br><br>Your new password is <b>emp12345</b>. Please change it after login.';
   } catch (e) {
     result.textContent = 'Cannot reach server. Please try again later.';
   }
@@ -1728,7 +1728,7 @@ async function submitOnboarding() {
     return;
   }
 
-  var obPassword = (document.getElementById('obPassword') || {}).value || 'emp123';
+  var obPassword = (document.getElementById('obPassword') || {}).value || 'emp1234545';
   var obRole = (document.getElementById('obRole') || {}).value || 'Employee';
   // Only MD can set HR role
   if (obRole === 'HR' && currentUser.role !== 'MD') obRole = 'Employee';
@@ -1766,9 +1766,12 @@ async function submitOnboarding() {
     } else {
       showToast('Employee added but login setup failed. Contact MD to create login credentials.', 'warning');
     }
-    hideOverlay('onboarding');
-  } catch (e) { showToast(e.message || 'Error adding employee'); }
-  if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = submitBtn.dataset.origText || 'Submit'; }
+    _submitSuccess(submitBtn);
+    setTimeout(function() { hideOverlay('onboarding'); }, 1500);
+  } catch (e) {
+    _submitError(submitBtn, 'Failed');
+    showToast(e.message || 'Error adding employee');
+  }
 }
 
 // =====================================================
@@ -2252,7 +2255,7 @@ async function deleteEmployeePermanently(code) {
 async function resetEmployeePassword(code) {
   var emp = EMPLOYEES.find(function(e) { return e.code === code; });
   if (!emp) return;
-  if (!confirm('Reset password for ' + emp.name + ' to default (emp123)?')) return;
+  if (!confirm('Reset password for ' + emp.name + ' to default (emp12345)?')) return;
   try {
     await apiCall('PUT', '/employees/' + code + '/reset-password', {});
     showToast('Password reset for ' + emp.name);
@@ -2839,12 +2842,19 @@ async function submitAdvanceRequest() {
   }
 
   try {
-    // Post to backend API
-    const apiRes = await apiCall('POST', '/advances', {
-      type: advSelectedType, amount, reason, details, project, category,
-      travelFrom, travelTo, vehicle, travelKm, emiAmount, emiMonths,
-      urgency: advSelectedUrgency
-    });
+    // Post to backend API — strip null/undefined to avoid validator errors
+    var advPayload = { type: advSelectedType, amount: amount, urgency: advSelectedUrgency };
+    if (reason) advPayload.reason = reason;
+    if (details) advPayload.details = details;
+    if (project) advPayload.project = project;
+    if (category) advPayload.category = category;
+    if (travelFrom) advPayload.travelFrom = travelFrom;
+    if (travelTo) advPayload.travelTo = travelTo;
+    if (vehicle) advPayload.vehicle = vehicle;
+    if (travelKm) advPayload.travelKm = travelKm;
+    if (emiAmount) advPayload.emiAmount = emiAmount;
+    if (emiMonths) advPayload.emiMonths = emiMonths;
+    const apiRes = await apiCall('POST', '/advances', advPayload);
 
     // HR's own salary advance skips HR step — goes directly to MD
     var initStatus = 'pending';
@@ -2869,12 +2879,16 @@ async function submitAdvanceRequest() {
     });
 
     const typeLabel = ADV_TYPE_LABELS[advSelectedType];
+    var advBtn = document.querySelector('#overlay-advance-apply .btn-primary');
+    _submitSuccess(advBtn);
     showToast(typeLabel + ' request submitted for \u20B9' + amount.toLocaleString('en-IN') + (initStatus === 'hr_accepted' ? ' — sent to MD' : ''));
-    hideOverlay('advance-apply');
+    setTimeout(function() { hideOverlay('advance-apply'); }, 1500);
     renderAllMyRequests();
     renderAllPendingBanners();
     refreshNotifications();
   } catch (e) {
+    var advBtnE = document.querySelector('#overlay-advance-apply .btn-primary');
+    _submitError(advBtnE, 'Failed');
     showToast(e.message || 'Error submitting advance request');
   }
 }
@@ -3212,9 +3226,15 @@ async function submitSiteExpenseBill() {
       date: new Date().toISOString().split('T')[0], status: 'Pending',
       expenseType: 'site_expense', billUrl: apiRes.billUrl || ''
     });
+    var expBtn = document.querySelector('#siteExpenseBillForm .nf-btn-primary');
+    _submitSuccess(expBtn);
     showToast('Site expense bill submitted for Rs.' + amount.toLocaleString('en-IN'));
-    renderSiteExpenseScreen();
-  } catch (e) { showToast(e.message || 'Error submitting bill'); }
+    setTimeout(function() { renderSiteExpenseScreen(); }, 1500);
+  } catch (e) {
+    var expBtnE = document.querySelector('#siteExpenseBillForm .nf-btn-primary');
+    _submitError(expBtnE, 'Failed');
+    showToast(e.message || 'Error submitting bill');
+  }
 }
 
 // =====================================================
@@ -5789,6 +5809,37 @@ function apiHeaders() {
   return h;
 }
 
+// Universal submit button visual feedback
+function _submitStart(btn) {
+  if (!btn) return;
+  btn._origHTML = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:4px;animation:spin 1s linear infinite"><circle cx="12" cy="12" r="10"/></svg>Submitting...';
+  btn.style.opacity = '0.7';
+}
+function _submitSuccess(btn) {
+  if (!btn) return;
+  btn.disabled = false;
+  btn.style.opacity = '1';
+  btn.style.background = 'var(--success, #22c55e)';
+  btn.style.color = '#fff';
+  btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:4px"><polyline points="20 6 9 17 4 12"/></svg>Submitted Successfully';
+  setTimeout(function() {
+    if (btn) { btn.style.background = ''; btn.style.color = ''; btn.innerHTML = btn._origHTML || 'Submit'; btn.disabled = false; }
+  }, 3000);
+}
+function _submitError(btn, msg) {
+  if (!btn) return;
+  btn.disabled = false;
+  btn.style.opacity = '1';
+  btn.style.background = 'var(--danger, #ef4444)';
+  btn.style.color = '#fff';
+  btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:4px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>' + (msg || 'Failed — Try Again');
+  setTimeout(function() {
+    if (btn) { btn.style.background = ''; btn.style.color = ''; btn.innerHTML = btn._origHTML || 'Submit'; }
+  }, 3000);
+}
+
 async function apiCall(method, path, body) {
   if (!isOnline) throw new Error('No internet connection');
   if (!JWT_TOKEN) throw new Error('Not authenticated');
@@ -7201,6 +7252,7 @@ function stopNotifPoll() {
 var _hrmsSocket = null;
 
 function initWebSocket() {
+  try {
   if (!window.io || !currentUser) return;
   if (_hrmsSocket) _hrmsSocket.disconnect();
 
@@ -7314,6 +7366,7 @@ function initWebSocket() {
       console.log('[WS] ' + data.empCode + ' went offline');
     }
   });
+  } catch(e) { console.error('[WS] Init error:', e); }
 }
 
 function disconnectWebSocket() {
@@ -7840,15 +7893,20 @@ async function submitLeave() {
       date: new Date().toISOString()
     };
     leaveApplications.push(app);
-    closeLeaveForm();
-    renderLeaveScreen();
+    var leaveBtn = document.querySelector('.leave-form-overlay .btn-primary, .leave-form-overlay .nf-btn-primary');
+    _submitSuccess(leaveBtn);
     if (lopFlag) {
       showToast('Leave submitted — salary deduction will apply for LOP days');
     } else {
       showToast('Leave application submitted (paid leave)');
     }
+    setTimeout(function() { closeLeaveForm(); renderLeaveScreen(); }, 1500);
     refreshNotifications();
-  } catch (e) { showToast(e.message || 'Error submitting leave'); }
+  } catch (e) {
+    var leaveBtnE = document.querySelector('.leave-form-overlay .btn-primary, .leave-form-overlay .nf-btn-primary');
+    _submitError(leaveBtnE, 'Failed');
+    showToast(e.message || 'Error submitting leave');
+  }
 }
 
 async function approveLeave(id) {
