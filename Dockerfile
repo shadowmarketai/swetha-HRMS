@@ -8,7 +8,7 @@ RUN cd server && npm install --production
 
 # Copy frontend static files to /app/public
 RUN mkdir -p /app/public
-COPY index.html styles.css app.js sw.js manifest.json /app/public/
+COPY index.html styles.css app.js peb-module.js sw.js manifest.json /app/public/
 COPY swetha_symbol.png swetha_name.png swetha_tagline.png swetha_new_logo.png /app/public/
 COPY icons/ /app/public/icons/
 COPY assets/ /app/public/assets/

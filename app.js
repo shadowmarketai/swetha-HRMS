@@ -1447,7 +1447,7 @@ function showOverlay(id) {
       }
       renderRecruitmentOverlay();
     }
-  } catch(e) { /* don't block overlay */ }
+  } catch(e) { console.error('Overlay render error:', id, e); }
   // Close any currently active overlays to prevent split-screen stacking
   document.querySelectorAll('.overlay-screen.active').forEach(function(o) {
     o.classList.remove('active');

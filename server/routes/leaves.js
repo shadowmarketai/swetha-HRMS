@@ -53,12 +53,13 @@ router.post('/', verifyToken, [
   body('type').trim().isIn(VALID_LEAVE_TYPES).withMessage('Invalid leave type'),
   body('from').isISO8601().withMessage('Valid from date required'),
   body('to').isISO8601().withMessage('Valid to date required'),
-  body('reason').optional().trim().isLength({ max: 500 })
+  body('reason').optional().trim().isLength({ max: 500 }),
+  body('isLOP').optional().isBoolean()
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
   try {
-    const { type, from, to, reason } = req.body;
+    const { type, from, to, reason, isLOP } = req.body;
     if (!type || !from || !to) return res.status(400).json({ error: 'Type, from and to dates required' });
     if (!VALID_LEAVE_TYPES.includes(type)) return res.status(400).json({ error: 'Invalid leave type' });
 
@@ -68,11 +69,15 @@ router.post('/', verifyToken, [
 
     const days = Math.round((toDate - fromDate) / 86400000) + 1;
 
-    // Check balance
+    // Check balance — allow LOP if client confirmed
+    let lopFlag = !!isLOP;
     const [bal] = await pool.query('SELECT * FROM leave_balances WHERE emp_code = ?', [req.user.empCode]);
     if (bal.length > 0) {
       const available = bal[0][type] || 0;
-      if (available < days) return res.status(400).json({ error: 'Insufficient ' + type + ' leave balance (' + available + ' remaining)' });
+      if (available < days && !lopFlag) {
+        return res.status(400).json({ error: 'Insufficient ' + type + ' leave balance (' + available + ' remaining). Apply as LOP if needed.' });
+      }
+      if (available < days) lopFlag = true;
     }
 
     // Get employee info
@@ -80,10 +85,13 @@ router.post('/', verifyToken, [
     const empName = emp.length ? emp[0].name : '';
     const dept = emp.length ? emp[0].dept : '';
 
+    // Add is_lop column if not exists (auto-migrate)
+    await pool.query("ALTER TABLE leave_applications ADD COLUMN is_lop BOOLEAN DEFAULT FALSE").catch(() => {});
+
     const [result] = await pool.query(
-      `INSERT INTO leave_applications (emp_code, emp_name, dept, leave_type, from_date, to_date, days, reason)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [req.user.empCode, empName, dept, type, from, to, days, reason || '']
+      `INSERT INTO leave_applications (emp_code, emp_name, dept, leave_type, from_date, to_date, days, reason, is_lop)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [req.user.empCode, empName, dept, type, from, to, days, reason || '', lopFlag]
     );
 
     // Notify all HR and MD users about new leave request
