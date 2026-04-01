@@ -79,6 +79,84 @@ async function runMigrations(conn) {
   if (applied > 0) console.log('Migrations: ' + applied + ' applied');
 }
 
+// Seed new SS*** employees + users if missing (one-time migration from SSC to SS codes)
+async function seedNewEmployees(conn) {
+  const bcrypt = require('bcryptjs');
+  const employees = [
+    {code:'MD001',name:'Selvam',dept:'Admin',designation:'Managing Director',salary:0,role:'MD',phone:'',doj:null,email:'selvam@swethastructures.com'},
+    {code:'HR001',name:'HR Admin',dept:'Admin',designation:'HR Admin',salary:0,role:'HR',phone:'',doj:null,email:''},
+    {code:'SS001',name:'Sankar Guru P',dept:'Design',designation:'Designing',salary:0,role:'Employee',phone:'',doj:null,email:'sankarguru182@gmail.com'},
+    {code:'SS002',name:'Vishnukumar M',dept:'Marketing',designation:'Marketing',salary:0,role:'Employee',phone:'',doj:null,email:'vishnum991@gmail.com'},
+    {code:'SS003',name:'Hariharan N',dept:'Execution',designation:'Execution',salary:0,role:'Employee',phone:'',doj:null,email:'hariharan0335@gmail.com'},
+    {code:'SS004',name:'Priyanka S',dept:'QS',designation:'Quantity Surveyor',salary:0,role:'Employee',phone:'',doj:null,email:'priyankaskcivil@gmail.com'},
+    {code:'SS005',name:'Vellaisamy Sankar',dept:'Execution',designation:'Execution',salary:0,role:'Employee',phone:'',doj:null,email:'vellaisamysankar88@yahoo.com'},
+    {code:'SS006',name:'Srinivasan',dept:'Marketing',designation:'Marketing',salary:0,role:'Employee',phone:'',doj:null,email:'lsssrinisan@gmail.com'},
+    {code:'SS007',name:'Balasubramanian N',dept:'Marketing',designation:'Marketing',salary:0,role:'Employee',phone:'',doj:null,email:'baluvspl@gmail.com'},
+    {code:'SS008',name:'Santhosh J',dept:'Execution',designation:'Execution',salary:0,role:'Employee',phone:'',doj:null,email:'santhosej0210@gmail.com'},
+    {code:'SS009',name:'Hariharan G',dept:'Design',designation:'Designing',salary:0,role:'Employee',phone:'',doj:null,email:'josephharigmw@gmail.com'},
+    {code:'SS010',name:'M Karthikeyan',dept:'Execution',designation:'Execution',salary:0,role:'Employee',phone:'',doj:null,email:'karthikmanoharan19@gmail.com'},
+    {code:'SS011',name:'Govindaraj R',dept:'Marketing',designation:'Marketing',salary:0,role:'Employee',phone:'',doj:null,email:'govindganga0208@gmail.com'},
+    {code:'SS012',name:'Kamalesh Velusamy',dept:'Execution',designation:'Execution',salary:0,role:'Employee',phone:'',doj:null,email:'vkamaleshkamalesh60306@gmail.com'},
+    {code:'SS013',name:'Santhoshkumar G',dept:'Production',designation:'Production',salary:0,role:'Employee',phone:'',doj:null,email:'santhoshganesan0556@gmail.com'},
+    {code:'SS014',name:'Nithyaprabhu A',dept:'Execution',designation:'Execution',salary:0,role:'Employee',phone:'',doj:null,email:'nithyaprabhu00@gmail.com'},
+    {code:'SS015',name:'Yuvaraj M',dept:'Execution',designation:'Execution',salary:0,role:'Employee',phone:'',doj:null,email:'yuvamarimuthu1085@gmail.com'},
+    {code:'SS016',name:'S Sankavai',dept:'Design',designation:'Designing',salary:0,role:'Employee',phone:'',doj:null,email:'sankavaisanthosh@gmail.com'},
+    {code:'SS017',name:'Kousikraja M',dept:'Marketing',designation:'Marketing',salary:0,role:'Employee',phone:'',doj:null,email:'kousik622@gmail.com'},
+    {code:'SS018',name:'Rajkumar R',dept:'Marketing',designation:'Marketing',salary:0,role:'Employee',phone:'',doj:null,email:'Rajthelegend4058@gmail.com'},
+    {code:'SS019',name:'Sakthikumar S',dept:'Production',designation:'Production',salary:0,role:'Employee',phone:'',doj:null,email:'sakthikumar250289@gmail.com'},
+    {code:'SS020',name:'Shanmugasundaran G',dept:'Production',designation:'Production',salary:0,role:'Employee',phone:'',doj:null,email:'shanmugashanmuga90@gmail.com'},
+    {code:'SS021',name:'Govarthan S',dept:'Admin',designation:'Admin',salary:0,role:'Employee',phone:'',doj:null,email:'govarthansakthi@gmail.com'},
+    {code:'SS022',name:'Devendaran Arivalagan',dept:'Production',designation:'Production',salary:0,role:'Employee',phone:'',doj:null,email:'devendaran96@gmail.com'},
+    {code:'SS023',name:'Gowtham S',dept:'Production',designation:'Production',salary:0,role:'Employee',phone:'',doj:null,email:'gowthamautomech1995@gmail.com'},
+    {code:'SS024',name:'Manikandan M',dept:'Production',designation:'Production',salary:0,role:'Employee',phone:'',doj:null,email:'manikandansurya914@gmail.com'},
+    {code:'SS025',name:'Karthikeyan A',dept:'Production',designation:'Production',salary:0,role:'Employee',phone:'',doj:null,email:'karthikabk28@gmail.com'},
+    {code:'SS026',name:'Krishna Gowri Sankar',dept:'Production',designation:'Production',salary:0,role:'Employee',phone:'',doj:null,email:'krishnagowrisankar1@gmail.com'},
+    {code:'SS027',name:'Mahaganapathi Ponnusamy',dept:'Production',designation:'Production',salary:0,role:'Employee',phone:'',doj:null,email:'Mahaganapathi529717@gmail.com'},
+    {code:'SS028',name:'Dinesh Jayabal',dept:'Admin',designation:'Driver',salary:0,role:'Employee',phone:'',doj:null,email:'dineshindira2024@gmail.com'},
+    {code:'SS029',name:'Depsingh R',dept:'Admin',designation:'Security',salary:0,role:'Employee',phone:'',doj:null,email:'depsinghrokaya@gmail.com'},
+    {code:'SS030',name:'Kathirvel N',dept:'Design',designation:'Designing',salary:0,role:'Employee',phone:'',doj:null,email:'kathirveln2588@gmail.com'},
+    {code:'SS031',name:'Shiyam Raj E',dept:'Accounts',designation:'Accounts',salary:0,role:'Employee',phone:'',doj:null,email:'shiyam0905@gmail.com'},
+    {code:'SS032',name:'Dharmaraj',dept:'Design',designation:'Designing',salary:0,role:'Employee',phone:'',doj:null,email:'thedharmarajm@gmail.com'},
+    {code:'SS033',name:'Sakthi Murugan',dept:'Execution',designation:'Execution',salary:0,role:'Employee',phone:'',doj:null,email:'sakthi252636@gmail.com'},
+    {code:'SS034',name:'Praveen Kumar J',dept:'Marketing',designation:'Marketing',salary:0,role:'Employee',phone:'',doj:null,email:'forpraveenvideos@gmail.com'},
+    {code:'SS035',name:'Dinesh',dept:'Design',designation:'Designing',salary:0,role:'Employee',phone:'',doj:null,email:'Dineshvj5315@gmail.com'},
+    {code:'SS036',name:'Lingeswaran Subramanian',dept:'Production',designation:'Production',salary:0,role:'Employee',phone:'',doj:null,email:'linges1993@gmail.com'},
+    {code:'SS037',name:'Udhayasankar',dept:'Production',designation:'Production',salary:0,role:'Employee',phone:'',doj:null,email:'udhayask14@gmail.com'},
+    {code:'SS038',name:'Manikam',dept:'Execution',designation:'Execution',salary:0,role:'Employee',phone:'',doj:null,email:'mkguys2010@gmail.com'},
+    {code:'SS039',name:'Sarath',dept:'Execution',designation:'Execution',salary:0,role:'Employee',phone:'',doj:null,email:'sarathcivil42@gmail.com'},
+    {code:'SS040',name:'Marimuthu',dept:'Execution',designation:'Execution',salary:0,role:'Employee',phone:'',doj:null,email:'marimuthu04071990@gmail.com'},
+    {code:'SS041',name:'Arunkumar',dept:'QS',designation:'Quantity Surveyor',salary:0,role:'Employee',phone:'',doj:null,email:'aruntec16@gmail.com'},
+    {code:'SS042',name:'Mohan',dept:'Execution',designation:'Execution',salary:0,role:'Employee',phone:'',doj:null,email:'perumalmohan666@gmail.com'}
+  ];
+  const passwords = { 'MD001': 'admin123', 'HR001': 'hr123' };
+  const defaultPass = 'emp123';
+  let seeded = 0;
+  for (const emp of employees) {
+    try {
+      await conn.query(
+        'INSERT IGNORE INTO employees (code, name, dept, designation, salary, role, phone, doj, email) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [emp.code, emp.name, emp.dept, emp.designation, emp.salary, emp.role, emp.phone, emp.doj, emp.email]
+      );
+      const pass = passwords[emp.code] || defaultPass;
+      const hash = await bcrypt.hash(pass, 10);
+      await conn.query(
+        'INSERT IGNORE INTO users (emp_code, password_hash, role) VALUES (?, ?, ?)',
+        [emp.code, hash, emp.role]
+      );
+      seeded++;
+    } catch (e) { /* ignore duplicates */ }
+  }
+  // Deactivate old SSC*** employees that are not in the new list
+  await conn.query("UPDATE employees SET is_active = 0 WHERE code LIKE 'SSC%'").catch(() => {});
+  await conn.query("UPDATE users SET is_active = 0 WHERE emp_code LIKE 'SSC%'").catch(() => {});
+  // Seed departments
+  const depts = [...new Set(employees.map(e => e.dept))];
+  for (const d of depts) {
+    await conn.query('INSERT IGNORE INTO departments (name) VALUES (?)', [d]).catch(() => {});
+  }
+  console.log('Employee seed: ' + seeded + ' processed, old SSC codes deactivated');
+}
+
 // Auto-initialize schema if tables are missing
 async function initSchema() {
   let conn;
@@ -129,6 +207,8 @@ async function initSchema() {
 
     // Run pending migrations (idempotent)
     await runMigrations(conn);
+    // Seed new SS*** employees if missing (migration from SSC to SS codes)
+    await seedNewEmployees(conn);
   } catch (err) {
     console.error('MySQL connection/init failed:', err.message);
     console.log('Server will continue without database — localStorage fallback active');

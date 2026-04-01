@@ -18,7 +18,7 @@
 // Capture Google OAuth2 redirect token IMMEDIATELY before SW/cached JS can lose it
 (function(){var h=location.hash;if(h&&h.indexOf('access_token')>-1){sessionStorage.setItem('hrms_google_token',h.substring(1));history.replaceState(null,'',location.pathname+location.search)}})();
 </script>
-<link rel="stylesheet" href="styles.css?v=139">
+<link rel="stylesheet" href="styles.css?v=140">
 </head>
 <body>
 <div class="phone-frame" id="app">
@@ -1009,6 +1009,6 @@ try{var s=localStorage.getItem('hrms_session');if(s){var p=JSON.parse(s);if(p&&p
 </script>
 <script src="/socket.io/socket.io.js"></script>
 <script src="peb-module.js?v=2"></script>
-<script src="app.js?v=141"></script>
+<script src="app.js?v=142"></script>
 </body>
 </html>
