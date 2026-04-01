@@ -18,12 +18,11 @@ COPY server/ ./server/
 COPY database/ ./database/
 
 # Ensure uploads directory exists
-RUN mkdir -p /app/server/uploads
+RUN mkdir -p /app/server/uploads && chmod 777 /app/server/uploads
 
-# Create non-root user for security
-RUN addgroup -S hrmsgroup && adduser -S hrmsuser -G hrmsgroup
-RUN chown -R hrmsuser:hrmsgroup /app
-USER hrmsuser
+# Copy entrypoint script
+COPY entrypoint.sh /app/server/entrypoint.sh
+RUN chmod +x /app/server/entrypoint.sh
 
 # Set static dir explicitly
 ENV STATIC_DIR=/app/public
@@ -35,6 +34,6 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
   CMD wget -q --spider http://localhost:3000/api/health || exit 1
 
-# Start server
+# Start server via entrypoint (ensures uploads dir permissions)
 WORKDIR /app/server
-CMD ["node", "server.js"]
+CMD ["sh", "entrypoint.sh"]
