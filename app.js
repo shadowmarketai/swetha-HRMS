@@ -22,6 +22,18 @@ function escapeAttr(str) {
 }
 
 // =====================================================
+// AUTHENTICATED URL HELPER
+// =====================================================
+// Append JWT token as query param for browser-initiated requests (img src, a href)
+function authUrl(path) {
+  if (!path) return '';
+  var token = JWT_TOKEN || safeStorage.get('hrms_jwt');
+  if (!token) return path;
+  var sep = path.indexOf('?') >= 0 ? '&' : '?';
+  return path + sep + 'token=' + encodeURIComponent(token);
+}
+
+// =====================================================
 // LAZY CDN LOADERS
 // =====================================================
 let _jsPdfLoaded = false, _chartJsLoaded = false;
@@ -578,7 +590,7 @@ function renderProfileOverlay() {
     window._profileLockStatus = lockData;
     _renderProfileContent(c, emp, initials, isMDUser, isHrMd, lockData);
   }).catch(function() {
-    window._profileLockStatus = { locks: {}, pending_requests: [], approved_requests: [], documents: [] };
+    window._profileLockStatus = { locks: { profile_details: true, educational_certs: true, bank_passbook: true, bank_details: true, experience_certs: true }, pending_requests: [], approved_requests: [], documents: [] };
     _renderProfileContent(c, emp, initials, isMDUser, isHrMd, window._profileLockStatus);
   });
 }
@@ -612,10 +624,11 @@ function _renderDocUploadCard(doc) {
   var html = '<div class="doc-upload-card uploaded">';
   var ext = (doc.file_path || '').split('.').pop().toLowerCase();
   var isImg = ['jpg','jpeg','png','gif','webp'].indexOf(ext) >= 0;
+  var docUrl = authUrl(doc.file_path);
   if (isImg) {
-    html += '<a href="' + escapeHTML(doc.file_path) + '" target="_blank" style="display:block"><img class="doc-thumb" src="' + escapeHTML(doc.file_path) + '" alt="' + escapeHTML(doc.doc_name) + '"></a>';
+    html += '<a href="' + escapeHTML(docUrl) + '" target="_blank" style="display:block"><img class="doc-thumb" src="' + escapeHTML(docUrl) + '" alt="' + escapeHTML(doc.doc_name) + '"></a>';
   } else {
-    html += '<a href="' + escapeHTML(doc.file_path) + '" target="_blank" style="display:block"><div style="height:70px;display:flex;align-items:center;justify-content:center;background:var(--gray-100);border-radius:6px;margin-bottom:6px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div></a>';
+    html += '<a href="' + escapeHTML(docUrl) + '" target="_blank" style="display:block"><div style="height:70px;display:flex;align-items:center;justify-content:center;background:var(--gray-100);border-radius:6px;margin-bottom:6px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div></a>';
   }
   var fileName = (doc.file_path || '').split('/').pop() || doc.doc_name || doc.doc_type;
   html += '<div style="font-size:.65rem;color:#22c55e;font-weight:600;margin-bottom:2px"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="vertical-align:middle;margin-right:2px"><polyline points="20 6 9 17 4 12"/></svg>Uploaded</div>';
@@ -647,7 +660,7 @@ function _renderProfileContent(c, emp, initials, isMDUser, isHrMd, lockStatus) {
   var photoUrl = emp.photoUrl || emp.photo_url || null;
   html += '<div style="position:relative;display:inline-block">';
   if (photoUrl) {
-    html += '<div class="profile-avatar" id="profAvatarImg" style="background-image:url(\'' + escapeHTML(photoUrl) + '\');background-size:cover;background-position:center"></div>';
+    html += '<div class="profile-avatar" id="profAvatarImg" style="background-image:url(\'' + escapeHTML(authUrl(photoUrl)) + '\');background-size:cover;background-position:center"></div>';
   } else {
     html += '<div class="profile-avatar" id="profAvatarImg">' + escapeHTML(initials) + '</div>';
   }
@@ -1002,11 +1015,13 @@ function uploadProfilePhoto() {
   }).then(function(r) { return r.json(); }).then(function(data) {
     if (data.photo_url) {
       currentUser.photo_url = data.photo_url;
+      currentUser.photoUrl = data.photo_url;
       var emp = EMPLOYEES.find(function(e) { return e.code === currentUser.code; });
-      if (emp) emp.photo_url = data.photo_url;
+      if (emp) { emp.photo_url = data.photo_url; emp.photoUrl = data.photo_url; }
+      var authedPhotoUrl = authUrl(data.photo_url);
       var avatar = document.getElementById('profAvatarImg');
       if (avatar) {
-        avatar.style.backgroundImage = 'url(' + data.photo_url + ')';
+        avatar.style.backgroundImage = 'url(\'' + authedPhotoUrl + '\')';
         avatar.style.backgroundSize = 'cover';
         avatar.style.backgroundPosition = 'center';
         avatar.textContent = '';
@@ -1015,7 +1030,7 @@ function uploadProfilePhoto() {
       var headerAv = document.getElementById('headerAvatar');
       if (headerAv) {
         headerAv.textContent = '';
-        headerAv.style.backgroundImage = 'url(' + data.photo_url + ')';
+        headerAv.style.backgroundImage = 'url(\'' + authedPhotoUrl + '\')';
         headerAv.style.backgroundSize = 'cover';
         headerAv.style.backgroundPosition = 'center';
       }
@@ -1149,7 +1164,7 @@ function applyRole() {
   var avatarPhoto = currentUser.photo_url || (emp && (emp.photo_url || emp.photoUrl)) || null;
   if (avatarPhoto) {
     headerAv.textContent = '';
-    headerAv.style.backgroundImage = 'url(' + avatarPhoto + ')';
+    headerAv.style.backgroundImage = 'url(\'' + authUrl(avatarPhoto) + '\')';
     headerAv.style.backgroundSize = 'cover';
     headerAv.style.backgroundPosition = 'center';
   } else {
@@ -2240,10 +2255,11 @@ function showEmployeeDetailModal(empCode) {
         var ext = (d.file_path || '').split('.').pop().toLowerCase();
         var isImg = ['jpg','jpeg','png','gif','webp'].indexOf(ext) >= 0;
         var label = docTypeLabels[d.doc_type] || d.doc_name || d.doc_type;
-        dhtml += '<a href="' + escapeHTML(d.file_path) + '" target="_blank" style="text-decoration:none" title="' + escapeHTML(label) + '">';
+        var docUrl = authUrl(d.file_path);
+        dhtml += '<a href="' + escapeHTML(docUrl) + '" target="_blank" style="text-decoration:none" title="' + escapeHTML(label) + '">';
         dhtml += '<div class="doc-upload-card uploaded" style="cursor:pointer">';
         if (isImg) {
-          dhtml += '<img class="doc-thumb" src="' + escapeHTML(d.file_path) + '" alt="' + escapeHTML(label) + '">';
+          dhtml += '<img class="doc-thumb" src="' + escapeHTML(docUrl) + '" alt="' + escapeHTML(label) + '">';
         } else {
           dhtml += '<div style="height:60px;display:flex;align-items:center;justify-content:center;background:var(--gray-100);border-radius:6px;margin-bottom:4px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>';
         }
@@ -2443,11 +2459,43 @@ function renderEmployeeDetailCard(empCode) {
   html += empDetailField('UAN', ext.uan, empCode, 'ext_uan');
   html += empDetailField('ESI No', ext.esiNo, empCode, 'ext_esiNo');
   html += '</div>';
+  // Documents section
+  html += '<div style="margin-top:10px"><div style="font-size:.72rem;font-weight:600;color:var(--text-secondary);margin-bottom:6px">Employee Documents</div><div id="inlineDocsList-' + empCode + '" style="font-size:.7rem;color:var(--gray-400)">Loading documents...</div></div>';
   html += '<div style="display:flex;gap:8px;margin-top:10px">';
-  html += '<button class="btn btn-primary" style="font-size:.72rem;padding:6px 14px" onclick="saveEmployeeDetails(\'' + empCode + '\')">Save Changes</button>';
+  html += '<button class="btn btn-primary" style="font-size:.72rem;padding:6px 14px" onclick="saveEmployeeDetailsInline(\'' + empCode + '\')">Save Changes</button>';
   html += '<button class="btn btn-sm" style="font-size:.72rem;padding:6px 14px" onclick="document.getElementById(\'empDetail-' + empCode + '\').style.display=\'none\'">Close</button>';
   html += '</div></div>';
   container.innerHTML = html;
+
+  // Load documents asynchronously
+  apiCall('GET', '/employees/' + empCode + '/documents').then(function(resp) {
+    var docsEl = document.getElementById('inlineDocsList-' + empCode);
+    if (!docsEl) return;
+    var docs = resp.data || [];
+    if (docs.length === 0) { docsEl.innerHTML = '<span style="color:var(--gray-400);font-size:.7rem">No documents uploaded</span>'; return; }
+    var docTypeLabels = { aadhaar_photo: 'Aadhaar Card', pan_photo: 'PAN Card', educational_cert: 'Educational Certificate', bank_passbook: 'Bank Passbook', experience_cert: 'Experience Certificate' };
+    var dhtml = '<div class="doc-upload-grid" style="grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:6px">';
+    docs.forEach(function(d) {
+      var fext = (d.file_path || '').split('.').pop().toLowerCase();
+      var isImg = ['jpg','jpeg','png','gif','webp'].indexOf(fext) >= 0;
+      var label = docTypeLabels[d.doc_type] || d.doc_name || d.doc_type;
+      var url = typeof authUrl === 'function' ? authUrl(d.file_path) : d.file_path;
+      dhtml += '<a href="' + escapeHTML(url) + '" target="_blank" style="text-decoration:none" title="' + escapeHTML(label) + '">';
+      dhtml += '<div class="doc-upload-card uploaded" style="cursor:pointer">';
+      if (isImg) {
+        dhtml += '<img class="doc-thumb" src="' + escapeHTML(url) + '" alt="' + escapeHTML(label) + '">';
+      } else {
+        dhtml += '<div style="height:50px;display:flex;align-items:center;justify-content:center;background:var(--gray-100);border-radius:6px;margin-bottom:4px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>';
+      }
+      dhtml += '<div class="doc-label" style="font-size:.58rem">' + escapeHTML(label) + '</div>';
+      dhtml += '</div></a>';
+    });
+    dhtml += '</div>';
+    docsEl.innerHTML = dhtml;
+  }).catch(function() {
+    var docsEl = document.getElementById('inlineDocsList-' + empCode);
+    if (docsEl) docsEl.innerHTML = '<span style="color:var(--gray-400);font-size:.7rem">Failed to load documents</span>';
+  });
 }
 
 function empDetailField(label, value, empCode, fieldKey, readOnly) {
@@ -2458,7 +2506,7 @@ function empDetailField(label, value, empCode, fieldKey, readOnly) {
     '</div>';
 }
 
-async function saveEmployeeDetails(empCode) {
+async function saveEmployeeDetailsInline(empCode) {
   var emp = EMPLOYEES.find(function(e) { return e.code === empCode; });
   if (!emp) return;
   var fields = ['name','dept','designation','salary','bank','accNo','phone','doj','email'];
@@ -2471,18 +2519,28 @@ async function saveEmployeeDetails(empCode) {
       updateData[f] = val;
     }
   });
-  // Update extended data locally
+  // Collect extended fields and map to camelCase keys for the API
+  var extFieldMap = {
+    fatherName: 'fatherName', motherName: 'motherName', bloodGroup: 'bloodGroup',
+    emergencyContact: 'emergencyContact', address: 'presentAddress',
+    aadhaar: 'aadhaar', pan: 'pan', uan: 'uan', esiNo: 'esiNo'
+  };
   var ext = getExtendedData(empCode);
-  var extFields = ['fatherName','motherName','bloodGroup','emergencyContact','address','aadhaar','pan','uan','esiNo'];
-  extFields.forEach(function(f) {
+  Object.keys(extFieldMap).forEach(function(f) {
     var input = document.getElementById('empField-' + empCode + '-ext_' + f);
-    if (input) ext[f] = input.value.trim();
+    if (input) {
+      var val = input.value.trim();
+      updateData[extFieldMap[f]] = val;
+      ext[f] = val;
+    }
   });
+  if (Object.keys(updateData).length === 0) { showToast('No changes to save'); return; }
   try {
     await apiCall('PUT', '/employees/' + empCode, updateData);
     Object.assign(emp, updateData);
     showToast('Employee details saved');
-    renderAllEmpList();
+    // Re-render just the detail card instead of collapsing it
+    renderEmployeeDetailCard(empCode);
   } catch (e) { showToast(e.message || 'Error saving employee details'); }
 }
 
@@ -7617,8 +7675,102 @@ function initWebSocket() {
   // ── Advance request submitted ──
   _hrmsSocket.on('advance:new', function(data) {
     showToast(data.empName + ' submitted ' + data.type + ' advance for Rs.' + Number(data.amount).toLocaleString('en-IN'), 'info');
+    refreshNotifications();
+    if (typeof renderAdvanceRequests === 'function') renderAdvanceRequests(advReqActiveTab);
+    renderAllPendingBanners();
     renderRecentActivity();
     renderHomeQuickStats();
+  });
+
+  // ── Advance: HR accepted ──
+  _hrmsSocket.on('advance:hr_accepted', function(data) {
+    showToast('Your ' + (data.type || '') + ' advance has been accepted by HR', 'success');
+    refreshNotifications();
+    if (typeof renderAdvanceRequests === 'function') renderAdvanceRequests(advReqActiveTab);
+    renderAllPendingBanners();
+    renderHomeQuickStats();
+  });
+
+  // ── Advance: pending MD approval ──
+  _hrmsSocket.on('advance:pending_approval', function(data) {
+    showToast(data.empName + ' advance pending your approval', 'info');
+    refreshNotifications();
+    if (typeof renderAdvanceRequests === 'function') renderAdvanceRequests(advReqActiveTab);
+    renderAllPendingBanners();
+    renderHomeQuickStats();
+  });
+
+  // ── Advance: approved ──
+  _hrmsSocket.on('advance:approved', function(data) {
+    showToast('Your ' + (data.type || '') + ' advance has been approved!', 'success');
+    refreshNotifications();
+    if (typeof renderAdvanceRequests === 'function') renderAdvanceRequests(advReqActiveTab);
+    renderAllPendingBanners();
+    renderHomeQuickStats();
+  });
+
+  // ── Advance: rejected ──
+  _hrmsSocket.on('advance:rejected', function(data) {
+    showToast('Your ' + (data.type || '') + ' advance was rejected' + (data.reason ? ': ' + data.reason : ''), 'error');
+    refreshNotifications();
+    if (typeof renderAdvanceRequests === 'function') renderAdvanceRequests(advReqActiveTab);
+    renderAllPendingBanners();
+    renderHomeQuickStats();
+  });
+
+  // ── Advance: general update (for MD/HR dashboard) ──
+  _hrmsSocket.on('advance:updated', function() {
+    if (typeof renderAdvanceRequests === 'function') renderAdvanceRequests(advReqActiveTab);
+    renderAllPendingBanners();
+    renderRecentActivity();
+  });
+
+  // ── Expense: new submission ──
+  _hrmsSocket.on('expense:new', function(data) {
+    showToast(data.empName + ' submitted ' + data.category + ' expense for Rs.' + Number(data.amount).toLocaleString('en-IN'), 'info');
+    refreshNotifications();
+    if (typeof renderSiteExpenseScreen === 'function') renderSiteExpenseScreen();
+    if (typeof renderTravelExpenseScreen === 'function') renderTravelExpenseScreen();
+    renderAllPendingBanners();
+    renderHomeQuickStats();
+  });
+
+  // ── Expense: HR accepted ──
+  _hrmsSocket.on('expense:hr_accepted', function(data) {
+    showToast('Your ' + (data.category || '') + ' expense has been accepted by HR', 'success');
+    refreshNotifications();
+    if (typeof renderSiteExpenseScreen === 'function') renderSiteExpenseScreen();
+    if (typeof renderTravelExpenseScreen === 'function') renderTravelExpenseScreen();
+    renderAllPendingBanners();
+    renderHomeQuickStats();
+  });
+
+  // ── Expense: approved ──
+  _hrmsSocket.on('expense:approved', function(data) {
+    showToast('Your ' + (data.category || '') + ' expense has been approved!', 'success');
+    refreshNotifications();
+    if (typeof renderSiteExpenseScreen === 'function') renderSiteExpenseScreen();
+    if (typeof renderTravelExpenseScreen === 'function') renderTravelExpenseScreen();
+    renderAllPendingBanners();
+    renderHomeQuickStats();
+  });
+
+  // ── Expense: rejected ──
+  _hrmsSocket.on('expense:rejected', function(data) {
+    showToast('Your ' + (data.category || '') + ' expense was rejected', 'error');
+    refreshNotifications();
+    if (typeof renderSiteExpenseScreen === 'function') renderSiteExpenseScreen();
+    if (typeof renderTravelExpenseScreen === 'function') renderTravelExpenseScreen();
+    renderAllPendingBanners();
+    renderHomeQuickStats();
+  });
+
+  // ── Expense: general update (for MD/HR dashboard) ──
+  _hrmsSocket.on('expense:updated', function() {
+    if (typeof renderSiteExpenseScreen === 'function') renderSiteExpenseScreen();
+    if (typeof renderTravelExpenseScreen === 'function') renderTravelExpenseScreen();
+    renderAllPendingBanners();
+    renderRecentActivity();
   });
 
   // ── User online/offline (for MD live tracking) ──

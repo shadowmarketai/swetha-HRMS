@@ -70,7 +70,7 @@ router.post('/', verifyToken, [
     );
 
     // Notify all HR and MD users about new advance request
-    const typeLabels = { salary: 'Salary Advance', travel: 'Travel Advance', site: 'Travel Expense' };
+    const typeLabels = { salary: 'Salary Advance', travel: 'Travel Advance', site: 'Site Advance' };
     const typeLabel = typeLabels[type] || type;
     const managers = await getEmpCodesByRole(pool, ['HR', 'MD']);
     const targets = managers.filter(c => c !== req.user.empCode);
@@ -105,6 +105,14 @@ router.patch('/:id/hr-accept', verifyToken, requireRole('HR'), auditLog('hr-acce
     const targets = [adv.emp_code, ...mdUsers].filter(c => c !== req.user.empCode);
     await notifyUsers(pool, targets, 'Advance Accepted by HR', adv.emp_name + '\'s ' + adv.type + ' advance (Rs.' + Number(adv.amount).toLocaleString('en-IN') + ') accepted by HR, awaiting MD', 'advance');
 
+    // Real-time socket events
+    const io = req.app.get('io');
+    if (io) {
+      io.to('user:' + adv.emp_code).emit('advance:hr_accepted', { id: adv.id, empName: adv.emp_name, type: adv.type, amount: adv.amount });
+      io.to('role:MD').emit('advance:pending_approval', { id: adv.id, empName: adv.emp_name, type: adv.type, amount: adv.amount });
+      io.to('role:HR').emit('advance:updated', { id: adv.id });
+    }
+
     res.json({ message: 'Advance accepted by HR' });
   } catch (err) {
     console.error(err);
@@ -126,6 +134,13 @@ router.patch('/:id/approve', verifyToken, requireRole('MD'), auditLog('approve',
     // Notify the employee that their advance was approved
     const adv = existing[0];
     await notifyUsers(pool, [adv.emp_code], 'Advance Approved', 'Your ' + adv.type + ' advance (Rs.' + Number(adv.amount).toLocaleString('en-IN') + ') has been approved', 'advance');
+
+    // Real-time socket events
+    const io = req.app.get('io');
+    if (io) {
+      io.to('user:' + adv.emp_code).emit('advance:approved', { id: adv.id, empName: adv.emp_name, type: adv.type, amount: adv.amount });
+      io.to('role:MD').to('role:HR').emit('advance:updated', { id: adv.id });
+    }
 
     res.json({ message: 'Advance approved' });
   } catch (err) {
@@ -149,6 +164,13 @@ router.patch('/:id/reject', verifyToken, requireRole('MD', 'HR'), auditLog('reje
     // Notify the employee that their advance was rejected
     const adv = existing[0];
     await notifyUsers(pool, [adv.emp_code], 'Advance Rejected', 'Your ' + adv.type + ' advance (Rs.' + Number(adv.amount).toLocaleString('en-IN') + ') has been rejected' + (reason ? ': ' + reason : ''), 'advance');
+
+    // Real-time socket events
+    const io = req.app.get('io');
+    if (io) {
+      io.to('user:' + adv.emp_code).emit('advance:rejected', { id: adv.id, empName: adv.emp_name, type: adv.type, amount: adv.amount, reason: reason || '' });
+      io.to('role:MD').to('role:HR').emit('advance:updated', { id: adv.id });
+    }
 
     res.json({ message: 'Advance rejected' });
   } catch (err) {

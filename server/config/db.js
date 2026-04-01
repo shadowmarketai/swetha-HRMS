@@ -40,6 +40,46 @@ async function runMigrations(conn) {
       sql: "ALTER TABLE employees ADD COLUMN profile_sections_locked JSON DEFAULT (JSON_OBJECT())"
     },
     {
+      name: 'add_bill_url_to_expense_reimbursements',
+      sql: "ALTER TABLE expense_reimbursements ADD COLUMN bill_url VARCHAR(500)"
+    },
+    {
+      name: 'add_expense_type_to_expense_reimbursements',
+      sql: "ALTER TABLE expense_reimbursements ADD COLUMN expense_type VARCHAR(50)"
+    },
+    {
+      name: 'add_project_to_expense_reimbursements',
+      sql: "ALTER TABLE expense_reimbursements ADD COLUMN project VARCHAR(100)"
+    },
+    {
+      name: 'add_travel_from_to_expense_reimbursements',
+      sql: "ALTER TABLE expense_reimbursements ADD COLUMN travel_from VARCHAR(100)"
+    },
+    {
+      name: 'add_travel_to_to_expense_reimbursements',
+      sql: "ALTER TABLE expense_reimbursements ADD COLUMN travel_to VARCHAR(100)"
+    },
+    {
+      name: 'add_vehicle_to_expense_reimbursements',
+      sql: "ALTER TABLE expense_reimbursements ADD COLUMN vehicle VARCHAR(50)"
+    },
+    {
+      name: 'add_travel_km_to_expense_reimbursements',
+      sql: "ALTER TABLE expense_reimbursements ADD COLUMN travel_km DECIMAL(10,2)"
+    },
+    {
+      name: 'add_travel_days_to_expense_reimbursements',
+      sql: "ALTER TABLE expense_reimbursements ADD COLUMN travel_days INT"
+    },
+    {
+      name: 'add_expense_date_to_expense_reimbursements',
+      sql: "ALTER TABLE expense_reimbursements ADD COLUMN expense_date DATE"
+    },
+    {
+      name: 'update_expense_status_enum',
+      sql: "ALTER TABLE expense_reimbursements MODIFY COLUMN status ENUM('Pending','hr_accepted','Approved','Rejected') DEFAULT 'Pending'"
+    },
+    {
       name: 'create_document_edit_requests',
       sql: `CREATE TABLE IF NOT EXISTS document_edit_requests (
         id INT AUTO_INCREMENT PRIMARY KEY,

@@ -130,9 +130,16 @@ const STATIC_DIR = process.env.STATIC_DIR || path.join(__dirname, '..');
 console.log('Serving static files from:', STATIC_DIR);
 app.use(express.static(STATIC_DIR));
 
-// Serve uploads — authenticated, force download, prevent path traversal
+// Serve uploads — authenticated (header OR query param token), inline images, prevent path traversal
 const { verifyToken: verifyUploadToken } = require('./middleware/auth');
-app.use('/uploads', verifyUploadToken, (req, res) => {
+const jwtLib = require('jsonwebtoken');
+app.use('/uploads', (req, res, next) => {
+  // Accept JWT from Authorization header OR ?token= query param
+  if (!req.headers.authorization && req.query.token) {
+    req.headers.authorization = 'Bearer ' + req.query.token;
+  }
+  verifyUploadToken(req, res, next);
+}, (req, res) => {
   const requestedFile = path.basename(req.path);
   const uploadsDir = path.resolve(path.join(__dirname, 'uploads'));
   const filePath = path.resolve(path.join(uploadsDir, requestedFile));
@@ -140,7 +147,14 @@ app.use('/uploads', verifyUploadToken, (req, res) => {
   if (!filePath.startsWith(uploadsDir)) {
     return res.status(400).json({ error: 'Invalid path' });
   }
-  res.setHeader('Content-Disposition', 'attachment');
+  // Serve images inline, everything else as download
+  const ext = path.extname(requestedFile).toLowerCase();
+  const imageExts = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.svg'];
+  if (imageExts.includes(ext)) {
+    res.setHeader('Content-Disposition', 'inline');
+  } else {
+    res.setHeader('Content-Disposition', 'attachment');
+  }
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.sendFile(filePath, (err) => {
     if (err && !res.headersSent) res.status(404).json({ error: 'File not found' });

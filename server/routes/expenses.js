@@ -4,6 +4,22 @@ const { verifyToken, requireRole } = require('../middleware/auth');
 const { auditLog } = require('../middleware/audit');
 const upload = require('../middleware/upload');
 
+// Helper: create notifications for multiple users
+async function notifyUsers(pool, empCodes, title, message, type) {
+  if (!empCodes || empCodes.length === 0) return;
+  const unique = [...new Set(empCodes)];
+  const values = unique.map(code => [code, title, message, type]);
+  try {
+    await pool.query('INSERT INTO notifications (emp_code, title, message, type) VALUES ?', [values]);
+  } catch (e) { console.error('Notify error:', e.message); }
+}
+
+// Helper: get emp_codes by role
+async function getEmpCodesByRole(pool, roles) {
+  const [rows] = await pool.query('SELECT emp_code FROM users WHERE role IN (?) AND is_active = 1', [roles]);
+  return rows.map(r => r.emp_code);
+}
+
 // GET /api/expenses — list expense reimbursements
 router.get('/', verifyToken, async (req, res) => {
   try {
@@ -42,6 +58,17 @@ router.post('/', verifyToken, upload.single('bill'), async (req, res) => {
       'INSERT INTO expense_reimbursements (emp_code, emp_name, category, amount, description, expense_type, project, travel_from, travel_to, vehicle, travel_km, travel_days, expense_date, bill_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [req.user.empCode, empName, category, amount, description || '', expenseType || null, project || null, travelFrom || null, travelTo || null, vehicle || null, travelKm || null, travelDays || null, date || null, billUrl]
     );
+    // Notify HR/MD about new expense
+    const managers = await getEmpCodesByRole(pool, ['HR', 'MD']);
+    const targets = managers.filter(c => c !== req.user.empCode);
+    await notifyUsers(pool, targets, 'Expense Submitted', empName + ' submitted ' + category + ' expense for Rs.' + Number(amount).toLocaleString('en-IN'), 'expense');
+
+    // Real-time socket events
+    const io = req.app.get('io');
+    if (io) {
+      io.to('role:MD').to('role:HR').emit('expense:new', { id: result.insertId, empCode: req.user.empCode, empName, category, amount });
+    }
+
     res.status(201).json({ id: result.insertId, success: true, billUrl: billUrl });
   } catch (err) {
     console.error(err);
@@ -52,24 +79,39 @@ router.post('/', verifyToken, upload.single('bill'), async (req, res) => {
 // PUT /api/expenses/:id/approve (supports dual approval: HR accept → MD confirm)
 router.put('/:id/approve', verifyToken, requireRole('MD', 'HR'), auditLog('approve', 'expense'), async (req, res) => {
   try {
-    const [existing] = await pool.query('SELECT status FROM expense_reimbursements WHERE id = ?', [req.params.id]);
+    const [existing] = await pool.query('SELECT * FROM expense_reimbursements WHERE id = ?', [req.params.id]);
     if (existing.length === 0) return res.status(404).json({ error: 'Expense not found' });
-    const currentStatus = existing[0].status;
+    const exp = existing[0];
+    const currentStatus = exp.status;
+    let newStatus;
     if (req.body.hrAccept) {
-      // HR accept step — only from Pending
       if (currentStatus !== 'Pending') return res.status(400).json({ error: `Cannot accept: status is ${currentStatus}` });
+      newStatus = 'hr_accepted';
       await pool.query(
         'UPDATE expense_reimbursements SET status = "hr_accepted", reviewed_by = ?, review_date = CURDATE() WHERE id = ?',
         [req.user.empCode, req.params.id]
       );
     } else {
-      // Final approve — from Pending or hr_accepted
       if (currentStatus !== 'Pending' && currentStatus !== 'hr_accepted') return res.status(400).json({ error: `Cannot approve: status is ${currentStatus}` });
+      newStatus = 'Approved';
       await pool.query(
         'UPDATE expense_reimbursements SET status = "Approved", reviewed_by = ?, review_date = CURDATE() WHERE id = ?',
         [req.user.empCode, req.params.id]
       );
     }
+
+    // Notify employee
+    const eventType = newStatus === 'hr_accepted' ? 'accepted by HR' : 'approved';
+    await notifyUsers(pool, [exp.emp_code], 'Expense ' + eventType, 'Your ' + exp.category + ' expense (Rs.' + Number(exp.amount).toLocaleString('en-IN') + ') has been ' + eventType, 'expense');
+
+    // Real-time socket events
+    const io = req.app.get('io');
+    if (io) {
+      const socketEvent = newStatus === 'hr_accepted' ? 'expense:hr_accepted' : 'expense:approved';
+      io.to('user:' + exp.emp_code).emit(socketEvent, { id: exp.id, empName: exp.emp_name, category: exp.category, amount: exp.amount });
+      io.to('role:MD').to('role:HR').emit('expense:updated', { id: exp.id });
+    }
+
     res.json({ success: true });
   } catch (err) {
     console.error(err);
@@ -80,13 +122,25 @@ router.put('/:id/approve', verifyToken, requireRole('MD', 'HR'), auditLog('appro
 // PUT /api/expenses/:id/reject
 router.put('/:id/reject', verifyToken, requireRole('MD', 'HR'), auditLog('reject', 'expense'), async (req, res) => {
   try {
-    const [existing] = await pool.query('SELECT status FROM expense_reimbursements WHERE id = ?', [req.params.id]);
+    const [existing] = await pool.query('SELECT * FROM expense_reimbursements WHERE id = ?', [req.params.id]);
     if (existing.length === 0) return res.status(404).json({ error: 'Expense not found' });
-    if (existing[0].status !== 'Pending' && existing[0].status !== 'hr_accepted') return res.status(400).json({ error: `Cannot reject: status is ${existing[0].status}` });
+    const exp = existing[0];
+    if (exp.status !== 'Pending' && exp.status !== 'hr_accepted') return res.status(400).json({ error: `Cannot reject: status is ${exp.status}` });
     await pool.query(
       'UPDATE expense_reimbursements SET status = "Rejected", reviewed_by = ?, review_date = CURDATE() WHERE id = ?',
       [req.user.empCode, req.params.id]
     );
+
+    // Notify employee
+    await notifyUsers(pool, [exp.emp_code], 'Expense Rejected', 'Your ' + exp.category + ' expense (Rs.' + Number(exp.amount).toLocaleString('en-IN') + ') has been rejected', 'expense');
+
+    // Real-time socket events
+    const io = req.app.get('io');
+    if (io) {
+      io.to('user:' + exp.emp_code).emit('expense:rejected', { id: exp.id, empName: exp.emp_name, category: exp.category, amount: exp.amount });
+      io.to('role:MD').to('role:HR').emit('expense:updated', { id: exp.id });
+    }
+
     res.json({ success: true });
   } catch (err) {
     console.error(err);
