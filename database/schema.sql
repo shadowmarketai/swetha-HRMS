@@ -733,3 +733,24 @@ CREATE TABLE IF NOT EXISTS daily_work_logs (
   FOREIGN KEY (task_id) REFERENCES wbs_tasks(id) ON DELETE SET NULL,
   INDEX ix_dl_proj_date (project_id, log_date)
 );
+
+-- Document Edit Requests (HR approval for locked profile sections)
+CREATE TABLE IF NOT EXISTS document_edit_requests (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  emp_code VARCHAR(20) NOT NULL,
+  section ENUM('educational_certs','bank_passbook','bank_details','experience_certs') NOT NULL,
+  reason TEXT,
+  status ENUM('pending','approved','rejected','used') DEFAULT 'pending',
+  requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  reviewed_by VARCHAR(20),
+  reviewed_at DATETIME,
+  review_note TEXT,
+  FOREIGN KEY (emp_code) REFERENCES employees(code) ON DELETE CASCADE,
+  INDEX idx_doc_edit_emp (emp_code),
+  INDEX idx_doc_edit_status (status)
+);
+
+-- Employee profile lock + bank extended columns
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS ifsc_code VARCHAR(20);
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS bank_branch VARCHAR(100);
+ALTER TABLE employees ADD COLUMN IF NOT EXISTS profile_sections_locked JSON DEFAULT (JSON_OBJECT());

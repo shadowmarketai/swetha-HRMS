@@ -176,6 +176,7 @@ app.use('/api/chatbot', require('./routes/chatbot'));
 app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api/peb/store', require('./routes/peb-store'));
 app.use('/api/peb/purchase', require('./routes/peb-purchase'));
+app.use('/api/edit-requests', require('./routes/edit-requests'));
 // Health check — verifies app + DB connectivity
 app.get('/api/health', async (req, res) => {
   const health = { status: 'ok', timestamp: new Date().toISOString(), db: 'ok', uptime: process.uptime() };
@@ -232,6 +233,25 @@ app.get('*', (req, res) => {
     await pool.query("ALTER TABLE employees ADD COLUMN previous_role VARCHAR(100)").catch(() => {});
     await pool.query("ALTER TABLE employees ADD COLUMN years_of_experience DECIMAL(4,1)").catch(() => {});
     await pool.query("ALTER TABLE employees ADD COLUMN marital_status VARCHAR(20)").catch(() => {});
+    await pool.query("ALTER TABLE employees ADD COLUMN ifsc_code VARCHAR(20)").catch(() => {});
+    await pool.query("ALTER TABLE employees ADD COLUMN bank_branch VARCHAR(100)").catch(() => {});
+    await pool.query("ALTER TABLE employees ADD COLUMN profile_sections_locked JSON DEFAULT (JSON_OBJECT())").catch(() => {});
+
+    // Document edit requests table
+    await pool.query(`CREATE TABLE IF NOT EXISTS document_edit_requests (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      emp_code VARCHAR(20) NOT NULL,
+      section ENUM('educational_certs','bank_passbook','bank_details','experience_certs') NOT NULL,
+      reason TEXT,
+      status ENUM('pending','approved','rejected','used') DEFAULT 'pending',
+      requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      reviewed_by VARCHAR(20),
+      reviewed_at DATETIME,
+      review_note TEXT,
+      FOREIGN KEY (emp_code) REFERENCES employees(code) ON DELETE CASCADE,
+      INDEX idx_doc_edit_emp (emp_code),
+      INDEX idx_doc_edit_status (status)
+    )`).catch(() => {});
 
     // Phase A: Attendance logs — add geofence columns
     await pool.query("ALTER TABLE attendance_logs ADD COLUMN location_name VARCHAR(200)").catch(() => {});

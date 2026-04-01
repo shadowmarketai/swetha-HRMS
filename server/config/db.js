@@ -26,6 +26,35 @@ async function runMigrations(conn) {
     {
       name: 'add_manager_role_to_employees',
       sql: "ALTER TABLE employees MODIFY COLUMN role ENUM('MD','HR','Manager','Employee') DEFAULT 'Employee'"
+    },
+    {
+      name: 'add_ifsc_code_to_employees',
+      sql: "ALTER TABLE employees ADD COLUMN ifsc_code VARCHAR(20)"
+    },
+    {
+      name: 'add_bank_branch_to_employees',
+      sql: "ALTER TABLE employees ADD COLUMN bank_branch VARCHAR(100)"
+    },
+    {
+      name: 'add_profile_sections_locked_to_employees',
+      sql: "ALTER TABLE employees ADD COLUMN profile_sections_locked JSON DEFAULT (JSON_OBJECT())"
+    },
+    {
+      name: 'create_document_edit_requests',
+      sql: `CREATE TABLE IF NOT EXISTS document_edit_requests (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        emp_code VARCHAR(20) NOT NULL,
+        section ENUM('educational_certs','bank_passbook','bank_details','experience_certs') NOT NULL,
+        reason TEXT,
+        status ENUM('pending','approved','rejected','used') DEFAULT 'pending',
+        requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        reviewed_by VARCHAR(20),
+        reviewed_at DATETIME,
+        review_note TEXT,
+        FOREIGN KEY (emp_code) REFERENCES employees(code) ON DELETE CASCADE,
+        INDEX idx_doc_edit_emp (emp_code),
+        INDEX idx_doc_edit_status (status)
+      )`
     }
   ];
   let applied = 0;

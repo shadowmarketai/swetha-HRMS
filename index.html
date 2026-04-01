@@ -635,6 +635,7 @@
       <button class="admin-tab" onclick="switchAdminTab('depts',this)">Departments</button>
       <button class="admin-tab" onclick="switchAdminTab('emplist',this)">All Employees</button>
       <button class="admin-tab" onclick="switchAdminTab('geofence',this)">Geofence Sites</button>
+      <button class="admin-tab" onclick="switchAdminTab('editRequests',this)">Edit Requests</button>
     </div>
     <div class="admin-section" id="adminRoles">
       <div class="section-title">Assign Employee Roles</div>
@@ -649,6 +650,16 @@
     <div class="admin-section hidden" id="adminEmpList">
       <div class="section-title">All Employees (by Department)</div>
       <div id="allEmpList"></div>
+    </div>
+    <div class="admin-section hidden" id="adminEditRequests">
+      <div class="section-title">Document Edit Requests</div>
+      <div style="margin-bottom:12px;display:flex;gap:6px" id="editReqFilters">
+        <button class="btn btn-sm edit-req-filter active" onclick="filterEditRequests('pending',this)" style="font-size:.72rem;padding:4px 10px;border-radius:8px;border:1px solid var(--primary);background:var(--primary);color:#fff">Pending</button>
+        <button class="btn btn-sm edit-req-filter" onclick="filterEditRequests('approved',this)" style="font-size:.72rem;padding:4px 10px;border-radius:8px;border:1px solid var(--gray-200);background:transparent;color:var(--gray-600)">Approved</button>
+        <button class="btn btn-sm edit-req-filter" onclick="filterEditRequests('rejected',this)" style="font-size:.72rem;padding:4px 10px;border-radius:8px;border:1px solid var(--gray-200);background:transparent;color:var(--gray-600)">Rejected</button>
+        <button class="btn btn-sm edit-req-filter" onclick="filterEditRequests('',this)" style="font-size:.72rem;padding:4px 10px;border-radius:8px;border:1px solid var(--gray-200);background:transparent;color:var(--gray-600)">All</button>
+      </div>
+      <div id="editRequestsList"></div>
     </div>
     <div class="admin-section hidden" id="adminGeofence">
       <div class="section-title">Geofence Site Locations</div>

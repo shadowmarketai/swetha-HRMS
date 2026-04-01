@@ -573,6 +573,69 @@ function renderProfileOverlay() {
   var isMDUser = currentUser.role === 'MD';
   var isHrMd = currentUser.role === 'MD' || currentUser.role === 'HR';
 
+  // Fetch lock status asynchronously then render
+  apiCall('GET', '/employees/' + currentUser.code + '/lock-status').then(function(lockData) {
+    window._profileLockStatus = lockData;
+    _renderProfileContent(c, emp, initials, isMDUser, isHrMd, lockData);
+  }).catch(function() {
+    window._profileLockStatus = { locks: {}, pending_requests: [], approved_requests: [], documents: [] };
+    _renderProfileContent(c, emp, initials, isMDUser, isHrMd, window._profileLockStatus);
+  });
+}
+
+function _isProfileSectionLocked(section, lockStatus) {
+  if (!lockStatus || !lockStatus.locks || !lockStatus.locks[section]) return false;
+  // If there's an approved request, section is unlocked
+  var approved = (lockStatus.approved_requests || []).find(function(r) { return r.section === section; });
+  return !approved;
+}
+
+function _renderLockBadge(section, lockStatus) {
+  var locked = _isProfileSectionLocked(section, lockStatus);
+  var pending = (lockStatus.pending_requests || []).find(function(r) { return r.section === section; });
+  var approved = (lockStatus.approved_requests || []).find(function(r) { return r.section === section; });
+  var html = '';
+  if (lockStatus.locks && lockStatus.locks[section]) {
+    if (approved) {
+      html += '<span class="lock-badge unlocked"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0"/></svg>Unlocked</span>';
+    } else {
+      html += '<span class="lock-badge locked"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Locked</span>';
+    }
+  }
+  if (pending && !approved) {
+    html += '<div class="edit-request-status pending"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Edit request pending HR approval</div>';
+  }
+  return html;
+}
+
+function _renderDocUploadCard(doc) {
+  var html = '<div class="doc-upload-card uploaded">';
+  var ext = (doc.file_path || '').split('.').pop().toLowerCase();
+  var isImg = ['jpg','jpeg','png','gif','webp'].indexOf(ext) >= 0;
+  if (isImg) {
+    html += '<img class="doc-thumb" src="' + escapeHTML(doc.file_path) + '" alt="' + escapeHTML(doc.doc_name) + '">';
+  } else {
+    html += '<div style="height:70px;display:flex;align-items:center;justify-content:center;background:var(--gray-100);border-radius:6px;margin-bottom:6px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>';
+  }
+  html += '<div class="doc-label">' + escapeHTML(doc.doc_name || doc.doc_type) + '</div>';
+  html += '<a href="' + escapeHTML(doc.file_path) + '" target="_blank" style="font-size:.6rem;color:var(--primary)">View</a>';
+  html += '</div>';
+  return html;
+}
+
+function requestSectionEdit(section) {
+  var reason = prompt('Please provide a reason for editing this section:');
+  if (!reason || !reason.trim()) return;
+  apiCall('POST', '/employees/' + currentUser.code + '/request-edit', { section: section, reason: reason.trim() }).then(function() {
+    showToast('Edit request submitted for HR approval');
+    renderProfileOverlay();
+  }).catch(function(err) {
+    showToast(err.message || 'Failed to submit request', 'error');
+  });
+}
+
+function _renderProfileContent(c, emp, initials, isMDUser, isHrMd, lockStatus) {
+
   var html = '<div class="card profile-card" style="margin:16px;border-radius:var(--radius)">';
   var photoUrl = emp.photoUrl || emp.photo_url || null;
   html += '<div style="position:relative;display:inline-block">';
@@ -643,16 +706,23 @@ function renderProfileOverlay() {
   html += '<div class="ss-form-group"><label>Payment Mode</label><div class="ss-readonly">NEFT</div></div>';
   html += '</div></div>';
 
-  // Section 5: Bank & Identity
+  // Section 5: Bank & Identity (with lock awareness)
+  var bankLocked = _isProfileSectionLocked('bank_details', lockStatus);
+  var bankReadonly = bankLocked ? ' readonly class="ss-readonly-locked"' : '';
   html += '<div class="card profile-section" style="margin:0 16px 12px;border-radius:var(--radius)">';
-  html += '<div class="profile-section-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>Bank & Identity</div>';
+  html += '<div class="profile-section-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>Bank & Identity' + _renderLockBadge('bank_details', lockStatus) + '</div>';
   html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
-  html += '<div class="ss-form-group"><label>Bank</label><input type="text" id="profBank" value="' + escapeHTML(emp.bank || '') + '" placeholder="Bank name"></div>';
-  html += '<div class="ss-form-group"><label>Account No</label><input type="text" id="profAccNo" value="' + escapeHTML(emp.accNo || '') + '" placeholder="Account number"></div>';
+  html += '<div class="ss-form-group"><label>Bank</label><input type="text" id="profBank" value="' + escapeHTML(emp.bank || '') + '" placeholder="Bank name"' + bankReadonly + '></div>';
+  html += '<div class="ss-form-group"><label>Account No</label><input type="text" id="profAccNo" value="' + escapeHTML(emp.accNo || '') + '" placeholder="Account number"' + bankReadonly + '></div>';
+  html += '<div class="ss-form-group"><label>IFSC Code</label><input type="text" id="profIfsc" value="' + escapeHTML(emp.ifscCode || emp.ifsc_code || '') + '" placeholder="IFSC code" maxlength="11"' + bankReadonly + '></div>';
+  html += '<div class="ss-form-group"><label>Bank Branch</label><input type="text" id="profBranch" value="' + escapeHTML(emp.bankBranch || emp.bank_branch || '') + '" placeholder="Branch name"' + bankReadonly + '></div>';
   html += '<div class="ss-form-group"><label>PAN</label><input type="text" id="profPan" value="' + escapeHTML(emp.pan || '') + '" placeholder="PAN number" maxlength="10"></div>';
   html += '<div class="ss-form-group"><label>Aadhaar</label><input type="text" id="profAadhaar" value="' + escapeHTML(emp.aadhaar || '') + '" placeholder="Aadhaar number" maxlength="12"></div>';
   html += '<div class="ss-form-group"><label>UAN</label><input type="text" id="profUan" value="' + escapeHTML(emp.uan || '') + '" placeholder="UAN number"></div>';
   html += '</div>';
+  if (bankLocked) {
+    html += '<button class="request-edit-btn" onclick="requestSectionEdit(\'bank_details\')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Request Edit Access</button>';
+  }
   // Document photo uploads
   html += '<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--gray-200)">';
   html += '<div style="font-size:.72rem;font-weight:600;color:var(--gray-600);margin-bottom:8px">Document Uploads</div>';
@@ -699,6 +769,60 @@ function renderProfileOverlay() {
   html += '<div class="ss-form-group"><label>Previous Employer</label><input type="text" id="profPrevEmployer" value="' + escapeHTML(emp.previousEmployer || '') + '" placeholder="Last company name"></div>';
   html += '<div class="ss-form-group"><label>Previous Role</label><input type="text" id="profPrevRole" value="' + escapeHTML(emp.previousRole || '') + '" placeholder="Last designation"></div>';
   html += '</div></div>';
+
+  // Section 7: Educational Certificates (lockable document upload)
+  var eduLocked = _isProfileSectionLocked('educational_certs', lockStatus);
+  var eduDocs = (lockStatus.documents || []).filter(function(d) { return d.doc_type === 'educational_cert'; });
+  html += '<div class="card profile-section" style="margin:0 16px 12px;border-radius:var(--radius)">';
+  html += '<div class="profile-section-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 10 3 12 0v-5"/></svg>Educational Certificates' + _renderLockBadge('educational_certs', lockStatus) + '</div>';
+  html += '<div class="doc-upload-grid">';
+  eduDocs.forEach(function(d) { html += _renderDocUploadCard(d); });
+  if (!eduLocked) {
+    html += '<div class="doc-upload-card dashed" onclick="scanAndUploadDoc(\'educational_cert\')">';
+    html += '<div style="height:70px;display:flex;align-items:center;justify-content:center"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>';
+    html += '<div class="doc-label">Upload Certificate</div></div>';
+  }
+  html += '</div>';
+  if (eduLocked) {
+    html += '<button class="request-edit-btn" onclick="requestSectionEdit(\'educational_certs\')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Request Edit Access</button>';
+  }
+  html += '</div>';
+
+  // Section 8: Bank Passbook (lockable document upload)
+  var pbLocked = _isProfileSectionLocked('bank_passbook', lockStatus);
+  var pbDocs = (lockStatus.documents || []).filter(function(d) { return d.doc_type === 'bank_passbook'; });
+  html += '<div class="card profile-section" style="margin:0 16px 12px;border-radius:var(--radius)">';
+  html += '<div class="profile-section-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>Bank Passbook' + _renderLockBadge('bank_passbook', lockStatus) + '</div>';
+  html += '<div class="doc-upload-grid">';
+  pbDocs.forEach(function(d) { html += _renderDocUploadCard(d); });
+  if (!pbLocked) {
+    html += '<div class="doc-upload-card dashed" onclick="scanAndUploadDoc(\'bank_passbook\')">';
+    html += '<div style="height:70px;display:flex;align-items:center;justify-content:center"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>';
+    html += '<div class="doc-label">Upload Passbook</div></div>';
+  }
+  html += '</div>';
+  if (pbLocked) {
+    html += '<button class="request-edit-btn" onclick="requestSectionEdit(\'bank_passbook\')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Request Edit Access</button>';
+  }
+  html += '</div>';
+
+  // Section 9: Experience Certificates (lockable document upload)
+  var expLocked = _isProfileSectionLocked('experience_certs', lockStatus);
+  var expDocs = (lockStatus.documents || []).filter(function(d) { return d.doc_type === 'experience_cert'; });
+  html += '<div class="card profile-section" style="margin:0 16px 12px;border-radius:var(--radius)">';
+  html += '<div class="profile-section-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>Experience Certificates' + _renderLockBadge('experience_certs', lockStatus) + '</div>';
+  html += '<div class="doc-upload-grid">';
+  expDocs.forEach(function(d) { html += _renderDocUploadCard(d); });
+  if (!expLocked) {
+    html += '<div class="doc-upload-card dashed" onclick="scanAndUploadDoc(\'experience_cert\')">';
+    html += '<div style="height:70px;display:flex;align-items:center;justify-content:center"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>';
+    html += '<div class="doc-label">Upload Certificate</div></div>';
+  }
+  html += '</div>';
+  if (expLocked) {
+    html += '<button class="request-edit-btn" onclick="requestSectionEdit(\'experience_certs\')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Request Edit Access</button>';
+  }
+  html += '</div>';
 
   // Save button (centered)
   html += '<div style="padding:12px 16px;text-align:center"><button class="nf-btn nf-btn-primary ss-save-btn" id="profSaveBtn" style="border-radius:var(--radius);min-width:200px;padding:12px 32px;font-size:.85rem" onclick="saveProfileDetails()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:6px"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>Save Changes</button><div id="profSaveMsg" style="margin-top:8px;font-size:.78rem;font-weight:600;display:none"></div></div>';
@@ -788,7 +912,9 @@ function saveProfileDetails() {
     yearOfPassing: g('profYearOfPassing'),
     previousEmployer: g('profPrevEmployer'),
     previousRole: g('profPrevRole'),
-    yearsOfExperience: g('profYearsExp')
+    yearsOfExperience: g('profYearsExp'),
+    ifscCode: g('profIfsc'),
+    bankBranch: g('profBranch')
   };
   var btn = document.getElementById('profSaveBtn');
   apiCall('PUT', '/employees/' + currentUser.code + '/self', payload).then(function() {
@@ -816,6 +942,8 @@ function saveProfileDetails() {
       dbEmp.previousEmployer = dbEmp.previous_employer || dbEmp.previousEmployer;
       dbEmp.previousRole = dbEmp.previous_role || dbEmp.previousRole;
       dbEmp.yearsOfExperience = dbEmp.years_of_experience || dbEmp.yearsOfExperience;
+      dbEmp.ifscCode = dbEmp.ifsc_code || dbEmp.ifscCode;
+      dbEmp.bankBranch = dbEmp.bank_branch || dbEmp.bankBranch;
       // Update EMPLOYEES array
       var idx = EMPLOYEES.findIndex(function(e) { return e.code === dbEmp.code; });
       if (idx >= 0) Object.assign(EMPLOYEES[idx], dbEmp);
@@ -1784,13 +1912,86 @@ function switchAdminTab(tab, btn) {
   document.getElementById('adminDepts').classList.toggle('hidden', tab !== 'depts');
   document.getElementById('adminEmpList').classList.toggle('hidden', tab !== 'emplist');
   document.getElementById('adminGeofence').classList.toggle('hidden', tab !== 'geofence');
+  var editReqEl = document.getElementById('adminEditRequests');
+  if (editReqEl) editReqEl.classList.toggle('hidden', tab !== 'editRequests');
   if (tab === 'geofence') renderGeofenceSites();
+  if (tab === 'editRequests') renderEditRequestsPanel('pending');
 }
 
 function renderAdminPanel() {
   renderRolesList();
   renderDeptsList();
   renderAllEmpList();
+}
+
+// ===== HR Edit Requests Panel =====
+function renderEditRequestsPanel(statusFilter) {
+  var container = document.getElementById('editRequestsList');
+  if (!container) return;
+  container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--gray-400)">Loading...</div>';
+  var url = '/edit-requests';
+  if (statusFilter) url += '?status=' + statusFilter;
+  apiCall('GET', url).then(function(resp) {
+    var requests = resp.data || [];
+    if (requests.length === 0) {
+      container.innerHTML = '<div style="text-align:center;padding:24px;color:var(--gray-400);font-size:.82rem">No ' + (statusFilter || '') + ' edit requests</div>';
+      return;
+    }
+    var html = '';
+    requests.forEach(function(r) {
+      var sectionLabel = (r.section || '').replace(/_/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); });
+      var dateStr = r.requested_at ? new Date(r.requested_at).toLocaleString() : '';
+      html += '<div class="edit-req-card">';
+      html += '<div class="req-header">';
+      html += '<span class="req-emp">' + escapeHTML(r.emp_name || r.emp_code) + ' <span style="font-weight:400;color:var(--gray-400);font-size:.72rem">(' + escapeHTML(r.emp_code) + ' / ' + escapeHTML(r.emp_dept || '') + ')</span></span>';
+      html += '<span class="req-section">' + escapeHTML(sectionLabel) + '</span>';
+      html += '</div>';
+      html += '<div class="req-reason">' + escapeHTML(r.reason || 'No reason provided') + '</div>';
+      html += '<div class="req-date">Requested: ' + escapeHTML(dateStr) + '</div>';
+      if (r.status === 'pending') {
+        html += '<div class="req-actions">';
+        html += '<button class="btn-approve" onclick="approveEditRequest(' + r.id + ')">Approve</button>';
+        html += '<button class="btn-reject" onclick="rejectEditRequest(' + r.id + ')">Reject</button>';
+        html += '</div>';
+      } else {
+        var statusClass = r.status === 'approved' ? 'approved' : (r.status === 'rejected' ? 'rejected' : 'pending');
+        html += '<div class="edit-request-status ' + statusClass + '">' + escapeHTML(r.status.charAt(0).toUpperCase() + r.status.slice(1));
+        if (r.reviewed_by) html += ' by ' + escapeHTML(r.reviewed_by);
+        if (r.review_note) html += ' — ' + escapeHTML(r.review_note);
+        html += '</div>';
+      }
+      html += '</div>';
+    });
+    container.innerHTML = html;
+  }).catch(function(err) {
+    container.innerHTML = '<div style="text-align:center;padding:20px;color:var(--danger);font-size:.82rem">Failed to load: ' + escapeHTML(err.message || 'Error') + '</div>';
+  });
+}
+
+function filterEditRequests(status, btn) {
+  document.querySelectorAll('.edit-req-filter').forEach(function(b) { b.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  renderEditRequestsPanel(status);
+}
+
+function approveEditRequest(id) {
+  if (!confirm('Approve this edit request? The employee will be able to modify the locked section.')) return;
+  apiCall('PATCH', '/edit-requests/' + id + '/approve', {}).then(function() {
+    showToast('Edit request approved');
+    renderEditRequestsPanel('pending');
+  }).catch(function(err) {
+    showToast(err.message || 'Failed to approve', 'error');
+  });
+}
+
+function rejectEditRequest(id) {
+  var note = prompt('Optional rejection reason:');
+  apiCall('PATCH', '/edit-requests/' + id + '/reject', { note: note || '' }).then(function() {
+    showToast('Edit request rejected');
+    renderEditRequestsPanel('pending');
+  }).catch(function(err) {
+    showToast(err.message || 'Failed to reject', 'error');
+  });
 }
 
 // Check if current user is a temporary MD (not the original MD001)
@@ -7468,6 +7669,10 @@ function scanAndUploadDoc(docType) {
   scanDocument(function(file) {
     showToast('Uploading...', 'info');
     uploadScannedDocument(file, docType).then(function(data) {
+      if (data.error) {
+        showToast(data.error, 'error');
+        return;
+      }
       if (data.url) {
         // Update local employee data so re-render shows the image
         var emp = EMPLOYEES.find(function(e) { return e.code === currentUser.code; });

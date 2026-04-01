@@ -32,6 +32,92 @@ router.get('/', verifyToken, async (req, res) => {
   }
 });
 
+// GET /api/employees/:code/lock-status — get profile section lock status for an employee
+router.get('/:code/lock-status', verifyToken, async (req, res) => {
+  try {
+    if (req.user.empCode !== req.params.code && !['MD', 'HR'].includes(req.user.role)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    const [empRows] = await pool.query('SELECT profile_sections_locked FROM employees WHERE code = ?', [req.params.code]);
+    if (empRows.length === 0) return res.status(404).json({ error: 'Employee not found' });
+    let locks = {};
+    try { locks = JSON.parse(empRows[0].profile_sections_locked || '{}'); } catch (e) { locks = {}; }
+
+    const [pendingReqs] = await pool.query(
+      'SELECT id, section, reason, requested_at FROM document_edit_requests WHERE emp_code = ? AND status = ?',
+      [req.params.code, 'pending']
+    );
+    const [approvedReqs] = await pool.query(
+      'SELECT id, section, reason, reviewed_at FROM document_edit_requests WHERE emp_code = ? AND status = ?',
+      [req.params.code, 'approved']
+    );
+
+    // Fetch uploaded documents for lockable sections
+    const [docs] = await pool.query(
+      "SELECT id, doc_type, doc_name, file_path, uploaded_at FROM documents WHERE emp_code = ? AND doc_type IN ('educational_cert','bank_passbook','experience_cert')",
+      [req.params.code]
+    );
+
+    res.json({ locks, pending_requests: pendingReqs, approved_requests: approvedReqs, documents: docs });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/employees/:code/request-edit — employee requests to edit a locked section
+router.post('/:code/request-edit', verifyToken, async (req, res) => {
+  try {
+    if (req.user.empCode !== req.params.code) {
+      return res.status(403).json({ error: 'You can only request edits for your own profile' });
+    }
+    const { section, reason } = req.body;
+    const validSections = ['educational_certs', 'bank_passbook', 'bank_details', 'experience_certs'];
+    if (!validSections.includes(section)) {
+      return res.status(400).json({ error: 'Invalid section' });
+    }
+    if (!reason || !reason.trim()) {
+      return res.status(400).json({ error: 'Reason is required' });
+    }
+
+    // Check for duplicate pending or approved request
+    const [existing] = await pool.query(
+      'SELECT id FROM document_edit_requests WHERE emp_code = ? AND section = ? AND status IN (?, ?)',
+      [req.params.code, section, 'pending', 'approved']
+    );
+    if (existing.length > 0) {
+      return res.status(409).json({ error: 'You already have a pending or approved edit request for this section' });
+    }
+
+    await pool.query(
+      'INSERT INTO document_edit_requests (emp_code, section, reason) VALUES (?, ?, ?)',
+      [req.params.code, section, reason.trim()]
+    );
+
+    // Notify HR/MD
+    const emp = await pool.query('SELECT name FROM employees WHERE code = ?', [req.params.code]);
+    const empName = emp[0] && emp[0][0] ? emp[0][0].name : req.params.code;
+    await pool.query(
+      "INSERT INTO notifications (emp_code, title, message, type) SELECT code, ?, ?, 'general' FROM employees WHERE role IN ('MD','HR') AND is_active = 1",
+      ['Profile Edit Request', empName + ' requested to edit ' + section.replace(/_/g, ' ')]
+    ).catch(() => {});
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to('role:MD').to('role:HR').emit('notification', {
+        title: 'Profile Edit Request',
+        message: empName + ' requested to edit ' + section.replace(/_/g, ' '),
+        type: 'info'
+      });
+    }
+
+    res.json({ message: 'Edit request submitted for HR approval' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // GET /api/employees/:code — IDOR protected
 router.get('/:code', verifyToken, async (req, res) => {
   try {
@@ -86,6 +172,25 @@ router.put('/:code/self', verifyToken, auditLog('update', 'employee'), async (re
     const b = req.body;
     // Helper: use new value if provided (non-empty), else keep current
     const v = (newVal, curVal) => (newVal !== undefined && newVal !== null && newVal !== '') ? newVal : curVal;
+    // Check lock status for bank_details section — if locked and no approved request, block bank field changes
+    let locks = {};
+    try { locks = JSON.parse(cur.profile_sections_locked || '{}'); } catch (e) { locks = {}; }
+    const bankFieldsChanged = (b.bank !== undefined && b.bank !== (cur.bank || '')) ||
+      (b.accNo !== undefined && b.accNo !== (cur.acc_no || '')) ||
+      (b.ifscCode !== undefined && b.ifscCode !== (cur.ifsc_code || '')) ||
+      (b.bankBranch !== undefined && b.bankBranch !== (cur.bank_branch || ''));
+
+    if (locks.bank_details && bankFieldsChanged) {
+      // Check for approved edit request
+      const [approved] = await pool.query(
+        "SELECT id FROM document_edit_requests WHERE emp_code = ? AND section = 'bank_details' AND status = 'approved' LIMIT 1",
+        [req.params.code]
+      );
+      if (approved.length === 0) {
+        return res.status(403).json({ error: 'Bank details section is locked. Request HR approval to edit.' });
+      }
+    }
+
     // Personal profile fields only — employees CANNOT change dept, designation, doj, salary, role
     await pool.query(
       `UPDATE employees SET phone=?, dob=?, email=?, blood_group=?, marital_status=?,
@@ -94,7 +199,8 @@ router.put('/:code/self', verifyToken, auditLog('update', 'employee'), async (re
        spouse_name=?, spouse_mobile=?, emergency_contact=?, emergency_phone=?,
        bank=?, acc_no=?, pan=?, aadhaar=?, uan=?,
        qualification=?, institution=?, year_of_passing=?,
-       previous_employer=?, previous_role=?, years_of_experience=? WHERE code=?`,
+       previous_employer=?, previous_role=?, years_of_experience=?,
+       ifsc_code=?, bank_branch=? WHERE code=?`,
       [
         v(b.phone, cur.phone), v(b.dob, cur.dob), v(b.email, cur.email),
         v(b.bloodGroup, cur.blood_group), v(b.maritalStatus, cur.marital_status),
@@ -107,9 +213,24 @@ router.put('/:code/self', verifyToken, auditLog('update', 'employee'), async (re
         v(b.qualification, cur.qualification), v(b.institution, cur.institution),
         v(b.yearOfPassing, cur.year_of_passing),
         v(b.previousEmployer, cur.previous_employer), v(b.previousRole, cur.previous_role),
-        v(b.yearsOfExperience, cur.years_of_experience), req.params.code
+        v(b.yearsOfExperience, cur.years_of_experience),
+        v(b.ifscCode, cur.ifsc_code), v(b.bankBranch, cur.bank_branch), req.params.code
       ]
     );
+
+    // After save: lock bank_details section if bank fields have values
+    const newBank = v(b.bank, cur.bank);
+    const newAccNo = v(b.accNo, cur.acc_no);
+    if (newBank && newAccNo) {
+      locks.bank_details = true;
+      await pool.query('UPDATE employees SET profile_sections_locked = ? WHERE code = ?', [JSON.stringify(locks), req.params.code]);
+      // Mark approved edit requests as used
+      await pool.query(
+        "UPDATE document_edit_requests SET status = 'used' WHERE emp_code = ? AND section = 'bank_details' AND status = 'approved'",
+        [req.params.code]
+      ).catch(() => {});
+    }
+
     res.json({ message: 'Personal details updated' });
   } catch (err) {
     console.error(err);
@@ -130,6 +251,40 @@ router.post('/upload-doc', verifyToken, upload.single('document'), async (req, r
         await pool.query('UPDATE employees SET aadhaar_photo_url = ? WHERE code = ?', [url, req.user.empCode]).catch(() => {});
       } else if (docType === 'pan_photo') {
         await pool.query('UPDATE employees SET pan_photo_url = ? WHERE code = ?', [url, req.user.empCode]).catch(() => {});
+      } else if (['educational_cert', 'bank_passbook', 'experience_cert'].includes(docType)) {
+        // Check lock status before allowing upload
+        const sectionMap = { educational_cert: 'educational_certs', bank_passbook: 'bank_passbook', experience_cert: 'experience_certs' };
+        const section = sectionMap[docType];
+        const [empRows] = await pool.query('SELECT profile_sections_locked FROM employees WHERE code = ?', [req.user.empCode]);
+        let locks = {};
+        if (empRows.length > 0) {
+          try { locks = JSON.parse(empRows[0].profile_sections_locked || '{}'); } catch (e) { locks = {}; }
+        }
+        if (locks[section]) {
+          // Check for approved edit request
+          const [approved] = await pool.query(
+            'SELECT id FROM document_edit_requests WHERE emp_code = ? AND section = ? AND status = ?',
+            [req.user.empCode, section, 'approved']
+          );
+          if (approved.length === 0) {
+            return res.status(403).json({ error: 'This section is locked. Request HR approval to upload new documents.' });
+          }
+        }
+        // Save to documents table
+        const docName = req.body.docName || req.file.originalname || docType;
+        await pool.query(
+          'INSERT INTO documents (emp_code, doc_type, doc_name, file_path, file_size, mime_type) VALUES (?, ?, ?, ?, ?, ?)',
+          [req.user.empCode, docType, docName, url, req.file.size || 0, req.file.mimetype || '']
+        ).catch(() => {});
+
+        // Lock the section after upload
+        locks[section] = true;
+        await pool.query('UPDATE employees SET profile_sections_locked = ? WHERE code = ?', [JSON.stringify(locks), req.user.empCode]).catch(() => {});
+        // Mark approved edit requests as used
+        await pool.query(
+          "UPDATE document_edit_requests SET status = 'used' WHERE emp_code = ? AND section = ? AND status = 'approved'",
+          [req.user.empCode, section]
+        ).catch(() => {});
       }
     }
     res.json({ url, filename: req.file.filename, message: 'Document uploaded' });
@@ -177,7 +332,7 @@ router.put('/:code', verifyToken, requireRole('MD', 'HR'), auditLog('update', 'e
       qualification: 'qualification', institution: 'institution',
       yearOfPassing: 'year_of_passing', previousEmployer: 'previous_employer',
       previousRole: 'previous_role', yearsOfExperience: 'years_of_experience',
-      maritalStatus: 'marital_status'
+      maritalStatus: 'marital_status', ifscCode: 'ifsc_code', bankBranch: 'bank_branch'
     };
 
     const setClauses = [];
