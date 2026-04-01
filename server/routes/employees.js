@@ -72,7 +72,7 @@ router.post('/:code/request-edit', verifyToken, async (req, res) => {
       return res.status(403).json({ error: 'You can only request edits for your own profile' });
     }
     const { section, reason } = req.body;
-    const validSections = ['educational_certs', 'bank_passbook', 'bank_details', 'experience_certs'];
+    const validSections = ['profile_details', 'educational_certs', 'bank_passbook', 'bank_details', 'experience_certs'];
     if (!validSections.includes(section)) {
       return res.status(400).json({ error: 'Invalid section' });
     }
@@ -112,6 +112,30 @@ router.post('/:code/request-edit', verifyToken, async (req, res) => {
     }
 
     res.json({ message: 'Edit request submitted for HR approval' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/employees/:code/documents — view employee documents (HR/MD or self)
+router.get('/:code/documents', verifyToken, async (req, res) => {
+  try {
+    if (req.user.empCode !== req.params.code && !['MD', 'HR'].includes(req.user.role)) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+    const [docs] = await pool.query(
+      'SELECT id, doc_type, doc_name, file_path, file_size, mime_type, uploaded_at FROM documents WHERE emp_code = ? ORDER BY uploaded_at DESC',
+      [req.params.code]
+    );
+    // Also include aadhaar/pan photo URLs from employees table
+    const [empRows] = await pool.query('SELECT aadhaar_photo_url, pan_photo_url FROM employees WHERE code = ?', [req.params.code]);
+    const idDocs = [];
+    if (empRows.length > 0) {
+      if (empRows[0].aadhaar_photo_url) idDocs.push({ doc_type: 'aadhaar_photo', doc_name: 'Aadhaar Card', file_path: empRows[0].aadhaar_photo_url });
+      if (empRows[0].pan_photo_url) idDocs.push({ doc_type: 'pan_photo', doc_name: 'PAN Card', file_path: empRows[0].pan_photo_url });
+    }
+    res.json({ data: idDocs.concat(docs) });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
@@ -172,22 +196,17 @@ router.put('/:code/self', verifyToken, auditLog('update', 'employee'), async (re
     const b = req.body;
     // Helper: use new value if provided (non-empty), else keep current
     const v = (newVal, curVal) => (newVal !== undefined && newVal !== null && newVal !== '') ? newVal : curVal;
-    // Check lock status for bank_details section — if locked and no approved request, block bank field changes
+    // Check lock status — if profile is locked, block all changes unless approved
     let locks = {};
     try { locks = JSON.parse(cur.profile_sections_locked || '{}'); } catch (e) { locks = {}; }
-    const bankFieldsChanged = (b.bank !== undefined && b.bank !== (cur.bank || '')) ||
-      (b.accNo !== undefined && b.accNo !== (cur.acc_no || '')) ||
-      (b.ifscCode !== undefined && b.ifscCode !== (cur.ifsc_code || '')) ||
-      (b.bankBranch !== undefined && b.bankBranch !== (cur.bank_branch || ''));
 
-    if (locks.bank_details && bankFieldsChanged) {
-      // Check for approved edit request
+    if (locks.profile_details) {
       const [approved] = await pool.query(
-        "SELECT id FROM document_edit_requests WHERE emp_code = ? AND section = 'bank_details' AND status = 'approved' LIMIT 1",
+        "SELECT id FROM document_edit_requests WHERE emp_code = ? AND section = 'profile_details' AND status = 'approved' LIMIT 1",
         [req.params.code]
       );
       if (approved.length === 0) {
-        return res.status(403).json({ error: 'Bank details section is locked. Request HR approval to edit.' });
+        return res.status(403).json({ error: 'Profile is locked after initial save. Request HR approval to edit.' });
       }
     }
 
@@ -218,18 +237,15 @@ router.put('/:code/self', verifyToken, auditLog('update', 'employee'), async (re
       ]
     );
 
-    // After save: lock bank_details section if bank fields have values
-    const newBank = v(b.bank, cur.bank);
-    const newAccNo = v(b.accNo, cur.acc_no);
-    if (newBank && newAccNo) {
-      locks.bank_details = true;
-      await pool.query('UPDATE employees SET profile_sections_locked = ? WHERE code = ?', [JSON.stringify(locks), req.params.code]);
-      // Mark approved edit requests as used
-      await pool.query(
-        "UPDATE document_edit_requests SET status = 'used' WHERE emp_code = ? AND section = 'bank_details' AND status = 'approved'",
-        [req.params.code]
-      ).catch(() => {});
-    }
+    // After save: lock profile_details and bank_details sections
+    locks.profile_details = true;
+    locks.bank_details = true;
+    await pool.query('UPDATE employees SET profile_sections_locked = ? WHERE code = ?', [JSON.stringify(locks), req.params.code]);
+    // Mark approved edit requests as used
+    await pool.query(
+      "UPDATE document_edit_requests SET status = 'used' WHERE emp_code = ? AND section IN ('profile_details','bank_details') AND status = 'approved'",
+      [req.params.code]
+    ).catch(() => {});
 
     res.json({ message: 'Personal details updated' });
   } catch (err) {
@@ -285,6 +301,23 @@ router.post('/upload-doc', verifyToken, upload.single('document'), async (req, r
           "UPDATE document_edit_requests SET status = 'used' WHERE emp_code = ? AND section = ? AND status = 'approved'",
           [req.user.empCode, section]
         ).catch(() => {});
+
+        // Notify HR/MD about document upload
+        const [empInfo] = await pool.query('SELECT name FROM employees WHERE code = ?', [req.user.empCode]).catch(() => [[]]);
+        const uploaderName = empInfo && empInfo[0] ? empInfo[0].name : req.user.empCode;
+        const sectionLabel = section.replace(/_/g, ' ');
+        await pool.query(
+          "INSERT INTO notifications (emp_code, title, message, type) SELECT code, ?, ?, 'general' FROM employees WHERE role IN ('MD','HR') AND is_active = 1",
+          ['Document Uploaded', uploaderName + ' uploaded a ' + sectionLabel + ' document']
+        ).catch(() => {});
+        const io = req.app.get('io');
+        if (io) {
+          io.to('role:MD').to('role:HR').emit('notification', {
+            title: 'Document Uploaded',
+            message: uploaderName + ' uploaded a ' + sectionLabel + ' document',
+            type: 'info'
+          });
+        }
       }
     }
     res.json({ url, filename: req.file.filename, message: 'Document uploaded' });

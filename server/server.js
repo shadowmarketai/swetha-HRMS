@@ -241,7 +241,7 @@ app.get('*', (req, res) => {
     await pool.query(`CREATE TABLE IF NOT EXISTS document_edit_requests (
       id INT AUTO_INCREMENT PRIMARY KEY,
       emp_code VARCHAR(20) NOT NULL,
-      section ENUM('educational_certs','bank_passbook','bank_details','experience_certs') NOT NULL,
+      section ENUM('profile_details','educational_certs','bank_passbook','bank_details','experience_certs') NOT NULL,
       reason TEXT,
       status ENUM('pending','approved','rejected','used') DEFAULT 'pending',
       requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -450,6 +450,9 @@ app.get('*', (req, res) => {
         ('3RD', 'Third Shift (Night)', '22:00', '06:00', '#7C3AED')
       `).catch(() => {});
     }
+
+    // Ensure profile_details is in the section ENUM (for existing tables)
+    await pool.query("ALTER TABLE document_edit_requests MODIFY COLUMN section ENUM('profile_details','educational_certs','bank_passbook','bank_details','experience_certs') NOT NULL").catch(() => {});
 
     console.log('DB migrations applied');
   } catch (e) { console.error('Migration error (non-fatal):', e.message); }

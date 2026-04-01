@@ -738,7 +738,7 @@ CREATE TABLE IF NOT EXISTS daily_work_logs (
 CREATE TABLE IF NOT EXISTS document_edit_requests (
   id INT AUTO_INCREMENT PRIMARY KEY,
   emp_code VARCHAR(20) NOT NULL,
-  section ENUM('educational_certs','bank_passbook','bank_details','experience_certs') NOT NULL,
+  section ENUM('profile_details','educational_certs','bank_passbook','bank_details','experience_certs') NOT NULL,
   reason TEXT,
   status ENUM('pending','approved','rejected','used') DEFAULT 'pending',
   requested_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

@@ -636,6 +636,12 @@ function requestSectionEdit(section) {
 
 function _renderProfileContent(c, emp, initials, isMDUser, isHrMd, lockStatus) {
 
+  // Check if entire profile is locked (one-time save rule)
+  var profileLocked = _isProfileSectionLocked('profile_details', lockStatus);
+  var profReadonly = profileLocked ? ' readonly' : '';
+  var profDisabled = profileLocked ? ' disabled' : '';
+  var profClass = profileLocked ? ' class="ss-readonly-locked"' : '';
+
   var html = '<div class="card profile-card" style="margin:16px;border-radius:var(--radius)">';
   var photoUrl = emp.photoUrl || emp.photo_url || null;
   html += '<div style="position:relative;display:inline-block">';
@@ -644,27 +650,33 @@ function _renderProfileContent(c, emp, initials, isMDUser, isHrMd, lockStatus) {
   } else {
     html += '<div class="profile-avatar" id="profAvatarImg">' + escapeHTML(initials) + '</div>';
   }
-  html += '<label for="profPhotoInput" style="position:absolute;bottom:0;right:0;width:28px;height:28px;background:var(--primary);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.2)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></label>';
-  html += '<input type="file" id="profPhotoInput" accept="image/*" style="display:none" onchange="uploadProfilePhoto()">';
+  if (!profileLocked) {
+    html += '<label for="profPhotoInput" style="position:absolute;bottom:0;right:0;width:28px;height:28px;background:var(--primary);border-radius:50%;display:flex;align-items:center;justify-content:center;cursor:pointer;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.2)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></label>';
+    html += '<input type="file" id="profPhotoInput" accept="image/*" style="display:none" onchange="uploadProfilePhoto()">';
+  }
   html += '</div>';
   html += '<h2>' + escapeHTML(emp.name) + '</h2>';
   html += '<div class="designation">' + escapeHTML(emp.designation || emp.dept || '') + '</div>';
   html += '<div class="emp-id">' + escapeHTML(emp.code) + '</div>';
+  if (profileLocked) {
+    html += '<div style="margin-top:8px">' + _renderLockBadge('profile_details', lockStatus) + '</div>';
+    html += '<button class="request-edit-btn" onclick="requestSectionEdit(\'profile_details\')" style="margin-top:6px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Request Edit Access</button>';
+  }
   html += '</div>';
 
-  // Section 1: Personal Information (editable)
+  // Section 1: Personal Information
   html += '<div class="card profile-section" style="margin:0 16px 12px;border-radius:var(--radius)">';
   html += '<div class="profile-section-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>Personal Information</div>';
   html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
   var dobVal = emp.dob ? (emp.dob.length > 10 ? emp.dob.substring(0,10) : emp.dob) : '';
-  html += '<div class="ss-form-group"><label>Date of Birth</label><input type="date" id="profDob" value="' + escapeHTML(dobVal) + '"></div>';
-  html += '<div class="ss-form-group"><label>Phone</label><input type="tel" id="profPhone" value="' + escapeHTML(emp.phone || '') + '" placeholder="Mobile number"></div>';
-  html += '<div class="ss-form-group"><label>Email</label><input type="email" id="profEmail" value="' + escapeHTML(emp.email || '') + '" placeholder="Email address"></div>';
-  html += '<div class="ss-form-group"><label>Blood Group</label><select class="nf-select" id="profBloodGroup">';
+  html += '<div class="ss-form-group"><label>Date of Birth</label><input type="date" id="profDob" value="' + escapeHTML(dobVal) + '"' + profReadonly + profClass + '></div>';
+  html += '<div class="ss-form-group"><label>Phone</label><input type="tel" id="profPhone" value="' + escapeHTML(emp.phone || '') + '" placeholder="Mobile number"' + profReadonly + profClass + '></div>';
+  html += '<div class="ss-form-group"><label>Email</label><input type="email" id="profEmail" value="' + escapeHTML(emp.email || '') + '" placeholder="Email address"' + profReadonly + profClass + '></div>';
+  html += '<div class="ss-form-group"><label>Blood Group</label><select class="nf-select" id="profBloodGroup"' + profDisabled + '>';
   var bgs = ['', 'A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
   bgs.forEach(function(bg) { html += '<option value="' + bg + '"' + (emp.bloodGroup === bg ? ' selected' : '') + '>' + (bg || 'Select') + '</option>'; });
   html += '</select></div>';
-  html += '<div class="ss-form-group"><label>Marital Status</label><select class="nf-select" id="profMaritalStatus">';
+  html += '<div class="ss-form-group"><label>Marital Status</label><select class="nf-select" id="profMaritalStatus"' + profDisabled + '>';
   var ms = ['', 'Single', 'Married', 'Divorced', 'Widowed'];
   ms.forEach(function(s) { html += '<option value="' + s + '"' + (emp.maritalStatus === s ? ' selected' : '') + '>' + (s || 'Select') + '</option>'; });
   html += '</select></div>';
@@ -673,24 +685,24 @@ function _renderProfileContent(c, emp, initials, isMDUser, isHrMd, lockStatus) {
   // Section 2: Address (editable, always shown)
   html += '<div class="card profile-section" style="margin:0 16px 12px;border-radius:var(--radius)">';
   html += '<div class="profile-section-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Address</div>';
-  html += '<div class="ss-form-group"><label>Present Address</label><textarea id="profPresentAddress" rows="2" placeholder="Current residential address">' + escapeHTML(emp.presentAddress || emp.address || '') + '</textarea></div>';
+  html += '<div class="ss-form-group"><label>Present Address</label><textarea id="profPresentAddress" rows="2" placeholder="Current residential address"' + profReadonly + profClass + '>' + escapeHTML(emp.presentAddress || emp.address || '') + '</textarea></div>';
   var sameAddr = emp.presentAddress && emp.permanentAddress && emp.presentAddress === emp.permanentAddress;
-  html += '<div class="ss-form-group"><label style="display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;font-size:.78rem"><input type="checkbox" id="profSameAddress" onchange="handleProfileSameAddress()"' + (sameAddr ? ' checked' : '') + '> Same as present address</label></div>';
-  html += '<div class="ss-form-group"><label>Permanent Address</label><textarea id="profPermanentAddress" rows="2" placeholder="Permanent address"' + (sameAddr ? ' disabled' : '') + '>' + escapeHTML(emp.permanentAddress || '') + '</textarea></div>';
+  html += '<div class="ss-form-group"><label style="display:flex;align-items:center;gap:6px;text-transform:none;letter-spacing:0;font-size:.78rem"><input type="checkbox" id="profSameAddress" onchange="handleProfileSameAddress()"' + (sameAddr ? ' checked' : '') + profDisabled + '> Same as present address</label></div>';
+  html += '<div class="ss-form-group"><label>Permanent Address</label><textarea id="profPermanentAddress" rows="2" placeholder="Permanent address"' + (sameAddr || profileLocked ? ' disabled' : '') + (profileLocked ? profClass : '') + '>' + escapeHTML(emp.permanentAddress || '') + '</textarea></div>';
   html += '</div>';
 
   // Section 3: Family & Emergency (editable)
   html += '<div class="card profile-section" style="margin:0 16px 12px;border-radius:var(--radius)">';
   html += '<div class="profile-section-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>Family & Emergency</div>';
   html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
-  html += '<div class="ss-form-group"><label>Father\'s Name</label><input type="text" id="profFatherName" value="' + escapeHTML(emp.fatherName || '') + '" placeholder="Father name"></div>';
-  html += '<div class="ss-form-group"><label>Father\'s Mobile</label><input type="tel" id="profFatherMobile" value="' + escapeHTML(emp.fatherMobile || '') + '" placeholder="Mobile"></div>';
-  html += '<div class="ss-form-group"><label>Mother\'s Name</label><input type="text" id="profMotherName" value="' + escapeHTML(emp.motherName || '') + '" placeholder="Mother name"></div>';
-  html += '<div class="ss-form-group"><label>Mother\'s Mobile</label><input type="tel" id="profMotherMobile" value="' + escapeHTML(emp.motherMobile || '') + '" placeholder="Mobile"></div>';
-  html += '<div class="ss-form-group"><label>Spouse Name</label><input type="text" id="profSpouseName" value="' + escapeHTML(emp.spouseName || '') + '" placeholder="Spouse name (optional)"></div>';
-  html += '<div class="ss-form-group"><label>Spouse Mobile</label><input type="tel" id="profSpouseMobile" value="' + escapeHTML(emp.spouseMobile || '') + '" placeholder="Mobile (optional)"></div>';
-  html += '<div class="ss-form-group"><label>Emergency Contact</label><input type="text" id="profEmergency" value="' + escapeHTML(emp.emergencyContact || '') + '" placeholder="Contact person name"></div>';
-  html += '<div class="ss-form-group"><label>Emergency Phone</label><input type="tel" id="profEmergencyPhone" value="' + escapeHTML(emp.emergencyPhone || '') + '" placeholder="Emergency number"></div>';
+  html += '<div class="ss-form-group"><label>Father\'s Name</label><input type="text" id="profFatherName" value="' + escapeHTML(emp.fatherName || '') + '" placeholder="Father name"' + profReadonly + profClass + '></div>';
+  html += '<div class="ss-form-group"><label>Father\'s Mobile</label><input type="tel" id="profFatherMobile" value="' + escapeHTML(emp.fatherMobile || '') + '" placeholder="Mobile"' + profReadonly + profClass + '></div>';
+  html += '<div class="ss-form-group"><label>Mother\'s Name</label><input type="text" id="profMotherName" value="' + escapeHTML(emp.motherName || '') + '" placeholder="Mother name"' + profReadonly + profClass + '></div>';
+  html += '<div class="ss-form-group"><label>Mother\'s Mobile</label><input type="tel" id="profMotherMobile" value="' + escapeHTML(emp.motherMobile || '') + '" placeholder="Mobile"' + profReadonly + profClass + '></div>';
+  html += '<div class="ss-form-group"><label>Spouse Name</label><input type="text" id="profSpouseName" value="' + escapeHTML(emp.spouseName || '') + '" placeholder="Spouse name (optional)"' + profReadonly + profClass + '></div>';
+  html += '<div class="ss-form-group"><label>Spouse Mobile</label><input type="tel" id="profSpouseMobile" value="' + escapeHTML(emp.spouseMobile || '') + '" placeholder="Mobile (optional)"' + profReadonly + profClass + '></div>';
+  html += '<div class="ss-form-group"><label>Emergency Contact</label><input type="text" id="profEmergency" value="' + escapeHTML(emp.emergencyContact || '') + '" placeholder="Contact person name"' + profReadonly + profClass + '></div>';
+  html += '<div class="ss-form-group"><label>Emergency Phone</label><input type="tel" id="profEmergencyPhone" value="' + escapeHTML(emp.emergencyPhone || '') + '" placeholder="Emergency number"' + profReadonly + profClass + '></div>';
   html += '</div></div>';
 
   // Section 4: Official Details
@@ -716,9 +728,9 @@ function _renderProfileContent(c, emp, initials, isMDUser, isHrMd, lockStatus) {
   html += '<div class="ss-form-group"><label>Account No</label><input type="text" id="profAccNo" value="' + escapeHTML(emp.accNo || '') + '" placeholder="Account number"' + bankReadonly + '></div>';
   html += '<div class="ss-form-group"><label>IFSC Code</label><input type="text" id="profIfsc" value="' + escapeHTML(emp.ifscCode || emp.ifsc_code || '') + '" placeholder="IFSC code" maxlength="11"' + bankReadonly + '></div>';
   html += '<div class="ss-form-group"><label>Bank Branch</label><input type="text" id="profBranch" value="' + escapeHTML(emp.bankBranch || emp.bank_branch || '') + '" placeholder="Branch name"' + bankReadonly + '></div>';
-  html += '<div class="ss-form-group"><label>PAN</label><input type="text" id="profPan" value="' + escapeHTML(emp.pan || '') + '" placeholder="PAN number" maxlength="10"></div>';
-  html += '<div class="ss-form-group"><label>Aadhaar</label><input type="text" id="profAadhaar" value="' + escapeHTML(emp.aadhaar || '') + '" placeholder="Aadhaar number" maxlength="12"></div>';
-  html += '<div class="ss-form-group"><label>UAN</label><input type="text" id="profUan" value="' + escapeHTML(emp.uan || '') + '" placeholder="UAN number"></div>';
+  html += '<div class="ss-form-group"><label>PAN</label><input type="text" id="profPan" value="' + escapeHTML(emp.pan || '') + '" placeholder="PAN number" maxlength="10"' + profReadonly + profClass + '></div>';
+  html += '<div class="ss-form-group"><label>Aadhaar</label><input type="text" id="profAadhaar" value="' + escapeHTML(emp.aadhaar || '') + '" placeholder="Aadhaar number" maxlength="12"' + profReadonly + profClass + '></div>';
+  html += '<div class="ss-form-group"><label>UAN</label><input type="text" id="profUan" value="' + escapeHTML(emp.uan || '') + '" placeholder="UAN number"' + profReadonly + profClass + '></div>';
   html += '</div>';
   if (bankLocked) {
     html += '<button class="request-edit-btn" onclick="requestSectionEdit(\'bank_details\')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Request Edit Access</button>';
@@ -738,9 +750,12 @@ function _renderProfileContent(c, emp, initials, isMDUser, isHrMd, lockStatus) {
     html += '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.5" style="margin-bottom:6px"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><circle cx="8" cy="15" r="2"/><path d="M14 13h4m-4 3h4"/></svg>';
     html += '<div style="font-size:.72rem;font-weight:600;color:var(--gray-500);margin-bottom:6px">Aadhaar Card</div>';
   }
-  html += '<button onclick="scanAndUploadDoc(\'aadhaar_photo\')" style="font-size:.68rem;padding:6px 14px;border:1px solid var(--primary);color:var(--primary);background:transparent;border-radius:8px;cursor:pointer;transition:all .15s" onmouseover="this.style.background=\'var(--primary)\';this.style.color=\'#fff\'" onmouseout="this.style.background=\'transparent\';this.style.color=\'var(--primary)\'">';
-  html += '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
-  html += (emp.aadhaar_photo_url ? 'Re-scan' : 'Scan & Upload') + '</button></div>';
+  if (!profileLocked) {
+    html += '<button onclick="scanAndUploadDoc(\'aadhaar_photo\')" style="font-size:.68rem;padding:6px 14px;border:1px solid var(--primary);color:var(--primary);background:transparent;border-radius:8px;cursor:pointer;transition:all .15s" onmouseover="this.style.background=\'var(--primary)\';this.style.color=\'#fff\'" onmouseout="this.style.background=\'transparent\';this.style.color=\'var(--primary)\'">';
+    html += '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
+    html += (emp.aadhaar_photo_url ? 'Re-scan' : 'Scan & Upload') + '</button>';
+  }
+  html += '</div>';
 
   // PAN card
   html += '<div style="border:1.5px dashed ' + (emp.pan_photo_url ? '#22c55e' : 'var(--gray-200)') + ';border-radius:10px;padding:12px;text-align:center;background:var(--gray-50,#f9fafb)">';
@@ -752,9 +767,12 @@ function _renderProfileContent(c, emp, initials, isMDUser, isHrMd, lockStatus) {
     html += '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.5" style="margin-bottom:6px"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M7 9h10M7 13h6"/></svg>';
     html += '<div style="font-size:.72rem;font-weight:600;color:var(--gray-500);margin-bottom:6px">PAN Card</div>';
   }
-  html += '<button onclick="scanAndUploadDoc(\'pan_photo\')" style="font-size:.68rem;padding:6px 14px;border:1px solid var(--primary);color:var(--primary);background:transparent;border-radius:8px;cursor:pointer;transition:all .15s" onmouseover="this.style.background=\'var(--primary)\';this.style.color=\'#fff\'" onmouseout="this.style.background=\'transparent\';this.style.color=\'var(--primary)\'">';
-  html += '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
-  html += (emp.pan_photo_url ? 'Re-scan' : 'Scan & Upload') + '</button></div>';
+  if (!profileLocked) {
+    html += '<button onclick="scanAndUploadDoc(\'pan_photo\')" style="font-size:.68rem;padding:6px 14px;border:1px solid var(--primary);color:var(--primary);background:transparent;border-radius:8px;cursor:pointer;transition:all .15s" onmouseover="this.style.background=\'var(--primary)\';this.style.color=\'#fff\'" onmouseout="this.style.background=\'transparent\';this.style.color=\'var(--primary)\'">';
+    html += '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
+    html += (emp.pan_photo_url ? 'Re-scan' : 'Scan & Upload') + '</button>';
+  }
+  html += '</div>';
 
   html += '</div></div></div>';
 
@@ -762,12 +780,12 @@ function _renderProfileContent(c, emp, initials, isMDUser, isHrMd, lockStatus) {
   html += '<div class="card profile-section" style="margin:0 16px 12px;border-radius:var(--radius)">';
   html += '<div class="profile-section-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 10 3 12 0v-5"/></svg>Qualification & Experience</div>';
   html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
-  html += '<div class="ss-form-group"><label>Qualification</label><input type="text" id="profQualification" value="' + escapeHTML(emp.qualification || '') + '" placeholder="e.g. B.E Civil"></div>';
-  html += '<div class="ss-form-group"><label>Institution</label><input type="text" id="profInstitution" value="' + escapeHTML(emp.institution || '') + '" placeholder="College / University"></div>';
-  html += '<div class="ss-form-group"><label>Year of Passing</label><input type="text" id="profYearOfPassing" value="' + escapeHTML(emp.yearOfPassing || '') + '" placeholder="e.g. 2020"></div>';
-  html += '<div class="ss-form-group"><label>Years of Experience</label><input type="number" id="profYearsExp" value="' + escapeHTML(String(emp.yearsOfExperience || '')) + '" placeholder="e.g. 5" step="0.5" min="0"></div>';
-  html += '<div class="ss-form-group"><label>Previous Employer</label><input type="text" id="profPrevEmployer" value="' + escapeHTML(emp.previousEmployer || '') + '" placeholder="Last company name"></div>';
-  html += '<div class="ss-form-group"><label>Previous Role</label><input type="text" id="profPrevRole" value="' + escapeHTML(emp.previousRole || '') + '" placeholder="Last designation"></div>';
+  html += '<div class="ss-form-group"><label>Qualification</label><input type="text" id="profQualification" value="' + escapeHTML(emp.qualification || '') + '" placeholder="e.g. B.E Civil"' + profReadonly + profClass + '></div>';
+  html += '<div class="ss-form-group"><label>Institution</label><input type="text" id="profInstitution" value="' + escapeHTML(emp.institution || '') + '" placeholder="College / University"' + profReadonly + profClass + '></div>';
+  html += '<div class="ss-form-group"><label>Year of Passing</label><input type="text" id="profYearOfPassing" value="' + escapeHTML(emp.yearOfPassing || '') + '" placeholder="e.g. 2020"' + profReadonly + profClass + '></div>';
+  html += '<div class="ss-form-group"><label>Years of Experience</label><input type="number" id="profYearsExp" value="' + escapeHTML(String(emp.yearsOfExperience || '')) + '" placeholder="e.g. 5" step="0.5" min="0"' + profReadonly + profClass + '></div>';
+  html += '<div class="ss-form-group"><label>Previous Employer</label><input type="text" id="profPrevEmployer" value="' + escapeHTML(emp.previousEmployer || '') + '" placeholder="Last company name"' + profReadonly + profClass + '></div>';
+  html += '<div class="ss-form-group"><label>Previous Role</label><input type="text" id="profPrevRole" value="' + escapeHTML(emp.previousRole || '') + '" placeholder="Last designation"' + profReadonly + profClass + '></div>';
   html += '</div></div>';
 
   // Section 7: Educational Certificates (lockable document upload)
@@ -824,8 +842,10 @@ function _renderProfileContent(c, emp, initials, isMDUser, isHrMd, lockStatus) {
   }
   html += '</div>';
 
-  // Save button (centered)
-  html += '<div style="padding:12px 16px;text-align:center"><button class="nf-btn nf-btn-primary ss-save-btn" id="profSaveBtn" style="border-radius:var(--radius);min-width:200px;padding:12px 32px;font-size:.85rem" onclick="saveProfileDetails()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:6px"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>Save Changes</button><div id="profSaveMsg" style="margin-top:8px;font-size:.78rem;font-weight:600;display:none"></div></div>';
+  // Save button (centered) — hidden when profile is locked
+  if (!profileLocked) {
+    html += '<div style="padding:12px 16px;text-align:center"><button class="nf-btn nf-btn-primary ss-save-btn" id="profSaveBtn" style="border-radius:var(--radius);min-width:200px;padding:12px 32px;font-size:.85rem" onclick="saveProfileDetails()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:6px"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>Save Changes</button><div id="profSaveMsg" style="margin-top:8px;font-size:.78rem;font-weight:600;display:none"></div></div>';
+  }
 
   // Actions
   html += '<div style="padding:0 16px 8px"><button class="payroll-report-btn" onclick="downloadIDCard()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>Download ID Card (PDF)</button></div>';
@@ -2166,9 +2186,13 @@ function showEmployeeDetailModal(empCode) {
   if (canEdit) {
     html += editField('Bank Name', 'bank', emp.bank);
     html += editField('Account No', 'accNo', emp.accNo);
+    html += editField('IFSC Code', 'ifscCode', emp.ifscCode || emp.ifsc_code);
+    html += editField('Bank Branch', 'bankBranch', emp.bankBranch || emp.bank_branch);
   } else {
     html += field('Bank', emp.bank || 'N/A');
     html += field('Account No', emp.accNo || 'N/A');
+    html += field('IFSC Code', emp.ifscCode || emp.ifsc_code || 'N/A');
+    html += field('Bank Branch', emp.bankBranch || emp.bank_branch || 'N/A');
   }
   html += '</div></div>';
 
@@ -2184,6 +2208,11 @@ function showEmployeeDetailModal(empCode) {
     html += '</div></div>';
   }
 
+  // Documents section for MD/HR — loaded asynchronously
+  if (canEdit) {
+    html += '<div class="edm-section"><div class="edm-section-title">Employee Documents</div><div id="edmDocsList" style="padding:4px 0"><div style="color:var(--gray-400);font-size:.75rem">Loading documents...</div></div></div>';
+  }
+
   // Save button for MD/HR
   if (canEdit) {
     html += '<div style="padding:12px 0;text-align:center"><button class="nf-btn nf-btn-primary" onclick="saveEmployeeDetails(\'' + empCode + '\')" style="min-width:160px">Save Changes</button></div>';
@@ -2191,6 +2220,40 @@ function showEmployeeDetailModal(empCode) {
 
   container.innerHTML = html;
   showOverlay('emp-detail');
+
+  // Load documents for MD/HR
+  if (canEdit) {
+    apiCall('GET', '/employees/' + empCode + '/documents').then(function(resp) {
+      var docsContainer = document.getElementById('edmDocsList');
+      if (!docsContainer) return;
+      var docs = resp.data || [];
+      if (docs.length === 0) {
+        docsContainer.innerHTML = '<div style="color:var(--gray-400);font-size:.75rem;padding:8px 0">No documents uploaded yet</div>';
+        return;
+      }
+      var docTypeLabels = { aadhaar_photo: 'Aadhaar Card', pan_photo: 'PAN Card', educational_cert: 'Educational Certificate', bank_passbook: 'Bank Passbook', experience_cert: 'Experience Certificate' };
+      var dhtml = '<div class="doc-upload-grid" style="grid-template-columns:repeat(auto-fill,minmax(110px,1fr))">';
+      docs.forEach(function(d) {
+        var ext = (d.file_path || '').split('.').pop().toLowerCase();
+        var isImg = ['jpg','jpeg','png','gif','webp'].indexOf(ext) >= 0;
+        var label = docTypeLabels[d.doc_type] || d.doc_name || d.doc_type;
+        dhtml += '<a href="' + escapeHTML(d.file_path) + '" target="_blank" style="text-decoration:none" title="' + escapeHTML(label) + '">';
+        dhtml += '<div class="doc-upload-card uploaded" style="cursor:pointer">';
+        if (isImg) {
+          dhtml += '<img class="doc-thumb" src="' + escapeHTML(d.file_path) + '" alt="' + escapeHTML(label) + '">';
+        } else {
+          dhtml += '<div style="height:60px;display:flex;align-items:center;justify-content:center;background:var(--gray-100);border-radius:6px;margin-bottom:4px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>';
+        }
+        dhtml += '<div class="doc-label" style="font-size:.6rem">' + escapeHTML(label) + '</div>';
+        dhtml += '</div></a>';
+      });
+      dhtml += '</div>';
+      docsContainer.innerHTML = dhtml;
+    }).catch(function() {
+      var docsContainer = document.getElementById('edmDocsList');
+      if (docsContainer) docsContainer.innerHTML = '<div style="color:var(--gray-400);font-size:.75rem">Failed to load documents</div>';
+    });
+  }
 }
 
 async function saveEmployeeDetails(empCode) {
