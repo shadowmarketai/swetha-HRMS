@@ -613,12 +613,13 @@ function _renderDocUploadCard(doc) {
   var ext = (doc.file_path || '').split('.').pop().toLowerCase();
   var isImg = ['jpg','jpeg','png','gif','webp'].indexOf(ext) >= 0;
   if (isImg) {
-    html += '<img class="doc-thumb" src="' + escapeHTML(doc.file_path) + '" alt="' + escapeHTML(doc.doc_name) + '">';
+    html += '<a href="' + escapeHTML(doc.file_path) + '" target="_blank" style="display:block"><img class="doc-thumb" src="' + escapeHTML(doc.file_path) + '" alt="' + escapeHTML(doc.doc_name) + '"></a>';
   } else {
-    html += '<div style="height:70px;display:flex;align-items:center;justify-content:center;background:var(--gray-100);border-radius:6px;margin-bottom:6px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>';
+    html += '<a href="' + escapeHTML(doc.file_path) + '" target="_blank" style="display:block"><div style="height:70px;display:flex;align-items:center;justify-content:center;background:var(--gray-100);border-radius:6px;margin-bottom:6px"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div></a>';
   }
-  html += '<div class="doc-label">' + escapeHTML(doc.doc_name || doc.doc_type) + '</div>';
-  html += '<a href="' + escapeHTML(doc.file_path) + '" target="_blank" style="font-size:.6rem;color:var(--primary)">View</a>';
+  var fileName = (doc.file_path || '').split('/').pop() || doc.doc_name || doc.doc_type;
+  html += '<div style="font-size:.65rem;color:#22c55e;font-weight:600;margin-bottom:2px"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="vertical-align:middle;margin-right:2px"><polyline points="20 6 9 17 4 12"/></svg>Uploaded</div>';
+  html += '<div class="doc-label" style="word-break:break-all;font-size:.6rem;color:var(--gray-500)" title="' + escapeHTML(fileName) + '">' + escapeHTML(fileName) + '</div>';
   html += '</div>';
   return html;
 }
@@ -745,15 +746,16 @@ function _renderProfileContent(c, emp, initials, isMDUser, isHrMd, lockStatus) {
   if (emp.aadhaar_photo_url) {
     html += '<a href="' + escapeHTML(emp.aadhaar_photo_url) + '" target="_blank" style="display:block;margin-bottom:8px">' +
       '<img src="' + escapeHTML(emp.aadhaar_photo_url) + '" style="width:100%;max-height:100px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb"></a>';
-    html += '<div style="font-size:.65rem;color:#22c55e;font-weight:600;margin-bottom:6px"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="vertical-align:middle;margin-right:2px"><polyline points="20 6 9 17 4 12"/></svg>Aadhaar Uploaded</div>';
+    html += '<div style="font-size:.65rem;color:#22c55e;font-weight:600;margin-bottom:4px"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="vertical-align:middle;margin-right:2px"><polyline points="20 6 9 17 4 12"/></svg>Aadhaar Uploaded</div>';
+    html += '<div style="font-size:.62rem;color:var(--gray-500);word-break:break-all">Aadhaar_Card.' + (emp.aadhaar_photo_url.split('.').pop() || 'jpg') + '</div>';
   } else {
     html += '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.5" style="margin-bottom:6px"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><circle cx="8" cy="15" r="2"/><path d="M14 13h4m-4 3h4"/></svg>';
     html += '<div style="font-size:.72rem;font-weight:600;color:var(--gray-500);margin-bottom:6px">Aadhaar Card</div>';
-  }
-  if (!profileLocked) {
-    html += '<button onclick="scanAndUploadDoc(\'aadhaar_photo\')" style="font-size:.68rem;padding:6px 14px;border:1px solid var(--primary);color:var(--primary);background:transparent;border-radius:8px;cursor:pointer;transition:all .15s" onmouseover="this.style.background=\'var(--primary)\';this.style.color=\'#fff\'" onmouseout="this.style.background=\'transparent\';this.style.color=\'var(--primary)\'">';
-    html += '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
-    html += (emp.aadhaar_photo_url ? 'Re-scan' : 'Scan & Upload') + '</button>';
+    if (!profileLocked) {
+      html += '<button onclick="scanAndUploadDoc(\'aadhaar_photo\')" style="font-size:.68rem;padding:6px 14px;border:1px solid var(--primary);color:var(--primary);background:transparent;border-radius:8px;cursor:pointer;transition:all .15s" onmouseover="this.style.background=\'var(--primary)\';this.style.color=\'#fff\'" onmouseout="this.style.background=\'transparent\';this.style.color=\'var(--primary)\'">';
+      html += '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
+      html += 'Scan & Upload</button>';
+    }
   }
   html += '</div>';
 
@@ -762,15 +764,16 @@ function _renderProfileContent(c, emp, initials, isMDUser, isHrMd, lockStatus) {
   if (emp.pan_photo_url) {
     html += '<a href="' + escapeHTML(emp.pan_photo_url) + '" target="_blank" style="display:block;margin-bottom:8px">' +
       '<img src="' + escapeHTML(emp.pan_photo_url) + '" style="width:100%;max-height:100px;object-fit:cover;border-radius:6px;border:1px solid #e5e7eb"></a>';
-    html += '<div style="font-size:.65rem;color:#22c55e;font-weight:600;margin-bottom:6px"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="vertical-align:middle;margin-right:2px"><polyline points="20 6 9 17 4 12"/></svg>PAN Uploaded</div>';
+    html += '<div style="font-size:.65rem;color:#22c55e;font-weight:600;margin-bottom:4px"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" style="vertical-align:middle;margin-right:2px"><polyline points="20 6 9 17 4 12"/></svg>PAN Uploaded</div>';
+    html += '<div style="font-size:.62rem;color:var(--gray-500);word-break:break-all">PAN_Card.' + (emp.pan_photo_url.split('.').pop() || 'jpg') + '</div>';
   } else {
     html += '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.5" style="margin-bottom:6px"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M7 9h10M7 13h6"/></svg>';
     html += '<div style="font-size:.72rem;font-weight:600;color:var(--gray-500);margin-bottom:6px">PAN Card</div>';
-  }
-  if (!profileLocked) {
-    html += '<button onclick="scanAndUploadDoc(\'pan_photo\')" style="font-size:.68rem;padding:6px 14px;border:1px solid var(--primary);color:var(--primary);background:transparent;border-radius:8px;cursor:pointer;transition:all .15s" onmouseover="this.style.background=\'var(--primary)\';this.style.color=\'#fff\'" onmouseout="this.style.background=\'transparent\';this.style.color=\'var(--primary)\'">';
-    html += '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
-    html += (emp.pan_photo_url ? 'Re-scan' : 'Scan & Upload') + '</button>';
+    if (!profileLocked) {
+      html += '<button onclick="scanAndUploadDoc(\'pan_photo\')" style="font-size:.68rem;padding:6px 14px;border:1px solid var(--primary);color:var(--primary);background:transparent;border-radius:8px;cursor:pointer;transition:all .15s" onmouseover="this.style.background=\'var(--primary)\';this.style.color=\'#fff\'" onmouseout="this.style.background=\'transparent\';this.style.color=\'var(--primary)\'">';
+      html += '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
+      html += 'Scan & Upload</button>';
+    }
   }
   html += '</div>';
 
@@ -795,7 +798,7 @@ function _renderProfileContent(c, emp, initials, isMDUser, isHrMd, lockStatus) {
   html += '<div class="profile-section-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 10 3 12 0v-5"/></svg>Educational Certificates' + _renderLockBadge('educational_certs', lockStatus) + '</div>';
   html += '<div class="doc-upload-grid">';
   eduDocs.forEach(function(d) { html += _renderDocUploadCard(d); });
-  if (!eduLocked) {
+  if (!eduLocked && eduDocs.length === 0) {
     html += '<div class="doc-upload-card dashed" onclick="scanAndUploadDoc(\'educational_cert\')">';
     html += '<div style="height:70px;display:flex;align-items:center;justify-content:center"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>';
     html += '<div class="doc-label">Upload Certificate</div></div>';
@@ -813,7 +816,7 @@ function _renderProfileContent(c, emp, initials, isMDUser, isHrMd, lockStatus) {
   html += '<div class="profile-section-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>Bank Passbook' + _renderLockBadge('bank_passbook', lockStatus) + '</div>';
   html += '<div class="doc-upload-grid">';
   pbDocs.forEach(function(d) { html += _renderDocUploadCard(d); });
-  if (!pbLocked) {
+  if (!pbLocked && pbDocs.length === 0) {
     html += '<div class="doc-upload-card dashed" onclick="scanAndUploadDoc(\'bank_passbook\')">';
     html += '<div style="height:70px;display:flex;align-items:center;justify-content:center"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>';
     html += '<div class="doc-label">Upload Passbook</div></div>';
@@ -831,7 +834,7 @@ function _renderProfileContent(c, emp, initials, isMDUser, isHrMd, lockStatus) {
   html += '<div class="profile-section-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>Experience Certificates' + _renderLockBadge('experience_certs', lockStatus) + '</div>';
   html += '<div class="doc-upload-grid">';
   expDocs.forEach(function(d) { html += _renderDocUploadCard(d); });
-  if (!expLocked) {
+  if (!expLocked && expDocs.length === 0) {
     html += '<div class="doc-upload-card dashed" onclick="scanAndUploadDoc(\'experience_cert\')">';
     html += '<div style="height:70px;display:flex;align-items:center;justify-content:center"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></div>';
     html += '<div class="doc-label">Upload Certificate</div></div>';
