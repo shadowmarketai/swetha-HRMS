@@ -3442,7 +3442,9 @@ function renderSiteExpenseScreen() {
   var myBills = expenseReimbursements.filter(function(e) {
     return e.empCode === currentUser.code && e.expenseType === 'site_expense';
   });
-  var totalBills = myBills.reduce(function(s, b) { return s + (b.amount || 0); }, 0);
+  // Only count non-rejected bills in the tally
+  var approvedBills = myBills.filter(function(b) { return b.status !== 'Rejected'; });
+  var totalBills = approvedBills.reduce(function(s, b) { return s + (b.amount || 0); }, 0);
   var diff = totalAdvance - totalBills;
 
   var html = '';
@@ -3566,7 +3568,9 @@ function renderTravelExpenseScreen() {
   var myBills = expenseReimbursements.filter(function(e) {
     return e.empCode === currentUser.code && e.expenseType === 'travel_expense';
   });
-  var totalBills = myBills.reduce(function(s, b) { return s + (b.amount || 0); }, 0);
+  // Only count non-rejected bills in the tally
+  var approvedBills = myBills.filter(function(b) { return b.status !== 'Rejected'; });
+  var totalBills = approvedBills.reduce(function(s, b) { return s + (b.amount || 0); }, 0);
   var diff = totalAdvance - totalBills;
 
   var html = '';
@@ -7679,9 +7683,12 @@ function initWebSocket() {
 
   // ── Advance: HR accepted ──
   _hrmsSocket.on('advance:hr_accepted', function(data) {
+    var adv = advanceRequests.find(function(a) { return a.id === data.id; });
+    if (adv) adv.status = 'hr_accepted';
     showToast('Your ' + (data.type || '') + ' advance has been accepted by HR', 'success');
     refreshNotifications();
     if (typeof renderAdvanceRequests === 'function') renderAdvanceRequests(advReqActiveTab);
+    renderAllMyRequests();
     renderAllPendingBanners();
     renderHomeQuickStats();
   });
@@ -7697,24 +7704,52 @@ function initWebSocket() {
 
   // ── Advance: approved ──
   _hrmsSocket.on('advance:approved', function(data) {
+    var adv = advanceRequests.find(function(a) { return a.id === data.id; });
+    if (adv) adv.status = 'approved';
     showToast('Your ' + (data.type || '') + ' advance has been approved!', 'success');
     refreshNotifications();
     if (typeof renderAdvanceRequests === 'function') renderAdvanceRequests(advReqActiveTab);
+    renderAllMyRequests();
+    if (typeof renderSiteExpenseScreen === 'function') renderSiteExpenseScreen();
+    if (typeof renderTravelExpenseScreen === 'function') renderTravelExpenseScreen();
     renderAllPendingBanners();
     renderHomeQuickStats();
   });
 
   // ── Advance: rejected ──
   _hrmsSocket.on('advance:rejected', function(data) {
+    var adv = advanceRequests.find(function(a) { return a.id === data.id; });
+    if (adv) { adv.status = 'rejected'; adv.rejectReason = data.reason || ''; }
     showToast('Your ' + (data.type || '') + ' advance was rejected' + (data.reason ? ': ' + data.reason : ''), 'error');
     refreshNotifications();
     if (typeof renderAdvanceRequests === 'function') renderAdvanceRequests(advReqActiveTab);
+    renderAllMyRequests();
     renderAllPendingBanners();
     renderHomeQuickStats();
   });
 
   // ── Advance: general update (for MD/HR dashboard) ──
-  _hrmsSocket.on('advance:updated', function() {
+  _hrmsSocket.on('advance:updated', function(data) {
+    // Re-fetch advances from server to stay in sync
+    apiCall('GET', '/advances?limit=100').then(function(resp) {
+      var rows = resp && resp.data ? resp.data : [];
+      rows.forEach(function(r) {
+        r.empCode = r.emp_code || r.empCode;
+        r.empName = r.emp_name || r.empName;
+        r.appliedDate = r.applied_date || r.appliedDate;
+        r.reviewedBy = r.reviewed_by || r.reviewedBy;
+        r.reviewDate = r.review_date || r.reviewDate;
+        r.rejectReason = r.reject_reason || r.rejectReason;
+        r.travelFrom = r.travel_from || r.travelFrom;
+        r.travelTo = r.travel_to || r.travelTo;
+        r.travelKm = r.travel_km || r.travelKm;
+        r.emiAmount = r.emi_amount || r.emiAmount;
+        r.emiMonths = r.emi_months || r.emiMonths;
+        var idx = advanceRequests.findIndex(function(a) { return a.id === r.id; });
+        if (idx >= 0) Object.assign(advanceRequests[idx], r);
+        else advanceRequests.push(r);
+      });
+    }).catch(function() {});
     if (typeof renderAdvanceRequests === 'function') renderAdvanceRequests(advReqActiveTab);
     renderAllPendingBanners();
     renderRecentActivity();
@@ -7732,38 +7767,62 @@ function initWebSocket() {
 
   // ── Expense: HR accepted ──
   _hrmsSocket.on('expense:hr_accepted', function(data) {
+    var exp = expenseReimbursements.find(function(e) { return e.id === data.id; });
+    if (exp) exp.status = 'hr_accepted';
     showToast('Your ' + (data.category || '') + ' expense has been accepted by HR', 'success');
     refreshNotifications();
     if (typeof renderSiteExpenseScreen === 'function') renderSiteExpenseScreen();
     if (typeof renderTravelExpenseScreen === 'function') renderTravelExpenseScreen();
+    if (typeof renderExpenseOverlay === 'function') renderExpenseOverlay();
     renderAllPendingBanners();
     renderHomeQuickStats();
   });
 
   // ── Expense: approved ──
   _hrmsSocket.on('expense:approved', function(data) {
+    var exp = expenseReimbursements.find(function(e) { return e.id === data.id; });
+    if (exp) exp.status = 'Approved';
     showToast('Your ' + (data.category || '') + ' expense has been approved!', 'success');
     refreshNotifications();
     if (typeof renderSiteExpenseScreen === 'function') renderSiteExpenseScreen();
     if (typeof renderTravelExpenseScreen === 'function') renderTravelExpenseScreen();
+    if (typeof renderExpenseOverlay === 'function') renderExpenseOverlay();
     renderAllPendingBanners();
     renderHomeQuickStats();
   });
 
   // ── Expense: rejected ──
   _hrmsSocket.on('expense:rejected', function(data) {
+    var exp = expenseReimbursements.find(function(e) { return e.id === data.id; });
+    if (exp) exp.status = 'Rejected';
     showToast('Your ' + (data.category || '') + ' expense was rejected', 'error');
     refreshNotifications();
     if (typeof renderSiteExpenseScreen === 'function') renderSiteExpenseScreen();
     if (typeof renderTravelExpenseScreen === 'function') renderTravelExpenseScreen();
+    if (typeof renderExpenseOverlay === 'function') renderExpenseOverlay();
     renderAllPendingBanners();
     renderHomeQuickStats();
   });
 
   // ── Expense: general update (for MD/HR dashboard) ──
-  _hrmsSocket.on('expense:updated', function() {
+  _hrmsSocket.on('expense:updated', function(data) {
+    // Re-fetch expenses from server to stay in sync
+    apiCall('GET', '/expenses?limit=100').then(function(resp) {
+      var rows = resp && resp.data ? resp.data : [];
+      rows.forEach(function(r) {
+        r.empCode = r.emp_code || r.empCode;
+        r.empName = r.emp_name || r.empName;
+        r.expenseType = r.expense_type || r.expenseType;
+        r.billUrl = r.bill_url || r.billUrl;
+        var idx = expenseReimbursements.findIndex(function(e) { return e.id === r.id; });
+        if (idx >= 0) Object.assign(expenseReimbursements[idx], r);
+        else expenseReimbursements.push(r);
+      });
+    }).catch(function() {});
     if (typeof renderSiteExpenseScreen === 'function') renderSiteExpenseScreen();
     if (typeof renderTravelExpenseScreen === 'function') renderTravelExpenseScreen();
+    if (typeof renderExpenseOverlay === 'function') renderExpenseOverlay();
+    if (typeof renderAdvanceRequests === 'function') renderAdvanceRequests(advReqActiveTab);
     renderAllPendingBanners();
     renderRecentActivity();
   });
