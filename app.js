@@ -257,6 +257,19 @@ const NAV_CONFIG = {
       { id:'hr-sal-self', label:'Self Salary', action:{type:'tab',target:'salary'} },
       { id:'hr-sal-list', label:'Employee List', action:{type:'tab',target:'salary'} }
     ]},
+    { id:'hr-peb-dash', label:'PEB Dashboard', icon:'store', action:{type:'overlay',target:'peb'} },
+    { id:'hr-inventory', label:'Inventory', icon:'store', children:[
+      { id:'hr-inv-stock', label:'Stock Items', action:{type:'overlay',target:'peb'} },
+      { id:'hr-inv-grn', label:'GRN', action:{type:'overlay',target:'peb'} },
+      { id:'hr-inv-requests', label:'Material Requests', action:{type:'overlay',target:'peb'} },
+      { id:'hr-inv-returns', label:'Returns & Scrap', action:{type:'overlay',target:'peb'} }
+    ]},
+    { id:'hr-procurement', label:'Procurement', icon:'purchase', children:[
+      { id:'hr-proc-vendors', label:'Vendors', action:{type:'overlay',target:'peb'} },
+      { id:'hr-proc-indents', label:'Purchase Indents', action:{type:'overlay',target:'peb'} },
+      { id:'hr-proc-orders', label:'Purchase Orders', action:{type:'overlay',target:'peb'} },
+      { id:'hr-proc-transport', label:'Transport', action:{type:'overlay',target:'peb'} }
+    ]},
     // Footer
     { id:'hr-profile', label:'Profile', icon:'profile', action:{type:'overlay',target:'profile'}, isFooter:true },
     { id:'hr-admin', label:'Admin Panel', icon:'admin', action:{type:'overlay',target:'admin'}, isFooter:true },
@@ -280,6 +293,12 @@ const NAV_CONFIG = {
     ]},
     { id:'emp-progress', label:'Project Progress', icon:'progress', action:{type:'tab',target:'progress'} },
     { id:'emp-salary', label:'Salary Statement', icon:'salary', action:{type:'tab',target:'salary'} },
+    { id:'emp-store', label:'Store', icon:'store', deptOnly:['Execution'], children:[
+      { id:'emp-inv-stock', label:'Stock Details', action:{type:'overlay',target:'peb'} },
+      { id:'emp-inv-requests', label:'Material Request', action:{type:'overlay',target:'peb'} },
+      { id:'emp-proc-transport', label:'Transport Booking', action:{type:'overlay',target:'peb'} },
+      { id:'emp-inv-returns', label:'Returns & Scrap', action:{type:'overlay',target:'peb'} }
+    ]},
     // Footer
     { id:'emp-profile', label:'Profile', icon:'profile', action:{type:'overlay',target:'profile'}, isFooter:true },
     { id:'emp-settings', label:'Settings', icon:'settings', action:{type:'overlay',target:'settings'}, isFooter:true },
@@ -1572,7 +1591,7 @@ let _overlayPreviousFocus = [];
 function showOverlay(id) {
   if (id === 'admin' && currentUser.role !== 'MD' && currentUser.role !== 'HR') return;
   if (id === 'location' && currentUser.role !== 'MD') return;
-  if (id === 'peb' && currentUser.role !== 'MD') return;
+  if (id === 'peb' && currentUser.role !== 'MD' && currentUser.role !== 'HR' && !(currentUser.role === 'Employee' && currentUser.dept === 'Execution')) return;
   if (id === 'onboarding' && currentUser.role !== 'MD' && currentUser.role !== 'HR' && currentUser.role !== 'Manager') return;
   if (id === 'advance-requests' && currentUser.role !== 'MD' && currentUser.role !== 'HR' && currentUser.role !== 'Manager') return;
   // Render content (wrapped in try-catch so errors don't block overlay display)
@@ -2326,15 +2345,20 @@ function toggleDeptEmployees(dept) {
   }
 }
 
-function addDepartment() {
+async function addDepartment() {
   const input = document.getElementById('newDeptName');
   const name = input.value.trim();
   if (!name) return;
   if (departments.includes(name)) { showToast('Department already exists'); return; }
-  departments.push(name);
-  input.value = '';
-  renderDeptsList();
-  showToast('Department "' + name + '" added successfully');
+  try {
+    await apiCall('POST', '/departments', { name: name });
+    departments.push(name);
+    input.value = '';
+    renderDeptsList();
+    showToast('Department "' + name + '" added successfully');
+  } catch (e) {
+    showToast(e.message || 'Failed to add department', 'error');
+  }
 }
 
 function renderAllEmpList() {
@@ -6621,7 +6645,8 @@ async function loadFromBackend() {
       { key: 'attendance', url: base + '/attendance?month=' + curMonth },
       { key: 'geofenceSites', url: base + '/geofence/sites' },
       { key: 'projects', url: base + '/projects' },
-      { key: 'documents', url: base + '/documents' }
+      { key: 'documents', url: base + '/documents' },
+      { key: 'departments', url: base + '/departments' }
     ];
     // MD/HR-only endpoints
     if (isMDorHR) {
@@ -6882,6 +6907,15 @@ async function loadFromBackend() {
       }
     }
 
+    // 23. Departments from DB
+    if (keyIdx.departments !== undefined) {
+      var deptData = getData(keyIdx.departments);
+      if (deptData && Array.isArray(deptData) && deptData.length > 0) {
+        departments.length = 0;
+        deptData.forEach(function(d) { departments.push(d.name); });
+      }
+    }
+
     return true;
   } catch (e) {
     return false;
@@ -6894,9 +6928,16 @@ async function loadFromBackend() {
 // =====================================================
 // ROLE-SPECIFIC NAVIGATION RENDERER
 // =====================================================
+function filterNavByDept(items) {
+  if (!currentUser) return items;
+  return items.filter(function(item) {
+    if (item.deptOnly && item.deptOnly.indexOf(currentUser.dept) === -1) return false;
+    return true;
+  });
+}
 function renderNavigation() {
   if (!currentUser) return;
-  var config = NAV_CONFIG[currentUser.role] || NAV_CONFIG.Employee;
+  var config = filterNavByDept(NAV_CONFIG[currentUser.role] || NAV_CONFIG.Employee);
   var container = document.getElementById('bottomTabs');
   if (!container) return;
   var isDesktop = window.innerWidth >= 768;

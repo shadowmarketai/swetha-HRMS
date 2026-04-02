@@ -228,7 +228,7 @@ async function generateSimpleCode(prefix, table, column) {
 // ========================================
 // VENDORS
 // ========================================
-router.get('/vendors', verifyToken, requireRole('MD'), async (req, res) => {
+router.get('/vendors', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
   try {
     const { search, qualified } = req.query;
     let q = 'SELECT * FROM peb_vendors WHERE is_active = TRUE';
@@ -241,7 +241,7 @@ router.get('/vendors', verifyToken, requireRole('MD'), async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
-router.post('/vendors', verifyToken, requireRole('MD'), async (req, res) => {
+router.post('/vendors', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
   try {
     const { company_name, contact_person, phone, email, address, gst_number, pan_number, payment_terms, rating } = req.body;
     if (!company_name) return res.status(400).json({ error: 'Company name required' });
@@ -258,7 +258,7 @@ router.post('/vendors', verifyToken, requireRole('MD'), async (req, res) => {
   }
 });
 
-router.put('/vendors/:id', verifyToken, requireRole('MD'), async (req, res) => {
+router.put('/vendors/:id', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
   try {
     const fields = ['company_name','contact_person','phone','email','address','gst_number','pan_number','payment_terms','rating','is_blacklisted','blacklist_reason','status'];
     const updates = [], values = [];
@@ -273,7 +273,7 @@ router.put('/vendors/:id', verifyToken, requireRole('MD'), async (req, res) => {
 // ========================================
 // PURCHASE INDENTS — Full L1/L2/L3 workflow
 // ========================================
-router.get('/indents', verifyToken, requireRole('MD'), async (req, res) => {
+router.get('/indents', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
   try {
     const { status } = req.query;
     let q = `SELECT pi.*, (SELECT COUNT(*) FROM peb_vendor_quotations vq WHERE vq.indent_id = pi.id) as quotation_count FROM peb_purchase_indents pi WHERE 1=1`;
@@ -285,7 +285,7 @@ router.get('/indents', verifyToken, requireRole('MD'), async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
-router.get('/indents/:id', verifyToken, requireRole('MD'), async (req, res) => {
+router.get('/indents/:id', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
   try {
     const [indent] = await db.query('SELECT * FROM peb_purchase_indents WHERE id = ?', [req.params.id]);
     if (indent.length === 0) return res.status(404).json({ error: 'Indent not found' });
@@ -303,7 +303,7 @@ router.get('/indents/:id', verifyToken, requireRole('MD'), async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
-router.post('/indents', verifyToken, requireRole('MD'), async (req, res) => {
+router.post('/indents', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
@@ -335,7 +335,7 @@ router.post('/indents', verifyToken, requireRole('MD'), async (req, res) => {
 // ========================================
 // VENDOR QUOTATIONS (3 required, auto-rank)
 // ========================================
-router.post('/quotations', verifyToken, requireRole('MD'), async (req, res) => {
+router.post('/quotations', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
@@ -383,7 +383,7 @@ router.post('/quotations', verifyToken, requireRole('MD'), async (req, res) => {
 });
 
 // L1/L2/L3 comparison
-router.get('/comparison/:indentId', verifyToken, requireRole('MD'), async (req, res) => {
+router.get('/comparison/:indentId', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
   try {
     const [quotations] = await db.query(
       `SELECT vq.*, v.company_name, v.rating, v.gst_number as vendor_gst, v.pan_number as vendor_pan
@@ -399,7 +399,7 @@ router.get('/comparison/:indentId', verifyToken, requireRole('MD'), async (req, 
 });
 
 // GM Approval (Step 1)
-router.post('/indents/:id/gm-approve', verifyToken, requireRole('MD'), async (req, res) => {
+router.post('/indents/:id/gm-approve', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
   try {
     const { action, remarks, selected_vendor_id, selection_justification } = req.body;
     if (!['APPROVED','REJECTED'].includes(action)) return res.status(400).json({ error: 'action must be APPROVED or REJECTED' });
@@ -440,7 +440,7 @@ router.post('/indents/:id/gm-approve', verifyToken, requireRole('MD'), async (re
 });
 
 // MD Final Approval (Step 2)
-router.post('/indents/:id/md-approve', verifyToken, requireRole('MD'), async (req, res) => {
+router.post('/indents/:id/md-approve', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
   try {
     const { action, remarks, override_price } = req.body;
     if (!['APPROVED','REJECTED'].includes(action)) return res.status(400).json({ error: 'action must be APPROVED or REJECTED' });
@@ -468,7 +468,7 @@ router.post('/indents/:id/md-approve', verifyToken, requireRole('MD'), async (re
 // ========================================
 // PURCHASE ORDERS — with payment tracking
 // ========================================
-router.get('/orders', verifyToken, requireRole('MD'), async (req, res) => {
+router.get('/orders', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
   try {
     const { status } = req.query;
     let q = `SELECT po.*, v.company_name as vendor_name, pi.indent_code
@@ -482,7 +482,7 @@ router.get('/orders', verifyToken, requireRole('MD'), async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
-router.get('/orders/:id', verifyToken, requireRole('MD'), async (req, res) => {
+router.get('/orders/:id', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
   try {
     const [po] = await db.query(
       'SELECT po.*, v.company_name as vendor_name FROM peb_purchase_orders po LEFT JOIN peb_vendors v ON po.vendor_id = v.id WHERE po.id = ?', [req.params.id]
@@ -496,7 +496,7 @@ router.get('/orders/:id', verifyToken, requireRole('MD'), async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
-router.post('/orders', verifyToken, requireRole('MD'), async (req, res) => {
+router.post('/orders', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
@@ -531,7 +531,7 @@ router.post('/orders', verifyToken, requireRole('MD'), async (req, res) => {
 });
 
 // PO Approve
-router.post('/orders/:id/approve', verifyToken, requireRole('MD'), async (req, res) => {
+router.post('/orders/:id/approve', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
   try {
     await db.query("UPDATE peb_purchase_orders SET approved_by_md=TRUE, approval_date=CURDATE(), status='SENT' WHERE id=?", [req.params.id]);
     res.json({ message: 'PO approved and sent' });
@@ -539,7 +539,7 @@ router.post('/orders/:id/approve', verifyToken, requireRole('MD'), async (req, r
 });
 
 // PO Payment
-router.post('/orders/:id/payment', verifyToken, requireRole('MD'), async (req, res) => {
+router.post('/orders/:id/payment', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
   try {
     const { amount, payment_date, mode, reference } = req.body;
     if (!amount || !payment_date || !mode) return res.status(400).json({ error: 'amount, payment_date, mode required' });
@@ -553,7 +553,7 @@ router.post('/orders/:id/payment', verifyToken, requireRole('MD'), async (req, r
 // ========================================
 // TRANSPORT — full approve + complete
 // ========================================
-router.get('/transport', verifyToken, requireRole('MD'), async (req, res) => {
+router.get('/transport', verifyToken, requireRole('MD', 'HR', 'Employee'), async (req, res) => {
   try {
     const { status } = req.query;
     let q = 'SELECT * FROM peb_transport_requests WHERE 1=1';
@@ -565,7 +565,7 @@ router.get('/transport', verifyToken, requireRole('MD'), async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
-router.get('/transport/:id', verifyToken, requireRole('MD'), async (req, res) => {
+router.get('/transport/:id', verifyToken, requireRole('MD', 'HR', 'Employee'), async (req, res) => {
   try {
     const [t] = await db.query('SELECT * FROM peb_transport_requests WHERE id = ?', [req.params.id]);
     if (t.length === 0) return res.status(404).json({ error: 'Not found' });
@@ -573,7 +573,7 @@ router.get('/transport/:id', verifyToken, requireRole('MD'), async (req, res) =>
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
-router.post('/transport', verifyToken, requireRole('MD'), async (req, res) => {
+router.post('/transport', verifyToken, requireRole('MD', 'HR', 'Employee'), async (req, res) => {
   try {
     const { type, origin_name, destination_name, scheduled_date, urgency, vehicle_type, estimated_weight, reason } = req.body;
     if (!type || !scheduled_date) return res.status(400).json({ error: 'type and scheduled_date required' });
@@ -587,7 +587,7 @@ router.post('/transport', verifyToken, requireRole('MD'), async (req, res) => {
 });
 
 // Approve with vehicle/driver details
-router.post('/transport/:id/approve', verifyToken, requireRole('MD'), async (req, res) => {
+router.post('/transport/:id/approve', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
   try {
     const { action, vehicle_number, driver_name, driver_phone } = req.body;
     if (!['APPROVED','REJECTED'].includes(action)) return res.status(400).json({ error: 'Invalid action' });
@@ -599,7 +599,7 @@ router.post('/transport/:id/approve', verifyToken, requireRole('MD'), async (req
 });
 
 // Start transit
-router.post('/transport/:id/start', verifyToken, requireRole('MD'), async (req, res) => {
+router.post('/transport/:id/start', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
   try {
     await db.query("UPDATE peb_transport_requests SET status='IN_TRANSIT' WHERE id=?", [req.params.id]);
     res.json({ message: 'Transport in transit' });
@@ -607,7 +607,7 @@ router.post('/transport/:id/start', verifyToken, requireRole('MD'), async (req, 
 });
 
 // Complete with km/cost/condition
-router.post('/transport/:id/complete', verifyToken, requireRole('MD'), async (req, res) => {
+router.post('/transport/:id/complete', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
   try {
     const { actual_km, transport_cost, delivery_condition, damage_notes } = req.body;
     await db.query("UPDATE peb_transport_requests SET status='DELIVERED',received_by=?,received_at=NOW(),actual_km=?,transport_cost=?,delivery_condition=?,damage_notes=? WHERE id=?",
@@ -617,7 +617,7 @@ router.post('/transport/:id/complete', verifyToken, requireRole('MD'), async (re
 });
 
 // Summary for dashboard
-router.get('/summary', verifyToken, requireRole('MD'), async (req, res) => {
+router.get('/summary', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
   try {
     const [[{ total_vendors }]] = await db.query('SELECT COUNT(*) as total_vendors FROM peb_vendors WHERE is_active = TRUE');
     const [[{ pending_indents }]] = await db.query("SELECT COUNT(*) as pending_indents FROM peb_purchase_indents WHERE status IN ('QUOTATION_PENDING','COMPARISON_READY','GM_APPROVED')");

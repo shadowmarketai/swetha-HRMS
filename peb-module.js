@@ -7,7 +7,15 @@ var _pebSectionMap = {
   'md-peb-dash':'dashboard','md-inv-stock':'stock-items','md-inv-grn':'grn',
   'md-inv-requests':'material-requests','md-inv-returns':'returns-scrap',
   'md-proc-vendors':'vendors','md-proc-indents':'purchase-indents',
-  'md-proc-orders':'purchase-orders','md-proc-transport':'transport'
+  'md-proc-orders':'purchase-orders','md-proc-transport':'transport',
+  // HR nav IDs
+  'hr-peb-dash':'dashboard','hr-inv-stock':'stock-items','hr-inv-grn':'grn',
+  'hr-inv-requests':'material-requests','hr-inv-returns':'returns-scrap',
+  'hr-proc-vendors':'vendors','hr-proc-indents':'purchase-indents',
+  'hr-proc-orders':'purchase-orders','hr-proc-transport':'transport',
+  // Employee (Site Engineer) nav IDs
+  'emp-inv-stock':'stock-items','emp-inv-requests':'material-requests',
+  'emp-proc-transport':'transport','emp-inv-returns':'returns-scrap'
 };
 var _pebSection = 'dashboard';
 var _pebTitles = {'dashboard':'PEB Dashboard','stock-items':'Stock Items','grn':'Goods Receipt Notes','material-requests':'Material Requests','returns-scrap':'Returns & Scrap','vendors':'Vendors','purchase-indents':'Purchase Indents','purchase-orders':'Purchase Orders','transport':'Transport Requests'};
@@ -130,6 +138,10 @@ async function _pebDashboard(el) {
 }
 
 // ========== STOCK ITEMS (full CRUD + detail + transaction) ==========
+function _pebCanEdit() {
+  return typeof currentUser !== 'undefined' && currentUser && (currentUser.role === 'MD' || currentUser.role === 'HR');
+}
+
 async function _pebStockItems(el) {
   try {
     var items = await _pebApi('/api/peb/store/items');
@@ -143,15 +155,17 @@ async function _pebStockItems(el) {
     html += _pebStat('Stock Value', _pebCurr(totalValue), '#3b82f6');
     html += '</div>';
 
-    // Action bar
-    html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">' +
-      '<div style="display:flex;gap:6px"><button class="btn btn-golden" style="font-size:.72rem;padding:6px 14px;border-radius:8px" onclick="_pebShowAddItem()">+ Add Item</button>' +
-      '<button class="btn btn-white-outline" style="font-size:.72rem;padding:6px 14px;border-radius:8px" onclick="_pebShowStockTxn()">+ Stock Entry</button></div></div>';
+    // Action bar (only for MD/HR)
+    if (_pebCanEdit()) {
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">' +
+        '<div style="display:flex;gap:6px"><button class="btn btn-golden" style="font-size:.72rem;padding:6px 14px;border-radius:8px" onclick="_pebShowAddItem()">+ Add Item</button>' +
+        '<button class="btn btn-white-outline" style="font-size:.72rem;padding:6px 14px;border-radius:8px" onclick="_pebShowStockTxn()">+ Stock Entry</button></div></div>';
+    }
 
     // Filters
     html += '<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">' +
       '<select id="pebCatF" style="padding:8px 12px;border:1px solid #e5e7eb;border-radius:8px;font-size:.78rem;background:#fff;color:#374151" onchange="_pebFilterStock()">' +
-        '<option value="">All Categories</option><option>RAW MATERIAL</option><option>CONSUMABLE</option><option>TOOL</option><option>HARDWARE</option><option>SAFETY</option><option>OTHER</option></select>' +
+        '<option value="">All Categories</option><option>CONSUMABLE</option><option>TOOL</option><option>MACHINE</option><option>RAW MATERIAL</option><option>FASTENER</option><option>HARDWARE</option><option>SAFETY</option><option>OTHER</option></select>' +
       '<input id="pebSrch" placeholder="Search items..." style="flex:1;min-width:180px;padding:8px 12px;border:1px solid #e5e7eb;border-radius:8px;font-size:.78rem;background:#fff" oninput="_pebFilterStock()"></div>';
 
     html += '<div id="pebStockTbl">' + _pebStockRows(items) + '</div>';
@@ -172,7 +186,7 @@ function _pebStockRows(items) {
       '<span style="color:#6b7280">' + Number(i.min_stock_level).toLocaleString('en-IN') + '</span>',
       low ? _pebBadge('LOW','red') : _pebBadge('OK','green'),
       '<div style="display:flex;gap:6px"><button onclick="_pebViewItem('+i.id+')" style="font-size:.68rem;padding:4px 10px;border:1px solid #3b82f6;color:#3b82f6;background:transparent;border-radius:6px;cursor:pointer;transition:all .15s" onmouseover="this.style.background=\'#3b82f6\';this.style.color=\'#fff\'" onmouseout="this.style.background=\'transparent\';this.style.color=\'#3b82f6\'">View</button>' +
-      '<button onclick="_pebEditItem('+i.id+')" style="font-size:.68rem;padding:4px 10px;border:1px solid #6b7280;color:#6b7280;background:transparent;border-radius:6px;cursor:pointer;transition:all .15s" onmouseover="this.style.background=\'#6b7280\';this.style.color=\'#fff\'" onmouseout="this.style.background=\'transparent\';this.style.color=\'#6b7280\'">Edit</button></div>'
+      (_pebCanEdit() ? '<button onclick="_pebEditItem('+i.id+')" style="font-size:.68rem;padding:4px 10px;border:1px solid #6b7280;color:#6b7280;background:transparent;border-radius:6px;cursor:pointer;transition:all .15s" onmouseover="this.style.background=\'#6b7280\';this.style.color=\'#fff\'" onmouseout="this.style.background=\'transparent\';this.style.color=\'#6b7280\'">Edit</button>' : '') + '</div>'
     ];
   }), '750px');
 }

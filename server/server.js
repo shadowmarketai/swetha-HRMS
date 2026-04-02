@@ -191,6 +191,7 @@ app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api/peb/store', require('./routes/peb-store'));
 app.use('/api/peb/purchase', require('./routes/peb-purchase'));
 app.use('/api/edit-requests', require('./routes/edit-requests'));
+app.use('/api/departments', require('./routes/departments'));
 // Health check — verifies app + DB connectivity
 app.get('/api/health', async (req, res) => {
   const health = { status: 'ok', timestamp: new Date().toISOString(), db: 'ok', uptime: process.uptime() };
