@@ -3029,11 +3029,18 @@ async function submitInlineExpense() {
   var inlineBtn = document.querySelector('#inlineExpenseForm .nf-btn-primary');
   _submitStart(inlineBtn);
   try {
-    var apiRes = await apiCall('POST', '/advances', {
-      type: type, amount: amount, reason: reason, details: details, project: project, category: category,
-      travelFrom: travelFrom, travelTo: travelTo, vehicle: vehicle, travelKm: travelKm,
-      emiAmount: emiAmount, emiMonths: emiMonths, urgency: 'normal'
-    });
+    var inlinePayload = { type: type, amount: amount, urgency: 'normal' };
+    if (reason) inlinePayload.reason = reason;
+    if (details) inlinePayload.details = details;
+    if (project) inlinePayload.project = project;
+    if (category) inlinePayload.category = category;
+    if (travelFrom) inlinePayload.travelFrom = travelFrom;
+    if (travelTo) inlinePayload.travelTo = travelTo;
+    if (vehicle) inlinePayload.vehicle = vehicle;
+    if (travelKm) inlinePayload.travelKm = travelKm;
+    if (emiAmount) inlinePayload.emiAmount = emiAmount;
+    if (emiMonths) inlinePayload.emiMonths = emiMonths;
+    var apiRes = await apiCall('POST', '/advances', inlinePayload);
     // HR's own salary advance skips HR step
     var inlineStatus = 'pending';
     if (currentUser.role === 'HR' && type === 'salary') inlineStatus = 'hr_accepted';
