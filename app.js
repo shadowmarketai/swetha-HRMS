@@ -2968,7 +2968,7 @@ function showInlineExpenseForm() {
   html += '<div class="form-row"><label>Project / Site *</label><select id="inlineSiteProject" class="nf-select"><option value="">Select project</option>';
   if (typeof projects !== 'undefined') { projects.forEach(function(p) { html += '<option>' + escapeHTML(p.name) + '</option>'; }); }
   html += '<option>Other</option></select></div>';
-  html += '<div class="form-row"><label>Category *</label><select id="inlineSiteCategory" class="nf-select"><option value="">Select category</option><option>Material</option><option>Labour</option><option>Equipment</option><option>Transport</option><option>Other</option></select></div>';
+  html += '<div class="form-row"><label>Purpose *</label><select id="inlineSiteCategory" class="nf-select"><option value="">Select purpose</option><option>Site Visit</option><option>Material Purchase</option><option>Supervision</option><option>Labour Payment</option><option>Equipment Hire</option><option>Other</option></select></div>';
   html += '</div>';
   // Salary fields
   html += '<div id="inlineFieldsSalary" style="display:none">';
@@ -3219,7 +3219,7 @@ async function submitAdvanceRequest() {
 }
 
 function getAdvMeta(r) {
-  if (r.type === 'site') return `<strong>${escapeHTML(r.project || '')}</strong> &middot; ${escapeHTML(r.category || '')}${r.details ? ' &middot; ' + escapeHTML(r.details) : ''}`;
+  if (r.type === 'site') return `<strong>${escapeHTML(r.project || '')}</strong>${r.category ? ' &middot; Purpose: ' + escapeHTML(r.category) : ''}${r.details ? ' &middot; ' + escapeHTML(r.details) : ''}`;
   if (r.type === 'salary') return `<strong>${escapeHTML(r.reason || '')}</strong>${r.details ? ' — ' + escapeHTML(r.details) : ''}<br>Deducted from next month salary`;
   if (r.type === 'travel') return `<strong>${escapeHTML(r.travelFrom || '')} \u2192 ${escapeHTML(r.travelTo || '')}</strong> &middot; ${escapeHTML(r.vehicle || '')}${r.travelKm ? ' &middot; ' + r.travelKm + ' km' : ''}${r.details ? '<br>' + escapeHTML(r.details) : ''}`;
   if (r.type === 'site_expense') return `<strong>${escapeHTML(r.project || '')}</strong> &middot; ${escapeHTML(r.category || 'Site Bill')}${r.details ? ' &middot; ' + escapeHTML(r.details) : ''}`;
@@ -3372,7 +3372,7 @@ function renderAdvanceRequests(filter) {
         Applied: ${formatAdvDate(r.appliedDate)}
         ${r.reviewedBy ? ' &middot; By: ' + escapeHTML(r.reviewedBy) + ' on ' + formatAdvDate(r.reviewDate) : ''}
         ${r.rejectReason ? '<br><span style="color:var(--danger)">Reason: ' + escapeHTML(r.rejectReason) + '</span>' : ''}
-        ${r.billUrl ? '<br><a href="' + escapeHTML(r.billUrl) + '" target="_blank" style="font-size:.72rem;color:var(--primary);font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:3px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>View Attached Bill</a>' : ''}
+        ${r.billUrl ? '<br><a href="' + escapeHTML(authUrl(r.billUrl)) + '" target="_blank" style="font-size:.72rem;color:var(--primary);font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:3px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>View Attached Bill</a>' : ''}
         ${stepHtml}
       </div>
       ${actionsHtml}
