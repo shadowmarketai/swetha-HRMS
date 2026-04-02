@@ -148,7 +148,7 @@
       </div>
       </div>
       <div style="margin-top:12px">
-        <button class="btn btn-primary w-full" style="border-radius:var(--radius)" id="newExpenseBtn" onclick="showInlineExpenseForm()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New Expense</button>
+        <button class="btn btn-primary w-full" style="border-radius:var(--radius)" id="newExpenseBtn" onclick="showInlineExpenseForm()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New Advance Request</button>
       </div>
       <div id="inlineExpenseForm" style="display:none"></div>
       <div class="my-requests-section" id="mySiteRequests"></div>
@@ -723,7 +723,7 @@
       <!-- Site fields (hidden) -->
       <div id="advFieldsSite" style="display:none">
         <div class="form-row"><label>Project / Site *</label><select id="advSiteProject"><option value="">Select project</option><option>Porur Villa Project</option><option>Tambaram Warehouse</option><option>PEB Factory Extension</option><option>Guduvanchery Residence</option><option>Other</option></select></div>
-        <div class="form-row"><label>Category *</label><select id="advSiteCategory"><option value="">Select category</option><option>Material</option><option>Labour</option><option>Equipment</option><option>Transport</option><option>Other</option></select></div>
+        <div class="form-row"><label>Purpose *</label><select id="advSiteCategory"><option value="">Select purpose</option><option>Site Visit</option><option>Material Purchase</option><option>Supervision</option><option>Labour Payment</option><option>Equipment Hire</option><option>Other</option></select></div>
       </div>
       <!-- Salary fields (shown by default) -->
       <div id="advFieldsSalary">
@@ -1009,6 +1009,6 @@ try{var s=localStorage.getItem('hrms_session');if(s){var p=JSON.parse(s);if(p&&p
 </script>
 <script src="/socket.io/socket.io.js"></script>
 <script src="peb-module.js?v=2"></script>
-<script src="app.js?v=144"></script>
+<script src="app.js?v=145"></script>
 </body>
 </html>

@@ -2955,12 +2955,12 @@ function showInlineExpenseForm() {
   if (btn) btn.style.display = 'none';
   container.style.display = 'block';
   var html = '<div class="card fade-in" style="padding:14px;margin-top:10px">';
-  html += '<h3 style="font-family:var(--font-display);font-size:.95rem;font-weight:600;margin-bottom:12px">New Expense Request</h3>';
-  html += '<div class="form-row"><label>Expense Type *</label><select id="inlineExpType" class="nf-select" onchange="toggleInlineExpFields()">';
+  html += '<h3 style="font-family:var(--font-display);font-size:.95rem;font-weight:600;margin-bottom:12px">New Advance Request</h3>';
+  html += '<div class="form-row"><label>Advance Type *</label><select id="inlineExpType" class="nf-select" onchange="toggleInlineExpFields()">';
   html += '<option value="">Select type</option>';
-  html += '<option value="site">Site Expense</option>';
+  html += '<option value="site">Site Advance</option>';
   html += '<option value="salary">Salary Advance</option>';
-  html += '<option value="travel">Travel Expense</option>';
+  html += '<option value="travel">Travel Advance</option>';
   html += '</select></div>';
   html += '<div class="form-row"><label>Amount (Rs.) *</label><input type="number" id="inlineExpAmount" placeholder="e.g. 25000"></div>';
   // Site fields
@@ -3032,7 +3032,7 @@ async function submitInlineExpense() {
     project = (document.getElementById('inlineSiteProject') || {}).value || '';
     category = (document.getElementById('inlineSiteCategory') || {}).value || '';
     if (!project) { showToast('Please select a project/site'); return; }
-    if (!category) { showToast('Please select a category'); return; }
+    if (!category) { showToast('Please select a purpose'); return; }
   } else if (type === 'salary') {
     reason = (document.getElementById('inlineSalaryReason') || {}).value || '';
     if (!reason) { showToast('Please select a reason'); return; }
@@ -3156,7 +3156,7 @@ async function submitAdvanceRequest() {
     project = document.getElementById('advSiteProject').value;
     category = document.getElementById('advSiteCategory').value;
     if (!project) { showToast('Please select a project/site'); return; }
-    if (!category) { showToast('Please select a category'); return; }
+    if (!category) { showToast('Please select a purpose'); return; }
   } else if (advSelectedType === 'travel') {
     travelFrom = document.getElementById('advTravelFrom').value.trim();
     travelTo = document.getElementById('advTravelTo').value.trim();
