@@ -142,10 +142,17 @@ router.get('/', verifyToken, async (req, res) => {
     let query, params;
 
     if (['MD', 'HR'].includes(req.user.role)) {
-      query = `SELECT a.*, e.name, e.dept FROM attendance_logs a
-               JOIN employees e ON a.emp_code = e.code
-               WHERE a.log_date LIKE ? ORDER BY a.log_date DESC, e.name`;
-      params = [month + '%'];
+      if (req.query.empCode) {
+        query = `SELECT a.*, e.name, e.dept FROM attendance_logs a
+                 JOIN employees e ON a.emp_code = e.code
+                 WHERE a.emp_code = ? AND a.log_date LIKE ? ORDER BY a.log_date ASC, a.check_in ASC`;
+        params = [req.query.empCode, month + '%'];
+      } else {
+        query = `SELECT a.*, e.name, e.dept FROM attendance_logs a
+                 JOIN employees e ON a.emp_code = e.code
+                 WHERE a.log_date LIKE ? ORDER BY a.log_date DESC, e.name`;
+        params = [month + '%'];
+      }
     } else {
       query = 'SELECT * FROM attendance_logs WHERE emp_code = ? AND log_date LIKE ? ORDER BY log_date DESC';
       params = [req.user.empCode, month + '%'];

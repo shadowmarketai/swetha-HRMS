@@ -2664,16 +2664,36 @@ function generateEmployeeLocations() {
       remark = lastLog.remark || '';
     }
 
-    if (firstCheckin) {
+    // First check-in time (earliest session, whether active or completed)
+    if (empLogs.length > 0 && empLogs[0].checkIn) {
+      checkInTime = new Date(empLogs[0].checkIn).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+    } else if (firstCheckin) {
       checkInTime = new Date(firstCheckin.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
     }
 
+    // Last checkout time (from completed sessions)
     var lastCheckout = null;
     for (var i = empLogs.length - 1; i >= 0; i--) {
-      if (empLogs[i].type === 'checkout') { lastCheckout = empLogs[i]; break; }
+      if (empLogs[i].checkOut) { lastCheckout = empLogs[i]; break; }
     }
     if (lastCheckout) {
-      checkOutTime = new Date(lastCheckout.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+      checkOutTime = new Date(lastCheckout.checkOut).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+    }
+
+    // Total working hours from all sessions
+    var totalMinutes = 0;
+    empLogs.forEach(function(l) {
+      if (l.checkIn) {
+        var start = new Date(l.checkIn).getTime();
+        var end = l.checkOut ? new Date(l.checkOut).getTime() : Date.now();
+        if (end > start) totalMinutes += (end - start) / 60000;
+      }
+    });
+    var totalHoursStr = '';
+    if (totalMinutes > 0) {
+      var hrs = Math.floor(totalMinutes / 60);
+      var mins = Math.round(totalMinutes % 60);
+      totalHoursStr = hrs + 'h ' + mins + 'm';
     }
 
     return {
@@ -2686,6 +2706,7 @@ function generateEmployeeLocations() {
       minutesAgo: minutesAgo,
       checkIn: checkInTime,
       checkOut: checkOutTime,
+      totalHours: totalHoursStr,
       geofenceStatus: geofenceStatus,
       remark: remark,
       totalLogs: empLogs.length
@@ -2761,6 +2782,7 @@ function renderLocationTracker() {
     var timeHtml = '';
     if (emp.checkIn) timeHtml += '<span style="color:var(--success)">In: ' + escapeHTML(emp.checkIn) + '</span>';
     if (emp.checkOut) timeHtml += (timeHtml ? ' &middot; ' : '') + '<span style="color:var(--danger)">Out: ' + escapeHTML(emp.checkOut) + '</span>';
+    if (emp.totalHours) timeHtml += (timeHtml ? ' &middot; ' : '') + '<span style="color:var(--primary);font-weight:600">' + escapeHTML(emp.totalHours) + '</span>';
     if (!timeHtml && emp.totalLogs === 0) timeHtml = '<span style="color:var(--gray-400)">Not logged in today</span>';
 
     var remarkHtml = '';
@@ -12124,7 +12146,7 @@ function changeHrAttMonth(dir) {
   if (_hrAttSelectedEmp) selectAttEmployee(_hrAttSelectedEmp);
 }
 
-function selectAttEmployee(empCode) {
+async function selectAttEmployee(empCode) {
   _hrAttSelectedEmp = empCode;
   filterAttEmpList();
   var emp = EMPLOYEES.find(function(e) { return e.code === empCode; });
@@ -12138,21 +12160,63 @@ function selectAttEmployee(empCode) {
   var daysInMonth = new Date(year, month + 1, 0).getDate();
   var firstDayOfWeek = new Date(year, month, 1).getDay();
   var todayDate = isCurrentMonth ? now.getDate() : daysInMonth;
-  // Seeded attendance for this employee
-  var seed = 0;
-  for (var i = 0; i < empCode.length; i++) seed += empCode.charCodeAt(i);
+  var monthStr = year + '-' + String(month + 1).padStart(2, '0');
+
+  // Show loading
+  area.innerHTML = '<div style="text-align:center;padding:24px;color:var(--gray-400);font-size:.78rem">Loading attendance data...</div>';
+
+  // Fetch real attendance logs from API
+  var logs = [];
+  try {
+    logs = await apiCall('GET', '/attendance?month=' + monthStr + '&empCode=' + encodeURIComponent(empCode));
+    if (!Array.isArray(logs)) logs = [];
+  } catch(e) { logs = []; }
+
+  // Group sessions by day number
+  var dayData = {};
+  logs.forEach(function(row) {
+    var d = row.log_date;
+    if (!d) return;
+    var dayNum = parseInt(d.substring(d.lastIndexOf('-') + 1), 10);
+    if (!dayData[dayNum]) dayData[dayNum] = [];
+    dayData[dayNum].push({
+      checkIn: row.check_in || null,
+      checkOut: row.check_out || null,
+      location: row.location_name || '',
+      remark: row.remark || '',
+      geofence: !!row.is_within_geofence
+    });
+  });
+
+  // Calculate per-day stats
   var att = {};
-  var presentCount = 0, absentCount = 0, leaveCount = 0, halfCount = 0;
+  var presentCount = 0, absentCount = 0;
+  var monthTotalMin = 0;
+  var dayHours = {};
   for (var d = 1; d <= todayDate; d++) {
     var dow = new Date(year, month, d).getDay();
     if (dow === 0) { att[d] = 'holiday'; continue; }
-    var h = ((seed * 31 + d * 17 + month * 53 + year * 7) % 100);
-    if (h < 65) { att[d] = 'present'; presentCount++; }
-    else if (h < 75) { att[d] = 'absent'; absentCount++; }
-    else if (h < 85) { att[d] = 'half'; halfCount++; }
-    else if (h < 92) { att[d] = 'leave'; leaveCount++; }
-    else { att[d] = 'holiday'; }
+    if (dayData[d] && dayData[d].length > 0) {
+      att[d] = 'present';
+      presentCount++;
+      var dayMin = 0;
+      dayData[d].forEach(function(s) {
+        if (s.checkIn) {
+          var start = new Date(s.checkIn).getTime();
+          var end = s.checkOut ? new Date(s.checkOut).getTime() : (isCurrentMonth && d === now.getDate() ? Date.now() : start);
+          if (end > start) dayMin += (end - start) / 60000;
+        }
+      });
+      dayHours[d] = dayMin;
+      monthTotalMin += dayMin;
+    } else {
+      att[d] = 'absent';
+      absentCount++;
+    }
   }
+  var monthHrs = Math.floor(monthTotalMin / 60);
+  var monthMins = Math.round(monthTotalMin % 60);
+
   var monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   var html = '<div class="card fade-in" style="margin-bottom:10px">';
   html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">';
@@ -12164,25 +12228,76 @@ function selectAttEmployee(empCode) {
   html += '<span style="font-size:.78rem;font-weight:600;min-width:110px;text-align:center">' + monthNames[month] + ' ' + year + '</span>';
   html += '<button class="cal-nav-btn" onclick="changeHrAttMonth(1)" style="background:var(--gray-100);border:none;border-radius:8px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;cursor:pointer' + (isCurrentMonth ? ';opacity:.3;pointer-events:none' : '') + '"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg></button>';
   html += '</div>';
-  html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px">';
+  // Summary stats
+  html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px">';
   html += '<div class="summary-card" style="padding:8px;text-align:center"><div style="font-size:1.1rem;font-weight:700;color:var(--success)">' + presentCount + '</div><div style="font-size:.65rem;color:var(--gray-500)">Present</div></div>';
   html += '<div class="summary-card" style="padding:8px;text-align:center"><div style="font-size:1.1rem;font-weight:700;color:var(--danger)">' + absentCount + '</div><div style="font-size:.65rem;color:var(--gray-500)">Absent</div></div>';
-  html += '<div class="summary-card" style="padding:8px;text-align:center"><div style="font-size:1.1rem;font-weight:700;color:var(--warning)">' + halfCount + '</div><div style="font-size:.65rem;color:var(--gray-500)">Half Day</div></div>';
-  html += '<div class="summary-card" style="padding:8px;text-align:center"><div style="font-size:1.1rem;font-weight:700;color:var(--primary)">' + leaveCount + '</div><div style="font-size:.65rem;color:var(--gray-500)">Leave</div></div>';
+  html += '<div class="summary-card" style="padding:8px;text-align:center"><div style="font-size:1.1rem;font-weight:700;color:var(--primary)">' + monthHrs + 'h ' + monthMins + 'm</div><div style="font-size:.65rem;color:var(--gray-500)">Total Hours</div></div>';
   html += '</div>';
-  // Calendar
+  // Calendar grid
   html += '<div class="cal-days" style="grid-template-columns:repeat(7,1fr);display:grid;gap:2px">';
   ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(function(dn) { html += '<div class="cal-day-label">' + dn + '</div>'; });
   for (var e2 = 0; e2 < firstDayOfWeek; e2++) html += '<div class="cal-day"></div>';
-  var badgeMap = {present:{label:'P',cls:'cal-badge-present'},absent:{label:'A',cls:'cal-badge-absent'},holiday:{label:'H',cls:'cal-badge-holiday'},half:{label:'\u00BD',cls:'cal-badge-half'},leave:{label:'L',cls:'cal-badge-leave'}};
+  var badgeMap = {present:{label:'P',cls:'cal-badge-present'},absent:{label:'A',cls:'cal-badge-absent'},holiday:{label:'H',cls:'cal-badge-holiday'}};
   for (var d2 = 1; d2 <= daysInMonth; d2++) {
     var isToday = isCurrentMonth && d2 === now.getDate();
     var st = d2 <= todayDate ? att[d2] || '' : '';
     var badge = st && badgeMap[st] ? '<span class="cal-status-badge ' + badgeMap[st].cls + '">' + badgeMap[st].label + '</span>' : '';
-    html += '<div class="cal-day' + (isToday ? ' today' : '') + '">' + d2 + badge + '</div>';
+    var clickAttr = (dayData[d2] && dayData[d2].length > 0) ? ' onclick="showAttDayDetail(' + d2 + ')" style="cursor:pointer"' : '';
+    html += '<div class="cal-day' + (isToday ? ' today' : '') + '"' + clickAttr + '>' + d2 + badge + '</div>';
   }
-  html += '</div></div>';
+  html += '</div>';
+  // Day detail area
+  html += '<div id="attDayDetailArea" style="margin-top:10px"></div>';
+  html += '</div>';
   area.innerHTML = html;
+
+  // Store dayData globally for detail view
+  window._attDayData = dayData;
+  window._attDayYear = year;
+  window._attDayMonth = month;
+}
+
+function showAttDayDetail(dayNum) {
+  var detailArea = document.getElementById('attDayDetailArea');
+  if (!detailArea) return;
+  var sessions = (window._attDayData || {})[dayNum];
+  if (!sessions || sessions.length === 0) { detailArea.innerHTML = ''; return; }
+  var year = window._attDayYear;
+  var month = window._attDayMonth;
+  var dateStr = new Date(year, month, dayNum).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', weekday: 'short' });
+  var html = '<div class="card fade-in" style="background:var(--gray-50);padding:12px">';
+  html += '<h4 style="font-size:.78rem;margin:0 0 8px 0;color:var(--gray-700)">' + escapeHTML(dateStr) + ' — ' + sessions.length + ' session' + (sessions.length > 1 ? 's' : '') + '</h4>';
+  var dayTotalMin = 0;
+  sessions.forEach(function(s, idx) {
+    var inTime = s.checkIn ? new Date(s.checkIn).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : '—';
+    var outTime = s.checkOut ? new Date(s.checkOut).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : 'Active';
+    var durStr = '—';
+    if (s.checkIn) {
+      var start = new Date(s.checkIn).getTime();
+      var end = s.checkOut ? new Date(s.checkOut).getTime() : Date.now();
+      var mins = (end - start) / 60000;
+      if (mins > 0) {
+        dayTotalMin += mins;
+        var h = Math.floor(mins / 60), m = Math.round(mins % 60);
+        durStr = h + 'h ' + m + 'm';
+      }
+    }
+    var geoIcon = s.geofence ? '<span style="color:var(--success)" title="Inside geofence">&#9679;</span>' : '<span style="color:var(--danger)" title="Outside geofence">&#9679;</span>';
+    html += '<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--gray-200);font-size:.72rem">';
+    html += '<span style="color:var(--gray-400);min-width:14px">' + (idx + 1) + '.</span>';
+    html += geoIcon;
+    html += '<span style="color:var(--success)">In: ' + escapeHTML(inTime) + '</span>';
+    html += '<span style="color:var(--gray-300)">&rarr;</span>';
+    html += '<span style="color:' + (s.checkOut ? 'var(--danger)' : 'var(--warning)') + '">Out: ' + escapeHTML(outTime) + '</span>';
+    html += '<span style="color:var(--primary);font-weight:600;margin-left:auto">' + durStr + '</span>';
+    html += '</div>';
+    if (s.location) html += '<div style="font-size:.62rem;color:var(--gray-500);padding-left:30px">' + escapeHTML(s.location) + (s.remark ? ' — ' + escapeHTML(s.remark) : '') + '</div>';
+  });
+  var totalH = Math.floor(dayTotalMin / 60), totalM = Math.round(dayTotalMin % 60);
+  html += '<div style="display:flex;justify-content:flex-end;padding-top:8px;font-size:.75rem;font-weight:700;color:var(--primary)">Total: ' + totalH + 'h ' + totalM + 'm</div>';
+  html += '</div>';
+  detailArea.innerHTML = html;
 }
 
 // =====================================================
