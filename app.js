@@ -723,32 +723,30 @@ function _renderProfileContent(c, emp, initials, isMDUser, isHrMd, lockStatus) {
   html += '<div class="card profile-section" style="margin:0 16px 12px;border-radius:var(--radius)">';
   html += '<div class="profile-section-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>Official Details</div>';
   html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
-  html += '<div class="ss-form-group"><label>Department</label><input type="text" id="profDept" value="' + escapeHTML(emp.dept || '') + '" placeholder="Department"></div>';
-  html += '<div class="ss-form-group"><label>Designation</label><input type="text" id="profDesignation" value="' + escapeHTML(emp.designation || '') + '" placeholder="Designation"></div>';
+  html += '<div class="ss-form-group"><label>Department</label><div class="ss-readonly">' + escapeHTML(emp.dept || '—') + '</div></div>';
+  html += '<div class="ss-form-group"><label>Designation</label><div class="ss-readonly">' + escapeHTML(emp.designation || '—') + '</div></div>';
   var dojVal = emp.doj ? (emp.doj.length > 10 ? emp.doj.substring(0,10) : emp.doj) : '';
-  html += '<div class="ss-form-group"><label>Date of Joining</label><input type="date" id="profDoj" value="' + escapeHTML(dojVal) + '"></div>';
+  var dojDisplay = dojVal ? new Date(dojVal + 'T00:00:00').toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric'}) : '—';
+  html += '<div class="ss-form-group"><label>Date of Joining</label><div class="ss-readonly">' + escapeHTML(dojDisplay) + '</div></div>';
   html += '<div class="ss-form-group"><label>Employee Code</label><div class="ss-readonly">' + escapeHTML(emp.code) + '</div></div>';
-  html += '<div class="ss-form-group"><label>Monthly Salary</label><input type="number" id="profSalary" value="' + (emp.salary || '') + '" placeholder="Salary"></div>';
+  html += '<div class="ss-form-group"><label>Monthly Salary</label><div class="ss-readonly">' + (emp.salary ? '\u20B9' + Number(emp.salary).toLocaleString('en-IN') : '—') + '</div></div>';
   html += '<div class="ss-form-group"><label>Payment Mode</label><div class="ss-readonly">NEFT</div></div>';
   html += '</div></div>';
 
-  // Section 5: Bank & Identity (with lock awareness)
-  var bankLocked = _isProfileSectionLocked('bank_details', lockStatus);
-  var bankReadonly = bankLocked ? ' readonly class="ss-readonly-locked"' : '';
+  // Section 5: Bank & Identity (read-only — managed by HR/MD)
   html += '<div class="card profile-section" style="margin:0 16px 12px;border-radius:var(--radius)">';
-  html += '<div class="profile-section-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>Bank & Identity' + _renderLockBadge('bank_details', lockStatus) + '</div>';
+  html += '<div class="profile-section-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>Bank & Identity <span style="font-size:.6rem;font-weight:500;color:var(--gray-400);margin-left:6px">Contact HR to update</span></div>';
   html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
-  html += '<div class="ss-form-group"><label>Bank</label><input type="text" id="profBank" value="' + escapeHTML(emp.bank || '') + '" placeholder="Bank name"' + bankReadonly + '></div>';
-  html += '<div class="ss-form-group"><label>Account No</label><input type="text" id="profAccNo" value="' + escapeHTML(emp.accNo || '') + '" placeholder="Account number"' + bankReadonly + '></div>';
-  html += '<div class="ss-form-group"><label>IFSC Code</label><input type="text" id="profIfsc" value="' + escapeHTML(emp.ifscCode || emp.ifsc_code || '') + '" placeholder="IFSC code" maxlength="11"' + bankReadonly + '></div>';
-  html += '<div class="ss-form-group"><label>Bank Branch</label><input type="text" id="profBranch" value="' + escapeHTML(emp.bankBranch || emp.bank_branch || '') + '" placeholder="Branch name"' + bankReadonly + '></div>';
-  html += '<div class="ss-form-group"><label>PAN</label><input type="text" id="profPan" value="' + escapeHTML(emp.pan || '') + '" placeholder="PAN number" maxlength="10"' + profReadonly + profClass + '></div>';
-  html += '<div class="ss-form-group"><label>Aadhaar</label><input type="text" id="profAadhaar" value="' + escapeHTML(emp.aadhaar || '') + '" placeholder="Aadhaar number" maxlength="12"' + profReadonly + profClass + '></div>';
-  html += '<div class="ss-form-group"><label>UAN</label><input type="text" id="profUan" value="' + escapeHTML(emp.uan || '') + '" placeholder="UAN number"' + profReadonly + profClass + '></div>';
+  html += '<div class="ss-form-group"><label>Bank</label><div class="ss-readonly">' + escapeHTML(emp.bank || '—') + '</div></div>';
+  var accDisplay = emp.accNo ? (emp.accNo.length > 4 ? emp.accNo.replace(/.(?=.{4})/g, 'X') : emp.accNo) : '—';
+  html += '<div class="ss-form-group"><label>Account No</label><div class="ss-readonly">' + escapeHTML(accDisplay) + '</div></div>';
+  html += '<div class="ss-form-group"><label>IFSC Code</label><div class="ss-readonly">' + escapeHTML(emp.ifscCode || emp.ifsc_code || '—') + '</div></div>';
+  html += '<div class="ss-form-group"><label>Bank Branch</label><div class="ss-readonly">' + escapeHTML(emp.bankBranch || emp.bank_branch || '—') + '</div></div>';
+  html += '<div class="ss-form-group"><label>PAN</label><div class="ss-readonly">' + escapeHTML(emp.pan || '—') + '</div></div>';
+  var aadhaarDisplay = emp.aadhaar ? (emp.aadhaar.length > 4 ? emp.aadhaar.replace(/.(?=.{4})/g, 'X') : emp.aadhaar) : '—';
+  html += '<div class="ss-form-group"><label>Aadhaar</label><div class="ss-readonly">' + escapeHTML(aadhaarDisplay) + '</div></div>';
+  html += '<div class="ss-form-group"><label>UAN</label><div class="ss-readonly">' + escapeHTML(emp.uan || '—') + '</div></div>';
   html += '</div>';
-  if (bankLocked) {
-    html += '<button class="request-edit-btn" onclick="requestSectionEdit(\'bank_details\')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Request Edit Access</button>';
-  }
   // Document photo uploads
   html += '<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--gray-200)">';
   html += '<div style="font-size:.72rem;font-weight:600;color:var(--gray-600);margin-bottom:8px">Document Uploads</div>';
@@ -888,13 +886,6 @@ function saveProfileDetails() {
     {id:'profMotherMobile', label:"Mother's Mobile"},
     {id:'profEmergency', label:'Emergency Contact'},
     {id:'profEmergencyPhone', label:'Emergency Phone'},
-    {id:'profDept', label:'Department'},
-    {id:'profDesignation', label:'Designation'},
-    {id:'profDoj', label:'Date of Joining'},
-    {id:'profBank', label:'Bank'},
-    {id:'profAccNo', label:'Account No'},
-    {id:'profPan', label:'PAN'},
-    {id:'profAadhaar', label:'Aadhaar'},
     {id:'profQualification', label:'Qualification'},
     {id:'profInstitution', label:'Institution'},
     {id:'profYearOfPassing', label:'Year of Passing'}
@@ -934,23 +925,12 @@ function saveProfileDetails() {
     spouseMobile: g('profSpouseMobile'),
     emergencyContact: g('profEmergency'),
     emergencyPhone: g('profEmergencyPhone'),
-    dept: g('profDept'),
-    designation: g('profDesignation'),
-    doj: g('profDoj'),
-    salary: g('profSalary'),
-    bank: g('profBank'),
-    accNo: g('profAccNo'),
-    pan: g('profPan'),
-    aadhaar: g('profAadhaar'),
-    uan: g('profUan'),
     qualification: g('profQualification'),
     institution: g('profInstitution'),
     yearOfPassing: g('profYearOfPassing'),
     previousEmployer: g('profPrevEmployer'),
     previousRole: g('profPrevRole'),
-    yearsOfExperience: g('profYearsExp'),
-    ifscCode: g('profIfsc'),
-    bankBranch: g('profBranch')
+    yearsOfExperience: g('profYearsExp')
   };
   var btn = document.getElementById('profSaveBtn');
   apiCall('PUT', '/employees/' + currentUser.code + '/self', payload).then(function() {
@@ -998,7 +978,7 @@ function saveProfileDetails() {
   }).catch(function(err) {
     var msg = document.getElementById('profSaveMsg');
     if (msg) { msg.style.display = 'block'; msg.style.color = 'var(--danger)'; msg.textContent = 'Failed to save: ' + (err.message || 'Server error'); }
-    if (btn) { btn.textContent = 'Save Changes'; btn.style.background = ''; btn.disabled = false; }
+    if (btn) { btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:6px"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>Save Changes'; btn.style.background = ''; btn.disabled = false; }
   });
   if (btn) { btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:6px;animation:spin 1s linear infinite"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>Saving...'; btn.disabled = true; setTimeout(function() { if (btn) btn.disabled = false; }, 5000); }
 }
@@ -3046,6 +3026,8 @@ async function submitInlineExpense() {
     if (!travelFrom || !travelTo) { showToast('Please enter From and To locations'); return; }
     if (!vehicle) { showToast('Please select a vehicle type'); return; }
   }
+  var inlineBtn = document.querySelector('#inlineExpenseForm .nf-btn-primary');
+  _submitStart(inlineBtn);
   try {
     var apiRes = await apiCall('POST', '/advances', {
       type: type, amount: amount, reason: reason, details: details, project: project, category: category,
@@ -3067,11 +3049,11 @@ async function submitInlineExpense() {
       reviewDate: inlineStatus === 'hr_accepted' ? new Date().toISOString().split('T')[0] : null,
       rejectReason: null
     });
+    _submitSuccess(inlineBtn);
     showToast(ADV_TYPE_LABELS[type] + ' request submitted for Rs.' + amount.toLocaleString('en-IN') + (inlineStatus === 'hr_accepted' ? ' — sent to MD' : ''));
-    hideInlineExpenseForm();
-    renderAllMyRequests();
-    renderAllPendingBanners();
+    setTimeout(function() { hideInlineExpenseForm(); renderAllMyRequests(); renderAllPendingBanners(); }, 1200);
   } catch (e) {
+    _submitError(inlineBtn, 'Failed');
     showToast('Error submitting request');
   }
 }
@@ -3662,6 +3644,8 @@ async function submitTravelExpenseBill() {
   if (!from || !to) { showToast('Please enter From and To locations'); return; }
   if (!vehicle) { showToast('Please select mode of travel'); return; }
   if (!amount) { showToast('Please enter the bill amount'); return; }
+  var teBtn = document.querySelector('#travelExpenseBillForm .nf-btn-primary');
+  _submitStart(teBtn);
   try {
     var fd = new FormData();
     fd.append('category', 'Travel');
@@ -3684,9 +3668,13 @@ async function submitTravelExpenseBill() {
       travelFrom: from, travelTo: to, vehicle: vehicle, travelKm: km, travelDays: days,
       billUrl: apiRes.billUrl || ''
     });
+    _submitSuccess(teBtn);
     showToast('Travel expense bill submitted for Rs.' + amount.toLocaleString('en-IN'));
-    renderTravelExpenseScreen();
-  } catch (e) { showToast(e.message || 'Error submitting bill'); }
+    setTimeout(function() { renderTravelExpenseScreen(); }, 1200);
+  } catch (e) {
+    _submitError(teBtn, 'Failed');
+    showToast(e.message || 'Error submitting bill');
+  }
 }
 
 // =====================================================
@@ -8673,6 +8661,8 @@ async function submitExpenseReimbursement() {
   var date = document.getElementById('expDate').value;
   var billInput = document.getElementById('expBillInput');
   if (!cat || !amount || !date) { showToast('Please fill all required fields'); return; }
+  var expClaimBtn = document.querySelector('#expensesContent .nf-btn-primary');
+  _submitStart(expClaimBtn);
   try {
     var fd = new FormData();
     fd.append('category', cat);
@@ -8688,9 +8678,13 @@ async function submitExpenseReimbursement() {
     };
     expenseReimbursements.push(exp);
     addNotification('Expense claim submitted: Rs.' + amount.toLocaleString('en-IN'), 'expense');
+    _submitSuccess(expClaimBtn);
     showToast('Expense claim submitted');
-    renderExpenseOverlay();
-  } catch (e) { showToast(e.message || 'Error submitting expense'); }
+    setTimeout(function() { renderExpenseOverlay(); }, 1200);
+  } catch (e) {
+    _submitError(expClaimBtn, 'Failed');
+    showToast(e.message || 'Error submitting expense');
+  }
 }
 async function hrAcceptExpense(id) {
   try {
