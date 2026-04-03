@@ -314,6 +314,18 @@ async function initSchema() {
     await seedNewEmployees(conn);
     // Import stock data from JSON + clear mock data (one-time)
     await seedStockAndClearMock(conn);
+
+    // Debug: log attendance record counts
+    try {
+      const [[{ total }]] = await conn.query('SELECT COUNT(*) as total FROM attendance_logs');
+      const [[{ today }]] = await conn.query("SELECT COUNT(*) as today FROM attendance_logs WHERE log_date = CURDATE()");
+      const [[{ thisMonth }]] = await conn.query("SELECT COUNT(*) as thisMonth FROM attendance_logs WHERE log_date LIKE CONCAT(DATE_FORMAT(NOW(),'%Y-%m'),'%')");
+      console.log('[DEBUG-ATTENDANCE] Total records:', total, '| Today:', today, '| This month:', thisMonth);
+      if (total > 0) {
+        const [sample] = await conn.query('SELECT emp_code, log_date, check_in, check_out FROM attendance_logs ORDER BY log_date DESC, check_in DESC LIMIT 5');
+        console.log('[DEBUG-ATTENDANCE] Latest 5 records:', JSON.stringify(sample));
+      }
+    } catch (e) { console.log('[DEBUG-ATTENDANCE] Error:', e.message); }
   } catch (err) {
     console.error('MySQL connection/init failed:', err.message);
     console.log('Server will continue without database — localStorage fallback active');
