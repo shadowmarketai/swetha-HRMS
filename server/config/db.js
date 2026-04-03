@@ -189,6 +189,19 @@ async function seedNewEmployees(conn) {
   // Deactivate old SSC*** employees that are not in the new list
   await conn.query("UPDATE employees SET is_active = 0 WHERE code LIKE 'SSC%'").catch(() => {});
   await conn.query("UPDATE users SET is_active = 0 WHERE emp_code LIKE 'SSC%'").catch(() => {});
+  // Auto-fix: create login accounts for any employees missing from users table
+  try {
+    const [missing] = await conn.query(
+      'SELECT e.code, e.role FROM employees e LEFT JOIN users u ON e.code = u.emp_code WHERE u.emp_code IS NULL AND e.is_active = 1'
+    );
+    if (missing.length > 0) {
+      const fixHash = await bcrypt.hash(defaultPass, 10);
+      for (const m of missing) {
+        await conn.query('INSERT IGNORE INTO users (emp_code, password_hash, role) VALUES (?, ?, ?)', [m.code, fixHash, m.role]);
+      }
+      console.log('[AUTO-FIX] Created login accounts for', missing.length, 'employees:', missing.map(m => m.code).join(', '));
+    }
+  } catch (e) { console.error('[AUTO-FIX] Error:', e.message); }
   // Seed departments
   const depts = [...new Set(employees.map(e => e.dept))];
   for (const d of depts) {
