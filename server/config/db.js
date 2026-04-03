@@ -80,6 +80,22 @@ async function runMigrations(conn) {
       sql: "ALTER TABLE expense_reimbursements MODIFY COLUMN status ENUM('Pending','hr_accepted','Approved','Rejected') DEFAULT 'Pending'"
     },
     {
+      name: 'add_dob_to_employees',
+      sql: "ALTER TABLE employees ADD COLUMN dob DATE"
+    },
+    {
+      name: 'add_gender_to_employees',
+      sql: "ALTER TABLE employees ADD COLUMN gender VARCHAR(10)"
+    },
+    {
+      name: 'add_aadhaar_to_employees',
+      sql: "ALTER TABLE employees ADD COLUMN aadhaar VARCHAR(12)"
+    },
+    {
+      name: 'add_pan_to_employees',
+      sql: "ALTER TABLE employees ADD COLUMN pan VARCHAR(10)"
+    },
+    {
       name: 'create_document_edit_requests',
       sql: `CREATE TABLE IF NOT EXISTS document_edit_requests (
         id INT AUTO_INCREMENT PRIMARY KEY,

@@ -1839,9 +1839,10 @@ function resetWizard() {
     const el = document.getElementById(id);
     if (el) el.value = el.tagName === 'SELECT' ? el.options[0].value : '';
   });
-  // Auto-generate employee code
-  const maxSSC = EMPLOYEES.filter(e=>e.code.startsWith('SSC')).length;
-  document.getElementById('obCode').value = 'SSC' + String(maxSSC + 1).padStart(3,'0');
+  // Auto-generate employee code (SS prefix)
+  const ssCodes = EMPLOYEES.filter(e=>e.code.startsWith('SS') && !e.code.startsWith('SSC')).map(e=>parseInt(e.code.replace('SS',''),10)||0);
+  const maxSS = ssCodes.length > 0 ? Math.max.apply(null, ssCodes) : 0;
+  document.getElementById('obCode').value = 'SS' + String(maxSS + 1).padStart(3,'0');
   // Populate dept dropdown with custom depts
   const deptSel = document.getElementById('obDept');
   deptSel.innerHTML = '<option value="">Select Dept</option>';
@@ -1888,9 +1889,18 @@ async function submitOnboarding() {
   var accNo = document.getElementById('obAccNo').value.trim();
   var phone = document.getElementById('obPhone').value.trim();
   var doj = document.getElementById('obDoj').value;
+  var email = (document.getElementById('obEmail').value || '').trim();
+  var dob = (document.getElementById('obDob').value || '');
+  var gender = (document.getElementById('obGender').value || '');
+  var address = (document.getElementById('obAddress').value || '').trim();
+  var aadhaar = (document.getElementById('obAadhaar').value || '').trim();
+  var pan = (document.getElementById('obPan').value || '').trim();
+  var ifscCode = (document.getElementById('obIfsc').value || '').trim();
+  var emergencyContact = (document.getElementById('obEmgName').value || '').trim();
+  var emergencyPhone = (document.getElementById('obEmgPhone').value || '').trim();
 
-  if (!name || !code || !dept || !designation || !salary) {
-    showToast('Please fill all required fields (Name, Code, Dept, Designation, Salary)');
+  if (!name || !code || !dept || !designation) {
+    showToast('Please fill all required fields (Name, Code, Dept, Designation)');
     return;
   }
 
@@ -1900,8 +1910,11 @@ async function submitOnboarding() {
   if (obRole === 'HR' && currentUser.role !== 'MD') obRole = 'Employee';
 
   var newEmp = {
-    code: code, name: name, dept: dept, designation: designation, salary: salary, bank: bank || 'TBD',
-    accNo: accNo || 'TBD', role: obRole, phone: phone || '', doj: doj || new Date().toISOString().split('T')[0],
+    code: code, name: name, dept: dept, designation: designation, salary: salary, bank: bank || '',
+    accNo: accNo || '', role: obRole, phone: phone || '', doj: doj || new Date().toISOString().split('T')[0],
+    email: email, dob: dob || null, gender: gender, address: address,
+    aadhaar: aadhaar, pan: pan, ifscCode: ifscCode,
+    emergencyContact: emergencyContact, emergencyPhone: emergencyPhone,
     status: 'Active'
   };
   var submitBtn = document.querySelector('#overlay-onboarding .btn-primary, #overlay-onboarding button[onclick*="submitOnboarding"]');

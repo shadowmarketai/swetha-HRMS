@@ -168,13 +168,19 @@ router.post('/', verifyToken, requireRole('MD', 'HR'), [
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
   try {
-    const { code, name, dept, designation, salary, bank, accNo, role, phone, doj } = req.body;
+    const { code, name, dept, designation, salary, bank, accNo, role, phone, doj,
+            email, dob, gender, address, aadhaar, pan, ifscCode,
+            emergencyContact, emergencyPhone } = req.body;
     if (!code || !name || !dept) {
       return res.status(400).json({ error: 'Code, name, and department required' });
     }
     await pool.query(
-      'INSERT INTO employees (code, name, dept, designation, salary, bank, acc_no, role, phone, doj) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [code, name, dept, designation || '', salary || 0, bank || '', accNo || '', role || 'Employee', phone || '', doj || null]
+      `INSERT INTO employees (code, name, dept, designation, salary, bank, acc_no, role, phone, doj,
+        email, dob, gender, address, aadhaar, pan, ifsc_code, emergency_contact, emergency_phone)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [code, name, dept, designation || '', salary || 0, bank || '', accNo || '', role || 'Employee',
+       phone || '', doj || null, email || '', dob || null, gender || '', address || '',
+       aadhaar || '', pan || '', ifscCode || '', emergencyContact || '', emergencyPhone || '']
     );
     res.status(201).json({ message: 'Employee added', code });
   } catch (err) {
