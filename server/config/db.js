@@ -168,8 +168,8 @@ async function seedNewEmployees(conn) {
     {code:'SS041',name:'Arunkumar',dept:'QS',designation:'Quantity Surveyor',salary:0,role:'Employee',phone:'',doj:null,email:'aruntec16@gmail.com'},
     {code:'SS042',name:'Mohan',dept:'Execution',designation:'Execution',salary:0,role:'Employee',phone:'',doj:null,email:'perumalmohan666@gmail.com'}
   ];
-  const passwords = { 'MD001': 'admin123', 'HR001': 'hr123' };
-  const defaultPass = 'emp123';
+  const passwords = { 'MD001': 'admin123', 'HR001': 'hr12345' };
+  const defaultPass = 'emp12345';
   let seeded = 0;
   for (const emp of employees) {
     try {

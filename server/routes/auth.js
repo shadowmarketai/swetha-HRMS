@@ -161,6 +161,48 @@ router.post('/register', verifyToken, requireRole('MD', 'HR'), async (req, res) 
   }
 });
 
+// POST /api/auth/reset-password — MD/HR resets an employee's password
+router.post('/reset-password', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
+  try {
+    const { empCode, newPassword } = req.body;
+    if (!empCode || !newPassword) return res.status(400).json({ error: 'Employee code and new password required' });
+    if (newPassword.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    const [emp] = await pool.query('SELECT code, role FROM employees WHERE code = ?', [empCode]);
+    if (emp.length === 0) return res.status(404).json({ error: 'Employee not found' });
+    const hash = await bcrypt.hash(newPassword, 10);
+    await pool.query(
+      'INSERT INTO users (emp_code, password_hash, role) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE password_hash = ?',
+      [empCode, hash, emp[0].role, hash]
+    );
+    res.json({ message: 'Password reset for ' + empCode });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/auth/bulk-create-missing — create login accounts for all employees missing from users table
+router.post('/bulk-create-missing', verifyToken, requireRole('MD'), async (req, res) => {
+  try {
+    const defaultPassword = req.body.password || 'emp12345';
+    if (defaultPassword.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    const [missing] = await pool.query(
+      'SELECT e.code, e.role FROM employees e LEFT JOIN users u ON e.code = u.emp_code WHERE u.emp_code IS NULL AND e.is_active = 1'
+    );
+    if (missing.length === 0) return res.json({ message: 'All employees already have login accounts', created: 0 });
+    const hash = await bcrypt.hash(defaultPassword, 10);
+    let created = 0;
+    for (const emp of missing) {
+      await pool.query('INSERT IGNORE INTO users (emp_code, password_hash, role) VALUES (?, ?, ?)', [emp.code, hash, emp.role]);
+      created++;
+    }
+    res.json({ message: created + ' login accounts created with password: ' + defaultPassword, created, employees: missing.map(e => e.code) });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // POST /api/auth/change-password
 router.post('/change-password', verifyToken, async (req, res) => {
   try {
