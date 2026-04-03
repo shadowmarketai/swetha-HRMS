@@ -120,6 +120,7 @@ const EMPLOYEES = [
 ];
 
 let departments = ['Design','Marketing','Execution','Production','QS','Admin','Accounts'];
+let departmentData = []; // [{id, name}] — full dept objects from DB
 let currentUser = null;
 let wizardStep = 1;
 let originalSalaryHTML = '';
@@ -1893,7 +1894,7 @@ async function submitOnboarding() {
     return;
   }
 
-  var obPassword = (document.getElementById('obPassword') || {}).value || 'emp1234545';
+  var obPassword = (document.getElementById('obPassword') || {}).value || 'emp12345';
   var obRole = (document.getElementById('obRole') || {}).value || 'Employee';
   // Only MD can set HR role
   if (obRole === 'HR' && currentUser.role !== 'MD') obRole = 'Employee';
@@ -2123,6 +2124,11 @@ function showEmployeeDetailModal(empCode) {
   function editField(label, key, value, type, full) {
     var inputType = type || 'text';
     var val = value || '';
+    if (key === 'dept') {
+      var opts = departments.map(function(d) { return '<option' + (d === val ? ' selected' : '') + '>' + escapeHTML(d) + '</option>'; }).join('');
+      return '<div class="edm-field' + (full ? ' full' : '') + '"><div class="edm-field-label">' + escapeHTML(label) + '</div>' +
+        '<select class="edm-edit-input" data-field="dept" style="width:100%;padding:6px 8px;border:1.5px solid var(--gray-200);border-radius:var(--radius-xs);font-size:.78rem;background:var(--card-bg);color:var(--text-primary)">' + opts + '</select></div>';
+    }
     return '<div class="edm-field' + (full ? ' full' : '') + '"><div class="edm-field-label">' + escapeHTML(label) + '</div>' +
       '<input type="' + inputType + '" class="edm-edit-input" data-field="' + key + '" value="' + escapeHTML(String(val)) + '" style="width:100%;padding:6px 8px;border:1.5px solid var(--gray-200);border-radius:var(--radius-xs);font-size:.78rem;font-family:var(--font-body);background:var(--card-bg);color:var(--text-primary)"></div>';
   }
@@ -2305,10 +2311,17 @@ function renderDeptsList() {
     const count = EMPLOYEES.filter(e => e.dept === d).length;
     const color = deptColors[d] || '#9CA3AF';
     const safeId = d.replace(/[^a-zA-Z0-9]/g, '_');
-    return `<div class="dept-manage-item" onclick="toggleDeptEmployees('${escapeHTML(d)}')" style="cursor:pointer">
-      <div class="dept-color" style="background:${color}"></div>
-      <div class="dept-info"><h4>${escapeHTML(d)}</h4><p>${count} employees</p></div>
-      <svg class="dept-chevron" id="chevron-${safeId}" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+    const dObj = departmentData.find(x => x.name === d);
+    const deptId = dObj ? dObj.id : '';
+    return `<div class="dept-manage-item" style="cursor:pointer">
+      <div style="flex:1;display:flex;align-items:center;gap:8px" onclick="toggleDeptEmployees('${escapeHTML(d)}')">
+        <div class="dept-color" style="background:${color}"></div>
+        <div class="dept-info"><h4>${escapeHTML(d)}</h4><p>${count} employees</p></div>
+      </div>
+      <div style="display:flex;gap:4px;align-items:center">
+        <button onclick="event.stopPropagation();editDepartment(${deptId},'${escapeAttr(d)}')" style="background:none;border:none;cursor:pointer;padding:4px;color:var(--text-secondary)" title="Rename"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+        <svg class="dept-chevron" id="chevron-${safeId}" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" onclick="toggleDeptEmployees('${escapeHTML(d)}')" style="cursor:pointer"><polyline points="9 18 15 12 9 6"/></svg>
+      </div>
     </div>
     <div class="dept-emp-list" id="deptEmps-${safeId}" style="display:none"></div>`;
   }).join('');
@@ -2351,13 +2364,36 @@ async function addDepartment() {
   if (!name) return;
   if (departments.includes(name)) { showToast('Department already exists'); return; }
   try {
-    await apiCall('POST', '/departments', { name: name });
+    var result = await apiCall('POST', '/departments', { name: name });
     departments.push(name);
+    departmentData.push({ id: result.id, name: name });
     input.value = '';
     renderDeptsList();
     showToast('Department "' + name + '" added successfully');
   } catch (e) {
     showToast(e.message || 'Failed to add department', 'error');
+  }
+}
+
+async function editDepartment(deptId, currentName) {
+  var newName = prompt('Rename department "' + currentName + '" to:', currentName);
+  if (!newName || newName.trim() === '' || newName.trim() === currentName) return;
+  newName = newName.trim();
+  if (departments.includes(newName)) { showToast('Department "' + newName + '" already exists', 'error'); return; }
+  try {
+    await apiCall('PUT', '/departments/' + deptId, { name: newName });
+    // Update local arrays
+    var idx = departments.indexOf(currentName);
+    if (idx !== -1) departments[idx] = newName;
+    var dObj = departmentData.find(function(x) { return x.id === deptId; });
+    if (dObj) dObj.name = newName;
+    // Update employee dept references locally
+    EMPLOYEES.forEach(function(e) { if (e.dept === currentName) e.dept = newName; });
+    renderDeptsList();
+    if (document.getElementById('allEmpList')) renderAllEmpList();
+    showToast('Department renamed to "' + newName + '"');
+  } catch (e) {
+    showToast(e.message || 'Failed to rename department', 'error');
   }
 }
 
@@ -2504,6 +2540,13 @@ function renderEmployeeDetailCard(empCode) {
 
 function empDetailField(label, value, empCode, fieldKey, readOnly) {
   var id = 'empField-' + empCode + '-' + fieldKey;
+  if (fieldKey === 'dept' && !readOnly) {
+    var opts = departments.map(function(d) { return '<option' + (d === value ? ' selected' : '') + '>' + escapeHTML(d) + '</option>'; }).join('');
+    return '<div class="emp-detail-field">' +
+      '<label class="emp-detail-label">' + escapeHTML(label) + '</label>' +
+      '<select class="emp-detail-input" id="' + id + '">' + opts + '</select>' +
+      '</div>';
+  }
   return '<div class="emp-detail-field">' +
     '<label class="emp-detail-label">' + escapeHTML(label) + '</label>' +
     '<input class="emp-detail-input" id="' + id + '" value="' + escapeHTML(String(value)) + '"' + (readOnly ? ' readonly style="opacity:.6"' : '') + '>' +
@@ -6912,6 +6955,7 @@ async function loadFromBackend() {
       var deptData = getData(keyIdx.departments);
       if (deptData && Array.isArray(deptData) && deptData.length > 0) {
         departments.length = 0;
+        departmentData = deptData;
         deptData.forEach(function(d) { departments.push(d.name); });
       }
     }

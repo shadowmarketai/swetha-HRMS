@@ -47,6 +47,28 @@ router.post('/', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
   }
 });
 
+// PUT /api/departments/:id — rename a department (MD/HR only)
+router.put('/:id', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
+  try {
+    const { name } = req.body;
+    if (!name || !name.trim()) return res.status(400).json({ error: 'Department name required' });
+    const trimmed = name.trim();
+    const [dept] = await pool.query('SELECT name FROM departments WHERE id = ?', [req.params.id]);
+    if (dept.length === 0) return res.status(404).json({ error: 'Department not found' });
+    const oldName = dept[0].name;
+    if (oldName === trimmed) return res.json({ message: 'No change' });
+    const [dup] = await pool.query('SELECT id FROM departments WHERE name = ? AND id != ?', [trimmed, req.params.id]);
+    if (dup.length > 0) return res.status(400).json({ error: 'Department name already exists' });
+    await pool.query('UPDATE departments SET name = ? WHERE id = ?', [trimmed, req.params.id]);
+    // Update all employees in the old department
+    await pool.query('UPDATE employees SET dept = ? WHERE dept = ?', [trimmed, oldName]);
+    res.json({ message: 'Department renamed', oldName, newName: trimmed });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // DELETE /api/departments/:id — remove a department (MD only)
 router.delete('/:id', verifyToken, requireRole('MD'), async (req, res) => {
   try {
