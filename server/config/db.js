@@ -204,10 +204,10 @@ async function seedStockAndClearMock(conn) {
     const [tables] = await conn.query("SHOW TABLES LIKE 'peb_stock_items'");
     if (tables.length === 0) { console.log('[STOCK-SEED] peb_stock_items table not found, skipping'); return; }
 
-    // Check current count — skip if already has 291 items (Excel import done)
-    const [[{ cnt }]] = await conn.query('SELECT COUNT(*) as cnt FROM peb_stock_items');
-    console.log('[STOCK-SEED] Current stock count:', cnt);
-    if (cnt >= 291) { console.log('[STOCK-SEED] Already imported, skipping'); return; }
+    // Check if Excel data already imported by looking for a known Excel item code
+    const [[{ cnt }]] = await conn.query("SELECT COUNT(*) as cnt FROM peb_stock_items WHERE item_code = 'SSF-CON-WEL-001'");
+    console.log('[STOCK-SEED] Excel item check (SSF-CON-WEL-001):', cnt);
+    if (cnt > 0) { console.log('[STOCK-SEED] Excel data already imported, skipping'); return; }
 
     console.log('[STOCK-SEED] Importing stock data from seed file...');
     const seedPath = path.join(__dirname, '..', 'stock-seed-data.json');
