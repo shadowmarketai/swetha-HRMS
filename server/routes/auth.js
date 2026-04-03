@@ -146,8 +146,8 @@ router.post('/register', verifyToken, requireRole('MD', 'HR'), async (req, res) 
     if (!empCode || !password) {
       return res.status(400).json({ error: 'Employee code and password required' });
     }
-    if (password.length < 8) {
-      return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    if (password.length < 6) {
+      return res.status(400).json({ error: 'Password must be at least 6 characters' });
     }
     const hash = await bcrypt.hash(password, 10);
     await pool.query(
@@ -166,7 +166,7 @@ router.post('/reset-password', verifyToken, requireRole('MD', 'HR'), async (req,
   try {
     const { empCode, newPassword } = req.body;
     if (!empCode || !newPassword) return res.status(400).json({ error: 'Employee code and new password required' });
-    if (newPassword.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    if (newPassword.length < 8) return res.status(400).json({ error: 'Password must be at least 6 characters' });
     const [emp] = await pool.query('SELECT code, role FROM employees WHERE code = ?', [empCode]);
     if (emp.length === 0) return res.status(404).json({ error: 'Employee not found' });
     const hash = await bcrypt.hash(newPassword, 10);
@@ -184,8 +184,8 @@ router.post('/reset-password', verifyToken, requireRole('MD', 'HR'), async (req,
 // POST /api/auth/bulk-create-missing — create login accounts for all employees missing from users table
 router.post('/bulk-create-missing', verifyToken, requireRole('MD'), async (req, res) => {
   try {
-    const defaultPassword = req.body.password || 'emp12345';
-    if (defaultPassword.length < 8) return res.status(400).json({ error: 'Password must be at least 8 characters' });
+    const defaultPassword = req.body.password || 'emp123';
+    if (defaultPassword.length < 8) return res.status(400).json({ error: 'Password must be at least 6 characters' });
     const [missing] = await pool.query(
       'SELECT e.code, e.role FROM employees e LEFT JOIN users u ON e.code = u.emp_code WHERE u.emp_code IS NULL AND e.is_active = 1'
     );

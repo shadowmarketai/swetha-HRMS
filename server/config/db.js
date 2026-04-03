@@ -168,8 +168,8 @@ async function seedNewEmployees(conn) {
     {code:'SS041',name:'Arunkumar',dept:'QS',designation:'Quantity Surveyor',salary:0,role:'Employee',phone:'',doj:null,email:'aruntec16@gmail.com'},
     {code:'SS042',name:'Mohan',dept:'Execution',designation:'Execution',salary:0,role:'Employee',phone:'',doj:null,email:'perumalmohan666@gmail.com'}
   ];
-  const passwords = { 'MD001': 'admin123', 'HR001': 'hr12345' };
-  const defaultPass = 'emp12345';
+  const passwords = { 'MD001': 'admin123', 'HR001': 'hr123' };
+  const defaultPass = 'emp123';
   let seeded = 0;
   for (const emp of employees) {
     try {
@@ -180,7 +180,7 @@ async function seedNewEmployees(conn) {
       const pass = passwords[emp.code] || defaultPass;
       const hash = await bcrypt.hash(pass, 10);
       await conn.query(
-        'INSERT IGNORE INTO users (emp_code, password_hash, role) VALUES (?, ?, ?)',
+        'INSERT INTO users (emp_code, password_hash, role) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE password_hash = VALUES(password_hash), role = VALUES(role)',
         [emp.code, hash, emp.role]
       );
       seeded++;
@@ -197,7 +197,10 @@ async function seedNewEmployees(conn) {
     if (missing.length > 0) {
       const fixHash = await bcrypt.hash(defaultPass, 10);
       for (const m of missing) {
-        await conn.query('INSERT IGNORE INTO users (emp_code, password_hash, role) VALUES (?, ?, ?)', [m.code, fixHash, m.role]);
+        await conn.query(
+          'INSERT INTO users (emp_code, password_hash, role) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE password_hash = VALUES(password_hash), role = VALUES(role)',
+          [m.code, fixHash, m.role]
+        );
       }
       console.log('[AUTO-FIX] Created login accounts for', missing.length, 'employees:', missing.map(m => m.code).join(', '));
     }

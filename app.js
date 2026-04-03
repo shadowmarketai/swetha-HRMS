@@ -1120,7 +1120,7 @@ async function processForgotPassword() {
     });
     var data = await res.json();
     if (!res.ok) { result.textContent = data.error || 'Password reset failed'; return; }
-    result.innerHTML = 'Password has been reset for <b>' + escapeHTML(code) + '</b>.<br><br>Your new password is <b>emp12345</b>. Please change it after login.';
+    result.innerHTML = 'Password has been reset for <b>' + escapeHTML(code) + '</b>.<br><br>Your new password is <b>emp123</b>. Please change it after login.';
   } catch (e) {
     result.textContent = 'Cannot reach server. Please try again later.';
   }
@@ -1894,7 +1894,7 @@ async function submitOnboarding() {
     return;
   }
 
-  var obPassword = (document.getElementById('obPassword') || {}).value || 'emp12345';
+  var obPassword = (document.getElementById('obPassword') || {}).value || 'emp123';
   var obRole = (document.getElementById('obRole') || {}).value || 'Employee';
   // Only MD can set HR role
   if (obRole === 'HR' && currentUser.role !== 'MD') obRole = 'Employee';
@@ -2627,7 +2627,7 @@ async function deleteEmployeePermanently(code) {
 async function resetEmployeePassword(code) {
   var emp = EMPLOYEES.find(function(e) { return e.code === code; });
   if (!emp) return;
-  if (!confirm('Reset password for ' + emp.name + ' to default (emp12345)?')) return;
+  if (!confirm('Reset password for ' + emp.name + ' to default (emp123)?')) return;
   try {
     await apiCall('PUT', '/employees/' + code + '/reset-password', {});
     showToast('Password reset for ' + emp.name);
