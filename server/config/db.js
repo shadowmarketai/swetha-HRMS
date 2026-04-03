@@ -197,7 +197,7 @@ async function seedNewEmployees(conn) {
   console.log('Employee seed: ' + seeded + ' processed, old SSC codes deactivated');
 }
 
-// One-time: import stock from JSON seed data and clear mock/test data
+// One-time: import stock from JSON seed data (runs only if SSF-CON-WEL-001 not found)
 async function seedStockAndClearMock(conn) {
   try {
     // Check if peb_stock_items table exists
@@ -244,17 +244,9 @@ async function seedStockAndClearMock(conn) {
     }
     console.log('[STOCK-SEED] Inserted', inserted, 'stock items');
 
-    // Clear mock/test data
-    const mockTables = ['attendance_logs', 'advance_requests', 'expense_reimbursements', 'leave_applications'];
-    await conn.query('SET FOREIGN_KEY_CHECKS = 0');
-    for (const t of mockTables) {
-      await conn.query('DELETE FROM ' + t).catch(() => {});
-    }
-    await conn.query('SET FOREIGN_KEY_CHECKS = 1');
-
-    // Reset leave balances
-    await conn.query('UPDATE leave_balances SET casual = 12, sick = 20, earned = 6, comp = 3').catch(() => {});
-    console.log('[STOCK-SEED] Mock data cleared, leave balances reset');
+    // NEVER delete from production tables like attendance_logs, leave_applications, etc.
+    // Previous code here wiped real production data on deploy — removed permanently.
+    console.log('[STOCK-SEED] Stock seeding complete. No other tables touched.');
   } catch (e) {
     console.error('[STOCK-SEED] Error:', e.message);
   }
