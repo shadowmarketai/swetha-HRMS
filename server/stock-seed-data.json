@@ -1,0 +1,2621 @@
+[
+  {
+    "item_code": "SSF-CON-WEL-001",
+    "item_name": "Welding Gloves - Leather (pairs)",
+    "category": "CONSUMABLE",
+    "sub_category": "WELDING",
+    "current_stock": 30,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-WEL-002",
+    "item_name": "Welding Glass-white",
+    "category": "CONSUMABLE",
+    "sub_category": "WELDING",
+    "current_stock": 11,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-WEL-003",
+    "item_name": "Welding Glass-black-shade 11",
+    "category": "CONSUMABLE",
+    "sub_category": "WELDING",
+    "current_stock": 61,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-WEL-004",
+    "item_name": "Welding Coil-er70s-1.2mm (nouarc)",
+    "category": "CONSUMABLE",
+    "sub_category": "WELDING",
+    "current_stock": 60,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-WEL-005",
+    "item_name": "Welding Electrode-e6013-2.5mm (sunbond)-cartons",
+    "category": "CONSUMABLE",
+    "sub_category": "WELDING",
+    "current_stock": 8,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-WEL-006",
+    "item_name": "Welding Electrode-e6013-3.15mm (sunbond)-cartons",
+    "category": "CONSUMABLE",
+    "sub_category": "WELDING",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-WEL-007",
+    "item_name": "Welding Electrode-e7018-4.00mm (sunbond)-cartons",
+    "category": "CONSUMABLE",
+    "sub_category": "WELDING",
+    "current_stock": 5,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-WEL-008",
+    "item_name": "CO2 Welding Machine- Tip",
+    "category": "CONSUMABLE",
+    "sub_category": "WELDING",
+    "current_stock": 15,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-WEL-009",
+    "item_name": "CO2 Welding Machine-gas Nozzle",
+    "category": "CONSUMABLE",
+    "sub_category": "WELDING",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-WEL-010",
+    "item_name": "Welding Holder - Heavy Duty",
+    "category": "CONSUMABLE",
+    "sub_category": "WELDING",
+    "current_stock": 2,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-WEL-011",
+    "item_name": "CO2 Welding Machine-diffuser-panasonic",
+    "category": "CONSUMABLE",
+    "sub_category": "WELDING",
+    "current_stock": 10,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-WEL-012",
+    "item_name": "CO2 Welding Machine-tip -panasonic",
+    "category": "CONSUMABLE",
+    "sub_category": "WELDING",
+    "current_stock": 10,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-WEL-013",
+    "item_name": "CO2 Welding Machine-tip Holder-panasonic",
+    "category": "CONSUMABLE",
+    "sub_category": "WELDING",
+    "current_stock": 4,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-WEL-014",
+    "item_name": "CO2 Welding Machine-tip Holder",
+    "category": "CONSUMABLE",
+    "sub_category": "WELDING",
+    "current_stock": 2,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-WEL-015",
+    "item_name": "CO2 Welding Machine-ceramic Cup",
+    "category": "CONSUMABLE",
+    "sub_category": "WELDING",
+    "current_stock": 10,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-WEL-016",
+    "item_name": "CO2 Welding Machine-earthing Holder -male",
+    "category": "CONSUMABLE",
+    "sub_category": "WELDING",
+    "current_stock": 3,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-WEL-017",
+    "item_name": "CO2 Welding Machine-earthing Holder -female",
+    "category": "CONSUMABLE",
+    "sub_category": "WELDING",
+    "current_stock": 3,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-WEL-018",
+    "item_name": "CO2 Pre Heater",
+    "category": "CONSUMABLE",
+    "sub_category": "WELDING",
+    "current_stock": 2,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-WEL-019",
+    "item_name": "CO2 Liner",
+    "category": "CONSUMABLE",
+    "sub_category": "WELDING",
+    "current_stock": 15,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-WEL-020",
+    "item_name": "Hose Connector",
+    "category": "CONSUMABLE",
+    "sub_category": "WELDING",
+    "current_stock": 3,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-WEL-021",
+    "item_name": "Gas Lighter",
+    "category": "CONSUMABLE",
+    "sub_category": "WELDING",
+    "current_stock": 2,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-WEL-022",
+    "item_name": "PTW Machine- Flux-25kg-10.71l (nourac)",
+    "category": "CONSUMABLE",
+    "sub_category": "WELDING",
+    "current_stock": 4,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-WEL-023",
+    "item_name": "PTW Welding Coil-em12k-250kg-1.6mm (nourac)",
+    "category": "CONSUMABLE",
+    "sub_category": "WELDING",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-WEL-024",
+    "item_name": "PTW Liner",
+    "category": "CONSUMABLE",
+    "sub_category": "WELDING",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-WEL-025",
+    "item_name": "Nozzle Gel",
+    "category": "CONSUMABLE",
+    "sub_category": "WELDING",
+    "current_stock": 5,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-WEL-026",
+    "item_name": "Cylinder Key-o2",
+    "category": "CONSUMABLE",
+    "sub_category": "WELDING",
+    "current_stock": 5,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-WEL-027",
+    "item_name": "Cylinder Key-co2",
+    "category": "CONSUMABLE",
+    "sub_category": "WELDING",
+    "current_stock": 3,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-WEL-028",
+    "item_name": "Oxygen Nut",
+    "category": "CONSUMABLE",
+    "sub_category": "WELDING",
+    "current_stock": 4,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-WEL-029",
+    "item_name": "Welding Face Shield",
+    "category": "CONSUMABLE",
+    "sub_category": "WELDING",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-WEL-030",
+    "item_name": "Welding Hand Shield",
+    "category": "CONSUMABLE",
+    "sub_category": "WELDING",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-WEL-031",
+    "item_name": "Welding Helmet",
+    "category": "CONSUMABLE",
+    "sub_category": "WELDING",
+    "current_stock": 3,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-WEL-032",
+    "item_name": "70sq.mm Copper Leg",
+    "category": "CONSUMABLE",
+    "sub_category": "WELDING",
+    "current_stock": 3,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-WEL-033",
+    "item_name": "70sq.mm Copper Cable-rolls",
+    "category": "CONSUMABLE",
+    "sub_category": "WELDING",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-FTP-001",
+    "item_name": "Cotton Gloves-(pairs)",
+    "category": "CONSUMABLE",
+    "sub_category": "FIT-UP",
+    "current_stock": 90,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-FTP-002",
+    "item_name": "Grinding Wheel-4\"",
+    "category": "CONSUMABLE",
+    "sub_category": "FIT-UP",
+    "current_stock": 35,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-FTP-003",
+    "item_name": "Grinding Wheel-7\"",
+    "category": "CONSUMABLE",
+    "sub_category": "FIT-UP",
+    "current_stock": 50,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-FTP-004",
+    "item_name": "Cutting Wheel-4\"",
+    "category": "CONSUMABLE",
+    "sub_category": "FIT-UP",
+    "current_stock": 140,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-FTP-005",
+    "item_name": "Pipe Cutter Wheel-14\"",
+    "category": "CONSUMABLE",
+    "sub_category": "FIT-UP",
+    "current_stock": 20,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-FTP-006",
+    "item_name": "Cup Power Brush-3\"",
+    "category": "CONSUMABLE",
+    "sub_category": "FIT-UP",
+    "current_stock": 22,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-FTP-007",
+    "item_name": "Gas Cuttting Nozzles-1/16",
+    "category": "CONSUMABLE",
+    "sub_category": "FIT-UP",
+    "current_stock": 4,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-FTP-008",
+    "item_name": "Gas Cuttting Nozzles-3/64",
+    "category": "CONSUMABLE",
+    "sub_category": "FIT-UP",
+    "current_stock": 4,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-FTP-009",
+    "item_name": "Safety Goggles",
+    "category": "CONSUMABLE",
+    "sub_category": "FIT-UP",
+    "current_stock": 15,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-FTP-010",
+    "item_name": "Drilling Machine Cutter-f14",
+    "category": "CONSUMABLE",
+    "sub_category": "FIT-UP",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-FTP-011",
+    "item_name": "Drilling Machine Cutter-f18",
+    "category": "CONSUMABLE",
+    "sub_category": "FIT-UP",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-FTP-012",
+    "item_name": "Drilling Machine Cutter-f22",
+    "category": "CONSUMABLE",
+    "sub_category": "FIT-UP",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-FTP-013",
+    "item_name": "Drilling Machine Cutter-f26",
+    "category": "CONSUMABLE",
+    "sub_category": "FIT-UP",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-FTP-014",
+    "item_name": "Drilling Machine Cutter-f28",
+    "category": "CONSUMABLE",
+    "sub_category": "FIT-UP",
+    "current_stock": 5,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-FTP-015",
+    "item_name": "Drilling Machine Cutter-f34",
+    "category": "CONSUMABLE",
+    "sub_category": "FIT-UP",
+    "current_stock": 2,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-FTP-016",
+    "item_name": "Drilling Machine Cutter-f30",
+    "category": "CONSUMABLE",
+    "sub_category": "FIT-UP",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-FTP-017",
+    "item_name": "Drilling Machine Cutter-f32",
+    "category": "CONSUMABLE",
+    "sub_category": "FIT-UP",
+    "current_stock": 3,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-FTP-018",
+    "item_name": "Iron Worker - Punch-f14",
+    "category": "CONSUMABLE",
+    "sub_category": "FIT-UP",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-FTP-019",
+    "item_name": "Iron Worker - Punch-f18",
+    "category": "CONSUMABLE",
+    "sub_category": "FIT-UP",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-FTP-020",
+    "item_name": "Iron Worker - Punch-f26",
+    "category": "CONSUMABLE",
+    "sub_category": "FIT-UP",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-FTP-021",
+    "item_name": "Iron Worker - Punch-f22",
+    "category": "CONSUMABLE",
+    "sub_category": "FIT-UP",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-FTP-022",
+    "item_name": "Iron Worker -die-f14",
+    "category": "CONSUMABLE",
+    "sub_category": "FIT-UP",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-FTP-023",
+    "item_name": "Iron Worker-die-f18",
+    "category": "CONSUMABLE",
+    "sub_category": "FIT-UP",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-FTP-024",
+    "item_name": "Iron Worker-die-f26",
+    "category": "CONSUMABLE",
+    "sub_category": "FIT-UP",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-FTP-025",
+    "item_name": "Grinding Wheel-5\"",
+    "category": "CONSUMABLE",
+    "sub_category": "FIT-UP",
+    "current_stock": 35,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-FTP-026",
+    "item_name": "Flop Wheel-4\"",
+    "category": "CONSUMABLE",
+    "sub_category": "FIT-UP",
+    "current_stock": 25,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-PNT-001",
+    "item_name": "Cotton Waste",
+    "category": "CONSUMABLE",
+    "sub_category": "PAINTING CONSUMABLES",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-PNT-002",
+    "item_name": "Hose Clamp",
+    "category": "CONSUMABLE",
+    "sub_category": "PAINTING CONSUMABLES",
+    "current_stock": 5,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-PNT-003",
+    "item_name": "8mm Air Hose",
+    "category": "CONSUMABLE",
+    "sub_category": "PAINTING CONSUMABLES",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-PNT-004",
+    "item_name": "4\"-painting Brush",
+    "category": "CONSUMABLE",
+    "sub_category": "PAINTING CONSUMABLES",
+    "current_stock": 15,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-PNT-005",
+    "item_name": "Spray Gun-air Spray",
+    "category": "CONSUMABLE",
+    "sub_category": "PAINTING CONSUMABLES",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-PNT-006",
+    "item_name": "Painting Coverall- XXL",
+    "category": "CONSUMABLE",
+    "sub_category": "PAINTING CONSUMABLES",
+    "current_stock": 2,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-PNT-007",
+    "item_name": "4\" Painting Roller",
+    "category": "CONSUMABLE",
+    "sub_category": "PAINTING CONSUMABLES",
+    "current_stock": 30,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-OTH-001",
+    "item_name": "Permanent Markers",
+    "category": "CONSUMABLE",
+    "sub_category": "OTHER CONSUMABLES",
+    "current_stock": 45,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-OTH-002",
+    "item_name": "Slate Pencils-(pks)",
+    "category": "CONSUMABLE",
+    "sub_category": "OTHER CONSUMABLES",
+    "current_stock": 8,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-OTH-003",
+    "item_name": "Chalk Pieces",
+    "category": "CONSUMABLE",
+    "sub_category": "OTHER CONSUMABLES",
+    "current_stock": 2,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-OTH-004",
+    "item_name": "Safety MASK",
+    "category": "CONSUMABLE",
+    "sub_category": "OTHER CONSUMABLES",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-OTH-005",
+    "item_name": "Teflon Tape",
+    "category": "CONSUMABLE",
+    "sub_category": "OTHER CONSUMABLES",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-OTH-006",
+    "item_name": "Insulation Tape",
+    "category": "CONSUMABLE",
+    "sub_category": "OTHER CONSUMABLES",
+    "current_stock": 35,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-OTH-007",
+    "item_name": "Oil Cane",
+    "category": "CONSUMABLE",
+    "sub_category": "OTHER CONSUMABLES",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-OTH-008",
+    "item_name": "Pencil Grinder Stone",
+    "category": "CONSUMABLE",
+    "sub_category": "OTHER CONSUMABLES",
+    "current_stock": 5,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-OTH-009",
+    "item_name": "Strapping Roll-nylon (rolls)",
+    "category": "CONSUMABLE",
+    "sub_category": "OTHER CONSUMABLES",
+    "current_stock": 5,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-OTH-010",
+    "item_name": "Strapping Roll Clip-nylon-(packs)-kg",
+    "category": "CONSUMABLE",
+    "sub_category": "OTHER CONSUMABLES",
+    "current_stock": 2,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-OTH-011",
+    "item_name": "Rust Penetrant Lubricant",
+    "category": "CONSUMABLE",
+    "sub_category": "OTHER CONSUMABLES",
+    "current_stock": 3,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-OTH-012",
+    "item_name": "Packing Tape-white",
+    "category": "CONSUMABLE",
+    "sub_category": "OTHER CONSUMABLES",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-OTH-013",
+    "item_name": "Packing Tape-brown",
+    "category": "CONSUMABLE",
+    "sub_category": "OTHER CONSUMABLES",
+    "current_stock": 40,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-OTH-014",
+    "item_name": "Packing Wrapper",
+    "category": "CONSUMABLE",
+    "sub_category": "OTHER CONSUMABLES",
+    "current_stock": 4,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-OTH-015",
+    "item_name": "Steel Strap -25mm Width-50kg",
+    "category": "CONSUMABLE",
+    "sub_category": "OTHER CONSUMABLES",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CON-OTH-016",
+    "item_name": "Steel Strap Clip-1 KG",
+    "category": "CONSUMABLE",
+    "sub_category": "OTHER CONSUMABLES",
+    "current_stock": 2,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CYL-001",
+    "item_name": "Oxygen Cylinder",
+    "category": "CONSUMABLE",
+    "sub_category": "CYLINDERS",
+    "current_stock": 4,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CYL-002",
+    "item_name": "CO2 Cylinder",
+    "category": "CONSUMABLE",
+    "sub_category": "CYLINDERS",
+    "current_stock": 8,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-CYL-003",
+    "item_name": "LPG",
+    "category": "CONSUMABLE",
+    "sub_category": "CYLINDERS",
+    "current_stock": 3,
+    "unit": "PIECE",
+    "min_stock": 10
+  },
+  {
+    "item_code": "SSF-TL-001",
+    "item_name": "L-square - 13\"",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-002",
+    "item_name": "L-square - 14\"",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-003",
+    "item_name": "L-square - 12\"",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 3,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-004",
+    "item_name": "L-square - 9\"",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-005",
+    "item_name": "L-square - 7\"",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-006",
+    "item_name": "L-square - 8\"",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 3,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-007",
+    "item_name": "L-square - 16\"",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-008",
+    "item_name": "L-square - 6\"",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 3,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-009",
+    "item_name": "L-square - 11\"",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-010",
+    "item_name": "L-square - 10\"",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-011",
+    "item_name": "Hammers-5lb",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 2,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-012",
+    "item_name": "Hammers-10lb",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-013",
+    "item_name": "Hammers-16lb",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-014",
+    "item_name": "Hammers-6lb",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-015",
+    "item_name": "Measurement Tape - 5m",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 4,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-016",
+    "item_name": "Measurement Tape - 15m",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 3,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-017",
+    "item_name": "Measurement Tape - 30m",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-018",
+    "item_name": "Vernier Calliper",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-019",
+    "item_name": "Center Punch",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-020",
+    "item_name": "Cutting Torch",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 2,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-021",
+    "item_name": "LPG Regulator",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-022",
+    "item_name": "O2 Regulator",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 2,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-023",
+    "item_name": "CO2 Regulator",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 2,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-024",
+    "item_name": "C Clamp - 170mm",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-025",
+    "item_name": "C Clamp - 90mm",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-026",
+    "item_name": "C Clamp - 65mm",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-027",
+    "item_name": "D-shackle",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-028",
+    "item_name": "7\" Grinding Machine Key",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-029",
+    "item_name": "4\" Grinding Machine Key",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-030",
+    "item_name": "Plier",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 2,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-031",
+    "item_name": "Rivet Gun",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-032",
+    "item_name": "Grease Gun Nipple Set",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-033",
+    "item_name": "Ceiling Light-panasonic-150w-round",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 3,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-034",
+    "item_name": "Panasonic Focus Light",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 2,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-035",
+    "item_name": "Exhaust Fan",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-036",
+    "item_name": "Maual Pump(2-wheeler)",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-037",
+    "item_name": "Spirit Level - 12\"-magnetic",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 6,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-038",
+    "item_name": "Grinding Machine Nut-set",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-039",
+    "item_name": "CHISEL",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 15,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-040",
+    "item_name": "Nose Plier",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 3,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-041",
+    "item_name": "Screw Driver ( * & -) Taparia",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-042",
+    "item_name": "Screw Driver ( -)",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 2,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-043",
+    "item_name": "Screw Spanner",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-044",
+    "item_name": "Talbro-21-23",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-045",
+    "item_name": "Venus-30-32",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-046",
+    "item_name": "Din895-36-41",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-047",
+    "item_name": "Seliktas-16-17",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-048",
+    "item_name": "Eastman-30-32",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-049",
+    "item_name": "Ambika-30-32",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-050",
+    "item_name": "Everest-18-19",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-051",
+    "item_name": "25-28 Taparia",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-052",
+    "item_name": "19-22 Spanners",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-053",
+    "item_name": "24-27 Spanners",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-054",
+    "item_name": "24-26 Spanners",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-055",
+    "item_name": "14-17 TONGLI",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-056",
+    "item_name": "15-14 Eastman",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-057",
+    "item_name": "14-17 VENUS",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-058",
+    "item_name": "18-19 TALBRO",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-059",
+    "item_name": "10-12 DE",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-060",
+    "item_name": "24-27 TATA",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-061",
+    "item_name": "24-27 Taparia",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-062",
+    "item_name": "Din895-27-30",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-063",
+    "item_name": "Taparia-12\" Alloy Wrench",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-064",
+    "item_name": "2\" Pipe Wrench",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-065",
+    "item_name": "Jhaveri-24-27",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-066",
+    "item_name": "7-9 Taparia",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-067",
+    "item_name": "18-19 Stanely",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-068",
+    "item_name": "Venus-30-32",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-069",
+    "item_name": "Taparia-30-32",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-070",
+    "item_name": "Taparia-36-41",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-071",
+    "item_name": "Taparia-21-23",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-072",
+    "item_name": "Ambika-30-32",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-073",
+    "item_name": "Taparia-24-27",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-074",
+    "item_name": "25-28 Taparia",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-075",
+    "item_name": "25-28",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-076",
+    "item_name": "Taparia-20-22",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-077",
+    "item_name": "ALLEN KEY SET",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-078",
+    "item_name": "Number Punch + Letter Punch Set-8mm",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 2,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-TL-079",
+    "item_name": "Torque Wrench",
+    "category": "TOOL",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-STR-MC-001",
+    "item_name": "Esab-1f Welding Machine - ARC Welding",
+    "category": "MACHINE",
+    "sub_category": "GENERAL",
+    "current_stock": 7,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-STR-MC-002",
+    "item_name": "Esab-3f Welding Machine - ARC Welding",
+    "category": "MACHINE",
+    "sub_category": "GENERAL",
+    "current_stock": 3,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-STR-MC-003",
+    "item_name": "Esab-3f Welding Machine - Mig/co2 Welding",
+    "category": "MACHINE",
+    "sub_category": "GENERAL",
+    "current_stock": 11,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-STR-MC-004",
+    "item_name": "Panasonic-3f MIG Machine",
+    "category": "MACHINE",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-STR-MC-005",
+    "item_name": "Grinding Machine - 4\"",
+    "category": "MACHINE",
+    "sub_category": "GENERAL",
+    "current_stock": 3,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-STR-MC-006",
+    "item_name": "Grinding Machine - 7\"",
+    "category": "MACHINE",
+    "sub_category": "GENERAL",
+    "current_stock": 6,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-STR-MC-007",
+    "item_name": "Magnetic Drilling Machine",
+    "category": "MACHINE",
+    "sub_category": "GENERAL",
+    "current_stock": 2,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-STR-MC-008",
+    "item_name": "Konark-pug Cutting Machine With 2 Rails",
+    "category": "MACHINE",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-STR-MC-009",
+    "item_name": "Pipe Cutter - 14\"",
+    "category": "MACHINE",
+    "sub_category": "GENERAL",
+    "current_stock": 2,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-STR-MC-010",
+    "item_name": "Electrode Oven",
+    "category": "MACHINE",
+    "sub_category": "GENERAL",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-STR-MC-011",
+    "item_name": "Air Blower",
+    "category": "MACHINE",
+    "sub_category": "GENERAL",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-STR-MC-012",
+    "item_name": "Pneumatic GREASE GUN",
+    "category": "MACHINE",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-STR-MC-013",
+    "item_name": "1.5 HP Air Compressor",
+    "category": "MACHINE",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-STR-MC-014",
+    "item_name": "Manual Grease Gun",
+    "category": "MACHINE",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-STR-MC-015",
+    "item_name": "Air Spray(painting)",
+    "category": "MACHINE",
+    "sub_category": "GENERAL",
+    "current_stock": 3,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-STR-MC-016",
+    "item_name": "Airless Spray(painting)",
+    "category": "MACHINE",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-STR-MC-017",
+    "item_name": "Gas Cutting Machine Set",
+    "category": "MACHINE",
+    "sub_category": "GENERAL",
+    "current_stock": 4,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-STR-MC-018",
+    "item_name": "Hand Drilling Machine",
+    "category": "MACHINE",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-STR-MC-019",
+    "item_name": "CNC Air Cleaning Gun With Hose(blue)",
+    "category": "MACHINE",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-STR-MC-020",
+    "item_name": "PTW",
+    "category": "MACHINE",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-STR-MC-021",
+    "item_name": "MESSAR PLASMA Cutting Machine",
+    "category": "MACHINE",
+    "sub_category": "GENERAL",
+    "current_stock": 1,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-STR-MC-022",
+    "item_name": "Grinding Machine - 5\"",
+    "category": "MACHINE",
+    "sub_category": "GENERAL",
+    "current_stock": 2,
+    "unit": "PIECE",
+    "min_stock": 5
+  },
+  {
+    "item_code": "SSF-RW-STR-PLT-001",
+    "item_name": "MS PLATE 2MM",
+    "category": "RAW MATERIAL",
+    "sub_category": "MS PLATE",
+    "current_stock": 0,
+    "unit": "KG",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-STR-PLT-002",
+    "item_name": "MS PLATE 4MM",
+    "category": "RAW MATERIAL",
+    "sub_category": "MS PLATE",
+    "current_stock": 0,
+    "unit": "KG",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-STR-PLT-003",
+    "item_name": "MS PLATEM 5MM",
+    "category": "RAW MATERIAL",
+    "sub_category": "MS PLATE",
+    "current_stock": 0,
+    "unit": "KG",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-STR-PLT-004",
+    "item_name": "MS PLATE 6MM",
+    "category": "RAW MATERIAL",
+    "sub_category": "MS PLATE",
+    "current_stock": 0,
+    "unit": "KG",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-STR-PLT-005",
+    "item_name": "MS PLATE 8MM",
+    "category": "RAW MATERIAL",
+    "sub_category": "MS PLATE",
+    "current_stock": 0,
+    "unit": "KG",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-STR-PLT-006",
+    "item_name": "MS PLATE 10MM",
+    "category": "RAW MATERIAL",
+    "sub_category": "MS PLATE",
+    "current_stock": 0,
+    "unit": "KG",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-STR-PLT-007",
+    "item_name": "MS PLATE 12MM",
+    "category": "RAW MATERIAL",
+    "sub_category": "MS PLATE",
+    "current_stock": 0,
+    "unit": "KG",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-STR-PLT-008",
+    "item_name": "MS PLATE 14MM",
+    "category": "RAW MATERIAL",
+    "sub_category": "MS PLATE",
+    "current_stock": 0,
+    "unit": "KG",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-STR-PLT-009",
+    "item_name": "MS PLATE 16MM",
+    "category": "RAW MATERIAL",
+    "sub_category": "MS PLATE",
+    "current_stock": 0,
+    "unit": "KG",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-STR-PLT-010",
+    "item_name": "MS PLATE 20MM",
+    "category": "RAW MATERIAL",
+    "sub_category": "MS PLATE",
+    "current_stock": 0,
+    "unit": "KG",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-STR-PLT-011",
+    "item_name": "MS PLATE 25MM",
+    "category": "RAW MATERIAL",
+    "sub_category": "MS PLATE",
+    "current_stock": 0,
+    "unit": "KG",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-STR-PLT-012",
+    "item_name": "MS PLATE 30MM",
+    "category": "RAW MATERIAL",
+    "sub_category": "MS PLATE",
+    "current_stock": 0,
+    "unit": "KG",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-STR-PLT-013",
+    "item_name": "MS PLATE 32MM",
+    "category": "RAW MATERIAL",
+    "sub_category": "MS PLATE",
+    "current_stock": 0,
+    "unit": "KG",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-STR-RD-001",
+    "item_name": "M.S Rod-25 Mm D",
+    "category": "RAW MATERIAL",
+    "sub_category": "MS ROD",
+    "current_stock": 0,
+    "unit": "KG",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-STR-RD-002",
+    "item_name": "M.S Rod-20 Mm D",
+    "category": "RAW MATERIAL",
+    "sub_category": "MS ROD",
+    "current_stock": 0,
+    "unit": "KG",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-STR-RD-003",
+    "item_name": "M.S Rod-12 Mm D",
+    "category": "RAW MATERIAL",
+    "sub_category": "MS ROD",
+    "current_stock": 0,
+    "unit": "KG",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-STR-RD-004",
+    "item_name": "75 Mm D-round Pipe-4mm Thickness-",
+    "category": "RAW MATERIAL",
+    "sub_category": "MS ROD",
+    "current_stock": 0,
+    "unit": "KG",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-STR-RD-005",
+    "item_name": "165 Mm D-round Pipe-3mm Thickness",
+    "category": "RAW MATERIAL",
+    "sub_category": "MS ROD",
+    "current_stock": 0,
+    "unit": "KG",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-STR-RD-006",
+    "item_name": "114mm D-round Pipe-5mm Thickness",
+    "category": "RAW MATERIAL",
+    "sub_category": "MS ROD",
+    "current_stock": 0,
+    "unit": "KG",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-STR-RD-007",
+    "item_name": "165mm D-round Pipe-5mm Thickness",
+    "category": "RAW MATERIAL",
+    "sub_category": "MS ROD",
+    "current_stock": 0,
+    "unit": "KG",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-STR-RD-008",
+    "item_name": "65mm*65mm-m.s L Angle-6mm Thickness",
+    "category": "RAW MATERIAL",
+    "sub_category": "MS ROD",
+    "current_stock": 0,
+    "unit": "KG",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-STR-RD-009",
+    "item_name": "50mm*50mm- M.S L Angle-6mm Thickness",
+    "category": "RAW MATERIAL",
+    "sub_category": "MS ROD",
+    "current_stock": 0,
+    "unit": "KG",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-STR-RD-010",
+    "item_name": "40mm*40mm- M.S L Angle-6mm Thickness",
+    "category": "RAW MATERIAL",
+    "sub_category": "MS ROD",
+    "current_stock": 0,
+    "unit": "KG",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-STR-SHS-001",
+    "item_name": "100*100 - 3 Mm Thickness-shs(square)",
+    "category": "RAW MATERIAL",
+    "sub_category": "SHS",
+    "current_stock": 0,
+    "unit": "KG",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-STR-SHS-002",
+    "item_name": "100*100 - 4 Mm Thickness-shs(square)",
+    "category": "RAW MATERIAL",
+    "sub_category": "SHS",
+    "current_stock": 0,
+    "unit": "KG",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-STR-SHS-003",
+    "item_name": "100*100 - 2 Mm Thickness-shs(square)",
+    "category": "RAW MATERIAL",
+    "sub_category": "SHS",
+    "current_stock": 0,
+    "unit": "KG",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-STR-SHS-004",
+    "item_name": "100*100 - 5 Mm Thickness-shs(square)",
+    "category": "RAW MATERIAL",
+    "sub_category": "SHS",
+    "current_stock": 0,
+    "unit": "KG",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-STR-SHS-005",
+    "item_name": "150*150 - 8 Mm Thickness-shs(square)",
+    "category": "RAW MATERIAL",
+    "sub_category": "SHS",
+    "current_stock": 0,
+    "unit": "KG",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-STR-SHS-006",
+    "item_name": "150*150 - 4 Mm Thickness-shs(square)",
+    "category": "RAW MATERIAL",
+    "sub_category": "SHS",
+    "current_stock": 0,
+    "unit": "KG",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-STR-SHS-007",
+    "item_name": "50*50 - 4 Mm Thickness-shs(square)",
+    "category": "RAW MATERIAL",
+    "sub_category": "SHS",
+    "current_stock": 0,
+    "unit": "KG",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-STR-SHS-008",
+    "item_name": "70*70 - 4 Mm Thickness-shs(square)",
+    "category": "RAW MATERIAL",
+    "sub_category": "SHS",
+    "current_stock": 0,
+    "unit": "KG",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-STR-ISMC-001",
+    "item_name": "Ismc-200mm -8mm Thickness",
+    "category": "RAW MATERIAL",
+    "sub_category": "ISMC",
+    "current_stock": 0,
+    "unit": "KG",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-STR-ISMC-002",
+    "item_name": "Ismc-150mm -6mm Thickness",
+    "category": "RAW MATERIAL",
+    "sub_category": "ISMC",
+    "current_stock": 0,
+    "unit": "KG",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-STR-ISMC-003",
+    "item_name": "Ismc-100mm -6mm Thickness",
+    "category": "RAW MATERIAL",
+    "sub_category": "ISMC",
+    "current_stock": 0,
+    "unit": "KG",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-STR-ISMC-004",
+    "item_name": "Ismc-200mm -6mm Thickness",
+    "category": "RAW MATERIAL",
+    "sub_category": "ISMC",
+    "current_stock": 0,
+    "unit": "KG",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-STR-ISMC-005",
+    "item_name": "Ismc-40*80-rhs--3mm Thick",
+    "category": "RAW MATERIAL",
+    "sub_category": "ISMC",
+    "current_stock": 0,
+    "unit": "KG",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-STR-SHS-009",
+    "item_name": "150*150 - 5 Mm Thickness-shs(square)",
+    "category": "RAW MATERIAL",
+    "sub_category": "SHS",
+    "current_stock": 0,
+    "unit": "KG",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-STR-SHS-010",
+    "item_name": "180*180 - 6 Mm Thickness-shs(square)",
+    "category": "RAW MATERIAL",
+    "sub_category": "SHS",
+    "current_stock": 0,
+    "unit": "KG",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-STR-SHS-011",
+    "item_name": "220*220 - 8 Mm Thickness-shs(square)",
+    "category": "RAW MATERIAL",
+    "sub_category": "SHS",
+    "current_stock": 0,
+    "unit": "KG",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-ROOF-001",
+    "item_name": "2 Mm Thickness-100 Mm WIDTH",
+    "category": "RAW MATERIAL",
+    "sub_category": "ROOFING",
+    "current_stock": 0,
+    "unit": "METER",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-ROOF-002",
+    "item_name": "2 Mm Thickness-175 Mm WIDTH",
+    "category": "RAW MATERIAL",
+    "sub_category": "ROOFING",
+    "current_stock": 0,
+    "unit": "METER",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-ROOF-003",
+    "item_name": "2 Mm Thickness-220 Mm WIDTH",
+    "category": "RAW MATERIAL",
+    "sub_category": "ROOFING",
+    "current_stock": 0,
+    "unit": "METER",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-ROOF-004",
+    "item_name": "2 Mm Thickness-230 Mm WIDTH",
+    "category": "RAW MATERIAL",
+    "sub_category": "ROOFING",
+    "current_stock": 0,
+    "unit": "METER",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-ROOF-005",
+    "item_name": "2 Mm Thickness-310 Mm WIDTH",
+    "category": "RAW MATERIAL",
+    "sub_category": "ROOFING",
+    "current_stock": 0,
+    "unit": "METER",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-ROOF-006",
+    "item_name": "2 Mm Thickness-345 Mm WIDTH",
+    "category": "RAW MATERIAL",
+    "sub_category": "ROOFING",
+    "current_stock": 0,
+    "unit": "METER",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-ROOF-007",
+    "item_name": "2 Mm Thickness-362 Mm WIDTH",
+    "category": "RAW MATERIAL",
+    "sub_category": "ROOFING",
+    "current_stock": 0,
+    "unit": "METER",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-ROOF-008",
+    "item_name": "2 Mm Thickness-375 Mm WIDTH",
+    "category": "RAW MATERIAL",
+    "sub_category": "ROOFING",
+    "current_stock": 0,
+    "unit": "METER",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-ROOF-009",
+    "item_name": "2 Mm Thickness-400 Mm WIDTH",
+    "category": "RAW MATERIAL",
+    "sub_category": "ROOFING",
+    "current_stock": 0,
+    "unit": "METER",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-ROOF-010",
+    "item_name": "2 Mm Thickness-405 Mm WIDTH",
+    "category": "RAW MATERIAL",
+    "sub_category": "ROOFING",
+    "current_stock": 0,
+    "unit": "METER",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-ROOF-011",
+    "item_name": "2 Mm Thickness-410 Mm WIDTH",
+    "category": "RAW MATERIAL",
+    "sub_category": "ROOFING",
+    "current_stock": 0,
+    "unit": "METER",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-ROOF-012",
+    "item_name": "2 Mm Thickness-420 Mm WIDTH",
+    "category": "RAW MATERIAL",
+    "sub_category": "ROOFING",
+    "current_stock": 0,
+    "unit": "METER",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-ROOF-013",
+    "item_name": "1.8 Mm Thickness-95 Mm WIDTH",
+    "category": "RAW MATERIAL",
+    "sub_category": "ROOFING",
+    "current_stock": 0,
+    "unit": "METER",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-ROOF-014",
+    "item_name": "1.8 Mm Thickness-175 Mm WIDTH",
+    "category": "RAW MATERIAL",
+    "sub_category": "ROOFING",
+    "current_stock": 0,
+    "unit": "METER",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-ROOF-015",
+    "item_name": "1.8 Mm Thickness-230 Mm WIDTH",
+    "category": "RAW MATERIAL",
+    "sub_category": "ROOFING",
+    "current_stock": 0,
+    "unit": "METER",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-ROOF-016",
+    "item_name": "1.8 Mm Thickness-290 Mm WIDTH",
+    "category": "RAW MATERIAL",
+    "sub_category": "ROOFING",
+    "current_stock": 0,
+    "unit": "METER",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-ROOF-017",
+    "item_name": "1.8 Mm Thickness-300 Mm WIDTH",
+    "category": "RAW MATERIAL",
+    "sub_category": "ROOFING",
+    "current_stock": 0,
+    "unit": "METER",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-ROOF-018",
+    "item_name": "1.8 Mm Thickness-305 Mm WIDTH",
+    "category": "RAW MATERIAL",
+    "sub_category": "ROOFING",
+    "current_stock": 0,
+    "unit": "METER",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-ROOF-019",
+    "item_name": "1.8 Mm Thickness-320 Mm WIDTH",
+    "category": "RAW MATERIAL",
+    "sub_category": "ROOFING",
+    "current_stock": 0,
+    "unit": "METER",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-ROOF-020",
+    "item_name": "1.8 Mm Thickness-325 Mm WIDTH",
+    "category": "RAW MATERIAL",
+    "sub_category": "ROOFING",
+    "current_stock": 0,
+    "unit": "METER",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-ROOF-021",
+    "item_name": "1.8 Mm Thickness-330 Mm WIDTH",
+    "category": "RAW MATERIAL",
+    "sub_category": "ROOFING",
+    "current_stock": 0,
+    "unit": "METER",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-ROOF-022",
+    "item_name": "1.8 Mm Thickness-335 Mm WIDTH",
+    "category": "RAW MATERIAL",
+    "sub_category": "ROOFING",
+    "current_stock": 0,
+    "unit": "METER",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-ROOF-023",
+    "item_name": "1.8 Mm Thickness-340 Mm WIDTH",
+    "category": "RAW MATERIAL",
+    "sub_category": "ROOFING",
+    "current_stock": 0,
+    "unit": "METER",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-ROOF-024",
+    "item_name": "1.8 Mm Thickness-350 Mm WIDTH",
+    "category": "RAW MATERIAL",
+    "sub_category": "ROOFING",
+    "current_stock": 0,
+    "unit": "METER",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-ROOF-025",
+    "item_name": "1.8 Mm Thickness-370 Mm WIDTH",
+    "category": "RAW MATERIAL",
+    "sub_category": "ROOFING",
+    "current_stock": 0,
+    "unit": "METER",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-ROOF-026",
+    "item_name": "1.8 Mm Thickness-345 Mm WIDTH",
+    "category": "RAW MATERIAL",
+    "sub_category": "ROOFING",
+    "current_stock": 0,
+    "unit": "METER",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-ROOF-027",
+    "item_name": "1.8 Mm Thickness-358 Mm WIDTH",
+    "category": "RAW MATERIAL",
+    "sub_category": "ROOFING",
+    "current_stock": 0,
+    "unit": "METER",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-ROOF-028",
+    "item_name": "1.8 Mm Thickness-73 Mm WIDTH",
+    "category": "RAW MATERIAL",
+    "sub_category": "ROOFING",
+    "current_stock": 0,
+    "unit": "METER",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-ROOF-029",
+    "item_name": "2 Mm Thickness-245 Mm WIDTH",
+    "category": "RAW MATERIAL",
+    "sub_category": "ROOFING",
+    "current_stock": 0,
+    "unit": "METER",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-ROOF-030",
+    "item_name": "2 Mm Thickness-350 Mm WIDTH",
+    "category": "RAW MATERIAL",
+    "sub_category": "ROOFING",
+    "current_stock": 0,
+    "unit": "METER",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-RW-ROOF-031",
+    "item_name": "2 Mm Thickness-245 Mm WIDTH",
+    "category": "RAW MATERIAL",
+    "sub_category": "ROOFING",
+    "current_stock": 0,
+    "unit": "METER",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-STR-FAST-001",
+    "item_name": "M16*60 HEX BOLTS",
+    "category": "FASTENER",
+    "sub_category": "BOLT & NUTS",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-STR-FAST-002",
+    "item_name": "M16*75 HEX BOLTS",
+    "category": "FASTENER",
+    "sub_category": "BOLT & NUTS",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-STR-FAST-003",
+    "item_name": "M20*65 HEX BOLTS",
+    "category": "FASTENER",
+    "sub_category": "BOLT & NUTS",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-STR-FAST-004",
+    "item_name": "M20*70 HEX BOLTS",
+    "category": "FASTENER",
+    "sub_category": "BOLT & NUTS",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-STR-FAST-005",
+    "item_name": "M20*75 HEX BOLTS",
+    "category": "FASTENER",
+    "sub_category": "BOLT & NUTS",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-STR-FAST-006",
+    "item_name": "M24*75 HEX BOLTS",
+    "category": "FASTENER",
+    "sub_category": "BOLT & NUTS",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-STR-FAST-007",
+    "item_name": "M25 HEX NUTS",
+    "category": "FASTENER",
+    "sub_category": "BOLT & NUTS",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-STR-FAST-008",
+    "item_name": "M20 HEX NUTS",
+    "category": "FASTENER",
+    "sub_category": "BOLT & NUTS",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-STR-FAST-009",
+    "item_name": "M24 HEX NUTS",
+    "category": "FASTENER",
+    "sub_category": "BOLT & NUTS",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-STR-FAST-010",
+    "item_name": "M16 NUTS",
+    "category": "FASTENER",
+    "sub_category": "BOLT & NUTS",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-STR-FAST-011",
+    "item_name": "1/2\" GI Bolt-1.5\" LENGTH",
+    "category": "FASTENER",
+    "sub_category": "BOLT & NUTS",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-STR-FAST-012",
+    "item_name": "1/2\" GI Bolt-2\" LENGTH",
+    "category": "FASTENER",
+    "sub_category": "BOLT & NUTS",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-STR-FAST-013",
+    "item_name": "1/2\" GI Bolt-4\" LENGTH",
+    "category": "FASTENER",
+    "sub_category": "BOLT & NUTS",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-STR-FAST-014",
+    "item_name": "1/2\" GI NUT",
+    "category": "FASTENER",
+    "sub_category": "BOLT & NUTS",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-STR-FAST-015",
+    "item_name": "1/2\" GI WASHER",
+    "category": "FASTENER",
+    "sub_category": "BOLT & NUTS",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-STR-FAST-016",
+    "item_name": "3/4\" GI WASHER",
+    "category": "FASTENER",
+    "sub_category": "BOLT & NUTS",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-STR-FAST-017",
+    "item_name": "5/8\" GI WASHER",
+    "category": "FASTENER",
+    "sub_category": "BOLT & NUTS",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-STR-FAST-018",
+    "item_name": "1\" GI WASHER",
+    "category": "FASTENER",
+    "sub_category": "BOLT & NUTS",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-STR-FAST-019",
+    "item_name": "1\" HILL SIDE GI WASHER",
+    "category": "FASTENER",
+    "sub_category": "BOLT & NUTS",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-STR-FAST-020",
+    "item_name": "M20*60 HEX BOLTS",
+    "category": "FASTENER",
+    "sub_category": "BOLT & NUTS",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-FAST-SCRW-001",
+    "item_name": "25MM SDS NON COLOR",
+    "category": "FASTENER",
+    "sub_category": "SCREWS",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-FAST-SCRW-002",
+    "item_name": "25MM SDS-GR GREY",
+    "category": "FASTENER",
+    "sub_category": "SCREWS",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-FAST-SCRW-003",
+    "item_name": "25MM SDS -EL GREY",
+    "category": "FASTENER",
+    "sub_category": "SCREWS",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-FAST-SCRW-004",
+    "item_name": "25MM SDS -NEON RED",
+    "category": "FASTENER",
+    "sub_category": "SCREWS",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-FAST-SCRW-005",
+    "item_name": "20MM SDS NON COLOR",
+    "category": "FASTENER",
+    "sub_category": "SCREWS",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-FAST-SCRW-006",
+    "item_name": "20MM SDS-GR GREY",
+    "category": "FASTENER",
+    "sub_category": "SCREWS",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-FAST-SCRW-007",
+    "item_name": "20MM SDS -EL GREY",
+    "category": "FASTENER",
+    "sub_category": "SCREWS",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-FAST-SCRW-008",
+    "item_name": "20MM SDS -NEON RED",
+    "category": "FASTENER",
+    "sub_category": "SCREWS",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-FAST-SCRW-009",
+    "item_name": "55MM SDS NON COLOR",
+    "category": "FASTENER",
+    "sub_category": "SCREWS",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-FAST-SCRW-010",
+    "item_name": "32MM Decking-non COLOR",
+    "category": "FASTENER",
+    "sub_category": "SCREWS",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-FAST-SCRW-011",
+    "item_name": "60MM SDS NON COLOR",
+    "category": "FASTENER",
+    "sub_category": "SCREWS",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-FAST-SCRW-012",
+    "item_name": "120MM SDS NON COLOR",
+    "category": "FASTENER",
+    "sub_category": "SCREWS",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-FAST-SCRW-013",
+    "item_name": "130MM SDS Noncolor",
+    "category": "FASTENER",
+    "sub_category": "SCREWS",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-FAST-SCRW-014",
+    "item_name": "50MM NEEDLE POINT NON COLOR",
+    "category": "FASTENER",
+    "sub_category": "SCREWS",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 0
+  },
+  {
+    "item_code": "SSF-FAST-SCRW-015",
+    "item_name": "Sealant",
+    "category": "FASTENER",
+    "sub_category": "SCREWS",
+    "current_stock": 0,
+    "unit": "PIECE",
+    "min_stock": 0
+  }
+]

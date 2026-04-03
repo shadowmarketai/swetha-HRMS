@@ -197,6 +197,68 @@ async function seedNewEmployees(conn) {
   console.log('Employee seed: ' + seeded + ' processed, old SSC codes deactivated');
 }
 
+// One-time: import stock from JSON seed data and clear mock/test data
+async function seedStockAndClearMock(conn) {
+  try {
+    // Check if peb_stock_items table exists
+    const [tables] = await conn.query("SHOW TABLES LIKE 'peb_stock_items'");
+    if (tables.length === 0) return; // table not created yet
+
+    // Check current count — skip if already has 291 items (Excel import done)
+    const [[{ cnt }]] = await conn.query('SELECT COUNT(*) as cnt FROM peb_stock_items');
+    if (cnt >= 291) return; // already imported
+
+    console.log('[STOCK-SEED] Importing stock data from seed file...');
+    const seedPath = path.join(__dirname, '..', 'stock-seed-data.json');
+    if (!fs.existsSync(seedPath)) {
+      console.log('[STOCK-SEED] seed file not found at', seedPath, '— skipping');
+      return;
+    }
+    const items = JSON.parse(fs.readFileSync(seedPath, 'utf8'));
+
+    // Clear existing stock tables
+    const stockTables = [
+      'peb_scrap_items', 'peb_scrap_batches', 'peb_return_items',
+      'peb_material_returns', 'peb_material_request_items', 'peb_material_requests',
+      'peb_grn_items', 'peb_grn', 'peb_stock_transactions', 'peb_stock_items'
+    ];
+    await conn.query('SET FOREIGN_KEY_CHECKS = 0');
+    for (const t of stockTables) {
+      await conn.query('DELETE FROM ' + t).catch(() => {});
+    }
+    await conn.query('SET FOREIGN_KEY_CHECKS = 1');
+
+    // Insert all stock items
+    let inserted = 0;
+    for (const item of items) {
+      try {
+        await conn.query(
+          'INSERT INTO peb_stock_items (item_code, item_name, category, sub_category, unit, current_stock, min_stock_level, location) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+          [item.item_code, item.item_name, item.category, item.sub_category, item.unit, item.current_stock, item.min_stock, 'Factory Store']
+        );
+        inserted++;
+      } catch (e) {
+        if (e.code !== 'ER_DUP_ENTRY') console.error('[STOCK-SEED] Error:', item.item_code, e.message);
+      }
+    }
+    console.log('[STOCK-SEED] Inserted', inserted, 'stock items');
+
+    // Clear mock/test data
+    const mockTables = ['attendance_logs', 'advance_requests', 'expense_reimbursements', 'leave_applications'];
+    await conn.query('SET FOREIGN_KEY_CHECKS = 0');
+    for (const t of mockTables) {
+      await conn.query('DELETE FROM ' + t).catch(() => {});
+    }
+    await conn.query('SET FOREIGN_KEY_CHECKS = 1');
+
+    // Reset leave balances
+    await conn.query('UPDATE leave_balances SET casual = 12, sick = 20, earned = 6, comp = 3').catch(() => {});
+    console.log('[STOCK-SEED] Mock data cleared, leave balances reset');
+  } catch (e) {
+    console.error('[STOCK-SEED] Error:', e.message);
+  }
+}
+
 // Auto-initialize schema if tables are missing
 async function initSchema() {
   let conn;
@@ -249,6 +311,8 @@ async function initSchema() {
     await runMigrations(conn);
     // Seed new SS*** employees if missing (migration from SSC to SS codes)
     await seedNewEmployees(conn);
+    // Import stock data from JSON + clear mock data (one-time)
+    await seedStockAndClearMock(conn);
   } catch (err) {
     console.error('MySQL connection/init failed:', err.message);
     console.log('Server will continue without database — localStorage fallback active');
