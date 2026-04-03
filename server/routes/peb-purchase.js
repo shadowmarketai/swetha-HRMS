@@ -270,6 +270,16 @@ router.put('/vendors/:id', verifyToken, requireRole('MD', 'HR'), async (req, res
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
+router.delete('/vendors/:id', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
+  try {
+    // Check if vendor has any linked POs or GRNs
+    const [[{ poCount }]] = await db.query('SELECT COUNT(*) as poCount FROM peb_purchase_orders WHERE vendor_id = ?', [req.params.id]);
+    if (poCount > 0) return res.status(400).json({ error: 'Cannot delete: vendor has ' + poCount + ' purchase orders' });
+    await db.query('DELETE FROM peb_vendors WHERE id = ?', [req.params.id]);
+    res.json({ message: 'Vendor deleted' });
+  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+});
+
 // ========================================
 // PURCHASE INDENTS — Full L1/L2/L3 workflow
 // ========================================

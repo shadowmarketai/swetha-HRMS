@@ -1008,7 +1008,7 @@
 try{var s=localStorage.getItem('hrms_session');if(s){var p=JSON.parse(s);if(p&&p.token&&p.token.includes('.')&&Date.now()<p.expiry){document.getElementById('loginScreen').classList.add('hidden');}}}catch(e){}
 </script>
 <script src="/socket.io/socket.io.js"></script>
-<script src="peb-module.js?v=3"></script>
+<script src="peb-module.js?v=4"></script>
 <script src="app.js?v=151"></script>
 </body>
 </html>

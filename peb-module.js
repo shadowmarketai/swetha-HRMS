@@ -34,6 +34,10 @@ async function _pebPut(path, data) {
   var cleanPath = path.replace(/^\/api/, '');
   return apiCall('PUT', cleanPath, data);
 }
+async function _pebDel(path) {
+  var cleanPath = path.replace(/^\/api/, '');
+  return apiCall('DELETE', cleanPath);
+}
 
 // ========== UI HELPERS ==========
 function _p(el) { return document.getElementById('pebContent'); }
@@ -122,9 +126,9 @@ async function _pebDashboard(el) {
     // Low Stock
     if ((d.lowStockItems||[]).length > 0) {
       html += '<div class="card" style="padding:14px;margin-bottom:12px"><h3 style="font-size:.82rem;font-weight:700;margin-bottom:10px">Low Stock Alerts</h3>';
-      html += _pebTbl(['Item','Current','Min Level','Unit'], d.lowStockItems.map(function(i) {
-        return [escapeHTML(i.item_name), '<span style="color:#ef4444;font-weight:600">'+i.current_stock+'</span>', ''+i.min_stock_level, escapeHTML(i.unit)];
-      }), '400px') + '</div>';
+      html += _pebTbl(['Item Code','Item','Current','Min Level','Unit'], d.lowStockItems.map(function(i) {
+        return ['<span style="font-weight:600;font-size:.7rem;color:#6366f1">'+escapeHTML(i.item_code||'')+'</span>', escapeHTML(i.item_name), '<span style="color:#ef4444;font-weight:600">'+i.current_stock+'</span>', ''+i.min_stock_level, escapeHTML(i.unit)];
+      }), '500px') + '</div>';
     }
 
     // Recent Transactions
@@ -585,12 +589,16 @@ async function _pebVendors(el) {
   try {
     var vendors = await _pebApi('/api/peb/purchase/vendors');
     var html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><span style="font-size:.75rem;color:var(--gray-500)">'+vendors.length+' vendors</span>' +
-      '<button class="btn btn-golden" style="font-size:.7rem;padding:5px 12px" onclick="_pebShowAddVendor()">+ Add Vendor</button></div>';
+      (_pebCanEdit() ? '<button class="btn btn-golden" style="font-size:.7rem;padding:5px 12px" onclick="_pebShowAddVendor()">+ Add Vendor</button>' : '') + '</div>';
     html += _pebTbl(['Code','Company','Contact','Phone','GST','Rating','Status','Actions'], vendors.map(function(v) {
+      var actions = '<div style="display:flex;gap:4px;flex-wrap:wrap">';
+      actions += '<button class="btn btn-white-outline" style="font-size:.6rem;padding:2px 8px" onclick="_pebToggleBlacklist('+v.id+','+v.is_blacklisted+')">'+(v.is_blacklisted?'Unblock':'Blacklist')+'</button>';
+      if (_pebCanEdit()) actions += '<button class="btn btn-white-outline" style="font-size:.6rem;padding:2px 8px;color:#ef4444;border-color:#ef4444" onclick="_pebDeleteVendor('+v.id+',\''+escapeHTML(v.company_name).replace(/'/g,"\\'")+'\')">Delete</button>';
+      actions += '</div>';
       return [escapeHTML(v.vendor_code), escapeHTML(v.company_name), escapeHTML(v.contact_person||'-'), escapeHTML(v.phone||'-'),
         escapeHTML(v.gst_number||'-'), v.rating ? v.rating+'/5' : '-',
         v.is_blacklisted ? _pebBadge('Blacklisted','red') : _pebBadge('Active','green'),
-        '<button class="btn btn-white-outline" style="font-size:.6rem;padding:2px 8px" onclick="_pebToggleBlacklist('+v.id+','+v.is_blacklisted+')">'+(v.is_blacklisted?'Unblock':'Blacklist')+'</button>'];
+        actions];
     }));
     el.innerHTML = html;
   } catch(e) { el.innerHTML = '<div class="card" style="padding:20px;text-align:center;color:var(--danger)">'+escapeHTML(e.message)+'</div>'; }
@@ -627,6 +635,11 @@ async function _pebToggleBlacklist(id, current) {
   var reason = !current ? prompt('Blacklist reason:') : '';
   if (!current && reason===null) return;
   try { await _pebPut('/api/peb/purchase/vendors/'+id, {is_blacklisted:!current, blacklist_reason:reason||null}); showToast(current?'Vendor unblocked':'Vendor blacklisted','success'); _pebVendors(_p()); } catch(e){showToast(e.message,'error');}
+}
+
+async function _pebDeleteVendor(id, name) {
+  if (!confirm('Delete vendor "' + name + '"? This cannot be undone.')) return;
+  try { await _pebDel('/api/peb/purchase/vendors/'+id); showToast('Vendor deleted','success'); _pebVendors(_p()); } catch(e){showToast(e.message,'error');}
 }
 
 // ========== PURCHASE INDENTS (full L1/L2/L3 workflow) ==========
