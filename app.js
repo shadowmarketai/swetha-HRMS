@@ -5234,8 +5234,9 @@ async function changePassword() {
   var newPass = document.getElementById('chgNewPass').value;
   var confirmPass = document.getElementById('chgConfirmPass').value;
 
-  if (!oldPass || !newPass || !confirmPass) { showToast('Please fill all fields'); return; }
-  if (newPass.length < 4) { showToast('Password must be at least 4 characters'); return; }
+  if (!oldPass) { showToast('Please enter your current password (or temp password from Forgot Password)'); return; }
+  if (!newPass || !confirmPass) { showToast('Please enter and confirm your new password'); return; }
+  if (newPass.length < 6) { showToast('Password must be at least 6 characters'); return; }
   if (newPass !== confirmPass) { showToast('Passwords do not match'); return; }
 
   try {

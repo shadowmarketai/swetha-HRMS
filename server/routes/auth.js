@@ -210,8 +210,8 @@ router.post('/change-password', verifyToken, async (req, res) => {
     if (!oldPassword || !newPassword) {
       return res.status(400).json({ error: 'Old and new passwords required' });
     }
-    if (newPassword.length < 8) {
-      return res.status(400).json({ error: 'New password must be at least 8 characters' });
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: 'New password must be at least 6 characters' });
     }
     const [rows] = await pool.query('SELECT password_hash FROM users WHERE emp_code = ?', [req.user.empCode]);
     if (rows.length === 0) return res.status(404).json({ error: 'User not found' });
