@@ -1120,7 +1120,8 @@ async function processForgotPassword() {
     });
     var data = await res.json();
     if (!res.ok) { result.textContent = data.error || 'Password reset failed'; return; }
-    result.innerHTML = 'Password has been reset for <b>' + escapeHTML(code) + '</b>.<br><br>Your new password is <b>emp123</b>. Please change it after login.';
+    var newPwd = data.tempPassword || 'emp123';
+    result.innerHTML = 'Password has been reset for <b>' + escapeHTML(code) + '</b>.<br><br>Your new password is <b>' + escapeHTML(newPwd) + '</b><br>Please change it after login.';
   } catch (e) {
     result.textContent = 'Cannot reach server. Please try again later.';
   }
