@@ -8823,7 +8823,7 @@ function restoreNotifPrefToggles() {
 // =====================================================
 function getLeaveBalance(empCode) {
   if (!leaveBalances[empCode]) {
-    leaveBalances[empCode] = { casual: 12, comp: 3 };
+    leaveBalances[empCode] = { casual: 12, earned: 20, sick: 6, comp: 3, permission: 2 };
   }
   return leaveBalances[empCode];
 }
@@ -8895,6 +8895,30 @@ function selectLeaveType(type, el) {
   selectedLeaveType = type;
   document.querySelectorAll('#leaveTypePills .lt-pill').forEach(p => p.classList.remove('active'));
   el.classList.add('active');
+  // Update balance text for selected type
+  var balText = document.getElementById('leaveBalText');
+  if (balText && currentUser) {
+    var bal = getLeaveBalance(currentUser.code);
+    if (type === 'permission') {
+      var permLeft = bal.permission !== undefined ? bal.permission : 2;
+      balText.innerHTML = 'Permission (2hr): <strong>' + permLeft + '</strong> of 2 remaining this month' +
+        '<br><span style="font-size:.7rem;color:' + (permLeft > 0 ? 'var(--success)' : 'var(--danger)') + '">' +
+        (permLeft > 0 ? permLeft + ' free permission(s) left — no salary deduction' : 'All permissions used — additional will be LOP') + '</span>';
+      // Auto-set same-day dates for permission
+      var today = new Date().toISOString().split('T')[0];
+      var fromEl = document.getElementById('leaveFromDate');
+      var toEl = document.getElementById('leaveToDate');
+      if (fromEl) fromEl.value = today;
+      if (toEl) toEl.value = today;
+    } else {
+      var rem = bal.casual || 0;
+      var usedThisMonth = getCasualLeavesUsedThisMonth(currentUser.code);
+      var monthlyPaid = Math.max(0, 1 - usedThisMonth);
+      balText.innerHTML = 'Casual Leave: <strong>' + rem + '</strong> of 12 remaining this year' +
+        '<br><span style="font-size:.7rem;color:' + (monthlyPaid > 0 ? 'var(--success)' : 'var(--danger)') + '">' +
+        (monthlyPaid > 0 ? '1 paid leave available this month' : 'Paid leave used this month — additional leave will be LOP (salary deducted)') + '</span>';
+    }
+  }
 }
 
 // Check how many casual leaves used this month
@@ -8933,7 +8957,15 @@ async function submitLeave() {
   var leaveType = selectedLeaveType;
   var isLOP = false;
 
-  if (leaveType === 'casual') {
+  if (leaveType === 'permission') {
+    // Permission: 2 per month, same day only
+    if (from !== to) { showToast('Permission is for 2 hours on a single day only'); return; }
+    var permLeft = bal.permission !== undefined ? bal.permission : 2;
+    if (permLeft <= 0) {
+      isLOP = true;
+      if (!confirm('You have used all 2 permissions this month.\n\nThis permission will be Loss of Pay (LOP) — 2 hours salary will be deducted.\n\nDo you want to proceed?')) return;
+    }
+  } else if (leaveType === 'casual') {
     if (bal.casual <= 0) {
       // No casual balance left — entire request is LOP
       isLOP = true;
@@ -9045,7 +9077,11 @@ function renderLeaveScreen() {
       balGrid.innerHTML = '';
     } else {
       const leaveTypes = [
-        {key:'casual',label:'Casual Leave',total:12,color:'#E85D04',cls:'casual'}
+        {key:'casual',label:'Casual',total:12,color:'#E85D04',cls:'casual'},
+        {key:'earned',label:'Earned',total:20,color:'#16a34a',cls:'earned'},
+        {key:'sick',label:'Sick',total:6,color:'#dc2626',cls:'sick'},
+        {key:'comp',label:'Comp Off',total:3,color:'#0891b2',cls:'comp'},
+        {key:'permission',label:'Permission',total:2,color:'#d97706',cls:'permission'}
       ];
       balGrid.innerHTML = '<div class="section-title" style="margin-top:4px">Leave Balance</div><div class="leave-balance-grid fade-in">' +
         leaveTypes.map(lt => {
@@ -10114,12 +10150,28 @@ function renderHomeQuickStats() {
     return l.empCode === currentUser.code && l.type === 'checkin' && l.timestamp && l.timestamp.startsWith(monthStr);
   }).length;
 
+  // Full leave balance
+  var earnedLeft = bal.earned !== undefined ? bal.earned : 20;
+  var sickLeft = bal.sick !== undefined ? bal.sick : 6;
+  var compLeft = bal.comp !== undefined ? bal.comp : 3;
+  var permLeft = bal.permission !== undefined ? bal.permission : 2;
+
   var html = '<div class="section-title" style="margin-top:4px">Quick Stats</div>';
   html += '<div class="home-quick-stats">';
-  html += '<div class="home-stat-card stat-leave"><div class="home-stat-value" style="color:var(--blue)">' + casualLeft + '</div><div class="home-stat-label">Leave Balance</div></div>';
   html += '<div class="home-stat-card stat-attendance"><div class="home-stat-value" style="color:var(--success)">' + myAttendance + '</div><div class="home-stat-label">Days Present</div></div>';
   html += '<div class="home-stat-card stat-advance"><div class="home-stat-value" style="color:var(--teal)">' + pendingAdv + '</div><div class="home-stat-label">Pending Advances</div></div>';
   html += '<div class="home-stat-card stat-expense"><div class="home-stat-value" style="color:var(--purple)">' + pendingLeaves + '</div><div class="home-stat-label">Pending Leaves</div></div>';
+  html += '</div>';
+
+  // Leave balance breakdown
+  html += '<div class="section-title" style="margin-top:10px">Leave Balance</div>';
+  html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">';
+  html += '<div class="home-stat-card" style="padding:8px;text-align:center"><div style="font-size:1.1rem;font-weight:700;color:var(--blue)">' + casualLeft + '</div><div style="font-size:.62rem;color:var(--gray-500)">Casual</div></div>';
+  html += '<div class="home-stat-card" style="padding:8px;text-align:center"><div style="font-size:1.1rem;font-weight:700;color:var(--success)">' + earnedLeft + '</div><div style="font-size:.62rem;color:var(--gray-500)">Earned</div></div>';
+  html += '<div class="home-stat-card" style="padding:8px;text-align:center"><div style="font-size:1.1rem;font-weight:700;color:var(--danger)">' + sickLeft + '</div><div style="font-size:.62rem;color:var(--gray-500)">Sick</div></div>';
+  html += '<div class="home-stat-card" style="padding:8px;text-align:center"><div style="font-size:1.1rem;font-weight:700;color:var(--teal)">' + compLeft + '</div><div style="font-size:.62rem;color:var(--gray-500)">Comp Off</div></div>';
+  html += '<div class="home-stat-card" style="padding:8px;text-align:center"><div style="font-size:1.1rem;font-weight:700;color:var(--warning-dark,#92400e)">' + permLeft + '</div><div style="font-size:.62rem;color:var(--gray-500)">Permission</div></div>';
+  html += '<div class="home-stat-card" style="padding:8px;text-align:center"><div style="font-size:1.1rem;font-weight:700;color:var(--gray-600)">' + (casualLeft + earnedLeft + sickLeft + compLeft) + '</div><div style="font-size:.62rem;color:var(--gray-500)">Total Left</div></div>';
   html += '</div>';
   c.innerHTML = html;
 }

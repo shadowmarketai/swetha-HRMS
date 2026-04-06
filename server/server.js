@@ -444,6 +444,12 @@ app.get('*', (req, res) => {
     await pool.query("ALTER TABLE tax_declarations ADD COLUMN prev_tds DECIMAL(14,2) DEFAULT 0").catch(() => {});
     await pool.query("ALTER TABLE tax_declarations ADD COLUMN form12b_submitted_at DATE").catch(() => {});
 
+    // Phase F2b: Permission leave type
+    await pool.query("ALTER TABLE leave_balances ADD COLUMN permission INT DEFAULT 2").catch(() => {});
+    await pool.query("ALTER TABLE leave_applications MODIFY COLUMN leave_type ENUM('casual','earned','sick','comp','permission') NOT NULL").catch(() => {});
+    // Reset permission balance monthly (set to 2 on 1st of each month)
+    await pool.query("UPDATE leave_balances SET permission = 2 WHERE permission IS NULL OR (DAY(CURDATE()) = 1 AND permission < 2)").catch(() => {});
+
     // Phase F3: Leave is_lop column
     await pool.query("ALTER TABLE leave_applications ADD COLUMN is_lop BOOLEAN DEFAULT FALSE").catch(() => {});
 
@@ -496,6 +502,22 @@ app.get('*', (req, res) => {
     console.log('DB migrations applied');
   } catch (e) { console.error('Migration error (non-fatal):', e.message); }
 })();
+
+// =====================================================
+// MONTHLY PERMISSION RESET — Reset 2-hour permission balance on 1st of month
+// =====================================================
+async function resetMonthlyPermissions() {
+  try {
+    const pool = require('./config/db');
+    const today = new Date();
+    if (today.getDate() === 1) {
+      const [result] = await pool.query('UPDATE leave_balances SET permission = 2 WHERE permission < 2');
+      if (result.affectedRows > 0) console.log('[PERM-RESET] Reset permission balance for ' + result.affectedRows + ' employees');
+    }
+  } catch (e) { console.error('[PERM-RESET] Error:', e.message); }
+}
+setTimeout(resetMonthlyPermissions, 15000);
+setInterval(resetMonthlyPermissions, 24 * 60 * 60 * 1000); // Check daily
 
 // =====================================================
 // SELFIE CLEANUP — Delete selfie photos older than 7 days
