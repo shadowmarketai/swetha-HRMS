@@ -294,11 +294,22 @@ const NAV_CONFIG = {
     ]},
     { id:'emp-progress', label:'Project Progress', icon:'progress', action:{type:'tab',target:'progress'} },
     { id:'emp-salary', label:'Salary Statement', icon:'salary', action:{type:'tab',target:'salary'} },
-    { id:'emp-store', label:'Store', icon:'store', deptOnly:['Execution','Production'], children:[
+    { id:'emp-store', label:'Store', icon:'store', deptOnly:['Site Engineer'], children:[
       { id:'emp-inv-stock', label:'Stock Items', action:{type:'overlay',target:'peb'} },
       { id:'emp-inv-requests', label:'Material Request', action:{type:'overlay',target:'peb'} },
       { id:'emp-inv-returns', label:'Returns & Scrap', action:{type:'overlay',target:'peb'} },
       { id:'emp-proc-transport', label:'Transport', action:{type:'overlay',target:'peb'} }
+    ]},
+    { id:'emp-admin-peb', label:'PEB Management', icon:'store', deptOnly:['Admin'], children:[
+      { id:'emp-adm-peb-dash', label:'PEB Dashboard', action:{type:'overlay',target:'peb'} },
+      { id:'emp-adm-inv-stock', label:'Stock Items', action:{type:'overlay',target:'peb'} },
+      { id:'emp-adm-inv-grn', label:'GRN', action:{type:'overlay',target:'peb'} },
+      { id:'emp-adm-inv-requests', label:'Material Requests', action:{type:'overlay',target:'peb'} },
+      { id:'emp-adm-inv-returns', label:'Returns & Scrap', action:{type:'overlay',target:'peb'} },
+      { id:'emp-adm-proc-vendors', label:'Vendors', action:{type:'overlay',target:'peb'} },
+      { id:'emp-adm-proc-indents', label:'Purchase Indents', action:{type:'overlay',target:'peb'} },
+      { id:'emp-adm-proc-orders', label:'Purchase Orders', action:{type:'overlay',target:'peb'} },
+      { id:'emp-adm-proc-transport', label:'Transport', action:{type:'overlay',target:'peb'} }
     ]},
     // Footer
     { id:'emp-profile', label:'Profile', icon:'profile', action:{type:'overlay',target:'profile'}, isFooter:true },
@@ -325,11 +336,22 @@ const NAV_CONFIG = {
       { id:'mgr-sal-list', label:'Employee List', action:{type:'tab',target:'salary'} }
     ]},
     { id:'mgr-progress', label:'Progress', icon:'progress', action:{type:'tab',target:'progress'} },
-    { id:'mgr-store', label:'Store', icon:'store', deptOnly:['Execution','Production'], children:[
+    { id:'mgr-store', label:'Store', icon:'store', deptOnly:['Site Engineer'], children:[
       { id:'mgr-inv-stock', label:'Stock Items', action:{type:'overlay',target:'peb'} },
       { id:'mgr-inv-requests', label:'Material Request', action:{type:'overlay',target:'peb'} },
       { id:'mgr-inv-returns', label:'Returns & Scrap', action:{type:'overlay',target:'peb'} },
       { id:'mgr-proc-transport', label:'Transport', action:{type:'overlay',target:'peb'} }
+    ]},
+    { id:'mgr-admin-peb', label:'PEB Management', icon:'store', deptOnly:['Admin'], children:[
+      { id:'mgr-adm-peb-dash', label:'PEB Dashboard', action:{type:'overlay',target:'peb'} },
+      { id:'mgr-adm-inv-stock', label:'Stock Items', action:{type:'overlay',target:'peb'} },
+      { id:'mgr-adm-inv-grn', label:'GRN', action:{type:'overlay',target:'peb'} },
+      { id:'mgr-adm-inv-requests', label:'Material Requests', action:{type:'overlay',target:'peb'} },
+      { id:'mgr-adm-inv-returns', label:'Returns & Scrap', action:{type:'overlay',target:'peb'} },
+      { id:'mgr-adm-proc-vendors', label:'Vendors', action:{type:'overlay',target:'peb'} },
+      { id:'mgr-adm-proc-indents', label:'Purchase Indents', action:{type:'overlay',target:'peb'} },
+      { id:'mgr-adm-proc-orders', label:'Purchase Orders', action:{type:'overlay',target:'peb'} },
+      { id:'mgr-adm-proc-transport', label:'Transport', action:{type:'overlay',target:'peb'} }
     ]},
     // Footer
     { id:'mgr-profile', label:'Profile', icon:'profile', action:{type:'overlay',target:'profile'}, isFooter:true },

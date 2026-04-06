@@ -2,7 +2,8 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
 const { verifyToken, requireRole, requireRoleOrDept } = require('../middleware/auth');
-const SITE_DEPTS = ['Execution', 'Production']; // Departments with PEB store access
+const SITE_DEPTS = ['Site Engineer']; // Departments with PEB store access (stock, material request, returns, scrap, transport)
+const ADMIN_DEPTS = ['Admin', 'Site Engineer']; // Departments with full PEB access (dashboard, inventory, procurement)
 
 // ========================================
 // HELPERS (ported from PEB utils)
@@ -231,7 +232,7 @@ async function generateSimpleCode(prefix, table, column) {
 // ========================================
 // DASHBOARD
 // ========================================
-router.get('/dashboard', verifyToken, requireRoleOrDept(['MD', 'HR'], SITE_DEPTS), async (req, res) => {
+router.get('/dashboard', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
   try {
     const [[{ totalItems }]] = await db.query('SELECT COUNT(*) as totalItems FROM peb_stock_items');
     const [[{ lowStock }]] = await db.query('SELECT COUNT(*) as lowStock FROM peb_stock_items WHERE current_stock <= min_stock_level AND min_stock_level > 0');
@@ -282,7 +283,7 @@ router.get('/items/:id', verifyToken, requireRole('MD', 'HR', 'Employee'), async
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
-router.post('/items', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
+router.post('/items', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
   try {
     const { item_name, category, sub_category, unit, hsn_code, min_stock_level, max_stock_level, unit_price, location } = req.body;
     if (!item_name || !category || !unit) return res.status(400).json({ error: 'item_name, category, unit required' });
@@ -295,7 +296,7 @@ router.post('/items', verifyToken, requireRole('MD', 'HR'), async (req, res) => 
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
-router.put('/items/:id', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
+router.put('/items/:id', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
   try {
     const [old] = await db.query('SELECT * FROM peb_stock_items WHERE id = ?', [req.params.id]);
     if (old.length === 0) return res.status(404).json({ error: 'Item not found' });
@@ -339,7 +340,7 @@ router.post('/transactions', verifyToken, requireRoleOrDept(['MD', 'HR'], SITE_D
 // ========================================
 // GRN (Goods Receipt Note) — TRANSACTIONAL
 // ========================================
-router.get('/grn', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
+router.get('/grn', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
   try {
     const [grns] = await db.query(
       `SELECT g.*, v.company_name as vendor_name FROM peb_grn g
@@ -349,7 +350,7 @@ router.get('/grn', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
-router.get('/grn/:id', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
+router.get('/grn/:id', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
   try {
     const [grn] = await db.query(
       `SELECT g.*, v.company_name as vendor_name FROM peb_grn g LEFT JOIN peb_vendors v ON g.vendor_id = v.id WHERE g.id = ?`, [req.params.id]
@@ -362,7 +363,7 @@ router.get('/grn/:id', verifyToken, requireRole('MD', 'HR'), async (req, res) =>
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
-router.post('/grn', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
+router.post('/grn', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
@@ -451,7 +452,7 @@ router.post('/material-requests', verifyToken, requireRole('MD', 'HR', 'Employee
 });
 
 // Approve material request
-router.post('/material-requests/:id/approve', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
+router.post('/material-requests/:id/approve', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
   try {
     const { action, remarks, items } = req.body;
     if (!['APPROVED','REJECTED'].includes(action)) return res.status(400).json({ error: 'action must be APPROVED or REJECTED' });
@@ -470,7 +471,7 @@ router.post('/material-requests/:id/approve', verifyToken, requireRole('MD', 'HR
 });
 
 // Dispatch — deducts stock
-router.post('/material-requests/:id/dispatch', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
+router.post('/material-requests/:id/dispatch', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
@@ -560,7 +561,7 @@ router.post('/returns', verifyToken, requireRoleOrDept(['MD', 'HR'], SITE_DEPTS)
 });
 
 // Verify return — restocks usable items
-router.post('/returns/:id/verify', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
+router.post('/returns/:id/verify', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
@@ -619,7 +620,7 @@ router.post('/scrap', verifyToken, requireRoleOrDept(['MD', 'HR'], SITE_DEPTS), 
 });
 
 // Sell scrap — MD only
-router.post('/scrap/:id/sell', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
+router.post('/scrap/:id/sell', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
   try {
     const { sale_amount, receipt_number } = req.body;
     if (!sale_amount) return res.status(400).json({ error: 'sale_amount required' });
