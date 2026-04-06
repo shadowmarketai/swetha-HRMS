@@ -49,8 +49,12 @@ router.post('/', verifyToken, requireRole('MD', 'HR'), auditLog('create', 'task'
 // PATCH /api/tasks/:id/toggle — toggle task done/undone
 router.patch('/:id/toggle', verifyToken, async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT done FROM tasks WHERE id = ?', [req.params.id]);
+    const [rows] = await pool.query('SELECT done, assigned_to, created_by FROM tasks WHERE id = ?', [req.params.id]);
     if (rows.length === 0) return res.status(404).json({ error: 'Task not found' });
+    // Only task assignee, creator, or MD/HR can toggle
+    if (!['MD', 'HR'].includes(req.user.role) && rows[0].assigned_to !== req.user.empCode && rows[0].assigned_to !== 'ALL' && rows[0].created_by !== req.user.empCode) {
+      return res.status(403).json({ error: 'You can only toggle your own tasks' });
+    }
     const newDone = rows[0].done ? 0 : 1;
     const newStatus = newDone ? 'done' : 'pending';
     await pool.query('UPDATE tasks SET done = ?, status = ? WHERE id = ?', [newDone, newStatus, req.params.id]);

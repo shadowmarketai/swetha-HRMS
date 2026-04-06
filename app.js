@@ -3525,8 +3525,10 @@ async function rejectAdvance(id) {
 
 function formatAdvDate(dateStr) {
   if (!dateStr) return '';
-  const d = new Date(dateStr);
-  const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  // Force local time parsing for YYYY-MM-DD strings to avoid UTC timezone shift
+  var s = String(dateStr).substring(0, 10);
+  var d = new Date(s + 'T00:00:00');
+  var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   return d.getDate() + ' ' + months[d.getMonth()] + ' ' + d.getFullYear();
 }
 
@@ -11661,7 +11663,7 @@ function renderProjectTasks(proj, isMDorHR) {
       var emp = EMPLOYEES.find(function(e){return e.code === task.assignedTo;});
 
       html += '<div class="project-task-item">';
-      html += '<div class="task-checkbox ' + checkClass + '" onclick="event.stopPropagation();toggleTaskStatus(' + proj.id + ',' + task.id + ')">' + checkIcon + '</div>';
+      html += '<div class="task-checkbox ' + checkClass + '" onclick="event.stopPropagation();toggleProjectTaskStatus(' + proj.id + ',' + task.id + ')">' + checkIcon + '</div>';
       html += '<div class="task-info">';
       html += '<h4 class="' + (isDone ? 'task-done' : '') + '">' + escapeHTML(task.title) + '</h4>';
       html += '<p>';
@@ -12670,7 +12672,7 @@ async function saveProjectTask(projectId) {
   } catch (e) { showToast('Error adding task'); }
 }
 
-async function toggleTaskStatus(projectId, taskId) {
+async function toggleProjectTaskStatus(projectId, taskId) {
   var proj = projects.find(function(p){return p.id===projectId;});
   if (!proj) return;
   var task = proj.tasks.find(function(t){return t.id===taskId;});

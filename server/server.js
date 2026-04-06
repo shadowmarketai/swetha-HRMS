@@ -444,6 +444,9 @@ app.get('*', (req, res) => {
     await pool.query("ALTER TABLE tax_declarations ADD COLUMN prev_tds DECIMAL(14,2) DEFAULT 0").catch(() => {});
     await pool.query("ALTER TABLE tax_declarations ADD COLUMN form12b_submitted_at DATE").catch(() => {});
 
+    // Phase F3: Leave is_lop column
+    await pool.query("ALTER TABLE leave_applications ADD COLUMN is_lop BOOLEAN DEFAULT FALSE").catch(() => {});
+
     // Phase G1: Missed attendance requests table
     await pool.query(`CREATE TABLE IF NOT EXISTS missed_attendance_requests (
       id INT AUTO_INCREMENT PRIMARY KEY,

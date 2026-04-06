@@ -109,9 +109,9 @@ router.get('/home', verifyToken, async (req, res) => {
 
       // Monthly expense trend
       const [expenseTrend] = await pool.query(
-        `SELECT DATE_FORMAT(created_at, '%Y-%m') as month, SUM(amount) as total
-         FROM expense_claims WHERE created_at >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)
-         GROUP BY DATE_FORMAT(created_at, '%Y-%m') ORDER BY month`
+        `SELECT DATE_FORMAT(submitted_at, '%Y-%m') as month, SUM(amount) as total
+         FROM expense_reimbursements WHERE submitted_at >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)
+         GROUP BY DATE_FORMAT(submitted_at, '%Y-%m') ORDER BY month`
       ).catch(() => [[]]);
       data.expenseTrend = expenseTrend;
     }

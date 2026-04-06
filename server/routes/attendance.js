@@ -3,6 +3,11 @@ const pool = require('../config/db');
 const { verifyToken, requireRole } = require('../middleware/auth');
 const upload = require('../middleware/upload');
 
+// Get current date in IST (India Standard Time)
+function getTodayIST() {
+  return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+}
+
 // Haversine distance in meters between two lat/lng pairs
 function haversineDistance(lat1, lng1, lat2, lng2) {
   const R = 6371000; // Earth radius in meters
@@ -33,7 +38,7 @@ async function checkGeofence(lat, lng) {
 router.post('/checkin', verifyToken, upload.single('selfie'), async (req, res) => {
   try {
     const { lat, lng, location, remark, accuracy } = req.body;
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayIST();
 
     // Check if there's an active session (checked in but not checked out)
     const [active] = await pool.query(
@@ -81,7 +86,7 @@ router.post('/checkin', verifyToken, upload.single('selfie'), async (req, res) =
 router.post('/checkout', verifyToken, upload.single('selfie'), async (req, res) => {
   try {
     const { lat, lng, location, remark } = req.body;
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayIST();
 
     // Find latest active session (checked in but not checked out)
     const [active] = await pool.query(
@@ -126,7 +131,7 @@ router.post('/checkout', verifyToken, upload.single('selfie'), async (req, res) 
 // GET /api/attendance/today — get today's status (all sessions)
 router.get('/today', verifyToken, async (req, res) => {
   try {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getTodayIST();
     const [rows] = await pool.query(
       'SELECT * FROM attendance_logs WHERE emp_code = ? AND log_date = ? ORDER BY check_in ASC',
       [req.user.empCode, today]

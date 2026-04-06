@@ -85,9 +85,6 @@ router.post('/', verifyToken, [
     const empName = emp.length ? emp[0].name : '';
     const dept = emp.length ? emp[0].dept : '';
 
-    // Add is_lop column if not exists (auto-migrate)
-    await pool.query("ALTER TABLE leave_applications ADD COLUMN is_lop BOOLEAN DEFAULT FALSE").catch(() => {});
-
     const [result] = await pool.query(
       `INSERT INTO leave_applications (emp_code, emp_name, dept, leave_type, from_date, to_date, days, reason, is_lop)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,

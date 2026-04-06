@@ -100,9 +100,12 @@ router.get('/hot-seat', verifyToken, async (req, res) => {
 router.post('/hot-seat', verifyToken, async (req, res) => {
   try {
     const { empCode, empName, goals, challenges, wins, feedback } = req.body;
+    // Employees can only create hot-seat for themselves; MD/HR can create for anyone
+    const targetCode = ['MD', 'HR'].includes(req.user.role) ? (empCode || req.user.empCode) : req.user.empCode;
+    const targetName = (targetCode === req.user.empCode) ? req.user.name : (empName || targetCode);
     const [result] = await pool.query(
       'INSERT INTO hot_seat_sessions (emp_code, emp_name, session_date, goals, challenges, wins, feedback) VALUES (?, ?, CURDATE(), ?, ?, ?, ?)',
-      [empCode || req.user.empCode, empName || req.user.name, JSON.stringify(goals || []), JSON.stringify(challenges || []), JSON.stringify(wins || []), JSON.stringify(feedback || [])]
+      [targetCode, targetName, JSON.stringify(goals || []), JSON.stringify(challenges || []), JSON.stringify(wins || []), JSON.stringify(feedback || [])]
     );
     res.status(201).json({ message: 'Hot seat session created', id: result.insertId });
   } catch (err) {

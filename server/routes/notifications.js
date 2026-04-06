@@ -22,8 +22,8 @@ router.post('/', verifyToken, async (req, res) => {
     const { title, body, category, empCode } = req.body;
     if (!title) return res.status(400).json({ error: 'Title required' });
 
-    // Only HR/MD can send notifications to other users
-    const targetCode = (req.user.role === 'Employee') ? req.user.empCode : (empCode || req.user.empCode);
+    // Only HR/MD can send notifications to other users; employees and managers can only notify themselves
+    const targetCode = ['MD', 'HR'].includes(req.user.role) ? (empCode || req.user.empCode) : req.user.empCode;
     const [result] = await pool.query(
       'INSERT INTO notifications (emp_code, title, message, type) VALUES (?, ?, ?, ?)',
       [targetCode, title, body || '', category || 'general']

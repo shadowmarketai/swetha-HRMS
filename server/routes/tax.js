@@ -55,7 +55,10 @@ router.post('/form12b', verifyToken, async (req, res) => {
   try {
     const { prev_employer, prev_from, prev_to, prev_gross, prev_tds } = req.body;
     if (!prev_employer) return res.status(400).json({ error: 'Previous employer name is required' });
-    const fy = '2025-26';
+    // Dynamic fiscal year: Apr-Mar (Apr 2025 → FY 2025-26)
+    const now = new Date();
+    const fyStart = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+    const fy = req.body.fy || (fyStart + '-' + String(fyStart + 1).slice(-2));
     await pool.query(
       `INSERT INTO tax_declarations (emp_code, fy, prev_employer, prev_from, prev_to, prev_gross, prev_tds, form12b_submitted_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, CURDATE())

@@ -324,7 +324,7 @@ router.post('/indents', verifyToken, requireRole('MD', 'HR'), async (req, res) =
     const indent_code = await generateCode('PI', 'peb_purchase_indents', 'indent_code');
     const [result] = await conn.query(
       "INSERT INTO peb_purchase_indents (indent_code,requested_by,requested_by_name,site_name,urgency,required_by,reason,project_reference,status) VALUES (?,?,?,?,?,?,?,?,'QUOTATION_PENDING')",
-      [indent_code, req.user.id, requested_by_name||null, site_name||null, urgency||'ROUTINE', required_by||null, reason, project_reference||null]
+      [indent_code, req.user.empCode, requested_by_name||null, site_name||null, urgency||'ROUTINE', required_by||null, reason, project_reference||null]
     );
 
     for (const item of items) {
@@ -419,7 +419,7 @@ router.post('/indents/:id/gm-approve', verifyToken, requireRole('MD', 'HR'), asy
 
     if (action === 'REJECTED') {
       await db.query('UPDATE peb_purchase_indents SET status=?, rejection_reason=?, gm_approved_by=?, gm_approved_at=NOW() WHERE id=?',
-        ['REJECTED', remarks||null, req.user.id, req.params.id]);
+        ['REJECTED', remarks||null, req.user.empCode, req.params.id]);
       return res.json({ message: 'Indent rejected' });
     }
 
@@ -442,7 +442,7 @@ router.post('/indents/:id/gm-approve', verifyToken, requireRole('MD', 'HR'), asy
 
     await db.query(
       'UPDATE peb_purchase_indents SET status="GM_APPROVED",gm_approved_by=?,gm_approved_at=NOW(),gm_remarks=?,selected_vendor_id=?,selection_justification=?,needs_special_approval=?,adjusted_price=? WHERE id=?',
-      [req.user.id, remarks||null, selected_vendor_id||null, selection_justification||null, needsSpecial, adjustedPrice, req.params.id]
+      [req.user.empCode, remarks||null, selected_vendor_id||null, selection_justification||null, needsSpecial, adjustedPrice, req.params.id]
     );
 
     res.json({ message: 'GM approved. Forwarded to MD.' + (needsSpecial ? ' (SPECIAL APPROVAL: Non-L1 vendor)' : '') });
@@ -461,7 +461,7 @@ router.post('/indents/:id/md-approve', verifyToken, requireRole('MD', 'HR'), asy
 
     if (action === 'REJECTED') {
       await db.query('UPDATE peb_purchase_indents SET status=?,rejection_reason=?,md_approved_by=?,md_approved_at=NOW() WHERE id=?',
-        ['REJECTED', remarks||null, req.user.id, req.params.id]);
+        ['REJECTED', remarks||null, req.user.empCode, req.params.id]);
       return res.json({ message: 'Indent rejected by MD' });
     }
 
@@ -469,7 +469,7 @@ router.post('/indents/:id/md-approve', verifyToken, requireRole('MD', 'HR'), asy
 
     const finalPrice = override_price || indent[0].adjusted_price;
     await db.query('UPDATE peb_purchase_indents SET status="MD_APPROVED",md_approved_by=?,md_approved_at=NOW(),md_remarks=?,final_approved_price=? WHERE id=?',
-      [req.user.id, remarks||null, finalPrice, req.params.id]);
+      [req.user.empCode, remarks||null, finalPrice, req.params.id]);
 
     res.json({ message: 'MD approved. Ready for PO creation.' });
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
@@ -518,7 +518,7 @@ router.post('/orders', verifyToken, requireRole('MD', 'HR'), async (req, res) =>
 
     const [result] = await conn.query(
       'INSERT INTO peb_purchase_orders (po_number,indent_id,vendor_id,quotation_id,total_amount,delivery_address,delivery_deadline,payment_terms,special_instructions,balance_due,created_by) VALUES (?,?,?,?,0,?,?,?,?,0,?)',
-      [po_number, indent_id||null, vendor_id, quotation_id||null, delivery_address||null, delivery_deadline||null, payment_terms||null, special_instructions||null, req.user.id]
+      [po_number, indent_id||null, vendor_id, quotation_id||null, delivery_address||null, delivery_deadline||null, payment_terms||null, special_instructions||null, req.user.empCode]
     );
 
     for (const item of items) {
@@ -554,7 +554,7 @@ router.post('/orders/:id/payment', verifyToken, requireRole('MD', 'HR'), async (
     const { amount, payment_date, mode, reference } = req.body;
     if (!amount || !payment_date || !mode) return res.status(400).json({ error: 'amount, payment_date, mode required' });
     await db.query('INSERT INTO peb_po_payments (po_id,amount,payment_date,mode,reference,recorded_by) VALUES (?,?,?,?,?,?)',
-      [req.params.id, amount, payment_date, mode, reference||null, req.user.id]);
+      [req.params.id, amount, payment_date, mode, reference||null, req.user.empCode]);
     await db.query('UPDATE peb_purchase_orders SET total_paid = total_paid + ?, balance_due = balance_due - ? WHERE id = ?', [amount, amount, req.params.id]);
     res.json({ message: 'Payment recorded' });
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
@@ -590,7 +590,7 @@ router.post('/transport', verifyToken, requireRole('MD', 'HR', 'Employee'), asyn
     const request_code = await generateCode('TRQ', 'peb_transport_requests', 'request_code');
     const [result] = await db.query(
       'INSERT INTO peb_transport_requests (request_code,requested_by,type,origin_name,destination_name,scheduled_date,urgency,vehicle_type,estimated_weight,reason) VALUES (?,?,?,?,?,?,?,?,?,?)',
-      [request_code, req.user.id, type, origin_name||null, destination_name||null, scheduled_date, urgency||'NORMAL', vehicle_type||null, estimated_weight||null, reason||null]
+      [request_code, req.user.empCode, type, origin_name||null, destination_name||null, scheduled_date, urgency||'NORMAL', vehicle_type||null, estimated_weight||null, reason||null]
     );
     res.status(201).json({ id: result.insertId, request_code, message: 'Transport request created' });
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
@@ -603,7 +603,7 @@ router.post('/transport/:id/approve', verifyToken, requireRole('MD', 'HR'), asyn
     if (!['APPROVED','REJECTED'].includes(action)) return res.status(400).json({ error: 'Invalid action' });
     const newStatus = action === 'APPROVED' ? 'APPROVED' : 'CANCELLED';
     await db.query('UPDATE peb_transport_requests SET status=?,approved_by=?,vehicle_number=?,driver_name=?,driver_phone=? WHERE id=?',
-      [newStatus, req.user.id, vehicle_number||null, driver_name||null, driver_phone||null, req.params.id]);
+      [newStatus, req.user.empCode, vehicle_number||null, driver_name||null, driver_phone||null, req.params.id]);
     res.json({ message: `Transport ${action.toLowerCase()}` });
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
@@ -621,7 +621,7 @@ router.post('/transport/:id/complete', verifyToken, requireRole('MD', 'HR'), asy
   try {
     const { actual_km, transport_cost, delivery_condition, damage_notes } = req.body;
     await db.query("UPDATE peb_transport_requests SET status='DELIVERED',received_by=?,received_at=NOW(),actual_km=?,transport_cost=?,delivery_condition=?,damage_notes=? WHERE id=?",
-      [req.user.id, actual_km||null, transport_cost||null, delivery_condition||'GOOD', damage_notes||null, req.params.id]);
+      [req.user.empCode, actual_km||null, transport_cost||null, delivery_condition||'GOOD', damage_notes||null, req.params.id]);
     res.json({ message: 'Transport completed' });
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });

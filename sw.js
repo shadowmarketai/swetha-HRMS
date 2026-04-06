@@ -189,20 +189,36 @@ async function syncOfflineQueue() {
 
     if (!token) return;
 
+    var synced = 0;
+    var remaining = [];
     for (const item of queue) {
       try {
-        await fetch(item.url, {
+        var resp = await fetch(item.url, {
           method: item.method || 'POST',
           headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
           body: JSON.stringify(item.body)
         });
+        if (resp.ok || resp.status === 400) {
+          // 400 = already checked in/out — don't retry
+          synced++;
+        } else {
+          remaining.push(item);
+        }
       } catch (e) {
-        console.log('[SW] Sync failed for', item.url);
-        return; // Stop syncing, will retry next time
+        remaining.push(item);
       }
     }
 
-    await clearOfflineQueue();
+    // Save only failed items back, removing successfully synced ones
+    if (remaining.length > 0) {
+      var db = await openDB();
+      var tx = db.transaction('offline-queue', 'readwrite');
+      await tx.objectStore('offline-queue').clear();
+      for (var r of remaining) { await tx.objectStore('offline-queue').add(r); }
+      await tx.done;
+    } else {
+      await clearOfflineQueue();
+    }
 
     // Notify user
     self.registration.showNotification('HRMS', {

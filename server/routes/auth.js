@@ -196,7 +196,7 @@ router.post('/bulk-create-missing', verifyToken, requireRole('MD'), async (req, 
       await pool.query('INSERT IGNORE INTO users (emp_code, password_hash, role) VALUES (?, ?, ?)', [emp.code, hash, emp.role]);
       created++;
     }
-    res.json({ message: created + ' login accounts created with password: ' + defaultPassword, created, employees: missing.map(e => e.code) });
+    res.json({ message: created + ' login accounts created', created, employees: missing.map(e => e.code) });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
@@ -361,8 +361,8 @@ router.post('/biometric-login', [
   }
 });
 
-// POST /api/auth/forgot-password — reset to a random temporary password (MD/HR can reset for any employee)
-router.post('/forgot-password', [
+// POST /api/auth/forgot-password — reset to a random temporary password (HR/MD only)
+router.post('/forgot-password', verifyToken, requireRole('MD', 'HR'), [
   body('empCode').trim().notEmpty().withMessage('Employee code required')
 ], async (req, res) => {
   const errors = validationResult(req);
@@ -373,17 +373,15 @@ router.post('/forgot-password', [
       'SELECT u.emp_code FROM users u JOIN employees e ON u.emp_code = e.code WHERE u.emp_code = ? AND u.is_active = 1',
       [empCode]
     );
-    // Return generic message to prevent employee code enumeration
     if (rows.length === 0) {
-      return res.json({ message: 'If the employee code exists, the password has been reset. Please contact HR for the temporary password.' });
+      return res.status(404).json({ error: 'Employee not found' });
     }
     // Generate a random 10-character temporary password
-    const tempPassword = crypto.randomBytes(5).toString('hex'); // e.g. "a3f9b2c1d4"
+    const tempPassword = crypto.randomBytes(5).toString('hex');
     const hash = await bcrypt.hash(tempPassword, 10);
     await pool.query('UPDATE users SET password_hash = ?, last_password_change = NOW() WHERE emp_code = ?', [hash, empCode]);
-    // The temp password is returned ONLY in the response — HR/admin shares it verbally
-    // In production, this should be sent via email instead
-    res.json({ message: 'Password has been reset. Please contact HR for the temporary password.', tempPassword });
+    // Temp password shown to HR/MD only — they share it verbally with the employee
+    res.json({ message: 'Password has been reset for ' + empCode, tempPassword });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });

@@ -49,9 +49,12 @@ router.get('/download/:id', verifyToken, async (req, res) => {
   }
 });
 
-// GET /api/documents/:empCode
+// GET /api/documents/:empCode — employees can only view own docs, MD/HR can view anyone
 router.get('/:empCode', verifyToken, async (req, res) => {
   try {
+    if (!['MD', 'HR'].includes(req.user.role) && req.params.empCode !== req.user.empCode) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
     const [rows] = await pool.query('SELECT * FROM documents WHERE emp_code = ? ORDER BY uploaded_at DESC', [req.params.empCode]);
     res.json(rows);
   } catch (err) {
@@ -60,12 +63,13 @@ router.get('/:empCode', verifyToken, async (req, res) => {
   }
 });
 
-// POST /api/documents/upload — upload document
+// POST /api/documents/upload — upload document (employees can only upload for themselves)
 router.post('/upload', verifyToken, upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
     const { empCode, docType, docName } = req.body;
-    const code = empCode || req.user.empCode;
+    // Employees can only upload for themselves; MD/HR can upload for anyone
+    const code = (!['MD', 'HR'].includes(req.user.role)) ? req.user.empCode : (empCode || req.user.empCode);
     await pool.query(
       'INSERT INTO documents (emp_code, doc_type, doc_name, file_path, file_size, mime_type) VALUES (?, ?, ?, ?, ?, ?)',
       [code, docType || 'general', docName || req.file.originalname, req.file.path, req.file.size, req.file.mimetype]

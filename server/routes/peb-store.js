@@ -288,7 +288,7 @@ router.post('/items', verifyToken, requireRole('MD', 'HR'), async (req, res) => 
     const item_code = await generateSimpleCode('PEB-ITEM', 'peb_stock_items', 'item_code');
     const [result] = await db.query(
       'INSERT INTO peb_stock_items (item_code,item_name,category,sub_category,unit,hsn_code,min_stock_level,max_stock_level,unit_price,location,last_updated_by) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
-      [item_code, item_name, category, sub_category||null, unit, hsn_code||null, min_stock_level||0, max_stock_level||0, unit_price||0, location||null, req.user.id]
+      [item_code, item_name, category, sub_category||null, unit, hsn_code||null, min_stock_level||0, max_stock_level||0, unit_price||0, location||null, req.user.empCode]
     );
     res.status(201).json({ id: result.insertId, item_code, message: 'Stock item created' });
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
@@ -303,7 +303,7 @@ router.put('/items/:id', verifyToken, requireRole('MD', 'HR'), async (req, res) 
       'UPDATE peb_stock_items SET item_name=?,category=?,sub_category=?,unit=?,hsn_code=?,min_stock_level=?,max_stock_level=?,unit_price=?,location=?,last_updated_by=? WHERE id=?',
       [item_name||old[0].item_name, category||old[0].category, sub_category??old[0].sub_category, unit||old[0].unit,
        hsn_code??old[0].hsn_code, min_stock_level??old[0].min_stock_level, max_stock_level??old[0].max_stock_level,
-       unit_price??old[0].unit_price, location??old[0].location, req.user.id, req.params.id]
+       unit_price??old[0].unit_price, location??old[0].location, req.user.empCode, req.params.id]
     );
     res.json({ message: 'Item updated' });
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
@@ -319,13 +319,13 @@ router.post('/transactions', verifyToken, requireRole('MD', 'HR'), async (req, r
 
     const [result] = await db.query(
       'INSERT INTO peb_stock_transactions (type,item_id,quantity,unit_cost,notes,created_by) VALUES (?,?,?,?,?,?)',
-      [type, item_id, quantity, unit_cost||0, notes||null, req.user.id]
+      [type, item_id, quantity, unit_cost||0, notes||null, req.user.empCode]
     );
 
     // Update current_stock
     const inTypes = ['GRN','MRT','ADJ','OPB'];
     const stockChange = inTypes.includes(type) ? Math.abs(quantity) : -Math.abs(quantity);
-    await db.query('UPDATE peb_stock_items SET current_stock = current_stock + ?, last_updated_by = ? WHERE id = ?', [stockChange, req.user.id, item_id]);
+    await db.query('UPDATE peb_stock_items SET current_stock = current_stock + ?, last_updated_by = ? WHERE id = ?', [stockChange, req.user.empCode, item_id]);
 
     const [item] = await db.query('SELECT * FROM peb_stock_items WHERE id = ?', [item_id]);
     res.status(201).json({ id: result.insertId, message: 'Transaction recorded', new_stock: item[0]?.current_stock });
@@ -371,7 +371,7 @@ router.post('/grn', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
     const grn_number = await generateCode('GRN', 'peb_grn', 'grn_number');
     const [grnResult] = await conn.query(
       'INSERT INTO peb_grn (grn_number,po_id,vendor_id,invoice_number,invoice_date,received_date,quality_status,quality_remarks,invoice_photo_url,created_by) VALUES (?,?,?,?,?,?,?,?,?,?)',
-      [grn_number, po_id||null, vendor_id, invoice_number||null, invoice_date||null, received_date, quality_status||'PASSED', quality_remarks||null, invoice_photo_url||null, req.user.id]
+      [grn_number, po_id||null, vendor_id, invoice_number||null, invoice_date||null, received_date, quality_status||'PASSED', quality_remarks||null, invoice_photo_url||null, req.user.empCode]
     );
 
     for (const item of items) {
@@ -381,9 +381,9 @@ router.post('/grn', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
 
       // Add stock transaction + update stock
       await conn.query('INSERT INTO peb_stock_transactions (type,item_id,quantity,unit_cost,reference_id,reference_type,created_by) VALUES ("GRN",?,?,?,?,"grn",?)',
-        [item.item_id, accepted, item.unit_cost||0, grnResult.insertId, req.user.id]);
+        [item.item_id, accepted, item.unit_cost||0, grnResult.insertId, req.user.empCode]);
       await conn.query('UPDATE peb_stock_items SET current_stock = current_stock + ?, last_updated_by = ? WHERE id = ?',
-        [accepted, req.user.id, item.item_id]);
+        [accepted, req.user.empCode, item.item_id]);
     }
 
     await conn.commit();
@@ -433,7 +433,7 @@ router.post('/material-requests', verifyToken, requireRole('MD', 'HR', 'Employee
     const request_code = await generateCode('MRQ', 'peb_material_requests', 'request_code');
     const [result] = await conn.query(
       'INSERT INTO peb_material_requests (request_code,requested_by,site_name,project_name,required_by,urgency,purpose) VALUES (?,?,?,?,?,?,?)',
-      [request_code, req.user.id, site_name, project_name||null, required_by||null, urgency||'NORMAL', purpose||null]
+      [request_code, req.user.empCode, site_name, project_name||null, required_by||null, urgency||'NORMAL', purpose||null]
     );
 
     for (const item of items) {
@@ -491,9 +491,9 @@ router.post('/material-requests/:id/dispatch', verifyToken, requireRole('MD', 'H
 
       // Deduct stock
       await conn.query('INSERT INTO peb_stock_transactions (type,item_id,quantity,reference_id,reference_type,created_by) VALUES ("MIS",?,?,?,"material_request",?)',
-        [item.item_id, item.issued_qty, req.params.id, req.user.id]);
+        [item.item_id, item.issued_qty, req.params.id, req.user.empCode]);
       await conn.query('UPDATE peb_stock_items SET current_stock = current_stock - ?, last_updated_by = ? WHERE id = ?',
-        [item.issued_qty, req.user.id, item.item_id]);
+        [item.issued_qty, req.user.empCode, item.item_id]);
     }
 
     await conn.query('UPDATE peb_material_requests SET stage = "DISPATCHED", store_remarks = ?, dispatched_at = NOW() WHERE id = ?',
@@ -540,7 +540,7 @@ router.post('/returns', verifyToken, requireRole('MD', 'HR'), async (req, res) =
     const mrn_code = await generateCode('MRN', 'peb_material_returns', 'mrn_code');
     const [result] = await conn.query(
       'INSERT INTO peb_material_returns (mrn_code,site_name,returned_by,returned_by_name,return_date) VALUES (?,?,?,?,?)',
-      [mrn_code, site_name, req.user.id, returned_by_name||null, return_date||new Date().toISOString().split('T')[0]]
+      [mrn_code, site_name, req.user.empCode, returned_by_name||null, return_date||new Date().toISOString().split('T')[0]]
     );
 
     for (const item of items) {
@@ -568,14 +568,14 @@ router.post('/returns/:id/verify', verifyToken, requireRole('MD', 'HR'), async (
     for (const item of items) {
       if (item.usable_qty > 0) {
         await conn.query('INSERT INTO peb_stock_transactions (type,item_id,quantity,reference_id,reference_type,created_by,notes) VALUES ("MRT",?,?,?,"material_return",?,"Return - usable")',
-          [item.item_id, item.usable_qty, req.params.id, req.user.id]);
+          [item.item_id, item.usable_qty, req.params.id, req.user.empCode]);
         await conn.query('UPDATE peb_stock_items SET current_stock = current_stock + ?, last_updated_by = ? WHERE id = ?',
-          [item.usable_qty, req.user.id, item.item_id]);
+          [item.usable_qty, req.user.empCode, item.item_id]);
       }
     }
 
     await conn.query('UPDATE peb_material_returns SET status = "VERIFIED", verified_by_store = ?, verified_at = NOW() WHERE id = ?',
-      [req.user.id, req.params.id]);
+      [req.user.empCode, req.params.id]);
 
     await conn.commit();
     res.json({ message: 'Return verified, usable items restocked' });
@@ -602,7 +602,7 @@ router.post('/scrap', verifyToken, requireRole('MD', 'HR'), async (req, res) => 
     let weight = total_weight || 0;
 
     const [result] = await db.query('INSERT INTO peb_scrap_batches (batch_code,total_weight,created_by) VALUES (?,?,?)',
-      [batch_code, weight, req.user.id]);
+      [batch_code, weight, req.user.empCode]);
 
     if (items) {
       for (const item of items) {
@@ -630,7 +630,7 @@ router.post('/scrap/:id/sell', verifyToken, requireRole('MD', 'HR'), async (req,
     for (const item of scrapItems) {
       if (item.item_id) {
         await db.query('INSERT INTO peb_stock_transactions (type,item_id,quantity,reference_id,reference_type,created_by,notes) VALUES ("SCP",?,?,?,"scrap",?,"Scrap sold")',
-          [item.item_id, item.qty, req.params.id, req.user.id]);
+          [item.item_id, item.qty, req.params.id, req.user.empCode]);
       }
     }
 

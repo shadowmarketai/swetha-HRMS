@@ -51,6 +51,7 @@ router.post('/', verifyToken, upload.single('bill'), async (req, res) => {
   try {
     const { category, amount, description, expenseType, project, travelFrom, travelTo, vehicle, travelKm, travelDays, date } = req.body;
     if (!category || !amount) return res.status(400).json({ error: 'Category and amount required' });
+    if (isNaN(parseFloat(amount)) || parseFloat(amount) <= 0) return res.status(400).json({ error: 'Amount must be a positive number' });
     const [emp] = await pool.query('SELECT name FROM employees WHERE code = ?', [req.user.empCode]);
     const empName = emp.length > 0 ? emp[0].name : '';
     const billUrl = req.file ? '/uploads/' + req.file.filename : null;
