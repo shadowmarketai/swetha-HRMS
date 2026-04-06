@@ -3629,11 +3629,15 @@ function previewSiteExpenseBill() {
   if (!category) { showToast('Please select a category'); return; }
   if (!amount) { showToast('Please enter the bill amount'); return; }
 
+  // Store form data + file before preview replaces the HTML
+  var billFile = (billInput && billInput.files && billInput.files[0]) ? billInput.files[0] : null;
+  window._siteExpPreview = { project: project, category: category, amount: amount, desc: desc, billFile: billFile };
+
   var billPreviewSrc = '';
   var billFileName = '';
   var previewImg = document.querySelector('#seBillPreview img');
   if (previewImg && previewImg.src) billPreviewSrc = previewImg.src;
-  if (billInput && billInput.files && billInput.files[0]) billFileName = billInput.files[0].name;
+  if (billFile) billFileName = billFile.name;
 
   var container = document.getElementById('siteExpenseBillForm');
   if (!container) return;
@@ -3673,11 +3677,14 @@ function previewSiteExpenseBill() {
 }
 
 async function submitSiteExpenseBill() {
-  var project = (document.getElementById('seBillProject') || {}).value || '';
-  var category = (document.getElementById('seBillCategory') || {}).value || '';
-  var amount = parseInt((document.getElementById('seBillAmount') || {}).value, 10) || 0;
-  var desc = (document.getElementById('seBillDesc') || {}).value || '';
-  var billInput = document.getElementById('seBillInput');
+  // Use stored preview data if available (preview replaces form inputs)
+  var stored = window._siteExpPreview || {};
+  var project = stored.project || (document.getElementById('seBillProject') || {}).value || '';
+  var category = stored.category || (document.getElementById('seBillCategory') || {}).value || '';
+  var amount = stored.amount || parseInt((document.getElementById('seBillAmount') || {}).value, 10) || 0;
+  var desc = stored.desc || (document.getElementById('seBillDesc') || {}).value || '';
+  var billFile = stored.billFile || null;
+  if (!billFile) { var billInput = document.getElementById('seBillInput'); if (billInput && billInput.files && billInput.files[0]) billFile = billInput.files[0]; }
   if (!project) { showToast('Please select a project/site'); return; }
   if (!category) { showToast('Please select a category'); return; }
   if (!amount) { showToast('Please enter the bill amount'); return; }
@@ -3689,7 +3696,7 @@ async function submitSiteExpenseBill() {
     fd.append('date', new Date().toISOString().split('T')[0]);
     fd.append('expenseType', 'site_expense');
     fd.append('project', project);
-    if (billInput && billInput.files && billInput.files[0]) fd.append('bill', billInput.files[0]);
+    if (billFile) fd.append('bill', billFile);
     var apiRes = await apiUpload('/expenses', fd);
     expenseReimbursements.push({
       id: (apiRes && apiRes.id) || (expenseReimbursements.length + 1),
@@ -3700,6 +3707,7 @@ async function submitSiteExpenseBill() {
     });
     var expBtn = document.querySelector('#siteExpenseBillForm .nf-btn-primary');
     _submitSuccess(expBtn);
+    window._siteExpPreview = null;
     showToast('Site expense bill submitted for Rs.' + amount.toLocaleString('en-IN'));
     setTimeout(function() { renderSiteExpenseScreen(); }, 1500);
   } catch (e) {
@@ -3813,11 +3821,15 @@ function previewTravelExpenseBill() {
   if (!vehicle) { showToast('Please select mode of travel'); return; }
   if (!amount) { showToast('Please enter the bill amount'); return; }
 
+  // Store form data + file before preview replaces the HTML
+  var billFile = (billInput && billInput.files && billInput.files[0]) ? billInput.files[0] : null;
+  window._travelExpPreview = { from: from, to: to, vehicle: vehicle, amount: amount, km: km, days: days, desc: desc, travelDate: travelDate, billFile: billFile };
+
   var billPreviewSrc = '';
   var billFileName = '';
   var previewImg = document.querySelector('#teBillPreview img');
   if (previewImg && previewImg.src) billPreviewSrc = previewImg.src;
-  if (billInput && billInput.files && billInput.files[0]) billFileName = billInput.files[0].name;
+  if (billFile) billFileName = billFile.name;
 
   var container = document.getElementById('travelExpenseBillForm');
   if (!container) return;
@@ -3860,15 +3872,18 @@ function previewTravelExpenseBill() {
 }
 
 async function submitTravelExpenseBill() {
-  var from = (document.getElementById('teBillFrom') || {}).value || '';
-  var to = (document.getElementById('teBillTo') || {}).value || '';
-  var vehicle = (document.getElementById('teBillVehicle') || {}).value || '';
-  var amount = parseInt((document.getElementById('teBillAmount') || {}).value, 10) || 0;
-  var km = parseInt((document.getElementById('teBillKm') || {}).value, 10) || null;
-  var days = parseInt((document.getElementById('teBillDays') || {}).value, 10) || 1;
-  var desc = (document.getElementById('teBillDesc') || {}).value || '';
-  var travelDate = (document.getElementById('teBillDate') || {}).value || new Date().toISOString().split('T')[0];
-  var billInput = document.getElementById('teBillInput');
+  // Use stored preview data if available (preview replaces form inputs)
+  var stored = window._travelExpPreview || {};
+  var from = stored.from || (document.getElementById('teBillFrom') || {}).value || '';
+  var to = stored.to || (document.getElementById('teBillTo') || {}).value || '';
+  var vehicle = stored.vehicle || (document.getElementById('teBillVehicle') || {}).value || '';
+  var amount = stored.amount || parseInt((document.getElementById('teBillAmount') || {}).value, 10) || 0;
+  var km = stored.km ? parseInt(stored.km, 10) : (parseInt((document.getElementById('teBillKm') || {}).value, 10) || null);
+  var days = stored.days ? parseInt(stored.days, 10) : (parseInt((document.getElementById('teBillDays') || {}).value, 10) || 1);
+  var desc = stored.desc || (document.getElementById('teBillDesc') || {}).value || '';
+  var travelDate = stored.travelDate || (document.getElementById('teBillDate') || {}).value || new Date().toISOString().split('T')[0];
+  var billFile = stored.billFile || null;
+  if (!billFile) { var billInput = document.getElementById('teBillInput'); if (billInput && billInput.files && billInput.files[0]) billFile = billInput.files[0]; }
   if (!from || !to) { showToast('Please enter From and To locations'); return; }
   if (!vehicle) { showToast('Please select mode of travel'); return; }
   if (!amount) { showToast('Please enter the bill amount'); return; }
@@ -3886,7 +3901,7 @@ async function submitTravelExpenseBill() {
     fd.append('vehicle', vehicle);
     if (km) fd.append('travelKm', km);
     fd.append('travelDays', days);
-    if (billInput && billInput.files && billInput.files[0]) fd.append('bill', billInput.files[0]);
+    if (billFile) fd.append('bill', billFile);
     var apiRes = await apiUpload('/expenses', fd);
     expenseReimbursements.push({
       id: (apiRes && apiRes.id) || (expenseReimbursements.length + 1),
@@ -3897,6 +3912,7 @@ async function submitTravelExpenseBill() {
       billUrl: apiRes.billUrl || ''
     });
     _submitSuccess(teBtn);
+    window._travelExpPreview = null;
     showToast('Travel expense bill submitted for Rs.' + amount.toLocaleString('en-IN'));
     setTimeout(function() { renderTravelExpenseScreen(); }, 1200);
   } catch (e) {
