@@ -6991,8 +6991,6 @@ async function loadFromBackend() {
       { key: 'notifPrefs', url: base + '/notifications/prefs' },
       { key: 'announcements', url: base + '/announcements?limit=200' },
       { key: 'tasks', url: base + '/tasks?limit=200' },
-      { key: 'jobs', url: base + '/recruitment/jobs' },
-      { key: 'candidates', url: base + '/recruitment/candidates' },
       { key: 'assets', url: base + '/assets?limit=200' },
       { key: 'exits', url: base + '/exit?limit=200' },
       { key: 'expenses', url: base + '/expenses?limit=500' },
@@ -7008,6 +7006,8 @@ async function loadFromBackend() {
     ];
     // MD/HR-only endpoints
     if (isMDorHR) {
+      requests.push({ key: 'jobs', url: base + '/recruitment/jobs' });
+      requests.push({ key: 'candidates', url: base + '/recruitment/candidates' });
       requests.push({ key: 'leaveBalanceAll', url: base + '/leaves/balance/all' });
       requests.push({ key: 'complianceFilings', url: base + '/compliance/filings' });
       requests.push({ key: 'contractWorkers', url: base + '/compliance/contract-workers' });
@@ -13571,7 +13571,6 @@ function renderSalaryView() {
 function renderEmployeeSalaryList() {
   var container = document.getElementById('salaryContent');
   if (!container) return;
-  var canEditSalary = currentUser && (currentUser.dept === 'Accounts' || currentUser.role === 'MD' || currentUser.role === 'HR');
   var html = '<div class="section-title" style="margin-top:4px">Employee Salary Structure</div>';
   html += '<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">';
   html += '<select id="salDeptFilter" onchange="renderEmpSalaryTable()" style="padding:6px 10px;border:1px solid var(--gray-200);border-radius:var(--radius);font-size:.78rem"><option value="">All Departments</option>';
@@ -13587,6 +13586,7 @@ function renderEmployeeSalaryList() {
 }
 
 function renderEmpSalaryTable() {
+  var canEditSalary = currentUser && (currentUser.dept === 'Accounts' || currentUser.role === 'MD' || currentUser.role === 'HR');
   var dept = (document.getElementById('salDeptFilter') || {}).value || '';
   var search = ((document.getElementById('salEmpSearch') || {}).value || '').toLowerCase();
   var filtered = EMPLOYEES.filter(function(e) {
