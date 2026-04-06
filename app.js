@@ -300,6 +300,19 @@ const NAV_CONFIG = {
       { id:'emp-inv-returns', label:'Returns & Scrap', action:{type:'overlay',target:'peb'} },
       { id:'emp-proc-transport', label:'Transport', action:{type:'overlay',target:'peb'} }
     ]},
+    { id:'emp-acc-payments', label:'Payments', icon:'salary', deptOnly:['Accounts'], children:[
+      { id:'emp-acc-approved-adv', label:'Approved Advances', action:{type:'overlay',target:'accounts-payments'} },
+      { id:'emp-acc-approved-exp', label:'Approved Expenses', action:{type:'overlay',target:'accounts-payments'} },
+      { id:'emp-acc-settlement', label:'Settlement Tracker', action:{type:'overlay',target:'accounts-payments'} }
+    ]},
+    { id:'emp-acc-salary', label:'All Salary', icon:'salary', deptOnly:['Accounts'], action:{type:'tab',target:'salary'} },
+    { id:'emp-acc-procurement', label:'Procurement', icon:'store', deptOnly:['Accounts'], children:[
+      { id:'emp-acc-proc-grn', label:'GRN', action:{type:'overlay',target:'peb'} },
+      { id:'emp-acc-proc-vendors', label:'Vendors', action:{type:'overlay',target:'peb'} },
+      { id:'emp-acc-proc-indents', label:'Purchase Indents', action:{type:'overlay',target:'peb'} },
+      { id:'emp-acc-proc-orders', label:'Purchase Orders', action:{type:'overlay',target:'peb'} },
+      { id:'emp-acc-proc-transport', label:'Transport', action:{type:'overlay',target:'peb'} }
+    ]},
     { id:'emp-admin-peb', label:'PEB Management', icon:'store', deptOnly:['Admin'], children:[
       { id:'emp-adm-peb-dash', label:'PEB Dashboard', action:{type:'overlay',target:'peb'} },
       { id:'emp-adm-inv-stock', label:'Stock Items', action:{type:'overlay',target:'peb'} },
@@ -1600,7 +1613,7 @@ let _overlayPreviousFocus = [];
 function showOverlay(id) {
   if (id === 'admin' && currentUser.role !== 'MD' && currentUser.role !== 'HR') return;
   if (id === 'location' && currentUser.role !== 'MD') return;
-  if (id === 'peb' && currentUser.role !== 'MD' && currentUser.role !== 'HR' && !(['Site Engineer','Admin','Execution','Production'].indexOf(currentUser.dept) >= 0)) return;
+  if (id === 'peb' && currentUser.role !== 'MD' && currentUser.role !== 'HR' && !(['Site Engineer','Admin','Accounts','Execution','Production'].indexOf(currentUser.dept) >= 0)) return;
   if (id === 'onboarding' && currentUser.role !== 'MD' && currentUser.role !== 'HR' && currentUser.role !== 'Manager') return;
   if (id === 'advance-requests' && currentUser.role !== 'MD' && currentUser.role !== 'HR' && currentUser.role !== 'Manager') return;
   // Render content (wrapped in try-catch so errors don't block overlay display)
@@ -1612,6 +1625,7 @@ function showOverlay(id) {
     if (id === 'location') openLocationTracker();
     if (id === 'advance-requests') { advReqActiveTab = 'pending'; advReqTypeFilter = 'all'; renderAdvanceRequests('pending'); document.querySelectorAll('#advReqTabs .tab-pill').forEach((p,i) => p.classList.toggle('active', i===0)); document.querySelectorAll('#advReqTypeFilter .loc-filter-chip').forEach((c,i) => c.classList.toggle('active', i===0)); }
     if (id === 'settings') initSettingsToggles();
+    if (id === 'accounts-payments') renderAccountsPayments();
     if (id === 'peb') renderPebOverlay();
     if (id === 'hr-recruit') {
       var el = document.getElementById('hrRecruitContent');
@@ -12807,6 +12821,124 @@ function editProject(id) {
 }
 
 // =====================================================
+// =====================================================
+// ACCOUNTS DEPARTMENT — PAYMENTS & SETTLEMENTS
+// =====================================================
+function renderAccountsPayments() {
+  var c = document.getElementById('accPaymentsContent');
+  if (!c) return;
+  var titleEl = document.getElementById('accPaymentsTitle');
+
+  var section = 'approved-advances';
+  if (_activeNavId === 'emp-acc-approved-exp') section = 'approved-expenses';
+  if (_activeNavId === 'emp-acc-settlement') section = 'settlement';
+
+  if (titleEl) {
+    var titles = {'approved-advances':'Approved Advances','approved-expenses':'Approved Expenses','settlement':'Settlement Tracker'};
+    titleEl.textContent = titles[section] || 'Payments';
+  }
+
+  if (section === 'approved-advances') renderAccApprovedAdvances(c);
+  else if (section === 'approved-expenses') renderAccApprovedExpenses(c);
+  else if (section === 'settlement') renderAccSettlementTracker(c);
+}
+
+function renderAccApprovedAdvances(c) {
+  var approved = (typeof advanceRequests !== 'undefined' ? advanceRequests : []).filter(function(r) {
+    return r.status === 'approved' || r.status === 'Approved';
+  });
+  var html = '<div class="section-title">MD Approved Advances — Ready for Payment</div>';
+  if (approved.length === 0) {
+    html += '<div class="card" style="padding:20px;text-align:center;color:var(--gray-400)">No approved advances pending payment</div>';
+  } else {
+    html += '<div class="card" style="padding:10px">';
+    var totalAmt = 0;
+    approved.sort(function(a, b) { return b.id - a.id; }).forEach(function(r) {
+      totalAmt += (r.amount || 0);
+      var typeLabel = r.type === 'site' ? 'Site' : r.type === 'salary' ? 'Salary' : r.type === 'travel' ? 'Travel' : r.type;
+      html += '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--gray-100)">';
+      html += '<div style="flex:1"><div style="font-weight:600;font-size:.82rem">' + escapeHTML(r.empName || r.empCode) + '</div>';
+      html += '<div style="font-size:.72rem;color:var(--gray-500)">' + escapeHTML(typeLabel) + ' Advance &middot; ' + escapeHTML(r.appliedDate || '') + '</div>';
+      if (r.details) html += '<div style="font-size:.68rem;color:var(--gray-400)">' + escapeHTML(r.details) + '</div>';
+      html += '</div>';
+      html += '<div style="text-align:right"><div style="font-weight:700;font-size:.88rem;color:var(--primary)">Rs.' + (r.amount || 0).toLocaleString('en-IN') + '</div>';
+      html += '<span class="badge-status badge-approved">Approved</span></div></div>';
+    });
+    html += '<div style="display:flex;justify-content:space-between;padding:12px 0;font-weight:700;font-size:.85rem;border-top:2px solid var(--gray-200)"><span>Total Payout</span><span style="color:var(--primary)">Rs.' + totalAmt.toLocaleString('en-IN') + '</span></div>';
+    html += '</div>';
+  }
+  c.innerHTML = html;
+}
+
+function renderAccApprovedExpenses(c) {
+  var approved = (typeof expenseReimbursements !== 'undefined' ? expenseReimbursements : []).filter(function(e) {
+    return e.status === 'Approved';
+  });
+  var html = '<div class="section-title">MD Approved Expenses — Ready for Reimbursement</div>';
+  if (approved.length === 0) {
+    html += '<div class="card" style="padding:20px;text-align:center;color:var(--gray-400)">No approved expenses pending payment</div>';
+  } else {
+    html += '<div class="card" style="padding:10px">';
+    var totalAmt = 0;
+    approved.sort(function(a, b) { return b.id - a.id; }).forEach(function(e) {
+      totalAmt += (e.amount || 0);
+      html += '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--gray-100)">';
+      html += '<div style="flex:1"><div style="font-weight:600;font-size:.82rem">' + escapeHTML(e.empName || e.empCode) + '</div>';
+      html += '<div style="font-size:.72rem;color:var(--gray-500)">' + escapeHTML(e.category || '') + ' &middot; ' + escapeHTML(e.date || '') + '</div>';
+      if (e.description) html += '<div style="font-size:.68rem;color:var(--gray-400)">' + escapeHTML(e.description) + '</div>';
+      if (e.billUrl) html += '<a href="' + escapeHTML(e.billUrl) + '" target="_blank" style="font-size:.68rem;color:var(--primary);font-weight:600">View Bill</a>';
+      html += '</div>';
+      html += '<div style="text-align:right"><div style="font-weight:700;font-size:.88rem;color:var(--primary)">Rs.' + (e.amount || 0).toLocaleString('en-IN') + '</div>';
+      html += '<span class="badge-status badge-approved">Approved</span></div></div>';
+    });
+    html += '<div style="display:flex;justify-content:space-between;padding:12px 0;font-weight:700;font-size:.85rem;border-top:2px solid var(--gray-200)"><span>Total Reimbursement</span><span style="color:var(--primary)">Rs.' + totalAmt.toLocaleString('en-IN') + '</span></div>';
+    html += '</div>';
+  }
+  c.innerHTML = html;
+}
+
+function renderAccSettlementTracker(c) {
+  // Per-employee advance vs expense settlement
+  var empMap = {};
+  (typeof advanceRequests !== 'undefined' ? advanceRequests : []).forEach(function(r) {
+    if (r.status !== 'approved' && r.status !== 'Approved') return;
+    if (!empMap[r.empCode]) empMap[r.empCode] = { name: r.empName || r.empCode, advTotal: 0, expTotal: 0 };
+    empMap[r.empCode].advTotal += (r.amount || 0);
+  });
+  (typeof expenseReimbursements !== 'undefined' ? expenseReimbursements : []).forEach(function(e) {
+    if (e.status !== 'Approved') return;
+    if (!empMap[e.empCode]) empMap[e.empCode] = { name: e.empName || e.empCode, advTotal: 0, expTotal: 0 };
+    empMap[e.empCode].expTotal += (e.amount || 0);
+  });
+  var employees = Object.keys(empMap).sort();
+  var html = '<div class="section-title">Employee Settlement Tracker</div>';
+  if (employees.length === 0) {
+    html += '<div class="card" style="padding:20px;text-align:center;color:var(--gray-400)">No settlements to track</div>';
+  } else {
+    html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">';
+    html += '<thead><tr style="background:var(--gray-50)"><th style="padding:8px 10px;text-align:left;font-size:.72rem;font-weight:700;color:var(--gray-500);border-bottom:2px solid var(--gray-200)">Employee</th><th style="padding:8px 10px;text-align:right;font-size:.72rem;font-weight:700;color:var(--gray-500);border-bottom:2px solid var(--gray-200)">Advance Given</th><th style="padding:8px 10px;text-align:right;font-size:.72rem;font-weight:700;color:var(--gray-500);border-bottom:2px solid var(--gray-200)">Expense Claimed</th><th style="padding:8px 10px;text-align:right;font-size:.72rem;font-weight:700;color:var(--gray-500);border-bottom:2px solid var(--gray-200)">Balance</th></tr></thead><tbody>';
+    var grandAdv = 0, grandExp = 0;
+    employees.forEach(function(code) {
+      var e = empMap[code];
+      var balance = e.advTotal - e.expTotal;
+      grandAdv += e.advTotal; grandExp += e.expTotal;
+      var balColor = balance > 0 ? '#dc2626' : balance < 0 ? '#16a34a' : 'var(--gray-600)';
+      var balLabel = balance > 0 ? 'To Return' : balance < 0 ? 'To Reimburse' : 'Settled';
+      html += '<tr><td style="padding:8px 10px;font-size:.78rem;font-weight:600;border-bottom:1px solid var(--gray-100)">' + escapeHTML(e.name) + '<br><span style="font-size:.65rem;color:var(--gray-400);font-weight:400">' + escapeHTML(code) + '</span></td>';
+      html += '<td style="padding:8px 10px;text-align:right;font-size:.78rem;border-bottom:1px solid var(--gray-100)">Rs.' + e.advTotal.toLocaleString('en-IN') + '</td>';
+      html += '<td style="padding:8px 10px;text-align:right;font-size:.78rem;border-bottom:1px solid var(--gray-100)">Rs.' + e.expTotal.toLocaleString('en-IN') + '</td>';
+      html += '<td style="padding:8px 10px;text-align:right;font-size:.78rem;font-weight:700;color:' + balColor + ';border-bottom:1px solid var(--gray-100)">Rs.' + Math.abs(balance).toLocaleString('en-IN') + '<br><span style="font-size:.6rem">' + balLabel + '</span></td></tr>';
+    });
+    var grandBal = grandAdv - grandExp;
+    html += '</tbody><tfoot><tr style="background:var(--gray-50)"><td style="padding:10px;font-weight:700;font-size:.78rem">Total</td>';
+    html += '<td style="padding:10px;text-align:right;font-weight:700;font-size:.78rem">Rs.' + grandAdv.toLocaleString('en-IN') + '</td>';
+    html += '<td style="padding:10px;text-align:right;font-weight:700;font-size:.78rem">Rs.' + grandExp.toLocaleString('en-IN') + '</td>';
+    html += '<td style="padding:10px;text-align:right;font-weight:700;font-size:.78rem;color:var(--primary)">Rs.' + Math.abs(grandBal).toLocaleString('en-IN') + '</td></tr></tfoot></table></div>';
+  }
+  c.innerHTML = html;
+}
+
+// =====================================================
 // CHANGE 1: EMPLOYEE ATTENDANCE VIEW (HR sees all)
 // =====================================================
 var _attendanceOriginalHTML = '';
@@ -13416,8 +13548,9 @@ function getAdvanceStepIndicator(status) {
 function renderSalaryView() {
   if (!currentUser) return;
   var isHR = currentUser.role === 'HR';
-  // HR "Employee List" mode — show all employees salary table
-  if (isHR && _activeNavId === 'hr-sal-list') {
+  var isAccounts = currentUser.dept === 'Accounts';
+  // HR/Accounts "Employee List" mode — show all employees salary table
+  if ((isHR && _activeNavId === 'hr-sal-list') || (isAccounts && _activeNavId === 'emp-acc-salary')) {
     renderEmployeeSalaryList();
     return;
   }

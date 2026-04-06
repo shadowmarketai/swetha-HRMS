@@ -3,7 +3,7 @@ const router = express.Router();
 const db = require('../config/db');
 const { verifyToken, requireRole, requireRoleOrDept } = require('../middleware/auth');
 const SITE_DEPTS = ['Site Engineer']; // Departments with PEB store access (stock, material request, returns, scrap, transport)
-const ADMIN_DEPTS = ['Admin', 'Site Engineer']; // Departments with full PEB access (dashboard, inventory, procurement)
+const ADMIN_DEPTS = ['Admin', 'Site Engineer', 'Accounts']; // Departments with full PEB access (dashboard, inventory, procurement)
 
 // ========================================
 // HELPERS (ported from PEB utils)

@@ -3,7 +3,7 @@ const router = express.Router();
 const db = require('../config/db');
 const { verifyToken, requireRole, requireRoleOrDept } = require('../middleware/auth');
 const SITE_DEPTS = ['Site Engineer'];
-const ADMIN_DEPTS = ['Admin', 'Site Engineer'];
+const ADMIN_DEPTS = ['Admin', 'Site Engineer', 'Accounts'];
 
 // Helpers
 async function generateCode(prefix, table, column) {

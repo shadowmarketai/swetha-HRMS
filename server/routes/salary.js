@@ -6,7 +6,14 @@ const { verifyToken, requireRole } = require('../middleware/auth');
 router.get('/', verifyToken, async (req, res) => {
   try {
     let query, params;
-    if (['MD', 'HR'].includes(req.user.role)) {
+    // MD, HR, and Accounts dept can see all salaries
+    const isAccounts = req.user.role === 'Employee' || req.user.role === 'Manager';
+    let empDept = '';
+    if (isAccounts) {
+      const [empRows] = await pool.query('SELECT dept FROM employees WHERE code = ?', [req.user.empCode]);
+      if (empRows.length > 0) empDept = empRows[0].dept;
+    }
+    if (['MD', 'HR'].includes(req.user.role) || empDept === 'Accounts') {
       query = 'SELECT code, name, dept, designation, salary, bank, acc_no FROM employees WHERE is_active = 1 ORDER BY dept, name';
       params = [];
     } else {

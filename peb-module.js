@@ -24,6 +24,10 @@ var _pebSectionMap = {
   // Manager (Site Engineer) nav IDs
   'mgr-inv-stock':'stock-items','mgr-inv-requests':'material-requests',
   'mgr-proc-transport':'transport','mgr-inv-returns':'returns-scrap',
+  // Employee (Accounts dept) nav IDs
+  'emp-acc-proc-grn':'grn','emp-acc-proc-vendors':'vendors',
+  'emp-acc-proc-indents':'purchase-indents','emp-acc-proc-orders':'purchase-orders',
+  'emp-acc-proc-transport':'transport',
   // Manager (Admin dept) nav IDs
   'mgr-adm-peb-dash':'dashboard','mgr-adm-inv-stock':'stock-items','mgr-adm-inv-grn':'grn',
   'mgr-adm-inv-requests':'material-requests','mgr-adm-inv-returns':'returns-scrap',
@@ -158,7 +162,7 @@ async function _pebDashboard(el) {
 function _pebCanEdit() {
   if (typeof currentUser === 'undefined' || !currentUser) return false;
   if (currentUser.role === 'MD' || currentUser.role === 'HR') return true;
-  if (currentUser.dept === 'Admin') return true;
+  if (currentUser.dept === 'Admin' || currentUser.dept === 'Accounts') return true;
   return false;
 }
 
