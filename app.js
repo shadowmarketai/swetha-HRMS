@@ -6976,7 +6976,12 @@ async function loadFromBackend() {
   if (!isOnline) throw new Error('No internet connection');
   if (!JWT_TOKEN) throw new Error('Not authenticated');
   try {
-    var isMDorHR = currentUser && (currentUser.role === 'MD' || currentUser.role === 'HR');
+    // Determine role from currentUser OR from JWT session (currentUser may not be set yet on first login)
+    var userRole = (currentUser && currentUser.role) || '';
+    if (!userRole && JWT_TOKEN) {
+      try { var payload = JSON.parse(atob(JWT_TOKEN.split('.')[1])); userRole = payload.role || ''; } catch(e) {}
+    }
+    var isMDorHR = userRole === 'MD' || userRole === 'HR';
     var headers = apiHeaders();
     var fetchOpts = { method: 'GET', headers: headers };
     var base = API_BASE;
@@ -9395,11 +9400,14 @@ async function deleteShiftType(code) {
 // F2: EXPENSE REIMBURSEMENT FUNCTIONS
 // =====================================================
 async function submitExpenseReimbursement() {
-  var cat = document.getElementById('expCategory').value;
-  var amount = parseFloat(document.getElementById('expAmount').value);
-  var desc = document.getElementById('expDesc').value.trim();
-  var date = document.getElementById('expDate').value;
-  var billInput = document.getElementById('expBillInput');
+  // Use stored preview data if available (preview replaces form inputs)
+  var stored = window._expPreviewData || {};
+  var cat = stored.cat || (document.getElementById('expCategory') || {}).value || '';
+  var amount = stored.amount || parseFloat((document.getElementById('expAmount') || {}).value) || 0;
+  var desc = stored.desc || ((document.getElementById('expDesc') || {}).value || '').trim();
+  var date = stored.date || (document.getElementById('expDate') || {}).value || '';
+  var billFile = stored.billFile || null;
+  if (!billFile) { var billInput = document.getElementById('expBillInput'); if (billInput && billInput.files && billInput.files[0]) billFile = billInput.files[0]; }
   if (!cat || !amount || !date) { showToast('Please fill all required fields'); return; }
   var expClaimBtn = document.querySelector('#expensesContent .nf-btn-primary');
   _submitStart(expClaimBtn);
@@ -9409,7 +9417,7 @@ async function submitExpenseReimbursement() {
     fd.append('amount', amount);
     fd.append('description', desc);
     fd.append('date', date);
-    if (billInput && billInput.files && billInput.files[0]) fd.append('bill', billInput.files[0]);
+    if (billFile) fd.append('bill', billFile);
     var res = await apiUpload('/expenses', fd);
     var exp = {
       id: (res && res.id) || expReimbNextId++, empCode: currentUser.code, empName: currentUser.name, dept: currentUser.dept,
@@ -9419,6 +9427,7 @@ async function submitExpenseReimbursement() {
     expenseReimbursements.push(exp);
     addNotification('Expense claim submitted: Rs.' + amount.toLocaleString('en-IN'), 'expense');
     _submitSuccess(expClaimBtn);
+    window._expPreviewData = null;
     showToast('Expense claim submitted');
     setTimeout(function() { renderExpenseOverlay(); }, 1200);
   } catch (e) {
@@ -9543,8 +9552,9 @@ function previewExpenseClaim() {
   if (previewImg && previewImg.src) billPreviewSrc = previewImg.src;
   if (billInput && billInput.files && billInput.files[0]) billFileName = billInput.files[0].name;
 
-  // Store form data temporarily for final submit
-  window._expPreviewData = { cat: cat, amount: amount, desc: desc, date: date, advAmt: advAmt, lineItems: lineItems, billInput: billInput };
+  // Store form data + file before preview replaces HTML
+  var billFile = (billInput && billInput.files && billInput.files[0]) ? billInput.files[0] : null;
+  window._expPreviewData = { cat: cat, amount: amount, desc: desc, date: date, advAmt: advAmt, lineItems: lineItems, billFile: billFile };
 
   // Build preview HTML
   var c = document.getElementById('expensesContent');
