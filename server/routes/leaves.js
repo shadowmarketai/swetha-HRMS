@@ -5,6 +5,7 @@ const { body, validationResult } = require('express-validator');
 const { auditLog } = require('../middleware/audit');
 
 const VALID_LEAVE_TYPES = ['casual', 'comp', 'permission'];
+// Note: earned and sick leave types removed from UI. Only casual, comp off, and permission (1/month) are active.
 
 // Helper: create notifications for multiple users
 async function notifyUsers(pool, empCodes, title, message, type) {
@@ -83,7 +84,7 @@ router.post('/', verifyToken, [
       const available = bal[0][type] || 0;
       if (available < days && !lopFlag) {
         if (type === 'permission') {
-          return res.status(400).json({ error: 'You have used all 2 permissions this month. Additional permission will be Loss of Pay (LOP). Confirm to proceed.' });
+          return res.status(400).json({ error: 'You have used your 1 permission this month. Additional permission will be Loss of Pay (LOP). Confirm to proceed.' });
         }
         return res.status(400).json({ error: 'Insufficient ' + type + ' leave balance (' + available + ' remaining). Apply as LOP if needed.' });
       }
@@ -224,12 +225,11 @@ router.get('/balance', verifyToken, async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM leave_balances WHERE emp_code = ?', [req.user.empCode]);
     if (rows.length === 0) {
-      // Create default balance
       await pool.query('INSERT INTO leave_balances (emp_code) VALUES (?)', [req.user.empCode]);
-      return res.json({ casual: 12, earned: 20, sick: 6, comp: 3, permission: 2 });
+      return res.json({ casual: 12, comp: 3, permission: 1 });
     }
     const b = rows[0];
-    res.json({ casual: b.casual || 0, earned: b.earned || 0, sick: b.sick || 0, comp: b.comp || 0, permission: b.permission !== undefined ? b.permission : 2 });
+    res.json({ casual: b.casual || 0, comp: b.comp || 0, permission: b.permission !== undefined ? b.permission : 1 });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
@@ -242,7 +242,7 @@ router.get('/balance/all', verifyToken, requireRole('MD', 'HR'), async (req, res
     const [rows] = await pool.query('SELECT * FROM leave_balances');
     const result = {};
     rows.forEach(r => {
-      result[r.emp_code] = { casual: r.casual, earned: r.earned, sick: r.sick, comp: r.comp, permission: r.permission !== undefined ? r.permission : 2 };
+      result[r.emp_code] = { casual: r.casual, comp: r.comp, permission: r.permission !== undefined ? r.permission : 1 };
     });
     res.json(result);
   } catch (err) {
@@ -255,9 +255,9 @@ router.get('/balance/all', verifyToken, requireRole('MD', 'HR'), async (req, res
 router.get('/balance/:code', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM leave_balances WHERE emp_code = ?', [req.params.code]);
-    if (rows.length === 0) return res.json({ casual: 12, earned: 20, sick: 6, comp: 3, permission: 2 });
+    if (rows.length === 0) return res.json({ casual: 12, comp: 3, permission: 1 });
     const b = rows[0];
-    res.json({ casual: b.casual || 0, earned: b.earned || 0, sick: b.sick || 0, comp: b.comp || 0, permission: b.permission !== undefined ? b.permission : 2 });
+    res.json({ casual: b.casual || 0, comp: b.comp || 0, permission: b.permission !== undefined ? b.permission : 1 });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
