@@ -12607,17 +12607,37 @@ async function loadAttendanceSummaryTable() {
 
   var presentCount = 0, absentCount = 0;
   var rows = activeEmps.map(function(emp) {
-    var isPresent = !!dayLogs[emp.code];
+    var log = dayLogs[emp.code];
+    var isPresent = !!log;
     if (isPresent) presentCount++; else absentCount++;
     var statusBadge = isPresent
       ? '<span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:.72rem;font-weight:600;background:#dcfce7;color:#16a34a">Present</span>'
       : '<span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:.72rem;font-weight:600;background:#fee2e2;color:#dc2626">Absent</span>';
-    return '<tr><td style="padding:8px 10px;font-size:.78rem;font-weight:600;border-bottom:1px solid var(--gray-100)">' + escapeHTML(emp.code) + '</td><td style="padding:8px 10px;font-size:.78rem;border-bottom:1px solid var(--gray-100)">' + escapeHTML(emp.name) + '</td><td style="padding:8px 10px;text-align:center;border-bottom:1px solid var(--gray-100)">' + statusBadge + '</td></tr>';
+    // Selfie column
+    var selfieHtml = '<span style="color:var(--gray-300);font-size:.68rem">—</span>';
+    if (log && log.selfie_checkin_url) {
+      var selfieUrl = log.selfie_checkin_url + (log.selfie_checkin_url.indexOf('?') === -1 ? '?' : '&') + 'token=' + encodeURIComponent(JWT_TOKEN);
+      selfieHtml = '<img src="' + escapeHTML(selfieUrl) + '" style="width:40px;height:40px;object-fit:cover;border-radius:8px;border:2px solid #16a34a;cursor:pointer" onclick="window.open(this.src,\'_blank\')" title="Check-in selfie">';
+    }
+    // Check-out selfie
+    var selfieOutHtml = '';
+    if (log && log.selfie_checkout_url) {
+      var selfieOutUrl = log.selfie_checkout_url + (log.selfie_checkout_url.indexOf('?') === -1 ? '?' : '&') + 'token=' + encodeURIComponent(JWT_TOKEN);
+      selfieOutHtml = '<img src="' + escapeHTML(selfieOutUrl) + '" style="width:40px;height:40px;object-fit:cover;border-radius:8px;border:2px solid #dc2626;cursor:pointer;margin-left:4px" onclick="window.open(this.src,\'_blank\')" title="Check-out selfie">';
+    }
+    var tdStyle = 'padding:8px 10px;border-bottom:1px solid var(--gray-100)';
+    return '<tr>' +
+      '<td style="' + tdStyle + ';font-size:.78rem;font-weight:600">' + escapeHTML(emp.code) + '</td>' +
+      '<td style="' + tdStyle + ';font-size:.78rem">' + escapeHTML(emp.name) + '</td>' +
+      '<td style="' + tdStyle + ';text-align:center">' + statusBadge + '</td>' +
+      '<td style="' + tdStyle + ';text-align:center">' + selfieHtml + selfieOutHtml + '</td>' +
+      '</tr>';
   });
 
+  var thStyle = 'padding:8px 10px;text-align:left;font-size:.72rem;font-weight:700;color:var(--gray-500);text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid var(--gray-200)';
   var html = '<div style="padding:10px 12px 6px;font-size:.75rem;color:var(--gray-500)">' + escapeHTML(dateLabel) + ' &mdash; <span style="color:#16a34a;font-weight:600">' + presentCount + ' Present</span> &middot; <span style="color:#dc2626;font-weight:600">' + absentCount + ' Absent</span></div>';
   html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">';
-  html += '<thead><tr style="background:var(--gray-50)"><th style="padding:8px 10px;text-align:left;font-size:.72rem;font-weight:700;color:var(--gray-500);text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid var(--gray-200)">Emp Code</th><th style="padding:8px 10px;text-align:left;font-size:.72rem;font-weight:700;color:var(--gray-500);text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid var(--gray-200)">Name</th><th style="padding:8px 10px;text-align:center;font-size:.72rem;font-weight:700;color:var(--gray-500);text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid var(--gray-200)">Status</th></tr></thead>';
+  html += '<thead><tr style="background:var(--gray-50)"><th style="' + thStyle + '">Emp Code</th><th style="' + thStyle + '">Name</th><th style="' + thStyle + ';text-align:center">Status</th><th style="' + thStyle + ';text-align:center">Selfie</th></tr></thead>';
   html += '<tbody>' + rows.join('') + '</tbody></table></div>';
 
   if (activeEmps.length === 0) {
