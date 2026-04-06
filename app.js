@@ -5239,7 +5239,7 @@ async function changePassword() {
   if (newPass.length < 6) { showToast('Password must be at least 6 characters'); return; }
   if (newPass !== confirmPass) { showToast('Passwords do not match'); return; }
 
-  var btn = document.querySelector('#screen-settings .btn-primary[onclick="changePassword()"]');
+  var btn = document.getElementById('btnUpdatePassword');
   if (btn) { btn.disabled = true; btn.textContent = 'Updating...'; }
   try {
     await apiCall('POST', '/auth/change-password', { oldPassword: oldPass, newPassword: newPass });
