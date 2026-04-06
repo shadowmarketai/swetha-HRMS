@@ -177,24 +177,6 @@ router.get('/', verifyToken, async (req, res) => {
   }
 });
 
-// GET /api/attendance/debug — temporary debug endpoint
-router.get('/debug', verifyToken, async (req, res) => {
-  try {
-    if (!['MD', 'HR'].includes(req.user.role)) return res.status(403).json({ error: 'MD/HR only' });
-    const [[{ total }]] = await pool.query('SELECT COUNT(*) as total FROM attendance_logs');
-    const [[{ thisMonth }]] = await pool.query("SELECT COUNT(*) as thisMonth FROM attendance_logs WHERE log_date LIKE CONCAT(DATE_FORMAT(NOW(),'%Y-%m'),'%')");
-    const [latest] = await pool.query('SELECT emp_code, log_date, check_in, check_out FROM attendance_logs ORDER BY log_date DESC, check_in DESC LIMIT 10');
-    const [empCodes] = await pool.query('SELECT DISTINCT emp_code FROM attendance_logs');
-    const [employees] = await pool.query('SELECT code, name FROM employees LIMIT 20');
-    const [[{ joinCount }]] = await pool.query(`SELECT COUNT(*) as joinCount FROM attendance_logs a JOIN employees e ON a.emp_code = e.code`);
-    const [[{ noJoin }]] = await pool.query(`SELECT COUNT(*) as noJoin FROM attendance_logs a LEFT JOIN employees e ON a.emp_code = e.code WHERE e.code IS NULL`);
-    res.json({ total, thisMonth, joinCount, orphanedRecords: noJoin, latestRecords: latest, attendanceEmpCodes: empCodes.map(r => r.emp_code), employeeCodes: employees.map(r => ({ code: r.code, name: r.name })), serverTime: new Date().toISOString(), serverDate: new Date().toISOString().split('T')[0] });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
-  }
-});
-
 // =====================================================
 // MISSED ATTENDANCE REQUESTS
 // =====================================================
