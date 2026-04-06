@@ -5285,7 +5285,8 @@ function exportToCSV(data, filename, columns) {
 
 function exportEmployeeList() {
   if (currentUser && currentUser.role === 'Employee') { showToast('Access denied. Management only.'); return; }
-  exportToCSV(EMPLOYEES, 'employees.csv', [
+  var activeEmps = EMPLOYEES.filter(function(e) { return e.status !== 'Inactive'; });
+  exportToCSV(activeEmps, 'employees.csv', [
     {label:'Name', key:'name'},
     {label:'Code', key:'code'},
     {label:'Department', key:'dept'},
@@ -5315,7 +5316,11 @@ function exportKPIReport() {
 
 function exportSalaryReport() {
   if (currentUser && currentUser.role === 'Employee') { showToast('Access denied. Management only.'); return; }
-  exportToCSV(EMPLOYEES, 'salary_dec2025.csv', [
+  var now = new Date();
+  var monthNames = ['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+  var filename = 'salary_' + monthNames[now.getMonth()] + now.getFullYear() + '.csv';
+  var activeEmps = EMPLOYEES.filter(function(e) { return e.status !== 'Inactive'; });
+  exportToCSV(activeEmps, filename, [
     {label:'Name', key:'name'}, {label:'Code', key:'code'},
     {label:'Department', key:'dept'}, {label:'Designation', key:'designation'},
     {label:'Gross Salary', key:'salary'},
@@ -5324,21 +5329,59 @@ function exportSalaryReport() {
   ]);
 }
 
-function exportAttendanceReport() {
+async function exportAttendanceReport() {
   if (currentUser && currentUser.role === 'Employee') { showToast('Access denied. Management only.'); return; }
-  const data = EMPLOYEES.map(e => ({
-    name: e.name, code: e.code, dept: e.dept,
-    present: Math.floor(Math.random() * 5) + 22,
-    absent: Math.floor(Math.random() * 3),
-    halfDay: Math.floor(Math.random() * 2),
-    leave: Math.floor(Math.random() * 2)
-  }));
-  exportToCSV(data, 'attendance_march2026.csv', [
-    {label:'Name', key:'name'}, {label:'Code', key:'code'},
-    {label:'Department', key:'dept'}, {label:'Present', key:'present'},
-    {label:'Absent', key:'absent'}, {label:'Half Day', key:'halfDay'},
-    {label:'Leave', key:'leave'}
-  ]);
+  showToast('Fetching attendance data...');
+  var now = new Date();
+  var monthStr = now.toISOString().slice(0, 7);
+  var monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var monthLabel = monthNames[now.getMonth()] + '_' + now.getFullYear();
+  try {
+    var logs = await apiCall('GET', '/attendance?month=' + monthStr);
+    if (!Array.isArray(logs)) logs = [];
+    // Count working days in the month up to today
+    var daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    var todayDate = now.getDate();
+    var workingDays = 0;
+    for (var d = 1; d <= todayDate; d++) {
+      if (new Date(now.getFullYear(), now.getMonth(), d).getDay() !== 0) workingDays++;
+    }
+    // Group attendance by employee
+    var empDays = {};
+    logs.forEach(function(row) {
+      if (!row.emp_code || !row.log_date) return;
+      if (!empDays[row.emp_code]) empDays[row.emp_code] = {};
+      var dayKey = row.log_date.substring(0, 10);
+      empDays[row.emp_code][dayKey] = true;
+    });
+    // Fetch leave data for the month
+    var leavesByEmp = {};
+    leaveApplications.forEach(function(l) {
+      if (l.status !== 'approved' && l.status !== 'Approved') return;
+      if (!l.empCode) return;
+      if (!leavesByEmp[l.empCode]) leavesByEmp[l.empCode] = 0;
+      // Count leave days that fall in this month
+      var from = new Date(l.fromDate || l.from);
+      var to = new Date(l.toDate || l.to || l.fromDate || l.from);
+      for (var ld = new Date(from); ld <= to; ld.setDate(ld.getDate() + 1)) {
+        if (ld.getFullYear() === now.getFullYear() && ld.getMonth() === now.getMonth()) {
+          leavesByEmp[l.empCode] = (leavesByEmp[l.empCode] || 0) + 1;
+        }
+      }
+    });
+    var data = EMPLOYEES.filter(function(e) { return e.status !== 'Inactive'; }).map(function(e) {
+      var presentDays = empDays[e.code] ? Object.keys(empDays[e.code]).length : 0;
+      var leaveDays = leavesByEmp[e.code] || 0;
+      var absentDays = Math.max(0, workingDays - presentDays - leaveDays);
+      return { name: e.name, code: e.code, dept: e.dept, present: presentDays, absent: absentDays, leave: leaveDays, workingDays: workingDays };
+    });
+    exportToCSV(data, 'attendance_' + monthLabel + '.csv', [
+      {label:'Name', key:'name'}, {label:'Code', key:'code'},
+      {label:'Department', key:'dept'}, {label:'Working Days', key:'workingDays'},
+      {label:'Present', key:'present'}, {label:'Absent', key:'absent'},
+      {label:'Leave', key:'leave'}
+    ]);
+  } catch (e) { showToast(e.message || 'Error exporting attendance'); }
 }
 
 function exportTaskReport() {
@@ -8971,7 +9014,94 @@ function openExpenseApplyForm() {
   html += '<p style="font-size:.72rem;margin-top:4px">Tap to upload bill / receipt</p>';
   html += '<input type="file" id="expBillInput" accept="image/*" style="display:none" onchange="handleExpBillPreview(this)"></div>';
   html += '<div id="expBillPreview" style="display:none;margin-top:6px"><img style="max-width:100%;border-radius:var(--radius-xs)"></div></div>';
-  html += '<div style="display:flex;gap:8px"><button class="nf-btn nf-btn-primary" onclick="submitExpenseReimbursement()">Submit Claim</button><button class="nf-btn nf-btn-outline" onclick="renderExpenseOverlay()">Cancel</button></div></div>';
+  html += '<div style="display:flex;gap:8px"><button class="nf-btn nf-btn-primary" onclick="previewExpenseClaim()">Preview Claim</button><button class="nf-btn nf-btn-outline" onclick="renderExpenseOverlay()">Cancel</button></div></div>';
+  c.innerHTML = html;
+}
+
+function previewExpenseClaim() {
+  var cat = (document.getElementById('expCategory') || {}).value;
+  var amount = parseFloat((document.getElementById('expAmount') || {}).value);
+  var desc = (document.getElementById('expDesc') || {}).value.trim();
+  var date = (document.getElementById('expDate') || {}).value;
+  var advAmt = parseFloat((document.getElementById('expAdvanceAmt') || {}).value) || 0;
+  var billInput = document.getElementById('expBillInput');
+
+  if (!cat) { showToast('Please select a category'); return; }
+  if (!amount || isNaN(amount)) { showToast('Please enter the amount spent'); return; }
+  if (!date) { showToast('Please select a date'); return; }
+
+  // Collect line items
+  var lineItems = [];
+  document.querySelectorAll('.exp-line-item').forEach(function(row) {
+    var d = (row.querySelector('.exp-item-desc') || {}).value || '';
+    var a = parseFloat((row.querySelector('.exp-item-amt') || {}).value) || 0;
+    if (d.trim() || a > 0) lineItems.push({ desc: d.trim(), amt: a });
+  });
+
+  // Get bill preview image
+  var billPreviewSrc = '';
+  var billFileName = '';
+  var previewImg = document.querySelector('#expBillPreview img');
+  if (previewImg && previewImg.src) billPreviewSrc = previewImg.src;
+  if (billInput && billInput.files && billInput.files[0]) billFileName = billInput.files[0].name;
+
+  // Store form data temporarily for final submit
+  window._expPreviewData = { cat: cat, amount: amount, desc: desc, date: date, advAmt: advAmt, lineItems: lineItems, billInput: billInput };
+
+  // Build preview HTML
+  var c = document.getElementById('expensesContent');
+  if (!c) return;
+
+  var catIcons = {'Travel':'\uD83D\uDE97','Food':'\uD83C\uDF7D\uFE0F','Accommodation':'\uD83C\uDFE8','Equipment':'\uD83D\uDD27','Office Supplies':'\uD83D\uDCCE','Medical':'\uD83C\uDFE5','Fuel':'\u26FD','Other':'\uD83D\uDCE6'};
+  var dateLabel = new Date(date + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  var balance = amount - advAmt;
+
+  var html = '<div class="card" style="margin-bottom:12px">';
+  html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><div style="width:36px;height:36px;border-radius:10px;background:var(--primary-50);display:flex;align-items:center;justify-content:center;font-size:1.2rem">' + (catIcons[cat] || '\uD83D\uDCE6') + '</div>';
+  html += '<div><h3 style="font-family:var(--font-display);font-size:.95rem;font-weight:600;margin:0">Preview Expense Claim</h3>';
+  html += '<p style="font-size:.7rem;color:var(--gray-400);margin:0">Review details before submitting</p></div></div>';
+
+  html += '<div style="background:var(--gray-50);border-radius:var(--radius-xs);padding:12px;margin-bottom:12px">';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:.78rem">';
+  html += '<div><span style="color:var(--gray-500)">Category:</span><br><strong>' + escapeHTML(cat) + '</strong></div>';
+  html += '<div><span style="color:var(--gray-500)">Date:</span><br><strong>' + escapeHTML(dateLabel) + '</strong></div>';
+  html += '<div><span style="color:var(--gray-500)">Amount Spent:</span><br><strong style="color:var(--danger);font-size:.88rem">Rs.' + amount.toLocaleString('en-IN') + '</strong></div>';
+  html += '<div><span style="color:var(--gray-500)">Advance Received:</span><br><strong>Rs.' + advAmt.toLocaleString('en-IN') + '</strong></div>';
+  html += '</div>';
+  if (balance > 0) {
+    html += '<div style="margin-top:8px;padding:6px 10px;background:var(--warning-light,#fef3c7);border-radius:var(--radius-xs);font-size:.75rem"><strong>Balance to claim: Rs.' + balance.toLocaleString('en-IN') + '</strong></div>';
+  }
+  html += '</div>';
+
+  if (desc) {
+    html += '<div style="margin-bottom:12px"><div style="font-size:.72rem;color:var(--gray-500);font-weight:600;margin-bottom:4px">DESCRIPTION</div>';
+    html += '<div style="font-size:.78rem;padding:8px;background:var(--gray-50);border-radius:var(--radius-xs)">' + escapeHTML(desc) + '</div></div>';
+  }
+
+  if (lineItems.length > 0) {
+    html += '<div style="margin-bottom:12px"><div style="font-size:.72rem;color:var(--gray-500);font-weight:600;margin-bottom:4px">LINE ITEMS</div>';
+    html += '<div style="background:var(--gray-50);border-radius:var(--radius-xs);overflow:hidden">';
+    var lineTotal = 0;
+    lineItems.forEach(function(item) {
+      lineTotal += item.amt;
+      html += '<div style="display:flex;justify-content:space-between;padding:6px 10px;border-bottom:1px solid var(--gray-100);font-size:.78rem"><span>' + escapeHTML(item.desc || 'Item') + '</span><strong>Rs.' + item.amt.toLocaleString('en-IN') + '</strong></div>';
+    });
+    html += '<div style="display:flex;justify-content:space-between;padding:8px 10px;font-size:.78rem;font-weight:700;background:var(--gray-100)"><span>Total</span><span>Rs.' + lineTotal.toLocaleString('en-IN') + '</span></div>';
+    html += '</div></div>';
+  }
+
+  if (billPreviewSrc) {
+    html += '<div style="margin-bottom:12px"><div style="font-size:.72rem;color:var(--gray-500);font-weight:600;margin-bottom:4px">ATTACHED BILL' + (billFileName ? ' — ' + escapeHTML(billFileName) : '') + '</div>';
+    html += '<div style="background:var(--gray-50);border-radius:var(--radius-xs);padding:8px;text-align:center"><img src="' + billPreviewSrc + '" style="max-width:100%;max-height:300px;border-radius:var(--radius-xs)"></div></div>';
+  } else {
+    html += '<div style="margin-bottom:12px;padding:8px 10px;background:#fee2e2;border-radius:var(--radius-xs);font-size:.75rem;color:#dc2626;font-weight:600">No bill attached</div>';
+  }
+
+  html += '<div style="display:flex;gap:8px;margin-top:14px">';
+  html += '<button class="nf-btn nf-btn-primary" onclick="submitExpenseReimbursement()" style="flex:1;font-weight:700">Confirm & Submit</button>';
+  html += '<button class="nf-btn nf-btn-outline" onclick="openExpenseApplyForm()" style="flex:1">Edit</button>';
+  html += '<button class="nf-btn nf-btn-outline" onclick="renderExpenseOverlay()">Cancel</button>';
+  html += '</div></div>';
   c.innerHTML = html;
 }
 
