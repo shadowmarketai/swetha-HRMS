@@ -1147,7 +1147,6 @@ function showForgotPassword() {
     <div style="margin-top:12px;text-align:center"><a href="#" onclick="restoreLoginForm();return false" style="font-size:.72rem;color:rgba(255,255,255,.7);text-decoration:none">&larr; Back to Login</a></div>
   `;
 }
-}
 
 function restoreLoginForm() {
   const form = document.querySelector('.login-form');
