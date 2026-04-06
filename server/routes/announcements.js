@@ -38,6 +38,10 @@ router.post('/', verifyToken, requireRole('MD', 'HR'), auditLog('create', 'annou
       'INSERT INTO announcements (title, content, category, priority, created_by, author_name) VALUES (?, ?, ?, ?, ?, ?)',
       [title, content, category || 'General', priority || 'Normal', req.user.empCode, authorName]
     );
+    const io = req.app.get('io');
+    if (io) {
+      io.to('all').emit('announcement:created', { id: result.insertId, title, category: category || 'General', priority: priority || 'Normal' });
+    }
     res.status(201).json({ id: result.insertId, success: true });
   } catch (err) {
     console.error(err);
@@ -49,6 +53,10 @@ router.post('/', verifyToken, requireRole('MD', 'HR'), auditLog('create', 'annou
 router.delete('/:id', verifyToken, requireRole('MD', 'HR'), auditLog('delete', 'announcement'), async (req, res) => {
   try {
     await pool.query('UPDATE announcements SET is_active = 0 WHERE id = ?', [req.params.id]);
+    const io = req.app.get('io');
+    if (io) {
+      io.to('all').emit('announcement:deleted', { id: parseInt(req.params.id) });
+    }
     res.json({ success: true });
   } catch (err) {
     console.error(err);

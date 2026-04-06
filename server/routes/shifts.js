@@ -35,6 +35,10 @@ router.post('/types', verifyToken, requireRole('MD', 'HR'), async (req, res) => 
       'INSERT INTO shift_types (code, name, start_time, end_time, color) VALUES (?, ?, ?, ?, ?)',
       [code, name, start_time || '09:00', end_time || '18:00', color || '#2563EB']
     );
+    const io = req.app.get('io');
+    if (io) {
+      io.to('role:MD').to('role:HR').emit('shiftType:created', { code, name });
+    }
     res.json({ success: true });
   } catch (err) {
     if (err.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'Shift code already exists' });
@@ -52,6 +56,10 @@ router.put('/types/:code', verifyToken, requireRole('MD', 'HR'), async (req, res
       [name, start_time, end_time, color, req.params.code]
     );
     if (result.affectedRows === 0) return res.status(404).json({ error: 'Shift type not found' });
+    const io = req.app.get('io');
+    if (io) {
+      io.to('role:MD').to('role:HR').emit('shiftType:updated', { code: req.params.code });
+    }
     res.json({ success: true });
   } catch (err) {
     console.error(err);
@@ -100,6 +108,11 @@ router.put('/:empCode', verifyToken, requireRole('MD', 'HR'), auditLog('assign',
        assigned_by = VALUES(assigned_by), updated_at = NOW()`,
       [empCode, shift_code || 'GEN', is_eligible !== undefined ? is_eligible : 1, req.user.empCode]
     );
+    const io = req.app.get('io');
+    if (io) {
+      io.to('role:MD').to('role:HR').emit('shift:assigned', { empCode, shiftCode: shift_code || 'GEN' });
+      io.to('user:' + empCode).emit('shift:assigned', { empCode, shiftCode: shift_code || 'GEN' });
+    }
     res.json({ success: true });
   } catch (err) {
     console.error(err);

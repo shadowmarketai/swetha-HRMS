@@ -33,6 +33,10 @@ router.post('/', verifyToken, async (req, res) => {
       'INSERT INTO exit_requests (emp_code, emp_name, reason, remarks, preferred_lwd) VALUES (?, ?, ?, ?, ?)',
       [req.user.empCode, empName, reason, remarks || '', preferred_lwd || null]
     );
+    const io = req.app.get('io');
+    if (io) {
+      io.to('role:MD').to('role:HR').emit('exit:requested', { id: result.insertId, empCode: req.user.empCode, empName });
+    }
     res.status(201).json({ id: result.insertId, success: true });
   } catch (err) {
     console.error(err);
@@ -43,7 +47,7 @@ router.post('/', verifyToken, async (req, res) => {
 // PUT /api/exit/:id/approve
 router.put('/:id/approve', verifyToken, requireRole('MD', 'HR'), auditLog('approve', 'exit'), async (req, res) => {
   try {
-    const [existing] = await pool.query('SELECT status FROM exit_requests WHERE id = ?', [req.params.id]);
+    const [existing] = await pool.query('SELECT status, emp_code FROM exit_requests WHERE id = ?', [req.params.id]);
     if (existing.length === 0) return res.status(404).json({ error: 'Exit request not found' });
     if (existing[0].status !== 'Pending') return res.status(400).json({ error: `Cannot approve: status is ${existing[0].status}` });
     const clearance = JSON.stringify({
@@ -54,6 +58,11 @@ router.put('/:id/approve', verifyToken, requireRole('MD', 'HR'), auditLog('appro
       'UPDATE exit_requests SET status = "Approved", reviewed_by = ?, review_date = CURDATE(), clearance = ? WHERE id = ?',
       [req.user.empCode, clearance, req.params.id]
     );
+    const io = req.app.get('io');
+    if (io) {
+      io.to('role:MD').to('role:HR').emit('exit:approved', { id: parseInt(req.params.id), empCode: existing[0].emp_code });
+      io.to('user:' + existing[0].emp_code).emit('exit:approved', { id: parseInt(req.params.id), empCode: existing[0].emp_code });
+    }
     res.json({ success: true });
   } catch (err) {
     console.error(err);
@@ -64,13 +73,18 @@ router.put('/:id/approve', verifyToken, requireRole('MD', 'HR'), auditLog('appro
 // PUT /api/exit/:id/reject
 router.put('/:id/reject', verifyToken, requireRole('MD', 'HR'), auditLog('reject', 'exit'), async (req, res) => {
   try {
-    const [existing] = await pool.query('SELECT status FROM exit_requests WHERE id = ?', [req.params.id]);
+    const [existing] = await pool.query('SELECT status, emp_code FROM exit_requests WHERE id = ?', [req.params.id]);
     if (existing.length === 0) return res.status(404).json({ error: 'Exit request not found' });
     if (existing[0].status !== 'Pending') return res.status(400).json({ error: `Cannot reject: status is ${existing[0].status}` });
     await pool.query(
       'UPDATE exit_requests SET status = "Rejected", reviewed_by = ?, review_date = CURDATE() WHERE id = ?',
       [req.user.empCode, req.params.id]
     );
+    const io = req.app.get('io');
+    if (io) {
+      io.to('role:MD').to('role:HR').emit('exit:rejected', { id: parseInt(req.params.id), empCode: existing[0].emp_code });
+      io.to('user:' + existing[0].emp_code).emit('exit:rejected', { id: parseInt(req.params.id), empCode: existing[0].emp_code });
+    }
     res.json({ success: true });
   } catch (err) {
     console.error(err);
@@ -95,7 +109,7 @@ router.put('/:id/clearance', verifyToken, requireRole('MD', 'HR'), async (req, r
 // PUT /api/exit/:id/complete — complete exit with F&F
 router.put('/:id/complete', verifyToken, requireRole('MD', 'HR'), auditLog('complete', 'exit'), async (req, res) => {
   try {
-    const [existing] = await pool.query('SELECT status FROM exit_requests WHERE id = ?', [req.params.id]);
+    const [existing] = await pool.query('SELECT status, emp_code FROM exit_requests WHERE id = ?', [req.params.id]);
     if (existing.length === 0) return res.status(404).json({ error: 'Exit request not found' });
     if (existing[0].status !== 'Approved') return res.status(400).json({ error: `Cannot complete: status must be Approved, got ${existing[0].status}` });
     const { fnf_amount, fnf_details } = req.body;
@@ -103,6 +117,11 @@ router.put('/:id/complete', verifyToken, requireRole('MD', 'HR'), auditLog('comp
       'UPDATE exit_requests SET status = "Completed", fnf_amount = ?, fnf_details = ?, completed_at = NOW() WHERE id = ?',
       [fnf_amount || 0, JSON.stringify(fnf_details || {}), req.params.id]
     );
+    const io = req.app.get('io');
+    if (io) {
+      io.to('role:MD').to('role:HR').emit('exit:completed', { id: parseInt(req.params.id), empCode: existing[0].emp_code });
+      io.to('user:' + existing[0].emp_code).emit('exit:completed', { id: parseInt(req.params.id), empCode: existing[0].emp_code });
+    }
     res.json({ success: true });
   } catch (err) {
     console.error(err);

@@ -70,6 +70,11 @@ router.post('/upload', verifyToken, upload.single('file'), async (req, res) => {
       'INSERT INTO documents (emp_code, doc_type, doc_name, file_path, file_size, mime_type) VALUES (?, ?, ?, ?, ?, ?)',
       [code, docType || 'general', docName || req.file.originalname, req.file.path, req.file.size, req.file.mimetype]
     );
+    const io = req.app.get('io');
+    if (io) {
+      io.to('role:MD').to('role:HR').emit('document:uploaded', { empCode: code, docType: docType || 'general', docName: docName || req.file.originalname });
+      io.to('user:' + code).emit('document:uploaded', { empCode: code, docType: docType || 'general', docName: docName || req.file.originalname });
+    }
     res.status(201).json({ message: 'Document uploaded', filename: req.file.filename });
   } catch (err) {
     console.error(err);
@@ -97,6 +102,10 @@ router.post('/generate', verifyToken, requireRole('MD', 'HR'), async (req, res) 
 router.delete('/:id', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
   try {
     await pool.query('DELETE FROM documents WHERE id = ?', [req.params.id]);
+    const io = req.app.get('io');
+    if (io) {
+      io.to('role:MD').to('role:HR').emit('document:deleted', { id: parseInt(req.params.id) });
+    }
     res.json({ message: 'Document deleted' });
   } catch (err) {
     console.error(err);

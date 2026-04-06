@@ -8219,6 +8219,208 @@ function initWebSocket() {
     renderRecentActivity();
   });
 
+  // ── Missed Attendance ──
+  _hrmsSocket.on('missed-attendance:new', function(data) {
+    showToast(data.name + ' submitted a missed attendance request for ' + data.date, 'info');
+    refreshNotifications();
+    loadMissedAttRequests();
+    renderHomeQuickStats();
+  });
+  _hrmsSocket.on('missed-attendance:approved', function(data) {
+    showToast('Your missed attendance for ' + data.date + ' has been approved!', 'success');
+    refreshNotifications();
+    loadMissedAttRequests();
+    buildCalendar();
+  });
+  _hrmsSocket.on('missed-attendance:rejected', function(data) {
+    showToast('Your missed attendance request for ' + data.date + ' was rejected', 'error');
+    refreshNotifications();
+    loadMissedAttRequests();
+  });
+
+  // ── Announcements ──
+  _hrmsSocket.on('announcement:created', function(data) {
+    showToast('New announcement: ' + (data.title || ''), 'info');
+    showNotifPopup('New Announcement', data.title || '');
+    refreshNotifications();
+    apiCall('GET', '/announcements?limit=200').then(function(resp) {
+      var list = Array.isArray(resp) ? resp : (resp && resp.data ? resp.data : []);
+      if (typeof announcements !== 'undefined') { announcements.length = 0; list.forEach(function(a) { announcements.push(a); }); }
+    }).catch(function() {});
+  });
+  _hrmsSocket.on('announcement:deleted', function() {
+    apiCall('GET', '/announcements?limit=200').then(function(resp) {
+      var list = Array.isArray(resp) ? resp : (resp && resp.data ? resp.data : []);
+      if (typeof announcements !== 'undefined') { announcements.length = 0; list.forEach(function(a) { announcements.push(a); }); }
+    }).catch(function() {});
+  });
+
+  // ── Tasks ──
+  _hrmsSocket.on('task:created', function(data) {
+    if (data.assignedTo === currentUser.code || data.assignedTo === currentUser.dept || data.assignedTo === 'ALL') {
+      showToast('New task assigned: ' + (data.title || ''), 'info');
+    } else if (currentUser.role === 'MD' || currentUser.role === 'HR') {
+      showToast('New task created: ' + (data.title || ''), 'info');
+    }
+    apiCall('GET', '/tasks?limit=200').then(function(resp) {
+      var list = Array.isArray(resp) ? resp : (resp && resp.data ? resp.data : []);
+      TASK_DATA.length = 0; list.forEach(function(t) { TASK_DATA.push(t); });
+      renderHomeTasks();
+    }).catch(function() {});
+  });
+  _hrmsSocket.on('task:updated', function() {
+    apiCall('GET', '/tasks?limit=200').then(function(resp) {
+      var list = Array.isArray(resp) ? resp : (resp && resp.data ? resp.data : []);
+      TASK_DATA.length = 0; list.forEach(function(t) { TASK_DATA.push(t); });
+      renderHomeTasks();
+    }).catch(function() {});
+  });
+  _hrmsSocket.on('task:toggled', function() {
+    apiCall('GET', '/tasks?limit=200').then(function(resp) {
+      var list = Array.isArray(resp) ? resp : (resp && resp.data ? resp.data : []);
+      TASK_DATA.length = 0; list.forEach(function(t) { TASK_DATA.push(t); });
+      renderHomeTasks();
+    }).catch(function() {});
+  });
+  _hrmsSocket.on('task:deleted', function() {
+    apiCall('GET', '/tasks?limit=200').then(function(resp) {
+      var list = Array.isArray(resp) ? resp : (resp && resp.data ? resp.data : []);
+      TASK_DATA.length = 0; list.forEach(function(t) { TASK_DATA.push(t); });
+      renderHomeTasks();
+    }).catch(function() {});
+  });
+
+  // ── Shifts ──
+  _hrmsSocket.on('shift:assigned', function(data) {
+    if (data.empCode === currentUser.code) {
+      showToast('Your shift has been updated to: ' + (data.shiftCode || ''), 'info');
+    }
+  });
+  _hrmsSocket.on('shiftType:created', function() { showToast('New shift type added', 'info'); });
+  _hrmsSocket.on('shiftType:updated', function() { showToast('Shift type updated', 'info'); });
+
+  // ── Assets ──
+  _hrmsSocket.on('asset:created', function(data) {
+    showToast('New asset added: ' + (data.name || ''), 'info');
+  });
+  _hrmsSocket.on('asset:assigned', function(data) {
+    if (data.empCode === currentUser.code) {
+      showToast('An asset has been assigned to you: ' + (data.assetName || ''), 'info');
+      showNotifPopup('Asset Assigned', 'You have been assigned: ' + (data.assetName || ''));
+    }
+  });
+  _hrmsSocket.on('asset:returned', function(data) {
+    if (currentUser.role === 'MD' || currentUser.role === 'HR') {
+      showToast('Asset returned: ' + (data.assetName || ''), 'info');
+    }
+  });
+
+  // ── Recruitment ──
+  _hrmsSocket.on('job:created', function(data) {
+    showToast('New job posted: ' + (data.title || ''), 'info');
+  });
+  _hrmsSocket.on('job:updated', function() { /* silent refresh */ });
+  _hrmsSocket.on('candidate:created', function(data) {
+    showToast('New candidate added: ' + (data.name || ''), 'info');
+  });
+  _hrmsSocket.on('candidate:moved', function(data) {
+    showToast('Candidate ' + (data.name || '') + ' moved to ' + (data.stage || ''), 'info');
+  });
+
+  // ── Projects ──
+  _hrmsSocket.on('project:created', function(data) {
+    showToast('New project created: ' + (data.name || ''), 'info');
+    apiCall('GET', '/projects').then(function(resp) {
+      var list = Array.isArray(resp) ? resp : (resp && resp.data ? resp.data : []);
+      projects.length = 0; list.map(mapProject).forEach(function(p) { projects.push(p); });
+    }).catch(function() {});
+  });
+  _hrmsSocket.on('project:updated', function() {
+    apiCall('GET', '/projects').then(function(resp) {
+      var list = Array.isArray(resp) ? resp : (resp && resp.data ? resp.data : []);
+      projects.length = 0; list.map(mapProject).forEach(function(p) { projects.push(p); });
+    }).catch(function() {});
+  });
+  _hrmsSocket.on('project:deleted', function() {
+    apiCall('GET', '/projects').then(function(resp) {
+      var list = Array.isArray(resp) ? resp : (resp && resp.data ? resp.data : []);
+      projects.length = 0; list.map(mapProject).forEach(function(p) { projects.push(p); });
+    }).catch(function() {});
+  });
+  _hrmsSocket.on('projectTask:created', function(data) {
+    if (data.assignedTo === currentUser.code) {
+      showToast('You have been assigned a project task: ' + (data.title || ''), 'info');
+    }
+  });
+  _hrmsSocket.on('projectTask:updated', function() { /* silent */ });
+  _hrmsSocket.on('projectTeam:added', function(data) {
+    if (data.empCode === currentUser.code) {
+      showToast('You have been added to a project', 'info');
+    }
+  });
+  _hrmsSocket.on('projectTeam:removed', function(data) {
+    if (data.empCode === currentUser.code) {
+      showToast('You have been removed from a project', 'info');
+    }
+  });
+
+  // ── KPI ──
+  _hrmsSocket.on('kpi:selfRated', function(data) {
+    if (currentUser.role === 'MD' || currentUser.role === 'HR') {
+      showToast((data.empName || data.empCode) + ' submitted self-rating', 'info');
+    }
+  });
+  _hrmsSocket.on('kpi:scoresUpdated', function(data) {
+    if (data.empCode === currentUser.code) {
+      showToast('Your KPI scores have been updated', 'info');
+    }
+  });
+
+  // ── Documents ──
+  _hrmsSocket.on('document:uploaded', function(data) {
+    if (data.empCode === currentUser.code) {
+      showToast('A document has been uploaded for you', 'info');
+    } else if (currentUser.role === 'MD' || currentUser.role === 'HR') {
+      showToast((data.empName || data.empCode) + ' uploaded a document', 'info');
+    }
+  });
+  _hrmsSocket.on('document:deleted', function() { /* silent */ });
+
+  // ── Exit ──
+  _hrmsSocket.on('exit:requested', function(data) {
+    showToast((data.empName || data.empCode) + ' submitted an exit request', 'info');
+    showNotifPopup('Exit Request', (data.empName || '') + ' has requested to exit');
+    refreshNotifications();
+  });
+  _hrmsSocket.on('exit:approved', function(data) {
+    if (data.empCode === currentUser.code) {
+      showToast('Your exit request has been approved', 'success');
+      showNotifPopup('Exit Approved', 'Your exit request has been approved');
+    }
+    refreshNotifications();
+  });
+  _hrmsSocket.on('exit:rejected', function(data) {
+    if (data.empCode === currentUser.code) {
+      showToast('Your exit request has been rejected', 'error');
+    }
+    refreshNotifications();
+  });
+  _hrmsSocket.on('exit:completed', function(data) {
+    if (data.empCode === currentUser.code) {
+      showToast('Your exit process has been completed', 'info');
+    }
+    refreshNotifications();
+  });
+
+  // ── Compliance ──
+  _hrmsSocket.on('filing:created', function(data) {
+    showToast('New compliance filing: ' + (data.type || ''), 'info');
+  });
+  _hrmsSocket.on('filing:marked', function() { showToast('Compliance filing marked as done', 'info'); });
+  _hrmsSocket.on('contractWorker:created', function(data) {
+    showToast('New contract worker added: ' + (data.name || ''), 'info');
+  });
+
   // ── User online/offline (for MD live tracking) ──
   _hrmsSocket.on('user:online', function(data) {
     if (currentUser.role === 'MD' || currentUser.role === 'HR') {

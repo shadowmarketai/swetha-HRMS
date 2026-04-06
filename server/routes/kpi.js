@@ -48,6 +48,10 @@ router.post('/self-rate', verifyToken, async (req, res) => {
         [req.user.empCode, period, r.category, r.rating, r.comments || '']
       );
     }
+    const io = req.app.get('io');
+    if (io) {
+      io.to('role:MD').to('role:HR').emit('kpi:selfRated', { empCode: req.user.empCode, period });
+    }
     res.json({ message: 'Self-rating submitted' });
   } catch (err) {
     console.error(err);
@@ -69,6 +73,11 @@ router.post('/scores', verifyToken, requireRole('MD', 'HR'), async (req, res) =>
          ON DUPLICATE KEY UPDATE actual_value=VALUES(actual_value), score=VALUES(score)`,
         [empCode, period, t.name, t.targetValue, t.actualValue, t.score, t.weight || 1]
       );
+    }
+    const io = req.app.get('io');
+    if (io) {
+      io.to('role:MD').to('role:HR').emit('kpi:scoresUpdated', { empCode, period });
+      io.to('user:' + empCode).emit('kpi:scoresUpdated', { empCode, period });
     }
     res.json({ message: 'KPI scores updated' });
   } catch (err) {

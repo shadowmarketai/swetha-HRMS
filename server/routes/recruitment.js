@@ -26,6 +26,10 @@ router.post('/jobs', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURDATE())`,
       [title, dept || '', location || '', type || 'Full-time', experience || '', salaryRange || '', description || '', requirements || '']
     );
+    const io = req.app.get('io');
+    if (io) {
+      io.to('role:MD').to('role:HR').emit('job:created', { id: result.insertId, title });
+    }
     res.status(201).json({ message: 'Job posted', id: result.insertId });
   } catch (err) {
     console.error(err);
@@ -41,6 +45,10 @@ router.put('/jobs/:id', verifyToken, requireRole('MD', 'HR'), async (req, res) =
       `UPDATE job_postings SET title=?, dept=?, location=?, type=?, experience=?, salary_range=?, description=?, requirements=?, status=? WHERE id=?`,
       [title, dept, location, type, experience, salaryRange, description, requirements, status || 'Open', req.params.id]
     );
+    const io = req.app.get('io');
+    if (io) {
+      io.to('role:MD').to('role:HR').emit('job:updated', { id: parseInt(req.params.id), title, status: status || 'Open' });
+    }
     res.json({ message: 'Job updated' });
   } catch (err) {
     console.error(err);
@@ -72,6 +80,10 @@ router.post('/candidates', verifyToken, requireRole('MD', 'HR'), async (req, res
       'INSERT INTO candidates (name, email, phone, job_id, rating, notes, applied_date) VALUES (?, ?, ?, ?, ?, ?, CURDATE())',
       [name, email || '', phone || '', jobId || null, rating || null, notes || '']
     );
+    const io = req.app.get('io');
+    if (io) {
+      io.to('role:MD').to('role:HR').emit('candidate:created', { id: result.insertId, name, jobId: jobId || null });
+    }
     res.status(201).json({ message: 'Candidate added', id: result.insertId });
   } catch (err) {
     console.error(err);
@@ -88,6 +100,10 @@ router.patch('/candidates/:id/move', verifyToken, requireRole('MD', 'HR'), async
       return res.status(400).json({ error: 'Invalid stage' });
     }
     await pool.query('UPDATE candidates SET stage = ? WHERE id = ?', [stage, req.params.id]);
+    const io = req.app.get('io');
+    if (io) {
+      io.to('role:MD').to('role:HR').emit('candidate:moved', { id: parseInt(req.params.id), stage });
+    }
     res.json({ message: `Candidate moved to ${stage}` });
   } catch (err) {
     console.error(err);

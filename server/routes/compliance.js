@@ -25,6 +25,10 @@ router.post('/filings', verifyToken, requireRole('MD', 'HR'), async (req, res) =
       'INSERT INTO compliance_filings (filing_type, period, due_date, authority) VALUES (?, ?, ?, ?)',
       [filing_type, period, due_date, authority || '']
     );
+    const io = req.app.get('io');
+    if (io) {
+      io.to('role:MD').to('role:HR').emit('filing:created', { id: result.insertId, filingType: filing_type, period, dueDate: due_date });
+    }
     res.status(201).json({ id: result.insertId, success: true });
   } catch (err) {
     console.error(err);
@@ -40,6 +44,10 @@ router.put('/filings/:id/mark-filed', verifyToken, requireRole('MD', 'HR'), audi
       'UPDATE compliance_filings SET status = "filed", filed_date = CURDATE(), filed_by = ?, reference_no = ? WHERE id = ?',
       [req.user.empCode, reference_no || '', req.params.id]
     );
+    const io = req.app.get('io');
+    if (io) {
+      io.to('role:MD').to('role:HR').emit('filing:marked', { id: parseInt(req.params.id), status: 'filed' });
+    }
     res.json({ success: true });
   } catch (err) {
     console.error(err);
@@ -67,6 +75,10 @@ router.post('/contract-workers', verifyToken, requireRole('MD', 'HR'), async (re
       'INSERT INTO contract_workers (name, contractor, dept, daily_wage, start_date, end_date) VALUES (?, ?, ?, ?, ?, ?)',
       [name, contractor || '', dept || '', daily_wage || 0, start_date || null, end_date || null]
     );
+    const io = req.app.get('io');
+    if (io) {
+      io.to('role:MD').to('role:HR').emit('contractWorker:created', { id: result.insertId, name, contractor: contractor || '' });
+    }
     res.status(201).json({ id: result.insertId, success: true });
   } catch (err) {
     console.error(err);

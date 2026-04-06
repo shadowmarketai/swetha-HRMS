@@ -32,6 +32,13 @@ router.post('/', verifyToken, requireRole('MD', 'HR'), auditLog('create', 'task'
       'INSERT INTO tasks (title, description, type, assigned_to, assigned_by, due_date, priority, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
       [title, description || '', type || 'routine', assignedTo || null, req.user.empCode, dueDate || null, priority || 'medium', note || '']
     );
+    const io = req.app.get('io');
+    if (io) {
+      io.to('role:MD').to('role:HR').emit('task:created', { id: result.insertId, title, assignedTo: assignedTo || null });
+      if (assignedTo) {
+        io.to('user:' + assignedTo).emit('task:created', { id: result.insertId, title });
+      }
+    }
     res.status(201).json({ message: 'Task created', id: result.insertId });
   } catch (err) {
     console.error(err);
@@ -47,6 +54,10 @@ router.patch('/:id/toggle', verifyToken, async (req, res) => {
     const newDone = rows[0].done ? 0 : 1;
     const newStatus = newDone ? 'done' : 'pending';
     await pool.query('UPDATE tasks SET done = ?, status = ? WHERE id = ?', [newDone, newStatus, req.params.id]);
+    const io = req.app.get('io');
+    if (io) {
+      io.to('role:MD').to('role:HR').emit('task:toggled', { id: parseInt(req.params.id), done: !!newDone, status: newStatus });
+    }
     res.json({ message: 'Task toggled', done: !!newDone });
   } catch (err) {
     console.error(err);
@@ -80,6 +91,13 @@ router.put('/:id', verifyToken, async (req, res) => {
       'UPDATE tasks SET title=?, description=?, type=?, due_date=?, priority=?, note=? WHERE id=?',
       [title, description, type, dueDate, priority, note, req.params.id]
     );
+    const io = req.app.get('io');
+    if (io) {
+      io.to('role:MD').to('role:HR').emit('task:updated', { id: parseInt(req.params.id), title });
+      if (task.assigned_to) {
+        io.to('user:' + task.assigned_to).emit('task:updated', { id: parseInt(req.params.id), title });
+      }
+    }
     res.json({ message: 'Task updated' });
   } catch (err) {
     console.error(err);
@@ -91,6 +109,10 @@ router.put('/:id', verifyToken, async (req, res) => {
 router.delete('/:id', verifyToken, requireRole('MD', 'HR'), auditLog('delete', 'task'), async (req, res) => {
   try {
     await pool.query('DELETE FROM tasks WHERE id = ?', [req.params.id]);
+    const io = req.app.get('io');
+    if (io) {
+      io.to('role:MD').to('role:HR').emit('task:deleted', { id: parseInt(req.params.id) });
+    }
     res.json({ message: 'Task deleted' });
   } catch (err) {
     console.error(err);

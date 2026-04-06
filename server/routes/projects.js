@@ -47,6 +47,10 @@ router.post('/', verifyToken, requireRole('MD', 'HR'), auditLog('create', 'proje
     proj.team = [];
     proj.materials = [];
     proj.wbs_tasks = [];
+    const io = req.app.get('io');
+    if (io) {
+      io.to('role:MD').to('role:HR').emit('project:created', { id: result.insertId, name });
+    }
     res.status(201).json(proj);
   } catch (err) {
     console.error(err);
@@ -67,6 +71,10 @@ router.put('/:id', verifyToken, requireRole('MD', 'HR'), auditLog('update', 'pro
        req.params.id]
     );
     const [rows] = await pool.query('SELECT * FROM projects WHERE id = ?', [req.params.id]);
+    const io = req.app.get('io');
+    if (io) {
+      io.to('role:MD').to('role:HR').emit('project:updated', { id: parseInt(req.params.id), name, status: status || 'Not Started' });
+    }
     res.json(rows[0] || {});
   } catch (err) {
     console.error(err);
@@ -82,6 +90,10 @@ router.delete('/:id', verifyToken, requireRole('MD'), auditLog('delete', 'projec
     await pool.query('DELETE FROM project_team WHERE project_id = ?', [req.params.id]);
     await pool.query('DELETE FROM project_tasks WHERE project_id = ?', [req.params.id]);
     await pool.query('DELETE FROM projects WHERE id = ?', [req.params.id]);
+    const io = req.app.get('io');
+    if (io) {
+      io.to('role:MD').to('role:HR').emit('project:deleted', { id: parseInt(req.params.id) });
+    }
     res.json({ message: 'Project deleted' });
   } catch (err) {
     console.error(err);
@@ -103,6 +115,13 @@ router.post('/:id/tasks', verifyToken, requireRole('MD', 'HR'), async (req, res)
     );
 
     const [rows] = await pool.query('SELECT * FROM project_tasks WHERE id = ?', [result.insertId]);
+    const io = req.app.get('io');
+    if (io) {
+      io.to('role:MD').to('role:HR').emit('projectTask:created', { id: result.insertId, projectId: parseInt(req.params.id), title });
+      if (assignedTo) {
+        io.to('user:' + assignedTo).emit('projectTask:created', { id: result.insertId, projectId: parseInt(req.params.id), title });
+      }
+    }
     res.status(201).json(rows[0]);
   } catch (err) {
     console.error(err);
@@ -130,6 +149,13 @@ router.put('/:id/tasks/:taskId', verifyToken, async (req, res) => {
     await pool.query(`UPDATE project_tasks SET ${fields.join(', ')} WHERE id = ? AND project_id = ?`, values);
 
     const [rows] = await pool.query('SELECT * FROM project_tasks WHERE id = ?', [req.params.taskId]);
+    const io = req.app.get('io');
+    if (io) {
+      io.to('role:MD').to('role:HR').emit('projectTask:updated', { id: parseInt(req.params.taskId), projectId: parseInt(req.params.id) });
+      if (assignedTo) {
+        io.to('user:' + assignedTo).emit('projectTask:updated', { id: parseInt(req.params.taskId), projectId: parseInt(req.params.id) });
+      }
+    }
     res.json(rows[0] || {});
   } catch (err) {
     console.error(err);
@@ -158,6 +184,11 @@ router.post('/:id/team', verifyToken, requireRole('MD', 'HR'), async (req, res) 
       'INSERT IGNORE INTO project_team (project_id, emp_code) VALUES (?, ?)',
       [req.params.id, empCode]
     );
+    const io = req.app.get('io');
+    if (io) {
+      io.to('role:MD').to('role:HR').emit('projectTeam:added', { projectId: parseInt(req.params.id), empCode });
+      io.to('user:' + empCode).emit('projectTeam:added', { projectId: parseInt(req.params.id), empCode });
+    }
     res.status(201).json({ message: 'Member added' });
   } catch (err) {
     console.error(err);
@@ -172,6 +203,11 @@ router.delete('/:id/team/:empCode', verifyToken, requireRole('MD', 'HR'), async 
       'DELETE FROM project_team WHERE project_id = ? AND emp_code = ?',
       [req.params.id, req.params.empCode]
     );
+    const io = req.app.get('io');
+    if (io) {
+      io.to('role:MD').to('role:HR').emit('projectTeam:removed', { projectId: parseInt(req.params.id), empCode: req.params.empCode });
+      io.to('user:' + req.params.empCode).emit('projectTeam:removed', { projectId: parseInt(req.params.id), empCode: req.params.empCode });
+    }
     res.json({ message: 'Member removed' });
   } catch (err) {
     console.error(err);
