@@ -452,26 +452,60 @@ router.post('/material-requests', verifyToken, requireRole('MD', 'HR', 'Employee
 });
 
 // Approve material request
-router.post('/material-requests/:id/approve', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
+// Admin accepts material request → forwards to MD for final approval
+router.post('/material-requests/:id/admin-accept', verifyToken, requireRoleOrDept(['HR'], ADMIN_DEPTS), async (req, res) => {
+  try {
+    const { remarks, items } = req.body;
+    const [rows] = await db.query('SELECT * FROM peb_material_requests WHERE id = ?', [req.params.id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Request not found' });
+    if (rows[0].stage !== 'REQUESTED') return res.status(400).json({ error: 'Request is already ' + rows[0].stage });
+
+    await db.query('UPDATE peb_material_requests SET stage = "ADMIN_ACCEPTED", store_remarks = ? WHERE id = ?', [remarks || null, req.params.id]);
+
+    if (items) {
+      for (const item of items) {
+        await db.query('UPDATE peb_material_request_items SET approved_qty = ? WHERE id = ?', [item.approved_qty, item.id]);
+      }
+    }
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to('role:MD').emit('materialRequest:pendingApproval', { id: parseInt(req.params.id), code: rows[0].request_code });
+    }
+
+    res.json({ message: 'Request accepted by Admin, forwarded to MD for approval' });
+  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+});
+
+// MD gives final approval for material request
+router.post('/material-requests/:id/approve', verifyToken, requireRoleOrDept(['MD'], []), async (req, res) => {
   try {
     const { action, remarks, items } = req.body;
     if (!['APPROVED','REJECTED'].includes(action)) return res.status(400).json({ error: 'action must be APPROVED or REJECTED' });
 
+    const [rows] = await db.query('SELECT * FROM peb_material_requests WHERE id = ?', [req.params.id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Request not found' });
+    if (rows[0].stage !== 'ADMIN_ACCEPTED') return res.status(400).json({ error: 'Admin must accept this request first (current: ' + rows[0].stage + ')' });
+
     await db.query('UPDATE peb_material_requests SET stage = ? WHERE id = ?', [action, req.params.id]);
 
-    // Update approved quantities if provided
     if (action === 'APPROVED' && items) {
       for (const item of items) {
         await db.query('UPDATE peb_material_request_items SET approved_qty = ? WHERE id = ?', [item.approved_qty, item.id]);
       }
     }
 
-    res.json({ message: `Request ${action.toLowerCase()}` });
+    const io = req.app.get('io');
+    if (io) {
+      io.to('role:HR').to('all').emit('materialRequest:approved', { id: parseInt(req.params.id), action });
+    }
+
+    res.json({ message: `Request ${action.toLowerCase()} by MD` });
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
-// Dispatch — deducts stock
-router.post('/material-requests/:id/dispatch', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
+// Dispatch — deducts stock (MD only after admin acceptance)
+router.post('/material-requests/:id/dispatch', verifyToken, requireRoleOrDept(['MD'], ADMIN_DEPTS), async (req, res) => {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
@@ -560,8 +594,21 @@ router.post('/returns', verifyToken, requireRoleOrDept(['MD', 'HR'], SITE_DEPTS)
   } finally { conn.release(); }
 });
 
-// Verify return — restocks usable items
-router.post('/returns/:id/verify', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
+// Admin accepts return — forwards to MD
+router.post('/returns/:id/admin-accept', verifyToken, requireRoleOrDept(['HR'], ADMIN_DEPTS), async (req, res) => {
+  try {
+    const [ret] = await db.query('SELECT * FROM peb_material_returns WHERE id = ?', [req.params.id]);
+    if (ret.length === 0) return res.status(404).json({ error: 'Return not found' });
+    if (ret[0].status === 'VERIFIED' || ret[0].status === 'ADMIN_ACCEPTED') return res.status(400).json({ error: 'Already processed' });
+    await db.query('UPDATE peb_material_returns SET status = "ADMIN_ACCEPTED" WHERE id = ?', [req.params.id]);
+    const io = req.app.get('io');
+    if (io) io.to('role:MD').emit('return:pendingApproval', { id: parseInt(req.params.id) });
+    res.json({ message: 'Return accepted by Admin, forwarded to MD' });
+  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+});
+
+// MD verifies return — restocks usable items
+router.post('/returns/:id/verify', verifyToken, requireRoleOrDept(['MD'], []), async (req, res) => {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
@@ -619,8 +666,21 @@ router.post('/scrap', verifyToken, requireRoleOrDept(['MD', 'HR'], SITE_DEPTS), 
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
-// Sell scrap — MD only
-router.post('/scrap/:id/sell', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
+// Admin accepts scrap for sale — forwards to MD
+router.post('/scrap/:id/admin-accept', verifyToken, requireRoleOrDept(['HR'], ADMIN_DEPTS), async (req, res) => {
+  try {
+    const [batch] = await db.query('SELECT * FROM peb_scrap_batches WHERE id = ?', [req.params.id]);
+    if (batch.length === 0) return res.status(404).json({ error: 'Batch not found' });
+    if (batch[0].status === 'SOLD' || batch[0].status === 'ADMIN_ACCEPTED') return res.status(400).json({ error: 'Already processed' });
+    await db.query("UPDATE peb_scrap_batches SET status = 'ADMIN_ACCEPTED' WHERE id = ?", [req.params.id]);
+    const io = req.app.get('io');
+    if (io) io.to('role:MD').emit('scrap:pendingApproval', { id: parseInt(req.params.id), code: batch[0].batch_code });
+    res.json({ message: 'Scrap accepted by Admin, forwarded to MD for sale approval' });
+  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+});
+
+// Sell scrap — MD only (after Admin acceptance)
+router.post('/scrap/:id/sell', verifyToken, requireRoleOrDept(['MD'], []), async (req, res) => {
   try {
     const { sale_amount, receipt_number } = req.body;
     if (!sale_amount) return res.status(400).json({ error: 'sale_amount required' });

@@ -411,7 +411,8 @@ router.get('/comparison/:indentId', verifyToken, requireRoleOrDept(['MD', 'HR'],
 });
 
 // GM Approval (Step 1)
-router.post('/indents/:id/gm-approve', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
+// Step 1: Admin accepts indent — forwards to MD
+router.post('/indents/:id/gm-approve', verifyToken, requireRoleOrDept(['HR'], ADMIN_DEPTS), async (req, res) => {
   try {
     const { action, remarks, selected_vendor_id, selection_justification } = req.body;
     if (!['APPROVED','REJECTED'].includes(action)) return res.status(400).json({ error: 'action must be APPROVED or REJECTED' });
@@ -451,8 +452,8 @@ router.post('/indents/:id/gm-approve', verifyToken, requireRoleOrDept(['MD', 'HR
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
-// MD Final Approval (Step 2)
-router.post('/indents/:id/md-approve', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
+// Step 2: MD final approval
+router.post('/indents/:id/md-approve', verifyToken, requireRoleOrDept(['MD'], []), async (req, res) => {
   try {
     const { action, remarks, override_price } = req.body;
     if (!['APPROVED','REJECTED'].includes(action)) return res.status(400).json({ error: 'action must be APPROVED or REJECTED' });
@@ -542,8 +543,8 @@ router.post('/orders', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS)
   finally { conn.release(); }
 });
 
-// PO Approve
-router.post('/orders/:id/approve', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
+// PO Approve — MD only
+router.post('/orders/:id/approve', verifyToken, requireRoleOrDept(['MD'], []), async (req, res) => {
   try {
     await db.query("UPDATE peb_purchase_orders SET approved_by_md=TRUE, approval_date=CURDATE(), status='SENT' WHERE id=?", [req.params.id]);
     res.json({ message: 'PO approved and sent' });
@@ -599,7 +600,8 @@ router.post('/transport', verifyToken, requireRole('MD', 'HR', 'Employee'), asyn
 });
 
 // Approve with vehicle/driver details
-router.post('/transport/:id/approve', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
+// Transport approve — Admin accepts, then MD can approve
+router.post('/transport/:id/approve', verifyToken, requireRoleOrDept(['MD'], ADMIN_DEPTS), async (req, res) => {
   try {
     const { action, vehicle_number, driver_name, driver_phone } = req.body;
     if (!['APPROVED','REJECTED'].includes(action)) return res.status(400).json({ error: 'Invalid action' });
