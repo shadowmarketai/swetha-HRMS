@@ -5239,13 +5239,24 @@ async function changePassword() {
   if (newPass.length < 6) { showToast('Password must be at least 6 characters'); return; }
   if (newPass !== confirmPass) { showToast('Passwords do not match'); return; }
 
+  var btn = document.querySelector('#screen-settings .btn-primary[onclick="changePassword()"]');
+  if (btn) { btn.disabled = true; btn.textContent = 'Updating...'; }
   try {
     await apiCall('POST', '/auth/change-password', { oldPassword: oldPass, newPassword: newPass });
     showToast('Password changed successfully!');
     document.getElementById('chgOldPass').value = '';
     document.getElementById('chgNewPass').value = '';
     document.getElementById('chgConfirmPass').value = '';
-  } catch (e) { showToast(e.message || 'Error changing password'); }
+    if (btn) {
+      btn.textContent = 'Updated';
+      btn.style.background = 'var(--success, #16a34a)';
+      btn.style.borderColor = 'var(--success, #16a34a)';
+      setTimeout(function() { btn.textContent = 'Update Password'; btn.style.background = ''; btn.style.borderColor = ''; btn.disabled = false; }, 3000);
+    }
+  } catch (e) {
+    showToast(e.message || 'Error changing password');
+    if (btn) { btn.disabled = false; btn.textContent = 'Update Password'; }
+  }
 }
 
 // =====================================================
@@ -12212,8 +12223,68 @@ function renderEmployeeAttendanceView() {
   html += '</div>';
   html += '<div id="attEmpListArea" class="card fade-in" style="max-height:260px;overflow-y:auto"></div>';
   html += '<div id="attEmpCalendarArea" style="margin-top:12px"></div>';
+  // Daily attendance summary table
+  html += '<div style="margin-top:16px">';
+  html += '<div class="section-title">Daily Attendance Summary</div>';
+  html += '<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">';
+  html += '<input type="date" id="attSummaryDate" value="' + new Date().toISOString().split('T')[0] + '" onchange="loadAttendanceSummaryTable()" style="padding:6px 10px;border:1px solid var(--gray-200);border-radius:var(--radius);font-size:.78rem">';
+  html += '</div>';
+  html += '<div id="attSummaryTableArea" class="card fade-in"></div>';
+  html += '</div>';
   container.innerHTML = html;
   filterAttEmpList();
+  loadAttendanceSummaryTable();
+}
+
+async function loadAttendanceSummaryTable() {
+  var area = document.getElementById('attSummaryTableArea');
+  if (!area) return;
+  var dateInput = document.getElementById('attSummaryDate');
+  var selectedDate = dateInput ? dateInput.value : new Date().toISOString().split('T')[0];
+  var monthStr = selectedDate.substring(0, 7);
+  var dateLabel = new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric', weekday:'long'});
+
+  area.innerHTML = '<div style="text-align:center;padding:16px;color:var(--gray-400);font-size:.78rem">Loading...</div>';
+
+  var logs = [];
+  try {
+    logs = await apiCall('GET', '/attendance?month=' + monthStr);
+    if (!Array.isArray(logs)) logs = [];
+  } catch(e) { logs = []; }
+
+  // Filter logs for the selected date
+  var dayLogs = {};
+  logs.forEach(function(row) {
+    if (!row.log_date) return;
+    var logDate = row.log_date.substring(0, 10);
+    if (logDate === selectedDate) {
+      if (!dayLogs[row.emp_code]) dayLogs[row.emp_code] = row;
+    }
+  });
+
+  // Build table rows for all active employees sorted by code ascending
+  var activeEmps = EMPLOYEES.filter(function(e) { return e.status !== 'Inactive'; });
+  activeEmps.sort(function(a, b) { return a.code.localeCompare(b.code); });
+
+  var presentCount = 0, absentCount = 0;
+  var rows = activeEmps.map(function(emp) {
+    var isPresent = !!dayLogs[emp.code];
+    if (isPresent) presentCount++; else absentCount++;
+    var statusBadge = isPresent
+      ? '<span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:.72rem;font-weight:600;background:#dcfce7;color:#16a34a">Present</span>'
+      : '<span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:.72rem;font-weight:600;background:#fee2e2;color:#dc2626">Absent</span>';
+    return '<tr><td style="padding:8px 10px;font-size:.78rem;font-weight:600;border-bottom:1px solid var(--gray-100)">' + escapeHTML(emp.code) + '</td><td style="padding:8px 10px;font-size:.78rem;border-bottom:1px solid var(--gray-100)">' + escapeHTML(emp.name) + '</td><td style="padding:8px 10px;text-align:center;border-bottom:1px solid var(--gray-100)">' + statusBadge + '</td></tr>';
+  });
+
+  var html = '<div style="padding:10px 12px 6px;font-size:.75rem;color:var(--gray-500)">' + escapeHTML(dateLabel) + ' &mdash; <span style="color:#16a34a;font-weight:600">' + presentCount + ' Present</span> &middot; <span style="color:#dc2626;font-weight:600">' + absentCount + ' Absent</span></div>';
+  html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">';
+  html += '<thead><tr style="background:var(--gray-50)"><th style="padding:8px 10px;text-align:left;font-size:.72rem;font-weight:700;color:var(--gray-500);text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid var(--gray-200)">Emp Code</th><th style="padding:8px 10px;text-align:left;font-size:.72rem;font-weight:700;color:var(--gray-500);text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid var(--gray-200)">Name</th><th style="padding:8px 10px;text-align:center;font-size:.72rem;font-weight:700;color:var(--gray-500);text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid var(--gray-200)">Status</th></tr></thead>';
+  html += '<tbody>' + rows.join('') + '</tbody></table></div>';
+
+  if (activeEmps.length === 0) {
+    html = '<div style="text-align:center;padding:16px;color:var(--gray-400);font-size:.78rem">No employees found</div>';
+  }
+  area.innerHTML = html;
 }
 
 function filterAttEmpList() {
