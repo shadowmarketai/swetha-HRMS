@@ -5918,10 +5918,96 @@ function sendNotification(title, body, tag) {
 // =====================================================
 let attendanceLogs = [];
 
+// Selfie capture for attendance — opens front camera, returns File
+function captureSelfiForAttendance() {
+  return new Promise(function(resolve, reject) {
+    // Create fullscreen overlay with camera
+    var overlay = document.createElement('div');
+    overlay.id = 'selfieOverlay';
+    overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center';
+    overlay.innerHTML = '<div style="color:#fff;font-size:.85rem;font-weight:600;margin-bottom:10px;text-align:center">Take a selfie for attendance</div>' +
+      '<video id="selfieVideo" autoplay playsinline style="width:100%;max-width:400px;max-height:60vh;border-radius:12px;object-fit:cover;transform:scaleX(-1)"></video>' +
+      '<canvas id="selfieCanvas" style="display:none"></canvas>' +
+      '<div style="display:flex;gap:16px;margin-top:16px">' +
+      '<button id="selfieCaptureBtn" style="width:64px;height:64px;border-radius:50%;border:4px solid #fff;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center"><div style="width:48px;height:48px;border-radius:50%;background:#fff"></div></button>' +
+      '</div>' +
+      '<button id="selfieCancelBtn" style="margin-top:12px;background:none;border:1px solid rgba(255,255,255,0.4);color:#fff;padding:8px 24px;border-radius:8px;font-size:.78rem;cursor:pointer">Cancel</button>';
+    document.body.appendChild(overlay);
+
+    var video = document.getElementById('selfieVideo');
+    var canvas = document.getElementById('selfieCanvas');
+    var stream = null;
+
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false })
+      .then(function(s) {
+        stream = s;
+        video.srcObject = stream;
+      })
+      .catch(function(err) {
+        cleanup();
+        showToast('Camera access denied. Please allow camera permission.');
+        reject(err);
+      });
+
+    function cleanup() {
+      if (stream) stream.getTracks().forEach(function(t) { t.stop(); });
+      var el = document.getElementById('selfieOverlay');
+      if (el) el.remove();
+    }
+
+    document.getElementById('selfieCaptureBtn').addEventListener('click', function() {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      var ctx = canvas.getContext('2d');
+      // Mirror the image to match what user sees
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+      ctx.drawImage(video, 0, 0);
+      canvas.toBlob(function(blob) {
+        cleanup();
+        var file = new File([blob], 'selfie_' + Date.now() + '.jpg', { type: 'image/jpeg' });
+        resolve(file);
+      }, 'image/jpeg', 0.8);
+    });
+
+    document.getElementById('selfieCancelBtn').addEventListener('click', function() {
+      cleanup();
+      reject(new Error('Selfie cancelled'));
+    });
+  });
+}
+
 function gpsCheckIn() {
   if (!navigator.geolocation) { showToast('Geolocation not supported'); return; }
   var btn = document.getElementById('gpsCheckinBtn');
-  if (btn) btn.textContent = 'Getting location...';
+  if (btn) btn.textContent = 'Opening camera...';
+
+  // Step 1: Capture selfie first
+  captureSelfiForAttendance().then(function(selfieFile) {
+    window._attendanceSelfie = selfieFile;
+    if (btn) btn.textContent = 'Getting location...';
+    // Step 2: Get GPS location
+    navigator.geolocation.getCurrentPosition(onSuccess,
+      function(err) {
+        if (err.code === 3) {
+          if (btn) btn.textContent = 'Retrying...';
+          navigator.geolocation.getCurrentPosition(onSuccess,
+            function(err2) {
+              showToast('Location error: ' + err2.message);
+              if (btn) btn.textContent = 'Check In';
+            },
+            { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
+          );
+        } else {
+          showToast('Location error: ' + err.message);
+          if (btn) btn.textContent = 'Check In';
+        }
+      },
+      { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 }
+    );
+  }).catch(function() {
+    if (btn) btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Check In';
+  });
 
   async function onSuccess(pos) {
     var geoResult = checkGeofence(pos.coords.latitude, pos.coords.longitude);
@@ -5931,14 +6017,16 @@ function gpsCheckIn() {
     }
     var locationName = geoResult.inside ? geoResult.location : 'Outside geofence';
     try {
-      var result = await apiCall('POST', '/attendance/checkin', {
-        lat: pos.coords.latitude,
-        lng: pos.coords.longitude,
-        location: locationName,
-        remark: remark,
-        isWithinGeofence: geoResult.inside,
-        accuracy: pos.coords.accuracy
-      });
+      var fd = new FormData();
+      fd.append('lat', pos.coords.latitude);
+      fd.append('lng', pos.coords.longitude);
+      fd.append('location', locationName);
+      fd.append('remark', remark);
+      fd.append('isWithinGeofence', geoResult.inside);
+      fd.append('accuracy', pos.coords.accuracy);
+      if (window._attendanceSelfie) fd.append('selfie', window._attendanceSelfie);
+      var result = await apiUpload('/attendance/checkin', fd);
+      window._attendanceSelfie = null;
       // Push mapped result to local array
       if (result && result.row) {
         attendanceLogs.push(mapAttendanceLog(result.row));
@@ -5974,30 +6062,30 @@ function gpsCheckIn() {
     updateCheckinStatus('checkin');
     renderAttendanceLogList();
   }
-
-  // Try high-accuracy GPS first, fallback to network location on timeout
-  navigator.geolocation.getCurrentPosition(onSuccess,
-    function(err) {
-      if (err.code === 3) {
-        if (btn) btn.textContent = 'Retrying...';
-        navigator.geolocation.getCurrentPosition(onSuccess,
-          function(err2) {
-            showToast('Location error: ' + err2.message);
-            if (btn) btn.textContent = 'Check In';
-          },
-          { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
-        );
-      } else {
-        showToast('Location error: ' + err.message);
-        if (btn) btn.textContent = 'Check In';
-      }
-    },
-    { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 }
-  );
 }
 
 function gpsCheckOut() {
   if (!navigator.geolocation) { showToast('Geolocation not supported'); return; }
+
+  // Step 1: Capture selfie first
+  captureSelfiForAttendance().then(function(selfieFile) {
+    window._attendanceSelfie = selfieFile;
+    // Step 2: Get GPS location
+    navigator.geolocation.getCurrentPosition(onSuccess,
+      function(err) {
+        if (err.code === 3) {
+          navigator.geolocation.getCurrentPosition(onSuccess,
+            function(err2) { showToast('Location error: ' + err2.message); },
+            { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
+          );
+        } else {
+          showToast('Location error: ' + err.message);
+        }
+      },
+      { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 }
+    );
+  }).catch(function() { /* selfie cancelled */ });
+
   async function onSuccess(pos) {
     var geoResult = checkGeofence(pos.coords.latitude, pos.coords.longitude);
     var remark = '';
@@ -6006,11 +6094,15 @@ function gpsCheckOut() {
     }
     var locationName = geoResult.inside ? geoResult.location : 'Outside geofence';
     try {
-      var result = await apiCall('POST', '/attendance/checkout', {
-        lat: pos.coords.latitude, lng: pos.coords.longitude,
-        location: locationName, remark: remark,
-        isWithinGeofence: geoResult.inside
-      });
+      var fd = new FormData();
+      fd.append('lat', pos.coords.latitude);
+      fd.append('lng', pos.coords.longitude);
+      fd.append('location', locationName);
+      fd.append('remark', remark);
+      fd.append('isWithinGeofence', geoResult.inside);
+      if (window._attendanceSelfie) fd.append('selfie', window._attendanceSelfie);
+      var result = await apiUpload('/attendance/checkout', fd);
+      window._attendanceSelfie = null;
       if (result && result.row) {
         attendanceLogs.push(mapAttendanceLog(result.row));
       } else {
@@ -6041,19 +6133,6 @@ function gpsCheckOut() {
     updateCheckinStatus('checkout');
     renderAttendanceLogList();
   }
-  navigator.geolocation.getCurrentPosition(onSuccess,
-    function(err) {
-      if (err.code === 3) {
-        navigator.geolocation.getCurrentPosition(onSuccess,
-          function(err2) { showToast('Location error: ' + err2.message); },
-          { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
-        );
-      } else {
-        showToast('Location error: ' + err.message);
-      }
-    },
-    { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 }
-  );
 }
 
 function updateCheckinCard(coords) {
@@ -12615,7 +12694,9 @@ async function selectAttEmployee(empCode) {
       checkOut: row.check_out || null,
       location: row.location_name || '',
       remark: row.remark || '',
-      geofence: !!row.is_within_geofence
+      geofence: !!row.is_within_geofence,
+      selfieIn: row.selfie_checkin_url || null,
+      selfieOut: row.selfie_checkout_url || null
     });
   });
 
@@ -12724,6 +12805,19 @@ function showAttDayDetail(dayNum) {
     html += '<span style="color:var(--primary);font-weight:600;margin-left:auto">' + durStr + '</span>';
     html += '</div>';
     if (s.location) html += '<div style="font-size:.62rem;color:var(--gray-500);padding-left:30px">' + escapeHTML(s.location) + (s.remark ? ' — ' + escapeHTML(s.remark) : '') + '</div>';
+    // Show selfie photos for HR/MD
+    if (s.selfieIn || s.selfieOut) {
+      html += '<div style="display:flex;gap:8px;padding:6px 0 4px 30px;flex-wrap:wrap">';
+      if (s.selfieIn) {
+        var selfieInUrl = s.selfieIn + (s.selfieIn.indexOf('?') === -1 ? '?' : '&') + 'token=' + encodeURIComponent(JWT_TOKEN);
+        html += '<div style="text-align:center"><img src="' + escapeHTML(selfieInUrl) + '" style="width:60px;height:60px;object-fit:cover;border-radius:8px;border:2px solid var(--success)" onclick="window.open(this.src,\'_blank\')" title="Check-in selfie"><div style="font-size:.58rem;color:var(--success);font-weight:600;margin-top:2px">Check-In</div></div>';
+      }
+      if (s.selfieOut) {
+        var selfieOutUrl = s.selfieOut + (s.selfieOut.indexOf('?') === -1 ? '?' : '&') + 'token=' + encodeURIComponent(JWT_TOKEN);
+        html += '<div style="text-align:center"><img src="' + escapeHTML(selfieOutUrl) + '" style="width:60px;height:60px;object-fit:cover;border-radius:8px;border:2px solid var(--danger)" onclick="window.open(this.src,\'_blank\')" title="Check-out selfie"><div style="font-size:.58rem;color:var(--danger);font-weight:600;margin-top:2px">Check-Out</div></div>';
+      }
+      html += '</div>';
+    }
   });
   var totalH = Math.floor(dayTotalMin / 60), totalM = Math.round(dayTotalMin % 60);
   html += '<div style="display:flex;justify-content:flex-end;padding-top:8px;font-size:.75rem;font-weight:700;color:var(--primary)">Total: ' + totalH + 'h ' + totalM + 'm</div>';

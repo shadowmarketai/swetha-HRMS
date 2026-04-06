@@ -444,6 +444,10 @@ app.get('*', (req, res) => {
     await pool.query("ALTER TABLE tax_declarations ADD COLUMN prev_tds DECIMAL(14,2) DEFAULT 0").catch(() => {});
     await pool.query("ALTER TABLE tax_declarations ADD COLUMN form12b_submitted_at DATE").catch(() => {});
 
+    // Phase G2: Selfie columns for attendance
+    await pool.query("ALTER TABLE attendance_logs ADD COLUMN selfie_checkin_url VARCHAR(500)").catch(() => {});
+    await pool.query("ALTER TABLE attendance_logs ADD COLUMN selfie_checkout_url VARCHAR(500)").catch(() => {});
+
     // Phase G: Shift types table
     await pool.query(`CREATE TABLE IF NOT EXISTS shift_types (
       code VARCHAR(10) PRIMARY KEY,

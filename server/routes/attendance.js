@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const pool = require('../config/db');
 const { verifyToken, requireRole } = require('../middleware/auth');
+const upload = require('../middleware/upload');
 
 // Haversine distance in meters between two lat/lng pairs
 function haversineDistance(lat1, lng1, lat2, lng2) {
@@ -29,7 +30,7 @@ async function checkGeofence(lat, lng) {
 }
 
 // POST /api/attendance/checkin — GPS check-in (supports multiple sessions per day)
-router.post('/checkin', verifyToken, async (req, res) => {
+router.post('/checkin', verifyToken, upload.single('selfie'), async (req, res) => {
   try {
     const { lat, lng, location, remark, accuracy } = req.body;
     const today = new Date().toISOString().split('T')[0];
@@ -47,14 +48,17 @@ router.post('/checkin', verifyToken, async (req, res) => {
     // Server-side geofence verification
     const geo = await checkGeofence(lat, lng);
 
+    // Selfie URL if uploaded
+    const selfieUrl = req.file ? '/uploads/' + req.file.filename : null;
+
     // Create a new check-in session (allows re-checkin after checkout)
     const [result] = await pool.query(
       `INSERT INTO attendance_logs (emp_code, check_in, check_in_lat, check_in_lng, status, log_date,
-       location_name, remark, is_within_geofence, accuracy)
-       VALUES (?, NOW(), ?, ?, "Present", ?, ?, ?, ?, ?)`,
+       location_name, remark, is_within_geofence, accuracy, selfie_checkin_url)
+       VALUES (?, NOW(), ?, ?, "Present", ?, ?, ?, ?, ?, ?)`,
       [req.user.empCode, lat || null, lng || null, today,
        geo.site || location || null, remark || null,
-       geo.within ? 1 : 0, accuracy || null]
+       geo.within ? 1 : 0, accuracy || null, selfieUrl]
     );
 
     const [rows] = await pool.query('SELECT * FROM attendance_logs WHERE id = ?', [result.insertId]);
@@ -74,7 +78,7 @@ router.post('/checkin', verifyToken, async (req, res) => {
 });
 
 // POST /api/attendance/checkout — GPS check-out (closes latest active session)
-router.post('/checkout', verifyToken, async (req, res) => {
+router.post('/checkout', verifyToken, upload.single('selfie'), async (req, res) => {
   try {
     const { lat, lng, location, remark } = req.body;
     const today = new Date().toISOString().split('T')[0];
@@ -92,12 +96,15 @@ router.post('/checkout', verifyToken, async (req, res) => {
     // Server-side geofence verification for checkout
     const geo = await checkGeofence(lat, lng);
 
+    // Selfie URL if uploaded
+    const selfieUrl = req.file ? '/uploads/' + req.file.filename : null;
+
     await pool.query(
       `UPDATE attendance_logs SET check_out = NOW(), check_out_lat = ?, check_out_lng = ?,
        location_name = COALESCE(?, location_name), remark = COALESCE(?, remark),
-       is_within_geofence = ? WHERE id = ?`,
+       is_within_geofence = ?, selfie_checkout_url = COALESCE(?, selfie_checkout_url) WHERE id = ?`,
       [lat || null, lng || null, geo.site || location || null, remark || null,
-       geo.within ? 1 : 0, active[0].id]
+       geo.within ? 1 : 0, selfieUrl, active[0].id]
     );
 
     const [rows] = await pool.query('SELECT * FROM attendance_logs WHERE id = ?', [active[0].id]);
