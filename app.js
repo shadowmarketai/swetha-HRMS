@@ -1585,7 +1585,7 @@ function switchTab(id, el, _fromPopstate) {
   if (id === 'travel-expense') renderTravelExpenseScreen();
   if (id === 'leaves') renderLeaveScreenForMode();
   if (id === 'progress') renderProgressScreen();
-  if (id === 'attendance') renderAttendanceView();
+  if (id === 'attendance') { renderAttendanceView(); loadMissedAttRequests(); }
   if (id === 'salary') renderSalaryView();
   updateNavActiveState();
 }
@@ -6964,6 +6964,7 @@ async function loadFromBackend() {
       { key: 'shiftTypes', url: base + '/shifts/types' },
       { key: 'tax', url: base + '/tax' },
       { key: 'attendance', url: base + '/attendance?month=' + curMonth },
+      { key: 'missedAttendance', url: base + '/attendance/missed' },
       { key: 'geofenceSites', url: base + '/geofence/sites' },
       { key: 'projects', url: base + '/projects' },
       { key: 'documents', url: base + '/documents' },
@@ -7174,6 +7175,12 @@ async function loadFromBackend() {
         attendanceLogs.length = 0;
         attData.map(mapAttendanceLog).forEach(function(a) { attendanceLogs.push(a); });
       }
+    }
+
+    // 18b. Missed attendance requests
+    if (keyIdx.missedAttendance !== undefined) {
+      var missedData = unwrap(getData(keyIdx.missedAttendance));
+      window._missedAttRequests = missedData || [];
     }
 
     // 19. Geofence sites
@@ -12570,6 +12577,10 @@ function renderEmployeeAttendanceView() {
   html += '</div>';
   html += '<div id="attSummaryTableArea" class="card fade-in"></div>';
   html += '</div>';
+  // Add HR missed attendance requests section
+  if (currentUser && currentUser.role === 'HR') {
+    html += renderMissedAttForHR();
+  }
   container.innerHTML = html;
   filterAttEmpList();
   loadAttendanceSummaryTable();
@@ -12843,6 +12854,140 @@ function showAttDayDetail(dayNum) {
   html += '<div style="display:flex;justify-content:flex-end;padding-top:8px;font-size:.75rem;font-weight:700;color:var(--primary)">Total: ' + totalH + 'h ' + totalM + 'm</div>';
   html += '</div>';
   detailArea.innerHTML = html;
+}
+
+// =====================================================
+// MISSED ATTENDANCE REQUESTS
+// =====================================================
+
+function showMissedAttendanceForm() {
+  var area = document.getElementById('missedAttFormArea');
+  if (!area) return;
+  if (area.innerHTML.trim()) { area.innerHTML = ''; return; } // toggle
+  var today = new Date().toISOString().split('T')[0];
+  var html = '<div class="card fade-in" style="padding:14px;margin-bottom:12px;border-left:4px solid var(--warning,#f59e0b)">';
+  html += '<h4 style="font-size:.85rem;font-weight:600;margin:0 0 10px 0">Missed Attendance Request</h4>';
+  html += '<div class="form-row"><label>Date *</label><input type="date" id="missedAttDate" max="' + today + '" style="width:100%"></div>';
+  html += '<div class="form-row"><label>Reason *</label><textarea id="missedAttReason" rows="2" placeholder="Why did you miss check-in? (e.g., phone was dead, forgot, etc.)" style="width:100%;padding:8px;border:1.5px solid var(--gray-200);border-radius:var(--radius-xs);font-size:.82rem"></textarea></div>';
+  html += '<div class="form-row"><label>Attach Proof (optional)</label>';
+  html += '<div class="camera-zone" onclick="document.getElementById(\'missedAttProof\').click()" style="padding:10px;margin-top:4px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
+  html += '<p style="font-size:.72rem;margin-top:4px">Tap to upload proof (screenshot, photo, etc.)</p>';
+  html += '<input type="file" id="missedAttProof" accept="image/*" style="display:none" onchange="handleBillPreview(this,\'missedAttProofPreview\')"></div>';
+  html += '<div id="missedAttProofPreview" style="display:none;margin-top:6px"></div></div>';
+  html += '<div style="display:flex;gap:8px"><button class="nf-btn nf-btn-primary" onclick="submitMissedAttendance()">Submit Request</button>';
+  html += '<button class="nf-btn nf-btn-outline" onclick="document.getElementById(\'missedAttFormArea\').innerHTML=\'\'">Cancel</button></div>';
+  html += '</div>';
+  area.innerHTML = html;
+}
+
+async function submitMissedAttendance() {
+  var date = (document.getElementById('missedAttDate') || {}).value;
+  var reason = (document.getElementById('missedAttReason') || {}).value.trim();
+  var proofInput = document.getElementById('missedAttProof');
+  if (!date) { showToast('Please select the date you missed'); return; }
+  if (!reason) { showToast('Please provide a reason'); return; }
+
+  var btn = document.querySelector('#missedAttFormArea .nf-btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Submitting...'; }
+
+  try {
+    var fd = new FormData();
+    fd.append('date', date);
+    fd.append('reason', reason);
+    if (proofInput && proofInput.files && proofInput.files[0]) fd.append('proof', proofInput.files[0]);
+    await apiUpload('/attendance/missed', fd);
+    showToast('Missed attendance request submitted. HR will review.');
+    document.getElementById('missedAttFormArea').innerHTML = '';
+    // Refresh missed requests
+    loadMissedAttRequests();
+  } catch (e) {
+    showToast(e.message || 'Error submitting request');
+    if (btn) { btn.disabled = false; btn.textContent = 'Submit Request'; }
+  }
+}
+
+async function loadMissedAttRequests() {
+  var area = document.getElementById('missedAttMyRequests');
+  if (!area || !currentUser) return;
+  try {
+    var data = await apiCall('GET', '/attendance/missed');
+    if (!Array.isArray(data)) data = [];
+    window._missedAttRequests = data;
+    // For employees, show their own requests
+    if (currentUser.role !== 'HR' && currentUser.role !== 'MD') {
+      var myReqs = data.filter(function(r) { return r.emp_code === currentUser.code; });
+      if (myReqs.length === 0) { area.innerHTML = ''; return; }
+      var html = '<div class="section-title" style="font-size:.78rem">My Missed Attendance Requests</div>';
+      html += '<div class="card fade-in" style="padding:10px">';
+      myReqs.forEach(function(r) {
+        var dateLabel = new Date(r.request_date + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+        var badgeCls = r.status === 'approved' ? 'badge-approved' : r.status === 'rejected' ? 'badge-rejected' : 'badge-pending';
+        var statusLabel = r.status.charAt(0).toUpperCase() + r.status.slice(1);
+        html += '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--gray-100)">';
+        html += '<div style="flex:1"><div style="font-weight:600;font-size:.78rem">' + escapeHTML(dateLabel) + '</div>';
+        html += '<div style="font-size:.68rem;color:var(--gray-500)">' + escapeHTML(r.reason) + '</div>';
+        if (r.review_note) html += '<div style="font-size:.65rem;color:var(--gray-400);margin-top:2px">HR: ' + escapeHTML(r.review_note) + '</div>';
+        html += '</div>';
+        html += '<span class="badge-status ' + badgeCls + '">' + escapeHTML(statusLabel) + '</span></div>';
+      });
+      html += '</div>';
+      area.innerHTML = html;
+    }
+  } catch (e) { /* silent */ }
+}
+
+// HR: Render missed attendance requests in Employee Attendance view
+function renderMissedAttForHR() {
+  var requests = window._missedAttRequests || [];
+  var pending = requests.filter(function(r) { return r.status === 'pending'; });
+  if (pending.length === 0) return '';
+
+  var html = '<div style="margin-top:16px"><div class="section-title">Missed Attendance Requests <span style="background:var(--danger);color:#fff;font-size:.65rem;padding:1px 7px;border-radius:10px;margin-left:6px">' + pending.length + '</span></div>';
+  html += '<div class="card fade-in" style="padding:10px">';
+  pending.forEach(function(r) {
+    var dateLabel = new Date(r.request_date + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    var empName = r.name || r.emp_code;
+    html += '<div style="padding:10px 0;border-bottom:1px solid var(--gray-100)">';
+    html += '<div style="display:flex;align-items:center;gap:10px">';
+    html += '<div style="flex:1"><div style="font-weight:600;font-size:.82rem">' + escapeHTML(empName) + ' <span style="font-weight:400;color:var(--gray-500);font-size:.72rem">(' + escapeHTML(r.emp_code) + ')</span></div>';
+    html += '<div style="font-size:.72rem;color:var(--gray-500)">Date: <strong>' + escapeHTML(dateLabel) + '</strong>' + (r.dept ? ' &middot; ' + escapeHTML(r.dept) : '') + '</div>';
+    html += '<div style="font-size:.72rem;color:var(--gray-600);margin-top:2px">Reason: ' + escapeHTML(r.reason) + '</div>';
+    if (r.proof_url) {
+      var proofUrl = r.proof_url + (r.proof_url.indexOf('?') === -1 ? '?' : '&') + 'token=' + encodeURIComponent(JWT_TOKEN);
+      html += '<a href="' + escapeHTML(proofUrl) + '" target="_blank" style="font-size:.68rem;color:var(--primary);font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:3px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>View Proof</a>';
+    }
+    html += '</div>';
+    html += '<div style="display:flex;gap:6px;margin-top:6px">';
+    html += '<button class="nf-btn nf-btn-success nf-btn-sm" onclick="approveMissedAtt(' + r.id + ')" style="font-size:.7rem">Approve</button>';
+    html += '<button class="nf-btn nf-btn-danger nf-btn-sm" onclick="rejectMissedAtt(' + r.id + ')" style="font-size:.7rem">Reject</button>';
+    html += '</div></div>';
+    html += '</div>';
+  });
+  html += '</div></div>';
+  return html;
+}
+
+async function approveMissedAtt(id) {
+  var note = prompt('Add a note (optional):') || '';
+  try {
+    await apiCall('PUT', '/attendance/missed/' + id + '/approve', { note: note });
+    showToast('Missed attendance approved — attendance marked');
+    // Refresh data
+    var data = await apiCall('GET', '/attendance/missed');
+    window._missedAttRequests = Array.isArray(data) ? data : [];
+    renderEmployeeAttendanceView();
+  } catch (e) { showToast(e.message || 'Error approving'); }
+}
+
+async function rejectMissedAtt(id) {
+  var note = prompt('Reason for rejection:') || '';
+  try {
+    await apiCall('PUT', '/attendance/missed/' + id + '/reject', { note: note });
+    showToast('Request rejected');
+    var data = await apiCall('GET', '/attendance/missed');
+    window._missedAttRequests = Array.isArray(data) ? data : [];
+    renderEmployeeAttendanceView();
+  } catch (e) { showToast(e.message || 'Error rejecting'); }
 }
 
 // =====================================================

@@ -444,6 +444,23 @@ app.get('*', (req, res) => {
     await pool.query("ALTER TABLE tax_declarations ADD COLUMN prev_tds DECIMAL(14,2) DEFAULT 0").catch(() => {});
     await pool.query("ALTER TABLE tax_declarations ADD COLUMN form12b_submitted_at DATE").catch(() => {});
 
+    // Phase G1: Missed attendance requests table
+    await pool.query(`CREATE TABLE IF NOT EXISTS missed_attendance_requests (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      emp_code VARCHAR(20) NOT NULL,
+      request_date DATE NOT NULL,
+      reason TEXT NOT NULL,
+      proof_url VARCHAR(500),
+      status ENUM('pending','approved','rejected') DEFAULT 'pending',
+      reviewed_by VARCHAR(20),
+      reviewed_at DATETIME,
+      review_note TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (emp_code) REFERENCES employees(code) ON DELETE CASCADE,
+      INDEX idx_missed_att_emp (emp_code),
+      INDEX idx_missed_att_status (status)
+    )`).catch(() => {});
+
     // Phase G2: Selfie columns for attendance
     await pool.query("ALTER TABLE attendance_logs ADD COLUMN selfie_checkin_url VARCHAR(500)").catch(() => {});
     await pool.query("ALTER TABLE attendance_logs ADD COLUMN selfie_checkout_url VARCHAR(500)").catch(() => {});

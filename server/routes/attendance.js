@@ -191,4 +191,137 @@ router.get('/debug', verifyToken, async (req, res) => {
   }
 });
 
+// =====================================================
+// MISSED ATTENDANCE REQUESTS
+// =====================================================
+
+// POST /api/attendance/missed — employee submits missed attendance request
+router.post('/missed', verifyToken, upload.single('proof'), async (req, res) => {
+  try {
+    const { date, reason } = req.body;
+    if (!date || !reason) return res.status(400).json({ error: 'Date and reason are required' });
+
+    // Check if already has attendance for that date
+    const [existing] = await pool.query(
+      'SELECT id FROM attendance_logs WHERE emp_code = ? AND log_date = ?',
+      [req.user.empCode, date]
+    );
+    if (existing.length > 0) return res.status(400).json({ error: 'You already have attendance recorded for this date' });
+
+    // Check if already has a pending request for that date
+    const [pendingReq] = await pool.query(
+      "SELECT id FROM missed_attendance_requests WHERE emp_code = ? AND request_date = ? AND status = 'pending'",
+      [req.user.empCode, date]
+    );
+    if (pendingReq.length > 0) return res.status(400).json({ error: 'You already have a pending request for this date' });
+
+    const proofUrl = req.file ? '/uploads/' + req.file.filename : null;
+
+    const [result] = await pool.query(
+      'INSERT INTO missed_attendance_requests (emp_code, request_date, reason, proof_url) VALUES (?, ?, ?, ?)',
+      [req.user.empCode, date, reason, proofUrl]
+    );
+
+    // Notify HR
+    const io = req.app.get('io');
+    if (io) {
+      io.to('role:HR').emit('missed-attendance:new', {
+        empCode: req.user.empCode, name: req.user.name, date, reason
+      });
+    }
+
+    res.json({ message: 'Missed attendance request submitted', id: result.insertId });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// GET /api/attendance/missed — list missed attendance requests
+router.get('/missed', verifyToken, async (req, res) => {
+  try {
+    let query, params;
+    if (req.user.role === 'HR' || req.user.role === 'MD') {
+      query = `SELECT m.*, e.name, e.dept FROM missed_attendance_requests m
+               JOIN employees e ON m.emp_code = e.code
+               ORDER BY m.created_at DESC LIMIT 200`;
+      params = [];
+    } else {
+      query = `SELECT * FROM missed_attendance_requests WHERE emp_code = ? ORDER BY created_at DESC LIMIT 50`;
+      params = [req.user.empCode];
+    }
+    const [rows] = await pool.query(query, params);
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PUT /api/attendance/missed/:id/approve — HR approves missed attendance
+router.put('/missed/:id/approve', verifyToken, requireRole('HR'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { note } = req.body;
+
+    const [rows] = await pool.query('SELECT * FROM missed_attendance_requests WHERE id = ?', [id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Request not found' });
+    if (rows[0].status !== 'pending') return res.status(400).json({ error: 'Request already ' + rows[0].status });
+
+    const request = rows[0];
+
+    // Mark request as approved
+    await pool.query(
+      "UPDATE missed_attendance_requests SET status = 'approved', reviewed_by = ?, reviewed_at = NOW(), review_note = ? WHERE id = ?",
+      [req.user.empCode, note || null, id]
+    );
+
+    // Auto-create attendance record for that date
+    await pool.query(
+      `INSERT INTO attendance_logs (emp_code, check_in, status, log_date, location_name, remark)
+       VALUES (?, CONCAT(?, ' 09:00:00'), 'Present', ?, 'Missed Check-In (Approved)', ?)`,
+      [request.emp_code, request.request_date, request.request_date, 'Missed attendance approved by HR: ' + (request.reason || '')]
+    );
+
+    // Notify the employee
+    const io = req.app.get('io');
+    if (io) {
+      io.to('user:' + request.emp_code).emit('missed-attendance:approved', { date: request.request_date });
+    }
+
+    res.json({ message: 'Request approved and attendance marked' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PUT /api/attendance/missed/:id/reject — HR rejects missed attendance
+router.put('/missed/:id/reject', verifyToken, requireRole('HR'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { note } = req.body;
+
+    const [rows] = await pool.query('SELECT * FROM missed_attendance_requests WHERE id = ?', [id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Request not found' });
+    if (rows[0].status !== 'pending') return res.status(400).json({ error: 'Request already ' + rows[0].status });
+
+    await pool.query(
+      "UPDATE missed_attendance_requests SET status = 'rejected', reviewed_by = ?, reviewed_at = NOW(), review_note = ? WHERE id = ?",
+      [req.user.empCode, note || null, id]
+    );
+
+    // Notify the employee
+    const io = req.app.get('io');
+    if (io) {
+      io.to('user:' + rows[0].emp_code).emit('missed-attendance:rejected', { date: rows[0].request_date });
+    }
+
+    res.json({ message: 'Request rejected' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 module.exports = router;
