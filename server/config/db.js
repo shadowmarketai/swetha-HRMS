@@ -196,7 +196,7 @@ async function seedNewEmployees(conn) {
       const pass = passwords[emp.code] || defaultPass;
       const hash = await bcrypt.hash(pass, 10);
       await conn.query(
-        'INSERT INTO users (emp_code, password_hash, role) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE password_hash = VALUES(password_hash), role = VALUES(role)',
+        'INSERT INTO users (emp_code, password_hash, role) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE role = VALUES(role)',
         [emp.code, hash, emp.role]
       );
       seeded++;
@@ -214,7 +214,7 @@ async function seedNewEmployees(conn) {
       const fixHash = await bcrypt.hash(defaultPass, 10);
       for (const m of missing) {
         await conn.query(
-          'INSERT INTO users (emp_code, password_hash, role) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE password_hash = VALUES(password_hash), role = VALUES(role)',
+          'INSERT IGNORE INTO users (emp_code, password_hash, role) VALUES (?, ?, ?)',
           [m.code, fixHash, m.role]
         );
       }
