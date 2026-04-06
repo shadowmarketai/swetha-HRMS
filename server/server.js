@@ -478,6 +478,54 @@ app.get('*', (req, res) => {
 })();
 
 // =====================================================
+// SELFIE CLEANUP — Delete selfie photos older than 7 days
+// =====================================================
+const fs = require('fs');
+const pathLib = require('path');
+
+async function cleanupOldSelfies() {
+  try {
+    const pool = require('./config/db');
+    // Find selfie URLs older than 7 days
+    const [rows] = await pool.query(
+      `SELECT id, selfie_checkin_url, selfie_checkout_url FROM attendance_logs
+       WHERE log_date < DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+       AND (selfie_checkin_url IS NOT NULL OR selfie_checkout_url IS NOT NULL)`
+    );
+    if (rows.length === 0) return;
+
+    let deleted = 0;
+    const uploadsDir = pathLib.resolve(pathLib.join(__dirname, 'uploads'));
+    for (const row of rows) {
+      // Delete check-in selfie file
+      if (row.selfie_checkin_url) {
+        const filename = pathLib.basename(row.selfie_checkin_url);
+        const filePath = pathLib.join(uploadsDir, filename);
+        try { fs.unlinkSync(filePath); } catch (e) { /* file may already be gone */ }
+      }
+      // Delete check-out selfie file
+      if (row.selfie_checkout_url) {
+        const filename = pathLib.basename(row.selfie_checkout_url);
+        const filePath = pathLib.join(uploadsDir, filename);
+        try { fs.unlinkSync(filePath); } catch (e) { /* file may already be gone */ }
+      }
+      deleted++;
+    }
+    // Clear URLs in DB
+    await pool.query(
+      `UPDATE attendance_logs SET selfie_checkin_url = NULL, selfie_checkout_url = NULL
+       WHERE log_date < DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+       AND (selfie_checkin_url IS NOT NULL OR selfie_checkout_url IS NOT NULL)`
+    );
+    if (deleted > 0) console.log('[SELFIE-CLEANUP] Deleted selfies from ' + deleted + ' attendance records (older than 7 days)');
+  } catch (e) { console.error('[SELFIE-CLEANUP] Error:', e.message); }
+}
+
+// Run cleanup on startup and then every hour
+setTimeout(cleanupOldSelfies, 10000);
+setInterval(cleanupOldSelfies, 60 * 60 * 1000);
+
+// =====================================================
 // SOCKET.IO — Real-time updates
 // =====================================================
 const http = require('http');
