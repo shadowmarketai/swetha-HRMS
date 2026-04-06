@@ -7335,8 +7335,8 @@ function renderMobileBottomTabs(config, container) {
       if (item.children && item.children.length) {
         showMobileSubMenu(item);
       } else {
-        executeNavAction(item, btn);
         _activeNavId = item.id;
+        executeNavAction(item, btn);
         updateNavActiveState();
       }
     };
@@ -7508,8 +7508,8 @@ function showMobileMoreMenu(items) {
       if (item.children && item.children.length) {
         showMobileSubMenu(item);
       } else {
-        executeNavAction(item, null);
         _activeNavId = item.id;
+        executeNavAction(item, null);
         updateNavActiveState();
       }
     };
