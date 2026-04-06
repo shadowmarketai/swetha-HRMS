@@ -5401,9 +5401,14 @@ async function changePassword() {
     document.getElementById('chgConfirmPass').value = '';
     if (btn) {
       btn.textContent = 'Updated';
-      btn.style.background = 'var(--success, #16a34a)';
-      btn.style.borderColor = 'var(--success, #16a34a)';
-      setTimeout(function() { btn.textContent = 'Update Password'; btn.style.background = ''; btn.style.borderColor = ''; btn.disabled = false; }, 3000);
+      btn.className = 'btn w-full';
+      btn.setAttribute('style', 'border-radius:var(--radius-sm);margin-top:8px;background:#16a34a !important;border-color:#16a34a !important;color:#fff !important');
+      setTimeout(function() {
+        btn.textContent = 'Update Password';
+        btn.className = 'btn btn-primary w-full';
+        btn.setAttribute('style', 'border-radius:var(--radius-sm);margin-top:8px');
+        btn.disabled = false;
+      }, 3000);
     }
   } catch (e) {
     showToast(e.message || 'Error changing password');
