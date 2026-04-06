@@ -55,12 +55,13 @@ router.post('/', verifyToken, [
   body('from').isISO8601().withMessage('Valid from date required'),
   body('to').isISO8601().withMessage('Valid to date required'),
   body('reason').optional().trim().isLength({ max: 500 }),
-  body('isLOP').optional().isBoolean()
+  body('isLOP').optional().isBoolean(),
+  body('isHalfDay').optional().isBoolean()
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
   try {
-    const { type, from, to, reason, isLOP } = req.body;
+    const { type, from, to, reason, isLOP, isHalfDay } = req.body;
     if (!type || !from || !to) return res.status(400).json({ error: 'Type, from and to dates required' });
     if (!VALID_LEAVE_TYPES.includes(type)) return res.status(400).json({ error: 'Invalid leave type' });
 
@@ -73,6 +74,8 @@ router.post('/', verifyToken, [
     if (type === 'permission') {
       days = 1; // 1 permission unit = 2 hours
       if (from !== to) return res.status(400).json({ error: 'Permission is for 2 hours on a single day only' });
+    } else if (isHalfDay) {
+      days = 0.5;
     } else {
       days = Math.round((toDate - fromDate) / 86400000) + 1;
     }

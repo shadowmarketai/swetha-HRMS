@@ -611,6 +611,10 @@ router.post('/returns/:id/admin-accept', verifyToken, requireRoleOrDept(['HR'], 
 router.post('/returns/:id/verify', verifyToken, requireRoleOrDept(['MD'], []), async (req, res) => {
   const conn = await db.getConnection();
   try {
+    // Verify status is ADMIN_ACCEPTED before proceeding
+    const [ret] = await conn.query('SELECT status FROM peb_material_returns WHERE id = ?', [req.params.id]);
+    if (ret.length === 0) { conn.release(); return res.status(404).json({ error: 'Return not found' }); }
+    if (ret[0].status !== 'ADMIN_ACCEPTED') { conn.release(); return res.status(400).json({ error: 'Admin must accept this return first (current: ' + ret[0].status + ')' }); }
     await conn.beginTransaction();
     const [items] = await conn.query('SELECT * FROM peb_return_items WHERE mrn_id = ?', [req.params.id]);
 
@@ -684,6 +688,10 @@ router.post('/scrap/:id/sell', verifyToken, requireRoleOrDept(['MD'], []), async
   try {
     const { sale_amount, receipt_number } = req.body;
     if (!sale_amount) return res.status(400).json({ error: 'sale_amount required' });
+    // Verify Admin has accepted before MD can sell
+    const [batch] = await db.query('SELECT status FROM peb_scrap_batches WHERE id = ?', [req.params.id]);
+    if (batch.length === 0) return res.status(404).json({ error: 'Batch not found' });
+    if (batch[0].status !== 'ADMIN_ACCEPTED') return res.status(400).json({ error: 'Admin must accept this batch first (current: ' + batch[0].status + ')' });
     await db.query("UPDATE peb_scrap_batches SET status='SOLD', sale_amount=?, sale_date=CURDATE(), receipt_number=? WHERE id=?",
       [sale_amount, receipt_number||null, req.params.id]);
 

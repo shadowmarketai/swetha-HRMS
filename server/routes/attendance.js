@@ -106,10 +106,9 @@ router.post('/checkout', verifyToken, upload.single('selfie'), async (req, res) 
 
     await pool.query(
       `UPDATE attendance_logs SET check_out = NOW(), check_out_lat = ?, check_out_lng = ?,
-       location_name = COALESCE(?, location_name), remark = COALESCE(?, remark),
-       is_within_geofence = ?, selfie_checkout_url = COALESCE(?, selfie_checkout_url) WHERE id = ?`,
-      [lat || null, lng || null, geo.site || location || null, remark || null,
-       geo.within ? 1 : 0, selfieUrl, active[0].id]
+       remark = COALESCE(?, remark),
+       selfie_checkout_url = COALESCE(?, selfie_checkout_url) WHERE id = ?`,
+      [lat || null, lng || null, remark || null, selfieUrl, active[0].id]
     );
 
     const [rows] = await pool.query('SELECT * FROM attendance_logs WHERE id = ?', [active[0].id]);
@@ -264,7 +263,7 @@ router.get('/missed', verifyToken, async (req, res) => {
 });
 
 // PUT /api/attendance/missed/:id/approve — HR approves missed attendance
-router.put('/missed/:id/approve', verifyToken, requireRole('HR'), async (req, res) => {
+router.put('/missed/:id/approve', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
   try {
     const { id } = req.params;
     const { note } = req.body;
@@ -302,7 +301,7 @@ router.put('/missed/:id/approve', verifyToken, requireRole('HR'), async (req, re
 });
 
 // PUT /api/attendance/missed/:id/reject — HR rejects missed attendance
-router.put('/missed/:id/reject', verifyToken, requireRole('HR'), async (req, res) => {
+router.put('/missed/:id/reject', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
   try {
     const { id } = req.params;
     const { note } = req.body;

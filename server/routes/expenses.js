@@ -85,7 +85,8 @@ router.put('/:id/approve', verifyToken, requireRole('MD', 'HR'), auditLog('appro
     const exp = existing[0];
     const currentStatus = exp.status;
     let newStatus;
-    if (req.body.hrAccept) {
+    if (req.user.role === 'HR') {
+      // HR can only accept (Pending → hr_accepted), never fully approve
       if (currentStatus !== 'Pending') return res.status(400).json({ error: `Cannot accept: status is ${currentStatus}` });
       newStatus = 'hr_accepted';
       await pool.query(
@@ -93,6 +94,7 @@ router.put('/:id/approve', verifyToken, requireRole('MD', 'HR'), auditLog('appro
         [req.user.empCode, req.params.id]
       );
     } else {
+      // MD can approve from Pending or hr_accepted
       if (currentStatus !== 'Pending' && currentStatus !== 'hr_accepted') return res.status(400).json({ error: `Cannot approve: status is ${currentStatus}` });
       newStatus = 'Approved';
       await pool.query(

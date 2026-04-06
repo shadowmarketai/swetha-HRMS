@@ -170,6 +170,16 @@ function _pebCanApprove() {
   return false;
 }
 
+// Check if user is Admin dept (accepts) vs MD (final approver)
+function _pebIsAdmin() {
+  if (typeof currentUser === 'undefined' || !currentUser) return false;
+  return currentUser.dept === 'Admin' || currentUser.role === 'HR';
+}
+function _pebIsMD() {
+  if (typeof currentUser === 'undefined' || !currentUser) return false;
+  return currentUser.role === 'MD';
+}
+
 async function _pebStockItems(el) {
   try {
     var items = await _pebApi('/api/peb/store/items');
@@ -397,7 +407,7 @@ async function _pebMaterialRequests(el) {
     var reqs = await _pebApi('/api/peb/store/material-requests');
     var html = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">' +
       '<div style="display:flex;gap:6px;align-items:center"><span style="font-size:.75rem;color:var(--gray-500)">'+reqs.length+' requests</span>' +
-        '<select id="pMR_stageF" style="padding:5px 8px;border:1px solid var(--gray-200);border-radius:6px;font-size:.7rem" onchange="_pebFilterMR()"><option value="">All Stages</option><option>REQUESTED</option><option>APPROVED</option><option>DISPATCHED</option><option>CLOSED</option><option>REJECTED</option></select></div>' +
+        '<select id="pMR_stageF" style="padding:5px 8px;border:1px solid var(--gray-200);border-radius:6px;font-size:.7rem" onchange="_pebFilterMR()"><option value="">All Stages</option><option>REQUESTED</option><option>ADMIN_ACCEPTED</option><option>APPROVED</option><option>DISPATCHED</option><option>CLOSED</option><option>REJECTED</option></select></div>' +
       '<button class="btn btn-golden" style="font-size:.7rem;padding:5px 12px" onclick="_pebShowAddMR()">+ New Request</button></div>';
     html += '<div id="pMR_tbl">' + _pebMRRows(reqs) + '</div>';
     el.innerHTML = html;
@@ -408,7 +418,9 @@ function _pebMRRows(reqs) {
   return _pebTbl(['Code','Site','Urgency','Stage','Date','Actions'], reqs.map(function(r) {
     return [escapeHTML(r.request_code), escapeHTML(r.site_name||'-'), _pebStatus(r.urgency), _pebStatus(r.stage), _pebDate(r.created_at),
       '<a href="#" onclick="_pebViewMR('+r.id+');return false" style="font-size:.7rem;color:var(--primary);margin-right:4px">View</a>' +
-      (_pebCanApprove() && r.stage==='REQUESTED' ? '<button class="btn btn-golden" style="font-size:.6rem;padding:2px 8px;margin-right:3px" onclick="_pebApproveMR('+r.id+',\'APPROVED\')">Approve</button><button class="btn" style="font-size:.6rem;padding:2px 8px;background:var(--danger);color:#fff" onclick="_pebApproveMR('+r.id+',\'REJECTED\')">Reject</button>' : '') +
+      (_pebIsAdmin() && r.stage==='REQUESTED' ? '<button class="btn btn-golden" style="font-size:.6rem;padding:2px 8px;margin-right:3px" onclick="_pebAdminAcceptMR('+r.id+')">Accept</button><button class="btn" style="font-size:.6rem;padding:2px 8px;background:var(--danger);color:#fff" onclick="_pebApproveMR('+r.id+',\'REJECTED\')">Reject</button>' : '') +
+      (_pebIsMD() && r.stage==='REQUESTED' ? '<button class="btn btn-golden" style="font-size:.6rem;padding:2px 8px;margin-right:3px" onclick="_pebApproveMR('+r.id+',\'APPROVED\')">Approve</button><button class="btn" style="font-size:.6rem;padding:2px 8px;background:var(--danger);color:#fff" onclick="_pebApproveMR('+r.id+',\'REJECTED\')">Reject</button>' : '') +
+      (_pebIsMD() && r.stage==='ADMIN_ACCEPTED' ? '<button class="btn btn-golden" style="font-size:.6rem;padding:2px 8px;margin-right:3px" onclick="_pebApproveMR('+r.id+',\'APPROVED\')">MD Approve</button>' : '') +
       (_pebCanApprove() && r.stage==='APPROVED' ? '<button class="btn btn-golden" style="font-size:.6rem;padding:2px 8px" onclick="_pebDispatchMR('+r.id+')">Dispatch</button>' : '')];
   }));
 }
@@ -437,12 +449,18 @@ async function _pebViewMR(id) {
       return [escapeHTML(i.item_name), escapeHTML(i.item_code), ''+i.requested_qty, ''+(i.approved_qty??'-'), ''+(i.issued_qty||'-'), i.current_stock+' '+escapeHTML(i.unit)];
     }), '500px');
 
-    if (_pebCanApprove() && data.stage==='REQUESTED') html += '<div style="display:flex;gap:8px;margin-top:12px"><button class="btn btn-golden" onclick="_pebApproveMR('+id+',\'APPROVED\')">Approve</button><button class="btn" style="background:var(--danger);color:#fff" onclick="_pebApproveMR('+id+',\'REJECTED\')">Reject</button></div>';
+    if (_pebIsAdmin() && data.stage==='REQUESTED') html += '<div style="display:flex;gap:8px;margin-top:12px"><button class="btn btn-golden" onclick="_pebAdminAcceptMR('+id+')">Accept & Forward to MD</button><button class="btn" style="background:var(--danger);color:#fff" onclick="_pebApproveMR('+id+',\'REJECTED\')">Reject</button></div>';
+    if (_pebIsMD() && data.stage==='REQUESTED') html += '<div style="display:flex;gap:8px;margin-top:12px"><button class="btn btn-golden" onclick="_pebApproveMR('+id+',\'APPROVED\')">Approve</button><button class="btn" style="background:var(--danger);color:#fff" onclick="_pebApproveMR('+id+',\'REJECTED\')">Reject</button></div>';
+    if (_pebIsMD() && data.stage==='ADMIN_ACCEPTED') html += '<div style="display:flex;gap:8px;margin-top:12px"><button class="btn btn-golden" onclick="_pebApproveMR('+id+',\'APPROVED\')">MD Approve</button></div>';
     if (_pebCanApprove() && data.stage==='APPROVED') html += '<button class="btn btn-golden" style="margin-top:12px" onclick="_pebDispatchMR('+id+')">Dispatch Materials</button>';
     el.innerHTML = html;
   } catch(e) { showToast(e.message,'error'); }
 }
 
+async function _pebAdminAcceptMR(id) {
+  var remarks = prompt('Remarks (optional):') || '';
+  try { await _pebPost('/api/peb/store/material-requests/'+id+'/admin-accept', {remarks:remarks}); showToast('Accepted — forwarded to MD','success'); _pebMaterialRequests(_p()); } catch(e) { showToast(e.message,'error'); }
+}
 async function _pebApproveMR(id, action) {
   var remarks = action==='REJECTED' ? prompt('Rejection reason:') : '';
   if (action==='REJECTED' && remarks===null) return;
@@ -591,7 +609,7 @@ async function _pebSaveReturn() {
     if(id&&qty) items.push({item_id:+id, returned_qty:qty, usable_qty:+r.querySelector('.pRet_usable').value||0, scrap_qty:+r.querySelector('.pRet_scrap').value||0, condition:r.querySelector('.pRet_cond').value});
   });
   if(items.length===0){showToast('Add at least one item','error');return;}
-  try { await _pebPost('/api/peb/store/returns', {site_name:document.getElementById('pRet_site').value, returned_by_name:'MD', return_date:document.getElementById('pRet_date').value, items:items}); showToast('Return created','success'); _pebReturnsScrap(_p()); } catch(e){showToast(e.message,'error');}
+  try { await _pebPost('/api/peb/store/returns', {site_name:document.getElementById('pRet_site').value, returned_by_name:(typeof currentUser!=='undefined'&&currentUser?currentUser.name:''), return_date:document.getElementById('pRet_date').value, items:items}); showToast('Return created','success'); _pebReturnsScrap(_p()); } catch(e){showToast(e.message,'error');}
 }
 
 function _pebShowAddScrap() {

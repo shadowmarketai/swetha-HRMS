@@ -211,11 +211,11 @@ async function syncOfflineQueue() {
 
     // Save only failed items back, removing successfully synced ones
     if (remaining.length > 0) {
-      var db = await openDB();
-      var tx = db.transaction('offline-queue', 'readwrite');
-      await tx.objectStore('offline-queue').clear();
-      for (var r of remaining) { await tx.objectStore('offline-queue').add(r); }
-      await tx.done;
+      var db = await openOfflineDB();
+      var tx = db.transaction('queue', 'readwrite');
+      var store = tx.objectStore('queue');
+      store.clear();
+      remaining.forEach(function(r) { store.add(r); });
     } else {
       await clearOfflineQueue();
     }

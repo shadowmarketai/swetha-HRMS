@@ -211,7 +211,7 @@ const NAV_CONFIG = {
     ]},
     { id:'md-tax', label:'Form 16 & Tax', icon:'tax', action:{type:'overlay',target:'hr-tax'} },
     { id:'md-salary', label:'Salary', icon:'salary', children:[
-      { id:'md-sal-structure', label:'Salary Structure', action:{type:'tab',target:'expenses'} },
+      { id:'md-sal-structure', label:'Salary Structure', action:{type:'tab',target:'salary'} },
       { id:'md-sal-check', label:'Salary Check', action:{type:'tab',target:'salary'} }
     ]},
     { id:'md-peb-dash', label:'PEB Dashboard', icon:'store', action:{type:'overlay',target:'peb'} },
@@ -1126,33 +1126,14 @@ function doLogout() {
 function showForgotPassword() {
   const form = document.querySelector('.login-form');
   form.innerHTML = `
-    <div style="margin-bottom:12px;font-family:var(--font-display);font-size:.95rem;font-weight:600">Reset Password</div>
-    <div class="login-field"><label>Employee Code</label><input type="text" id="forgotCode" placeholder="e.g. SS001" maxlength="20" autocomplete="off"></div>
-    <button class="login-btn" id="forgotSubmitBtn" type="button">Submit</button>
-    <div id="forgotResult" style="margin-top:10px;font-size:.75rem;color:rgba(255,255,255,.85);line-height:1.4"></div>
+    <div style="margin-bottom:12px;font-family:var(--font-display);font-size:.95rem;font-weight:600">Forgot Password?</div>
+    <div style="font-size:.78rem;color:rgba(255,255,255,.85);line-height:1.5;padding:12px;background:rgba(255,255,255,.1);border-radius:8px;margin-bottom:12px">
+      Please contact your <strong>HR</strong> to reset your password.<br><br>
+      HR will reset it from their panel and provide you a temporary password.
+    </div>
     <div style="margin-top:12px;text-align:center"><a href="#" onclick="restoreLoginForm();return false" style="font-size:.72rem;color:rgba(255,255,255,.7);text-decoration:none">&larr; Back to Login</a></div>
   `;
-  document.getElementById('forgotSubmitBtn').addEventListener('click', processForgotPassword);
 }
-
-async function processForgotPassword() {
-  var code = document.getElementById('forgotCode').value.trim().toUpperCase();
-  var result = document.getElementById('forgotResult');
-  if (!code) { result.textContent = 'Please enter your Employee Code'; return; }
-  if (!isOnline) { result.textContent = 'No internet connection. Please try again later.'; return; }
-  try {
-    var res = await fetch(API_BASE + '/auth/forgot-password', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ empCode: code })
-    });
-    var data = await res.json();
-    if (!res.ok) { result.textContent = data.error || 'Password reset failed'; return; }
-    var newPwd = data.tempPassword || 'emp123';
-    result.innerHTML = 'Password has been reset for <b>' + escapeHTML(code) + '</b>.<br><br>Your new password is <b>' + escapeHTML(newPwd) + '</b><br>Please change it after login.';
-  } catch (e) {
-    result.textContent = 'Cannot reach server. Please try again later.';
-  }
 }
 
 function restoreLoginForm() {
@@ -1299,9 +1280,7 @@ function seededRandom(seed) {
 }
 
 function generateMonthlySalary(emp, monthIdx, year) {
-  const rng = seededRandom(emp.code + monthIdx + year);
-  const variation = 0.95 + rng() * 0.10; // ±5%
-  const gross = Math.round(emp.salary * variation);
+  const gross = emp.salary || 0;
   const basic = Math.round(gross * 0.50);
   const hra = Math.round(gross * 0.20);
   const da = Math.round(gross * 0.10);
@@ -1313,7 +1292,7 @@ function generateMonthlySalary(emp, monthIdx, year) {
   const totalDed = pf + esi + profTax;
   const net = gross - totalDed;
   const daysInMonth = new Date(year, monthIdx + 1, 0).getDate();
-  const workedDays = Math.max(daysInMonth - Math.floor(rng() * 3), daysInMonth - 2);
+  const workedDays = daysInMonth;
   return { gross, basic, hra, da, otherAllow, specialAllow, pf, esi, profTax, totalDed, net, workedDays, daysInMonth };
 }
 
@@ -9027,7 +9006,7 @@ async function submitLeave() {
 
   try {
     var lopFlag = isLOP || (leaveType === 'casual' && days > paidAvailable);
-    var apiRes = await apiCall('POST', '/leaves', { type: leaveType, from: from, to: to, reason: reason, isLOP: lopFlag });
+    var apiRes = await apiCall('POST', '/leaves', { type: leaveType, from: from, to: to, reason: reason, isLOP: lopFlag, isHalfDay: isHalfDay });
     var app = {
       id: (apiRes && apiRes.id) || leaveNextId++,
       empCode: currentUser.code,
@@ -10189,9 +10168,14 @@ function renderHomeQuickStats() {
   // Attendance this month
   var todayStr = new Date().toISOString().split('T')[0];
   var monthStr = todayStr.substring(0, 7);
-  var myAttendance = (typeof attendanceLogs !== 'undefined' ? attendanceLogs : []).filter(function(l) {
-    return l.empCode === currentUser.code && l.type === 'checkin' && l.timestamp && l.timestamp.startsWith(monthStr);
-  }).length;
+  // Count unique attendance days (not by type — records with checkout still count)
+  var myAttDays = {};
+  (typeof attendanceLogs !== 'undefined' ? attendanceLogs : []).forEach(function(l) {
+    if (l.empCode === currentUser.code && l.logDate && String(l.logDate).substring(0, 7) === monthStr) {
+      myAttDays[String(l.logDate).substring(0, 10)] = true;
+    }
+  });
+  var myAttendance = Object.keys(myAttDays).length;
 
   // Leave balance
   var compLeft = bal.comp !== undefined ? bal.comp : 3;

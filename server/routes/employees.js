@@ -146,7 +146,7 @@ router.get('/:code/documents', verifyToken, async (req, res) => {
 router.get('/:code', verifyToken, async (req, res) => {
   try {
     // Employees can only view their own record; MD/HR can view anyone
-    if (req.user.role === 'Employee' && req.params.code !== req.user.empCode) {
+    if (!['MD', 'HR'].includes(req.user.role) && req.params.code !== req.user.empCode) {
       return res.status(403).json({ error: 'Access denied' });
     }
     const [rows] = await pool.query('SELECT * FROM employees WHERE code = ?', [req.params.code]);
@@ -407,6 +407,7 @@ router.put('/:code', verifyToken, requireRole('MD', 'HR'), auditLog('update', 'e
 router.delete('/:code', verifyToken, requireRole('MD'), auditLog('delete', 'employee'), async (req, res) => {
   try {
     await pool.query('UPDATE employees SET is_active = 0 WHERE code = ?', [req.params.code]);
+    await pool.query('UPDATE users SET is_active = 0 WHERE emp_code = ?', [req.params.code]);
     res.json({ message: 'Employee deactivated' });
   } catch (err) {
     console.error(err);
