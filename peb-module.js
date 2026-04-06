@@ -162,6 +162,14 @@ function _pebCanEdit() {
   return false;
 }
 
+// Site Engineer can only request/view — no approve/reject/dispatch/verify/sell
+function _pebCanApprove() {
+  if (typeof currentUser === 'undefined' || !currentUser) return false;
+  if (currentUser.role === 'MD' || currentUser.role === 'HR') return true;
+  if (currentUser.dept === 'Admin') return true;
+  return false;
+}
+
 async function _pebStockItems(el) {
   try {
     var items = await _pebApi('/api/peb/store/items');
@@ -400,8 +408,8 @@ function _pebMRRows(reqs) {
   return _pebTbl(['Code','Site','Urgency','Stage','Date','Actions'], reqs.map(function(r) {
     return [escapeHTML(r.request_code), escapeHTML(r.site_name||'-'), _pebStatus(r.urgency), _pebStatus(r.stage), _pebDate(r.created_at),
       '<a href="#" onclick="_pebViewMR('+r.id+');return false" style="font-size:.7rem;color:var(--primary);margin-right:4px">View</a>' +
-      (r.stage==='REQUESTED' ? '<button class="btn btn-golden" style="font-size:.6rem;padding:2px 8px;margin-right:3px" onclick="_pebApproveMR('+r.id+',\'APPROVED\')">Approve</button><button class="btn" style="font-size:.6rem;padding:2px 8px;background:var(--danger);color:#fff" onclick="_pebApproveMR('+r.id+',\'REJECTED\')">Reject</button>' : '') +
-      (r.stage==='APPROVED' ? '<button class="btn btn-golden" style="font-size:.6rem;padding:2px 8px" onclick="_pebDispatchMR('+r.id+')">Dispatch</button>' : '')];
+      (_pebCanApprove() && r.stage==='REQUESTED' ? '<button class="btn btn-golden" style="font-size:.6rem;padding:2px 8px;margin-right:3px" onclick="_pebApproveMR('+r.id+',\'APPROVED\')">Approve</button><button class="btn" style="font-size:.6rem;padding:2px 8px;background:var(--danger);color:#fff" onclick="_pebApproveMR('+r.id+',\'REJECTED\')">Reject</button>' : '') +
+      (_pebCanApprove() && r.stage==='APPROVED' ? '<button class="btn btn-golden" style="font-size:.6rem;padding:2px 8px" onclick="_pebDispatchMR('+r.id+')">Dispatch</button>' : '')];
   }));
 }
 
@@ -429,8 +437,8 @@ async function _pebViewMR(id) {
       return [escapeHTML(i.item_name), escapeHTML(i.item_code), ''+i.requested_qty, ''+(i.approved_qty??'-'), ''+(i.issued_qty||'-'), i.current_stock+' '+escapeHTML(i.unit)];
     }), '500px');
 
-    if (data.stage==='REQUESTED') html += '<div style="display:flex;gap:8px;margin-top:12px"><button class="btn btn-golden" onclick="_pebApproveMR('+id+',\'APPROVED\')">Approve</button><button class="btn" style="background:var(--danger);color:#fff" onclick="_pebApproveMR('+id+',\'REJECTED\')">Reject</button></div>';
-    if (data.stage==='APPROVED') html += '<button class="btn btn-golden" style="margin-top:12px" onclick="_pebDispatchMR('+id+')">Dispatch Materials</button>';
+    if (_pebCanApprove() && data.stage==='REQUESTED') html += '<div style="display:flex;gap:8px;margin-top:12px"><button class="btn btn-golden" onclick="_pebApproveMR('+id+',\'APPROVED\')">Approve</button><button class="btn" style="background:var(--danger);color:#fff" onclick="_pebApproveMR('+id+',\'REJECTED\')">Reject</button></div>';
+    if (_pebCanApprove() && data.stage==='APPROVED') html += '<button class="btn btn-golden" style="margin-top:12px" onclick="_pebDispatchMR('+id+')">Dispatch Materials</button>';
     el.innerHTML = html;
   } catch(e) { showToast(e.message,'error'); }
 }
@@ -678,9 +686,9 @@ function _pebIndentRows(indents) {
       '<strong>'+qCnt+'</strong>/3 '+(qCnt>=3?_pebBadge('COMPLETE','green'):_pebBadge('PENDING','orange')),
       _pebStatus(r.status), _pebDate(r.created_at),
       '<a href="#" onclick="_pebViewIndent('+r.id+');return false" style="font-size:.7rem;color:var(--primary);margin-right:4px">View</a>' +
-      (r.status==='QUOTATION_PENDING'?'<button class="btn btn-golden" style="font-size:.6rem;padding:2px 8px" onclick="_pebAddQuotation('+r.id+')">+ Quote</button>':'') +
-      (r.status==='COMPARISON_READY'?'<button class="btn btn-golden" style="font-size:.6rem;padding:2px 8px" onclick="_pebGMReview('+r.id+')">GM Review</button>':'') +
-      (r.status==='GM_APPROVED'?'<button class="btn btn-golden" style="font-size:.6rem;padding:2px 8px" onclick="_pebMDApprove('+r.id+')">MD Approve</button>':'')
+      (_pebCanApprove() && r.status==='QUOTATION_PENDING'?'<button class="btn btn-golden" style="font-size:.6rem;padding:2px 8px" onclick="_pebAddQuotation('+r.id+')">+ Quote</button>':'') +
+      (_pebCanApprove() && r.status==='COMPARISON_READY'?'<button class="btn btn-golden" style="font-size:.6rem;padding:2px 8px" onclick="_pebGMReview('+r.id+')">GM Review</button>':'') +
+      (_pebCanApprove() && r.status==='GM_APPROVED'?'<button class="btn btn-golden" style="font-size:.6rem;padding:2px 8px" onclick="_pebMDApprove('+r.id+')">MD Approve</button>':'')
     ];
   }));
 }
@@ -741,8 +749,8 @@ async function _pebViewIndent(id) {
     // Action buttons
     html += '<div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">';
     if(data.status==='QUOTATION_PENDING') html += '<button class="btn btn-golden" onclick="_pebAddQuotation('+id+')">+ Add Quotation</button>';
-    if(data.status==='COMPARISON_READY') html += '<button class="btn btn-golden" onclick="_pebGMReview('+id+')">GM Review & Approve</button>';
-    if(data.status==='GM_APPROVED') html += '<button class="btn btn-golden" onclick="_pebMDApprove('+id+')">MD Final Approve</button>';
+    if(_pebCanApprove() && data.status==='COMPARISON_READY') html += '<button class="btn btn-golden" onclick="_pebGMReview('+id+')">GM Review & Approve</button>';
+    if(_pebCanApprove() && data.status==='GM_APPROVED') html += '<button class="btn btn-golden" onclick="_pebMDApprove('+id+')">MD Final Approve</button>';
     if(['COMPARISON_READY','QUOTATION_PENDING'].indexOf(data.status)>=0) html += '<button class="btn" style="background:var(--danger);color:#fff" onclick="_pebRejectIndent('+id+')">Reject</button>';
     html += '</div>';
 
@@ -923,7 +931,7 @@ async function _pebOrders(el) {
     html += _pebTbl(['PO #','Vendor','Amount','Paid','Balance','Status','Actions'], pos.map(function(p) {
       return [escapeHTML(p.po_number), escapeHTML(p.vendor_name||'-'), _pebCurr(p.total_amount), _pebCurr(p.total_paid), _pebCurr(p.balance_due), _pebStatus(p.status),
         '<a href="#" onclick="_pebViewPO('+p.id+');return false" style="font-size:.7rem;color:var(--primary);margin-right:4px">View</a>' +
-        (p.status==='DRAFT'?'<button class="btn btn-golden" style="font-size:.6rem;padding:2px 8px;margin-right:3px" onclick="_pebApprovePO('+p.id+')">Approve</button>':'') +
+        (_pebCanApprove() && p.status==='DRAFT'?'<button class="btn btn-golden" style="font-size:.6rem;padding:2px 8px;margin-right:3px" onclick="_pebApprovePO('+p.id+')">Approve</button>':'') +
         (p.balance_due>0?'<button class="btn btn-golden" style="font-size:.6rem;padding:2px 8px" onclick="_pebShowPayment('+p.id+')">Pay</button>':'')];
     }));
     el.innerHTML = html;
@@ -953,7 +961,7 @@ async function _pebViewPO(id) {
       }), '400px');
     }
     html += '<div style="display:flex;gap:8px;margin-top:12px">';
-    if(data.status==='DRAFT') html += '<button class="btn btn-golden" onclick="_pebApprovePO('+id+')">Approve PO</button>';
+    if(_pebCanApprove() && data.status==='DRAFT') html += '<button class="btn btn-golden" onclick="_pebApprovePO('+id+')">Approve PO</button>';
     if(data.balance_due>0) html += '<button class="btn btn-golden" onclick="_pebShowPayment('+id+')">Record Payment</button>';
     html += '</div>';
     el.innerHTML = html;
@@ -989,7 +997,7 @@ async function _pebTransport(el) {
     html += _pebTbl(['Code','Type','From','To','Date','Vehicle','Status','Actions'], reqs.map(function(t) {
       return [escapeHTML(t.request_code), _pebStatus(t.type), escapeHTML(t.origin_name||'-'), escapeHTML(t.destination_name||'-'), _pebDate(t.scheduled_date), escapeHTML(t.vehicle_number||'-'), _pebStatus(t.status),
         '<a href="#" onclick="_pebViewTransport('+t.id+');return false" style="font-size:.7rem;color:var(--primary);margin-right:4px">View</a>' +
-        (t.status==='REQUESTED'?'<button class="btn btn-golden" style="font-size:.6rem;padding:2px 8px;margin-right:3px" onclick="_pebApproveTransport('+t.id+')">Approve</button><button class="btn" style="font-size:.6rem;padding:2px 8px;background:var(--danger);color:#fff" onclick="_pebRejectTransport('+t.id+')">Reject</button>':'') +
+        (_pebCanApprove() && t.status==='REQUESTED'?'<button class="btn btn-golden" style="font-size:.6rem;padding:2px 8px;margin-right:3px" onclick="_pebApproveTransport('+t.id+')">Approve</button><button class="btn" style="font-size:.6rem;padding:2px 8px;background:var(--danger);color:#fff" onclick="_pebRejectTransport('+t.id+')">Reject</button>':'') +
         (t.status==='APPROVED'?'<button class="btn btn-golden" style="font-size:.6rem;padding:2px 8px" onclick="_pebStartTransit('+t.id+')">Start Transit</button>':'') +
         (t.status==='IN_TRANSIT'?'<button class="btn btn-golden" style="font-size:.6rem;padding:2px 8px" onclick="_pebCompleteTransport('+t.id+')">Complete</button>':'')];
     }));
@@ -1015,7 +1023,7 @@ async function _pebViewTransport(id) {
       (t.transport_cost?'<p><strong>Cost:</strong> '+_pebCurr(t.transport_cost)+' | <strong>KM:</strong> '+(t.actual_km||'-')+' | <strong>Condition:</strong> '+_pebStatus(t.delivery_condition||'')+'</p>':'') +
       '</div>';
     html += '<div style="display:flex;gap:8px">';
-    if(t.status==='REQUESTED') html += '<button class="btn btn-golden" onclick="_pebApproveTransport('+id+')">Approve</button><button class="btn" style="background:var(--danger);color:#fff" onclick="_pebRejectTransport('+id+')">Reject</button>';
+    if(_pebCanApprove() && t.status==='REQUESTED') html += '<button class="btn btn-golden" onclick="_pebApproveTransport('+id+')">Approve</button><button class="btn" style="background:var(--danger);color:#fff" onclick="_pebRejectTransport('+id+')">Reject</button>';
     if(t.status==='APPROVED') html += '<button class="btn btn-golden" onclick="_pebStartTransit('+id+')">Start Transit</button>';
     if(t.status==='IN_TRANSIT') html += '<button class="btn btn-golden" onclick="_pebCompleteTransport('+id+')">Complete</button>';
     html += '</div>';

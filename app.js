@@ -9942,30 +9942,33 @@ function renderAttendanceLogList() {
     c.innerHTML = '<div style="padding:16px;text-align:center;color:var(--gray-400);font-size:.8rem">No attendance records yet. Use GPS Check-In to start logging.</div>';
     return;
   }
-  // Group by date
+  // Group by date — use checkIn/checkOut fields directly (not type)
   var byDate = {};
   myLogs.forEach(function(log) {
-    var d = log.timestamp ? log.timestamp.split('T')[0] : 'unknown';
-    if (!byDate[d]) byDate[d] = { checkin: null, checkout: null };
-    if (log.type === 'checkin' && !byDate[d].checkin) byDate[d].checkin = log;
-    if (log.type === 'checkout') byDate[d].checkout = log;
+    var d = log.logDate ? String(log.logDate).substring(0, 10) : (log.timestamp ? log.timestamp.split('T')[0] : 'unknown');
+    if (!byDate[d]) byDate[d] = { checkin: null, checkout: null, log: null };
+    // Each attendance record has both checkIn and checkOut fields
+    if (log.checkIn && !byDate[d].checkin) byDate[d].checkin = log;
+    if (log.checkOut) byDate[d].checkout = log;
+    if (!byDate[d].log) byDate[d].log = log;
   });
   var dates = Object.keys(byDate).sort().reverse().slice(0, 30);
   var html = '<div style="padding:12px">';
   dates.forEach(function(dt) {
     var pair = byDate[dt];
-    var ciTime = pair.checkin ? new Date(pair.checkin.timestamp).toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'}) : '--:--';
-    var coTime = pair.checkout ? new Date(pair.checkout.timestamp).toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'}) : '--:--';
-    var loc = (pair.checkin && pair.checkin.location) ? pair.checkin.location : 'Unknown';
+    var theLog = pair.checkin || pair.checkout || pair.log;
+    var ciTime = theLog && theLog.checkIn ? new Date(theLog.checkIn).toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'}) : '--:--';
+    var coLog = pair.checkout || theLog;
+    var coTime = coLog && coLog.checkOut ? new Date(coLog.checkOut).toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'}) : '--:--';
+    var loc = (theLog && theLog.location) ? theLog.location : 'Unknown';
     var duration = '';
-    if (pair.checkin && pair.checkout) {
-      var diff = (new Date(pair.checkout.timestamp) - new Date(pair.checkin.timestamp)) / 60000;
-      var hrs = Math.floor(diff / 60), mins = Math.round(diff % 60);
-      duration = hrs + 'h ' + mins + 'm';
+    if (theLog && theLog.checkIn && (coLog && coLog.checkOut)) {
+      var diff = (new Date(coLog.checkOut) - new Date(theLog.checkIn)) / 60000;
+      if (diff > 0) { var hrs = Math.floor(diff / 60), mins = Math.round(diff % 60); duration = hrs + 'h ' + mins + 'm'; }
     }
     var statusHtml = '';
-    if (pair.checkin) {
-      var ciDate = new Date(pair.checkin.timestamp);
+    if (theLog && theLog.checkIn) {
+      var ciDate = new Date(theLog.checkIn);
       var totalMin = ciDate.getHours() * 60 + ciDate.getMinutes();
       if (totalMin > 9 * 60 + 15) statusHtml = '<span style="font-size:.65rem;color:var(--danger);font-weight:600">Late</span>';
       else statusHtml = '<span style="font-size:.65rem;color:var(--success);font-weight:600">On-time</span>';
