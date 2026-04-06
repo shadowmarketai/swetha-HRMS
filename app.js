@@ -1621,7 +1621,7 @@ let _overlayPreviousFocus = [];
 function showOverlay(id) {
   if (id === 'admin' && currentUser.role !== 'MD' && currentUser.role !== 'HR') return;
   if (id === 'location' && currentUser.role !== 'MD') return;
-  if (id === 'peb' && currentUser.role !== 'MD' && currentUser.role !== 'HR' && !(currentUser.role === 'Employee' && currentUser.dept === 'Execution')) return;
+  if (id === 'peb' && currentUser.role !== 'MD' && currentUser.role !== 'HR' && !(['Site Engineer','Admin','Execution','Production'].indexOf(currentUser.dept) >= 0)) return;
   if (id === 'onboarding' && currentUser.role !== 'MD' && currentUser.role !== 'HR' && currentUser.role !== 'Manager') return;
   if (id === 'advance-requests' && currentUser.role !== 'MD' && currentUser.role !== 'HR' && currentUser.role !== 'Manager') return;
   // Render content (wrapped in try-catch so errors don't block overlay display)

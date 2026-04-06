@@ -15,7 +15,20 @@ var _pebSectionMap = {
   'hr-proc-orders':'purchase-orders','hr-proc-transport':'transport',
   // Employee (Site Engineer) nav IDs
   'emp-inv-stock':'stock-items','emp-inv-requests':'material-requests',
-  'emp-proc-transport':'transport','emp-inv-returns':'returns-scrap'
+  'emp-proc-transport':'transport','emp-inv-returns':'returns-scrap',
+  // Employee (Admin dept) nav IDs — full PEB access
+  'emp-adm-peb-dash':'dashboard','emp-adm-inv-stock':'stock-items','emp-adm-inv-grn':'grn',
+  'emp-adm-inv-requests':'material-requests','emp-adm-inv-returns':'returns-scrap',
+  'emp-adm-proc-vendors':'vendors','emp-adm-proc-indents':'purchase-indents',
+  'emp-adm-proc-orders':'purchase-orders','emp-adm-proc-transport':'transport',
+  // Manager (Site Engineer) nav IDs
+  'mgr-inv-stock':'stock-items','mgr-inv-requests':'material-requests',
+  'mgr-proc-transport':'transport','mgr-inv-returns':'returns-scrap',
+  // Manager (Admin dept) nav IDs
+  'mgr-adm-peb-dash':'dashboard','mgr-adm-inv-stock':'stock-items','mgr-adm-inv-grn':'grn',
+  'mgr-adm-inv-requests':'material-requests','mgr-adm-inv-returns':'returns-scrap',
+  'mgr-adm-proc-vendors':'vendors','mgr-adm-proc-indents':'purchase-indents',
+  'mgr-adm-proc-orders':'purchase-orders','mgr-adm-proc-transport':'transport'
 };
 var _pebSection = 'dashboard';
 var _pebTitles = {'dashboard':'PEB Dashboard','stock-items':'Stock Items','grn':'Goods Receipt Notes','material-requests':'Material Requests','returns-scrap':'Returns & Scrap','vendors':'Vendors','purchase-indents':'Purchase Indents','purchase-orders':'Purchase Orders','transport':'Transport Requests'};
@@ -143,7 +156,10 @@ async function _pebDashboard(el) {
 
 // ========== STOCK ITEMS (full CRUD + detail + transaction) ==========
 function _pebCanEdit() {
-  return typeof currentUser !== 'undefined' && currentUser && (currentUser.role === 'MD' || currentUser.role === 'HR');
+  if (typeof currentUser === 'undefined' || !currentUser) return false;
+  if (currentUser.role === 'MD' || currentUser.role === 'HR') return true;
+  if (currentUser.dept === 'Admin') return true;
+  return false;
 }
 
 async function _pebStockItems(el) {
