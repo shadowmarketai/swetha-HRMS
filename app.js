@@ -8412,6 +8412,16 @@ function initWebSocket() {
     }
   });
 
+  // ── Salary updated ──
+  _hrmsSocket.on('salary:updated', function(data) {
+    // Update local EMPLOYEES array
+    var emp = EMPLOYEES.find(function(e) { return e.code === data.empCode; });
+    if (emp) emp.salary = data.salary;
+    if (currentUser.role === 'MD' || currentUser.role === 'HR') {
+      showToast('Salary updated for ' + (data.empName || data.empCode) + ': Rs.' + Number(data.salary).toLocaleString('en-IN'), 'info');
+    }
+  });
+
   // ── Documents ──
   _hrmsSocket.on('document:uploaded', function(data) {
     if (data.empCode === currentUser.code) {
@@ -13546,10 +13556,11 @@ function getAdvanceStepIndicator(status) {
 // =====================================================
 function renderSalaryView() {
   if (!currentUser) return;
+  var isMD = currentUser.role === 'MD';
   var isHR = currentUser.role === 'HR';
   var isAccounts = currentUser.dept === 'Accounts';
-  // HR/Accounts "Employee List" mode — show all employees salary table
-  if ((isHR && _activeNavId === 'hr-sal-list') || (isAccounts && _activeNavId === 'emp-acc-salary')) {
+  // MD/HR/Accounts "Employee List" mode — show all employees salary table
+  if ((isMD && _activeNavId === 'md-sal-structure') || (isHR && _activeNavId === 'hr-sal-list') || (isAccounts && _activeNavId === 'emp-acc-salary')) {
     renderEmployeeSalaryList();
     return;
   }
@@ -13560,6 +13571,7 @@ function renderSalaryView() {
 function renderEmployeeSalaryList() {
   var container = document.getElementById('salaryContent');
   if (!container) return;
+  var canEditSalary = currentUser && (currentUser.dept === 'Accounts' || currentUser.role === 'MD' || currentUser.role === 'HR');
   var html = '<div class="section-title" style="margin-top:4px">Employee Salary Structure</div>';
   html += '<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">';
   html += '<select id="salDeptFilter" onchange="renderEmpSalaryTable()" style="padding:6px 10px;border:1px solid var(--gray-200);border-radius:var(--radius);font-size:.78rem"><option value="">All Departments</option>';
@@ -13588,7 +13600,7 @@ function renderEmpSalaryTable() {
   if (filtered.length === 0) { area.innerHTML = '<div style="text-align:center;padding:16px;color:var(--gray-400);font-size:.78rem">No employees found</div>'; return; }
   var totalSalary = 0;
   var html = '<div class="card fade-in" style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.72rem">';
-  html += '<thead><tr style="background:var(--gray-50);text-align:left"><th style="padding:8px 6px">Name</th><th style="padding:8px 6px">Code</th><th style="padding:8px 6px">Dept</th><th style="padding:8px 6px">Designation</th><th style="padding:8px 6px;text-align:right">Salary</th><th style="padding:8px 6px">Bank</th></tr></thead><tbody>';
+  html += '<thead><tr style="background:var(--gray-50);text-align:left"><th style="padding:8px 6px">Name</th><th style="padding:8px 6px">Code</th><th style="padding:8px 6px">Dept</th><th style="padding:8px 6px">Designation</th><th style="padding:8px 6px;text-align:right">Salary</th><th style="padding:8px 6px">Bank</th>' + (canEditSalary ? '<th style="padding:8px 6px;text-align:center">Action</th>' : '') + '</tr></thead><tbody>';
   filtered.forEach(function(e) {
     totalSalary += e.salary;
     var basic = Math.round(e.salary * 0.5);
@@ -13602,9 +13614,11 @@ function renderEmpSalaryTable() {
     html += '<td style="padding:8px 6px">' + escapeHTML(e.designation) + '</td>';
     html += '<td style="padding:8px 6px;text-align:right;font-weight:600">Rs.' + e.salary.toLocaleString('en-IN') + '</td>';
     html += '<td style="padding:8px 6px;font-size:.65rem">' + escapeHTML(e.bank || '') + '</td>';
+    if (canEditSalary) html += '<td style="padding:8px 6px;text-align:center"><button class="btn btn-sm" style="font-size:.6rem;padding:2px 8px;background:var(--primary);color:#fff;border-radius:4px" onclick="event.stopPropagation();openSalaryEditForm(\'' + escapeAttr(e.code) + '\',' + e.salary + ')">Edit</button></td>';
     html += '</tr>';
     // Expandable salary breakdown row
-    html += '<tr style="display:none;background:var(--gray-50)"><td colspan="6" style="padding:6px 12px;font-size:.68rem">';
+    var colSpan = canEditSalary ? 7 : 6;
+    html += '<tr style="display:none;background:var(--gray-50)"><td colspan="' + colSpan + '" style="padding:6px 12px;font-size:.68rem">';
     html += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:4px">';
     html += '<div><strong>Basic:</strong> Rs.' + basic.toLocaleString('en-IN') + '</div>';
     html += '<div><strong>HRA:</strong> Rs.' + hra.toLocaleString('en-IN') + '</div>';
@@ -13617,6 +13631,39 @@ function renderEmpSalaryTable() {
   html += '</tbody></table></div>';
   html += '<div class="card" style="margin-top:8px;padding:10px;display:flex;justify-content:space-between;font-size:.78rem"><span>Total Employees: <strong>' + filtered.length + '</strong></span><span>Total Monthly Payroll: <strong>Rs.' + totalSalary.toLocaleString('en-IN') + '</strong></span></div>';
   area.innerHTML = html;
+}
+
+// Salary edit form (Accounts dept / MD / HR)
+function openSalaryEditForm(empCode, currentSalary) {
+  var emp = EMPLOYEES.find(function(e) { return e.code === empCode; });
+  if (!emp) return;
+  var html = '<div class="card fade-in" style="padding:14px;margin:12px 0;border-left:4px solid var(--primary)">';
+  html += '<h4 style="font-size:.85rem;font-weight:600;margin:0 0 10px 0">Update Salary — ' + escapeHTML(emp.name) + ' (' + escapeHTML(empCode) + ')</h4>';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+  html += '<div class="form-row"><label>Current Salary</label><input type="text" value="Rs.' + currentSalary.toLocaleString('en-IN') + '" readonly style="background:var(--gray-50);cursor:not-allowed"></div>';
+  html += '<div class="form-row"><label>New Salary (Rs.) *</label><input type="number" id="newSalaryAmt" value="' + currentSalary + '" min="0" step="100"></div>';
+  html += '</div>';
+  html += '<div style="display:flex;gap:8px;margin-top:10px">';
+  html += '<button class="nf-btn nf-btn-primary" onclick="saveSalaryUpdate(\'' + escapeAttr(empCode) + '\')">Update Salary</button>';
+  html += '<button class="nf-btn nf-btn-outline" onclick="renderEmpSalaryTable()">Cancel</button>';
+  html += '</div></div>';
+  var area = document.getElementById('empSalaryTableArea');
+  if (area) area.innerHTML = html + area.innerHTML;
+}
+
+async function saveSalaryUpdate(empCode) {
+  var newSalary = parseFloat((document.getElementById('newSalaryAmt') || {}).value);
+  if (isNaN(newSalary) || newSalary < 0) { showToast('Please enter a valid salary amount'); return; }
+  try {
+    await apiCall('PUT', '/salary/' + empCode, { salary: newSalary });
+    // Update local data
+    var emp = EMPLOYEES.find(function(e) { return e.code === empCode; });
+    if (emp) emp.salary = newSalary;
+    showToast('Salary updated for ' + empCode);
+    renderEmpSalaryTable();
+  } catch (e) {
+    showToast(e.message || 'Error updating salary');
+  }
 }
 
 // =====================================================

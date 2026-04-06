@@ -49,4 +49,40 @@ router.get('/:code/:month', verifyToken, async (req, res) => {
   }
 });
 
+// PUT /api/salary/:code — update employee salary (Accounts dept, MD, HR only)
+router.put('/:code', verifyToken, async (req, res) => {
+  try {
+    // Check if user is MD, HR, or Accounts dept
+    let allowed = ['MD', 'HR'].includes(req.user.role);
+    if (!allowed) {
+      const [empRows] = await pool.query('SELECT dept FROM employees WHERE code = ?', [req.user.empCode]);
+      if (empRows.length > 0 && empRows[0].dept === 'Accounts') allowed = true;
+    }
+    if (!allowed) return res.status(403).json({ error: 'Only Accounts, MD, or HR can update salary' });
+
+    const { salary } = req.body;
+    if (salary === undefined || salary === null || isNaN(parseFloat(salary)) || parseFloat(salary) < 0) {
+      return res.status(400).json({ error: 'Valid salary amount required' });
+    }
+
+    const [emp] = await pool.query('SELECT code, name FROM employees WHERE code = ?', [req.params.code]);
+    if (emp.length === 0) return res.status(404).json({ error: 'Employee not found' });
+
+    await pool.query('UPDATE employees SET salary = ? WHERE code = ?', [parseFloat(salary), req.params.code]);
+
+    // Notify MD and HR about salary update
+    const io = req.app.get('io');
+    if (io) {
+      io.to('role:MD').to('role:HR').emit('salary:updated', {
+        empCode: req.params.code, empName: emp[0].name, salary: parseFloat(salary), updatedBy: req.user.empCode
+      });
+    }
+
+    res.json({ message: 'Salary updated for ' + req.params.code, salary: parseFloat(salary) });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 module.exports = router;
