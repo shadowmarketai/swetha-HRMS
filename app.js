@@ -5506,13 +5506,23 @@ async function exportAttendanceReport() {
     for (var d = 1; d <= todayDate; d++) {
       if (new Date(now.getFullYear(), now.getMonth(), d).getDay() !== 0) workingDays++;
     }
-    // Group attendance by employee
+    // Group attendance by employee — track days and total hours
     var empDays = {};
+    var empTotalMin = {};
     logs.forEach(function(row) {
       if (!row.emp_code || !row.log_date) return;
       if (!empDays[row.emp_code]) empDays[row.emp_code] = {};
       var dayKey = row.log_date.substring(0, 10);
       empDays[row.emp_code][dayKey] = true;
+      // Calculate hours from check_in/check_out
+      if (row.check_in) {
+        var start = new Date(row.check_in).getTime();
+        var end = row.check_out ? new Date(row.check_out).getTime() : Date.now();
+        if (end > start) {
+          if (!empTotalMin[row.emp_code]) empTotalMin[row.emp_code] = 0;
+          empTotalMin[row.emp_code] += (end - start) / 60000;
+        }
+      }
     });
     // Fetch leave data for the month
     var leavesByEmp = {};
@@ -5533,13 +5543,17 @@ async function exportAttendanceReport() {
       var presentDays = empDays[e.code] ? Object.keys(empDays[e.code]).length : 0;
       var leaveDays = leavesByEmp[e.code] || 0;
       var absentDays = Math.max(0, workingDays - presentDays - leaveDays);
-      return { name: e.name, code: e.code, dept: e.dept, present: presentDays, absent: absentDays, leave: leaveDays, workingDays: workingDays };
+      var totalMin = empTotalMin[e.code] || 0;
+      var h = Math.floor(totalMin / 60), m = Math.round(totalMin % 60);
+      var avgHrs = presentDays > 0 ? (totalMin / presentDays / 60).toFixed(1) : '0.0';
+      return { name: e.name, code: e.code, dept: e.dept, present: presentDays, absent: absentDays, leave: leaveDays, workingDays: workingDays, totalHours: h + 'h ' + m + 'm', avgHoursPerDay: avgHrs + 'h' };
     });
     exportToCSV(data, 'attendance_' + monthLabel + '.csv', [
       {label:'Name', key:'name'}, {label:'Code', key:'code'},
       {label:'Department', key:'dept'}, {label:'Working Days', key:'workingDays'},
       {label:'Present', key:'present'}, {label:'Absent', key:'absent'},
-      {label:'Leave', key:'leave'}
+      {label:'Leave', key:'leave'}, {label:'Total Hours Worked', key:'totalHours'},
+      {label:'Avg Hours/Day', key:'avgHoursPerDay'}
     ]);
   } catch (e) { showToast(e.message || 'Error exporting attendance'); }
 }
@@ -12882,13 +12896,16 @@ async function loadAttendanceSummaryTable() {
     if (!Array.isArray(logs)) logs = [];
   } catch(e) { logs = []; }
 
-  // Filter logs for the selected date
+  // Filter logs for the selected date — collect ALL sessions per employee
   var dayLogs = {};
+  var dayAllLogs = {};
   logs.forEach(function(row) {
     if (!row.log_date) return;
     var logDate = row.log_date.substring(0, 10);
     if (logDate === selectedDate) {
       if (!dayLogs[row.emp_code]) dayLogs[row.emp_code] = row;
+      if (!dayAllLogs[row.emp_code]) dayAllLogs[row.emp_code] = [];
+      dayAllLogs[row.emp_code].push(row);
     }
   });
 
@@ -12904,6 +12921,32 @@ async function loadAttendanceSummaryTable() {
     var statusBadge = isPresent
       ? '<span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:.72rem;font-weight:600;background:#dcfce7;color:#16a34a">Present</span>'
       : '<span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:.72rem;font-weight:600;background:#fee2e2;color:#dc2626">Absent</span>';
+    // Calculate hours worked from all sessions
+    var hoursHtml = '<span style="color:var(--gray-300);font-size:.68rem">—</span>';
+    var inTimeHtml = '<span style="color:var(--gray-300);font-size:.68rem">—</span>';
+    var outTimeHtml = '<span style="color:var(--gray-300);font-size:.68rem">—</span>';
+    if (isPresent) {
+      var sessions = dayAllLogs[emp.code] || [];
+      var totalMin = 0;
+      var firstIn = null, lastOut = null;
+      sessions.forEach(function(s) {
+        if (s.check_in) {
+          if (!firstIn) firstIn = s.check_in;
+          var start = new Date(s.check_in).getTime();
+          var end = s.check_out ? new Date(s.check_out).getTime() : Date.now();
+          if (end > start) totalMin += (end - start) / 60000;
+        }
+        if (s.check_out) lastOut = s.check_out;
+      });
+      if (firstIn) inTimeHtml = '<span style="font-size:.72rem;color:var(--success);font-weight:600">' + new Date(firstIn).toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit',hour12:true}) + '</span>';
+      if (lastOut) outTimeHtml = '<span style="font-size:.72rem;color:var(--danger);font-weight:600">' + new Date(lastOut).toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit',hour12:true}) + '</span>';
+      var h = Math.floor(totalMin / 60), m = Math.round(totalMin % 60);
+      if (totalMin > 0) {
+        var color = totalMin >= 480 ? '#16a34a' : totalMin >= 240 ? '#d97706' : '#dc2626';
+        hoursHtml = '<span style="font-size:.75rem;font-weight:700;color:' + color + '">' + h + 'h ' + m + 'm</span>';
+      }
+    }
+
     // Selfie column
     var selfieHtml = '<span style="color:var(--gray-300);font-size:.68rem">—</span>';
     if (log && log.selfie_checkin_url) {
@@ -12921,6 +12964,9 @@ async function loadAttendanceSummaryTable() {
       '<td style="' + tdStyle + ';font-size:.78rem;font-weight:600">' + escapeHTML(emp.code) + '</td>' +
       '<td style="' + tdStyle + ';font-size:.78rem">' + escapeHTML(emp.name) + '</td>' +
       '<td style="' + tdStyle + ';text-align:center">' + statusBadge + '</td>' +
+      '<td style="' + tdStyle + ';text-align:center">' + inTimeHtml + '</td>' +
+      '<td style="' + tdStyle + ';text-align:center">' + outTimeHtml + '</td>' +
+      '<td style="' + tdStyle + ';text-align:center">' + hoursHtml + '</td>' +
       '<td style="' + tdStyle + ';text-align:center">' + selfieHtml + selfieOutHtml + '</td>' +
       '</tr>';
   });
@@ -12928,7 +12974,7 @@ async function loadAttendanceSummaryTable() {
   var thStyle = 'padding:8px 10px;text-align:left;font-size:.72rem;font-weight:700;color:var(--gray-500);text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid var(--gray-200)';
   var html = '<div style="padding:10px 12px 6px;font-size:.75rem;color:var(--gray-500)">' + escapeHTML(dateLabel) + ' &mdash; <span style="color:#16a34a;font-weight:600">' + presentCount + ' Present</span> &middot; <span style="color:#dc2626;font-weight:600">' + absentCount + ' Absent</span></div>';
   html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">';
-  html += '<thead><tr style="background:var(--gray-50)"><th style="' + thStyle + '">Emp Code</th><th style="' + thStyle + '">Name</th><th style="' + thStyle + ';text-align:center">Status</th><th style="' + thStyle + ';text-align:center">Selfie</th></tr></thead>';
+  html += '<thead><tr style="background:var(--gray-50)"><th style="' + thStyle + '">Emp Code</th><th style="' + thStyle + '">Name</th><th style="' + thStyle + ';text-align:center">Status</th><th style="' + thStyle + ';text-align:center">In</th><th style="' + thStyle + ';text-align:center">Out</th><th style="' + thStyle + ';text-align:center">Hours</th><th style="' + thStyle + ';text-align:center">Selfie</th></tr></thead>';
   html += '<tbody>' + rows.join('') + '</tbody></table></div>';
 
   if (activeEmps.length === 0) {
