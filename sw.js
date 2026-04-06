@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hrms-v160';
+const CACHE_NAME = 'hrms-v161';
 const PRECACHE_URLS = [
   './',
   './index.html',
@@ -39,6 +39,9 @@ self.addEventListener('activate', event => {
 // Fetch — network-first for same-origin, cache-first for CDN
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
+
+  // Skip non-http schemes (chrome-extension://, etc.)
+  if (!url.protocol.startsWith('http')) return;
 
   // Skip Google/external API
   if (url.hostname.includes('google') || url.hostname.includes('googleapis') || url.hostname.includes('gstatic')) return;
