@@ -3613,7 +3613,60 @@ function showSiteExpenseBillForm() {
   html += '<input type="hidden" id="seBillUrl">';
   html += '<div id="seBillPreview" style="display:none;margin-top:6px"><img style="max-width:100%;border-radius:var(--radius-xs)"></div>';
   html += '<div style="display:flex;gap:8px;margin-top:14px">';
-  html += '<button class="nf-btn nf-btn-primary" onclick="submitSiteExpenseBill()" style="flex:1">Submit Bill</button>';
+  html += '<button class="nf-btn nf-btn-primary" onclick="previewSiteExpenseBill()" style="flex:1">Preview Bill</button>';
+  html += '<button class="nf-btn nf-btn-outline" onclick="document.getElementById(\'siteExpenseBillForm\').style.display=\'none\'">Cancel</button>';
+  html += '</div></div>';
+  container.innerHTML = html;
+}
+
+function previewSiteExpenseBill() {
+  var project = (document.getElementById('seBillProject') || {}).value || '';
+  var category = (document.getElementById('seBillCategory') || {}).value || '';
+  var amount = parseInt((document.getElementById('seBillAmount') || {}).value, 10) || 0;
+  var desc = (document.getElementById('seBillDesc') || {}).value || '';
+  var billInput = document.getElementById('seBillInput');
+  if (!project) { showToast('Please select a project/site'); return; }
+  if (!category) { showToast('Please select a category'); return; }
+  if (!amount) { showToast('Please enter the bill amount'); return; }
+
+  var billPreviewSrc = '';
+  var billFileName = '';
+  var previewImg = document.querySelector('#seBillPreview img');
+  if (previewImg && previewImg.src) billPreviewSrc = previewImg.src;
+  if (billInput && billInput.files && billInput.files[0]) billFileName = billInput.files[0].name;
+
+  var container = document.getElementById('siteExpenseBillForm');
+  if (!container) return;
+  var dateLabel = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+
+  var html = '<div class="card fade-in" style="padding:14px;margin-top:10px">';
+  html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><div style="width:36px;height:36px;border-radius:10px;background:var(--primary-50);display:flex;align-items:center;justify-content:center;font-size:1.2rem">\uD83C\uDFD7</div>';
+  html += '<div><h3 style="font-family:var(--font-display);font-size:.95rem;font-weight:600;margin:0">Preview Site Expense</h3>';
+  html += '<p style="font-size:.7rem;color:var(--gray-400);margin:0">Review before submitting</p></div></div>';
+
+  html += '<div style="background:var(--gray-50);border-radius:var(--radius-xs);padding:12px;margin-bottom:12px">';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:.78rem">';
+  html += '<div><span style="color:var(--gray-500)">Project/Site:</span><br><strong>' + escapeHTML(project) + '</strong></div>';
+  html += '<div><span style="color:var(--gray-500)">Category:</span><br><strong>' + escapeHTML(category) + '</strong></div>';
+  html += '<div><span style="color:var(--gray-500)">Amount:</span><br><strong style="color:var(--danger);font-size:.88rem">Rs.' + amount.toLocaleString('en-IN') + '</strong></div>';
+  html += '<div><span style="color:var(--gray-500)">Date:</span><br><strong>' + escapeHTML(dateLabel) + '</strong></div>';
+  html += '</div></div>';
+
+  if (desc) {
+    html += '<div style="margin-bottom:12px"><div style="font-size:.72rem;color:var(--gray-500);font-weight:600;margin-bottom:4px">DESCRIPTION</div>';
+    html += '<div style="font-size:.78rem;padding:8px;background:var(--gray-50);border-radius:var(--radius-xs)">' + escapeHTML(desc) + '</div></div>';
+  }
+
+  if (billPreviewSrc) {
+    html += '<div style="margin-bottom:12px"><div style="font-size:.72rem;color:var(--gray-500);font-weight:600;margin-bottom:4px">ATTACHED BILL' + (billFileName ? ' \u2014 ' + escapeHTML(billFileName) : '') + '</div>';
+    html += '<div style="background:var(--gray-50);border-radius:var(--radius-xs);padding:8px;text-align:center"><img src="' + billPreviewSrc + '" style="max-width:100%;max-height:300px;border-radius:var(--radius-xs)"></div></div>';
+  } else {
+    html += '<div style="margin-bottom:12px;padding:8px 10px;background:#fee2e2;border-radius:var(--radius-xs);font-size:.75rem;color:#dc2626;font-weight:600">No bill attached</div>';
+  }
+
+  html += '<div style="display:flex;gap:8px;margin-top:14px">';
+  html += '<button class="nf-btn nf-btn-primary" onclick="submitSiteExpenseBill()" style="flex:1;font-weight:700">Confirm & Submit</button>';
+  html += '<button class="nf-btn nf-btn-outline" onclick="showSiteExpenseBillForm()" style="flex:1">Edit</button>';
   html += '<button class="nf-btn nf-btn-outline" onclick="document.getElementById(\'siteExpenseBillForm\').style.display=\'none\'">Cancel</button>';
   html += '</div></div>';
   container.innerHTML = html;
@@ -3739,7 +3792,68 @@ function showTravelExpenseBillForm() {
   html += '<input type="file" id="teBillInput" accept="image/*,application/pdf" capture="environment" style="display:none" onchange="handleBillPreview(this,\'teBillPreview\')"></div>';
   html += '<div id="teBillPreview" style="display:none;margin-top:6px"><img style="max-width:100%;border-radius:var(--radius-xs)"></div>';
   html += '<div style="display:flex;gap:8px;margin-top:14px">';
-  html += '<button class="nf-btn nf-btn-primary" onclick="submitTravelExpenseBill()" style="flex:1">Submit Bill</button>';
+  html += '<button class="nf-btn nf-btn-primary" onclick="previewTravelExpenseBill()" style="flex:1">Preview Bill</button>';
+  html += '<button class="nf-btn nf-btn-outline" onclick="document.getElementById(\'travelExpenseBillForm\').style.display=\'none\'">Cancel</button>';
+  html += '</div></div>';
+  container.innerHTML = html;
+}
+
+function previewTravelExpenseBill() {
+  var from = (document.getElementById('teBillFrom') || {}).value || '';
+  var to = (document.getElementById('teBillTo') || {}).value || '';
+  var vehicle = (document.getElementById('teBillVehicle') || {}).value || '';
+  var amount = parseInt((document.getElementById('teBillAmount') || {}).value, 10) || 0;
+  var km = (document.getElementById('teBillKm') || {}).value || '';
+  var days = (document.getElementById('teBillDays') || {}).value || '1';
+  var desc = (document.getElementById('teBillDesc') || {}).value || '';
+  var travelDate = (document.getElementById('teBillDate') || {}).value || new Date().toISOString().split('T')[0];
+  var billInput = document.getElementById('teBillInput');
+
+  if (!from || !to) { showToast('Please enter From and To locations'); return; }
+  if (!vehicle) { showToast('Please select mode of travel'); return; }
+  if (!amount) { showToast('Please enter the bill amount'); return; }
+
+  var billPreviewSrc = '';
+  var billFileName = '';
+  var previewImg = document.querySelector('#teBillPreview img');
+  if (previewImg && previewImg.src) billPreviewSrc = previewImg.src;
+  if (billInput && billInput.files && billInput.files[0]) billFileName = billInput.files[0].name;
+
+  var container = document.getElementById('travelExpenseBillForm');
+  if (!container) return;
+  var dateLabel = new Date(travelDate + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+
+  var html = '<div class="card fade-in" style="padding:14px;margin-top:10px">';
+  html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><div style="width:36px;height:36px;border-radius:10px;background:var(--primary-50);display:flex;align-items:center;justify-content:center;font-size:1.2rem">\uD83D\uDE97</div>';
+  html += '<div><h3 style="font-family:var(--font-display);font-size:.95rem;font-weight:600;margin:0">Preview Travel Expense</h3>';
+  html += '<p style="font-size:.7rem;color:var(--gray-400);margin:0">Review before submitting</p></div></div>';
+
+  html += '<div style="background:var(--gray-50);border-radius:var(--radius-xs);padding:12px;margin-bottom:12px">';
+  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:.78rem">';
+  html += '<div><span style="color:var(--gray-500)">From:</span><br><strong>' + escapeHTML(from) + '</strong></div>';
+  html += '<div><span style="color:var(--gray-500)">To:</span><br><strong>' + escapeHTML(to) + '</strong></div>';
+  html += '<div><span style="color:var(--gray-500)">Travel Date:</span><br><strong>' + escapeHTML(dateLabel) + '</strong></div>';
+  html += '<div><span style="color:var(--gray-500)">Days:</span><br><strong>' + escapeHTML(days) + '</strong></div>';
+  html += '<div><span style="color:var(--gray-500)">Mode:</span><br><strong>' + escapeHTML(vehicle) + '</strong></div>';
+  html += '<div><span style="color:var(--gray-500)">Distance:</span><br><strong>' + (km ? escapeHTML(km) + ' km' : 'N/A') + '</strong></div>';
+  html += '<div style="grid-column:1/-1"><span style="color:var(--gray-500)">Bill Amount:</span><br><strong style="color:var(--danger);font-size:.92rem">Rs.' + amount.toLocaleString('en-IN') + '</strong></div>';
+  html += '</div></div>';
+
+  if (desc) {
+    html += '<div style="margin-bottom:12px"><div style="font-size:.72rem;color:var(--gray-500);font-weight:600;margin-bottom:4px">TRIP DETAILS</div>';
+    html += '<div style="font-size:.78rem;padding:8px;background:var(--gray-50);border-radius:var(--radius-xs)">' + escapeHTML(desc) + '</div></div>';
+  }
+
+  if (billPreviewSrc) {
+    html += '<div style="margin-bottom:12px"><div style="font-size:.72rem;color:var(--gray-500);font-weight:600;margin-bottom:4px">ATTACHED RECEIPT' + (billFileName ? ' \u2014 ' + escapeHTML(billFileName) : '') + '</div>';
+    html += '<div style="background:var(--gray-50);border-radius:var(--radius-xs);padding:8px;text-align:center"><img src="' + billPreviewSrc + '" style="max-width:100%;max-height:300px;border-radius:var(--radius-xs)"></div></div>';
+  } else {
+    html += '<div style="margin-bottom:12px;padding:8px 10px;background:#fee2e2;border-radius:var(--radius-xs);font-size:.75rem;color:#dc2626;font-weight:600">No receipt attached</div>';
+  }
+
+  html += '<div style="display:flex;gap:8px;margin-top:14px">';
+  html += '<button class="nf-btn nf-btn-primary" onclick="submitTravelExpenseBill()" style="flex:1;font-weight:700">Confirm & Submit</button>';
+  html += '<button class="nf-btn nf-btn-outline" onclick="showTravelExpenseBillForm()" style="flex:1">Edit</button>';
   html += '<button class="nf-btn nf-btn-outline" onclick="document.getElementById(\'travelExpenseBillForm\').style.display=\'none\'">Cancel</button>';
   html += '</div></div>';
   container.innerHTML = html;
