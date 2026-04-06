@@ -294,11 +294,11 @@ const NAV_CONFIG = {
     ]},
     { id:'emp-progress', label:'Project Progress', icon:'progress', action:{type:'tab',target:'progress'} },
     { id:'emp-salary', label:'Salary Statement', icon:'salary', action:{type:'tab',target:'salary'} },
-    { id:'emp-store', label:'Store', icon:'store', deptOnly:['Execution'], children:[
-      { id:'emp-inv-stock', label:'Stock Details', action:{type:'overlay',target:'peb'} },
+    { id:'emp-store', label:'Store', icon:'store', deptOnly:['Execution','Production'], children:[
+      { id:'emp-inv-stock', label:'Stock Items', action:{type:'overlay',target:'peb'} },
       { id:'emp-inv-requests', label:'Material Request', action:{type:'overlay',target:'peb'} },
-      { id:'emp-proc-transport', label:'Transport Booking', action:{type:'overlay',target:'peb'} },
-      { id:'emp-inv-returns', label:'Returns & Scrap', action:{type:'overlay',target:'peb'} }
+      { id:'emp-inv-returns', label:'Returns & Scrap', action:{type:'overlay',target:'peb'} },
+      { id:'emp-proc-transport', label:'Transport', action:{type:'overlay',target:'peb'} }
     ]},
     // Footer
     { id:'emp-profile', label:'Profile', icon:'profile', action:{type:'overlay',target:'profile'}, isFooter:true },
@@ -325,6 +325,12 @@ const NAV_CONFIG = {
       { id:'mgr-sal-list', label:'Employee List', action:{type:'tab',target:'salary'} }
     ]},
     { id:'mgr-progress', label:'Progress', icon:'progress', action:{type:'tab',target:'progress'} },
+    { id:'mgr-store', label:'Store', icon:'store', deptOnly:['Execution','Production'], children:[
+      { id:'mgr-inv-stock', label:'Stock Items', action:{type:'overlay',target:'peb'} },
+      { id:'mgr-inv-requests', label:'Material Request', action:{type:'overlay',target:'peb'} },
+      { id:'mgr-inv-returns', label:'Returns & Scrap', action:{type:'overlay',target:'peb'} },
+      { id:'mgr-proc-transport', label:'Transport', action:{type:'overlay',target:'peb'} }
+    ]},
     // Footer
     { id:'mgr-profile', label:'Profile', icon:'profile', action:{type:'overlay',target:'profile'}, isFooter:true },
     { id:'mgr-settings', label:'Settings', icon:'settings', action:{type:'overlay',target:'settings'}, isFooter:true },

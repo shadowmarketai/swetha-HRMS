@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
-const { verifyToken, requireRole } = require('../middleware/auth');
+const { verifyToken, requireRole, requireRoleOrDept } = require('../middleware/auth');
+const SITE_DEPTS = ['Execution', 'Production']; // Departments with PEB store access
 
 // ========================================
 // HELPERS (ported from PEB utils)
@@ -230,7 +231,7 @@ async function generateSimpleCode(prefix, table, column) {
 // ========================================
 // DASHBOARD
 // ========================================
-router.get('/dashboard', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
+router.get('/dashboard', verifyToken, requireRoleOrDept(['MD', 'HR'], SITE_DEPTS), async (req, res) => {
   try {
     const [[{ totalItems }]] = await db.query('SELECT COUNT(*) as totalItems FROM peb_stock_items');
     const [[{ lowStock }]] = await db.query('SELECT COUNT(*) as lowStock FROM peb_stock_items WHERE current_stock <= min_stock_level AND min_stock_level > 0');
@@ -312,7 +313,7 @@ router.put('/items/:id', verifyToken, requireRole('MD', 'HR'), async (req, res) 
 // ========================================
 // STOCK TRANSACTIONS (manual entry)
 // ========================================
-router.post('/transactions', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
+router.post('/transactions', verifyToken, requireRoleOrDept(['MD', 'HR'], SITE_DEPTS), async (req, res) => {
   try {
     const { type, item_id, quantity, unit_cost, notes } = req.body;
     if (!type || !item_id || quantity === undefined) return res.status(400).json({ error: 'type, item_id, quantity required' });
@@ -530,7 +531,7 @@ router.get('/returns/:id', verifyToken, requireRole('MD', 'HR', 'Employee'), asy
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
-router.post('/returns', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
+router.post('/returns', verifyToken, requireRoleOrDept(['MD', 'HR'], SITE_DEPTS), async (req, res) => {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
@@ -595,7 +596,7 @@ router.get('/scrap', verifyToken, requireRole('MD', 'HR', 'Employee'), async (re
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
-router.post('/scrap', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
+router.post('/scrap', verifyToken, requireRoleOrDept(['MD', 'HR'], SITE_DEPTS), async (req, res) => {
   try {
     const { total_weight, items } = req.body;
     const batch_code = await generateCode('SCR', 'peb_scrap_batches', 'batch_code');
@@ -639,7 +640,7 @@ router.post('/scrap/:id/sell', verifyToken, requireRole('MD', 'HR'), async (req,
 });
 
 // Low stock alerts
-router.get('/alerts', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
+router.get('/alerts', verifyToken, requireRoleOrDept(['MD', 'HR'], SITE_DEPTS), async (req, res) => {
   try {
     const [items] = await db.query('SELECT * FROM peb_stock_items WHERE current_stock <= min_stock_level AND min_stock_level > 0 ORDER BY (current_stock / min_stock_level) ASC');
     res.json(items);

@@ -42,4 +42,24 @@ function requireRole(...roles) {
   };
 }
 
-module.exports = { generateToken, verifyToken, requireRole };
+// Allow access if user has one of the specified roles OR belongs to one of the specified departments
+function requireRoleOrDept(roles, depts) {
+  return async (req, res, next) => {
+    if (!req.user) return res.status(403).json({ error: 'Insufficient permissions' });
+    const effectiveRole = req.user.role === 'Manager' && roles.includes('HR') ? 'HR' : req.user.role;
+    if (roles.includes(effectiveRole)) return next();
+    // Check department
+    if (depts && depts.length > 0) {
+      try {
+        const pool = require('../config/db');
+        const [rows] = await pool.query('SELECT dept FROM employees WHERE code = ? AND is_active = 1', [req.user.empCode]);
+        if (rows.length > 0 && depts.some(d => rows[0].dept && rows[0].dept.toLowerCase() === d.toLowerCase())) {
+          return next();
+        }
+      } catch (e) { /* fall through to denied */ }
+    }
+    return res.status(403).json({ error: 'Insufficient permissions' });
+  };
+}
+
+module.exports = { generateToken, verifyToken, requireRole, requireRoleOrDept };
