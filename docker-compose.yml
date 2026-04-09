@@ -22,6 +22,9 @@ services:
       - STATIC_DIR=/app/public
     volumes:
       - hrms_uploads:/app/server/uploads
+    networks:
+      - default
+      - coolify
     depends_on:
       mysql:
         condition: service_healthy
@@ -49,3 +52,7 @@ services:
 volumes:
   hrms_data:
   hrms_uploads:
+
+networks:
+  coolify:
+    external: true
