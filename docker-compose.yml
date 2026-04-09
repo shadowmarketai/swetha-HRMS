@@ -25,6 +25,8 @@ services:
     networks:
       - default
       - coolify
+    labels:
+      - "traefik.docker.network=coolify"
     depends_on:
       mysql:
         condition: service_healthy
