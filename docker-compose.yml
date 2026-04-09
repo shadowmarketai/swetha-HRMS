@@ -27,6 +27,8 @@ services:
       - coolify
     labels:
       - "traefik.docker.network=coolify"
+      - "traefik.http.services.https-0-ko4wg0kk8c4s04g8o8cc08k0-app.loadbalancer.server.port=3000"
+      - "traefik.http.services.http-0-ko4wg0kk8c4s04g8o8cc08k0-app.loadbalancer.server.port=3000"
     depends_on:
       mysql:
         condition: service_healthy
