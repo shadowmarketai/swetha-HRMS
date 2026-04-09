@@ -8,6 +8,7 @@ require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const HOST = process.env.HOST || '0.0.0.0';
 const IS_TEST = process.env.NODE_ENV === 'test' || process.env.PLAYWRIGHT === '1';
 
 // Trust reverse proxy (Traefik/Nginx) for rate limiting + IP detection
@@ -192,18 +193,21 @@ app.use('/api/peb/store', require('./routes/peb-store'));
 app.use('/api/peb/purchase', require('./routes/peb-purchase'));
 app.use('/api/edit-requests', require('./routes/edit-requests'));
 app.use('/api/departments', require('./routes/departments'));
-// Health check — verifies app + DB connectivity
+// Health check — always responds 200 quickly so Traefik keeps routing during slow DB migrations.
+// DB status is reported in the payload for observability but never fails the check.
 app.get('/api/health', async (req, res) => {
-  const health = { status: 'ok', timestamp: new Date().toISOString(), db: 'ok', uptime: process.uptime() };
+  const health = { status: 'ok', timestamp: new Date().toISOString(), db: 'unknown', uptime: process.uptime() };
   try {
     const pool = require('./config/db');
-    await pool.query('SELECT 1');
+    // Race the DB ping against a 2s timeout so the check never hangs
+    const ping = pool.query('SELECT 1');
+    const timeout = new Promise((_, rej) => setTimeout(() => rej(new Error('db timeout')), 2000));
+    await Promise.race([ping, timeout]);
+    health.db = 'ok';
   } catch (e) {
-    health.status = 'degraded';
     health.db = 'unreachable';
   }
-  const code = health.status === 'ok' ? 200 : 503;
-  res.status(code).json(health);
+  res.status(200).json(health);
 });
 
 // 404 for missing uploads — don't serve index.html for file requests
@@ -622,8 +626,8 @@ io.on('connection', (socket) => {
 // Make io accessible in routes
 app.set('io', io);
 
-server.listen(PORT, () => {
-  console.log(`HRMS Server running on port ${PORT}`);
+server.listen(PORT, HOST, () => {
+  console.log(`HRMS Server running on ${HOST}:${PORT}`);
   console.log(`Frontend: http://localhost:${PORT}`);
   console.log(`API: http://localhost:${PORT}/api`);
   console.log(`WebSocket: ws://localhost:${PORT}`);
