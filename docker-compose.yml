@@ -25,6 +25,8 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      proxy-fix:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health"]
       interval: 15s
@@ -45,6 +47,17 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+  proxy-fix:
+    image: docker:cli
+    restart: "no"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        echo "Connecting coolify-proxy to per-app network..."
+        docker network connect ko4wg0kk8c4s04g8o8cc08k0 coolify-proxy 2>/dev/null || echo "Already connected or network not found"
+        echo "Proxy fix complete"
 
 volumes:
   hrms_data:
