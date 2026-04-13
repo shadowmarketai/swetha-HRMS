@@ -216,7 +216,7 @@ async function _pebStockItems(el) {
 }
 
 function _pebStockRows(items) {
-  return _pebTbl(['Code','Name','Category','Stock','Unit','Min','Status','Actions'], items.map(function(i) {
+  return _pebTbl(['Code','Name','Category','Current Stock','Unit','Min','Status','Actions'], items.map(function(i) {
     var low = i.min_stock_level > 0 && i.current_stock <= i.min_stock_level;
     var stockColor = low ? '#ef4444' : '#16a34a';
     return [
@@ -277,6 +277,7 @@ function _pebShowAddItem(editData) {
         {label:'Unit',id:'pF_unit',type:'select',required:true,options:'<option value="">Select</option><option'+(d.unit==='KG'?' selected':'')+'>KG</option><option'+(d.unit==='METER'?' selected':'')+'>METER</option><option'+(d.unit==='PIECE'?' selected':'')+'>PIECE</option><option'+(d.unit==='BUNDLE'?' selected':'')+'>BUNDLE</option><option'+(d.unit==='SQ_METER'?' selected':'')+'>SQ_METER</option><option'+(d.unit==='TON'?' selected':'')+'>TON</option><option'+(d.unit==='SET'?' selected':'')+'>SET</option><option'+(d.unit==='LITER'?' selected':'')+'>LITER</option>'}
       ]},
       {label:'Sub Category',id:'pF_subcat',value:d.sub_category||'',placeholder:'e.g. WELDING, CUTTING, ELECTRICAL'},
+      {label:'Current Stock',id:'pF_stock',type:'number',value:d.current_stock||'',step:'0.01',placeholder:'Opening stock quantity'},
       {type:'row',fields:[{label:'Min Stock',id:'pF_min',type:'number',value:d.min_stock_level||''},{label:'Max Stock',id:'pF_max',type:'number',value:d.max_stock_level||''}]},
       {type:'row',fields:[{label:'HSN Code',id:'pF_hsn',value:d.hsn_code||''},{label:'Unit Price',id:'pF_price',type:'number',value:d.unit_price||'',step:'0.01'}]},
       {label:'Location',id:'pF_loc',value:d.location||'',placeholder:'Warehouse, Rack'}
@@ -286,7 +287,7 @@ function _pebShowAddItem(editData) {
 
 async function _pebSaveItem(id) {
   var data = {item_name:document.getElementById('pF_name').value,category:document.getElementById('pF_cat').value,unit:document.getElementById('pF_unit').value,
-    sub_category:document.getElementById('pF_subcat').value||null,
+    sub_category:document.getElementById('pF_subcat').value||null,current_stock:+(document.getElementById('pF_stock').value)||0,
     min_stock_level:+(document.getElementById('pF_min').value)||0,max_stock_level:+(document.getElementById('pF_max').value)||0,
     hsn_code:document.getElementById('pF_hsn').value||null,unit_price:+(document.getElementById('pF_price').value)||0,location:document.getElementById('pF_loc').value||null};
   if (!data.item_name||!data.category||!data.unit) { showToast('Name, category, unit required','error'); return; }

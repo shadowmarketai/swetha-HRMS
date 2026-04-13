@@ -285,13 +285,21 @@ router.get('/items/:id', verifyToken, requireRole('MD', 'HR', 'Employee'), async
 
 router.post('/items', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
   try {
-    const { item_name, category, sub_category, unit, hsn_code, min_stock_level, max_stock_level, unit_price, location } = req.body;
+    const { item_name, category, sub_category, unit, hsn_code, current_stock, min_stock_level, max_stock_level, unit_price, location } = req.body;
     if (!item_name || !category || !unit) return res.status(400).json({ error: 'item_name, category, unit required' });
     const item_code = await generateSimpleCode('PEB-ITEM', 'peb_stock_items', 'item_code');
+    const stockQty = current_stock || 0;
     const [result] = await db.query(
-      'INSERT INTO peb_stock_items (item_code,item_name,category,sub_category,unit,hsn_code,min_stock_level,max_stock_level,unit_price,location,last_updated_by) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
-      [item_code, item_name, category, sub_category||null, unit, hsn_code||null, min_stock_level||0, max_stock_level||0, unit_price||0, location||null, req.user.empCode]
+      'INSERT INTO peb_stock_items (item_code,item_name,category,sub_category,unit,hsn_code,current_stock,min_stock_level,max_stock_level,unit_price,location,last_updated_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
+      [item_code, item_name, category, sub_category||null, unit, hsn_code||null, stockQty, min_stock_level||0, max_stock_level||0, unit_price||0, location||null, req.user.empCode]
     );
+    // Log opening balance transaction if stock > 0
+    if (stockQty > 0) {
+      await db.query(
+        'INSERT INTO peb_stock_transactions (item_id,type,quantity,notes,created_by) VALUES (?,?,?,?,?)',
+        [result.insertId, 'OPB', stockQty, 'Opening balance on item creation', req.user.empCode]
+      );
+    }
     res.status(201).json({ id: result.insertId, item_code, message: 'Stock item created' });
   } catch (err) {
     console.error('[PEB-STORE] Item creation error:', err.message);
@@ -304,13 +312,21 @@ router.put('/items/:id', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPT
   try {
     const [old] = await db.query('SELECT * FROM peb_stock_items WHERE id = ?', [req.params.id]);
     if (old.length === 0) return res.status(404).json({ error: 'Item not found' });
-    const { item_name, category, sub_category, unit, hsn_code, min_stock_level, max_stock_level, unit_price, location } = req.body;
+    const { item_name, category, sub_category, unit, hsn_code, current_stock, min_stock_level, max_stock_level, unit_price, location } = req.body;
     await db.query(
-      'UPDATE peb_stock_items SET item_name=?,category=?,sub_category=?,unit=?,hsn_code=?,min_stock_level=?,max_stock_level=?,unit_price=?,location=?,last_updated_by=? WHERE id=?',
+      'UPDATE peb_stock_items SET item_name=?,category=?,sub_category=?,unit=?,hsn_code=?,current_stock=?,min_stock_level=?,max_stock_level=?,unit_price=?,location=?,last_updated_by=? WHERE id=?',
       [item_name||old[0].item_name, category||old[0].category, sub_category??old[0].sub_category, unit||old[0].unit,
-       hsn_code??old[0].hsn_code, min_stock_level??old[0].min_stock_level, max_stock_level??old[0].max_stock_level,
+       hsn_code??old[0].hsn_code, current_stock??old[0].current_stock, min_stock_level??old[0].min_stock_level, max_stock_level??old[0].max_stock_level,
        unit_price??old[0].unit_price, location??old[0].location, req.user.empCode, req.params.id]
     );
+    // Log adjustment if stock was manually changed
+    if (current_stock !== undefined && current_stock !== null && Number(current_stock) !== Number(old[0].current_stock)) {
+      const diff = Number(current_stock) - Number(old[0].current_stock);
+      await db.query(
+        'INSERT INTO peb_stock_transactions (item_id,type,quantity,notes,created_by) VALUES (?,?,?,?,?)',
+        [req.params.id, 'ADJ', diff, 'Manual stock adjustment via edit (was ' + old[0].current_stock + ', now ' + current_stock + ')', req.user.empCode]
+      );
+    }
     res.json({ message: 'Item updated' });
   } catch (err) {
     console.error('[PEB-STORE] Item update error:', err.message);
