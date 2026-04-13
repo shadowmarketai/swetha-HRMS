@@ -162,7 +162,7 @@ async function _pebDashboard(el) {
 function _pebCanEdit() {
   if (typeof currentUser === 'undefined' || !currentUser) return false;
   if (currentUser.role === 'MD' || currentUser.role === 'HR') return true;
-  if (currentUser.dept === 'Admin' || currentUser.dept === 'Accounts') return true;
+  if (currentUser.dept === 'Admin' || currentUser.dept === 'Site Engineer' || currentUser.dept === 'Accounts') return true;
   return false;
 }
 
@@ -201,7 +201,7 @@ async function _pebStockItems(el) {
     if (_pebCanEdit()) {
       html += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">' +
         '<div style="display:flex;gap:6px"><button class="btn btn-golden" style="font-size:.72rem;padding:6px 14px;border-radius:8px" onclick="_pebShowAddItem()">+ Add Item</button>' +
-        '<button class="btn btn-white-outline" style="font-size:.72rem;padding:6px 14px;border-radius:8px" onclick="_pebShowStockTxn()">+ Stock Entry</button></div></div>';
+        '<button class="btn" style="font-size:.72rem;padding:6px 14px;border-radius:8px;border:1px solid #cbd5e1;color:#475569;background:#f8fafc;cursor:pointer" onclick="_pebShowStockTxn()">+ Stock Entry</button></div></div>';
     }
 
     // Filters
@@ -249,7 +249,7 @@ async function _pebViewItem(id) {
   try {
     var data = await _pebApi('/api/peb/store/items/'+id);
     var el = _p();
-    var html = '<button class="btn btn-white-outline" style="font-size:.7rem;margin-bottom:12px" onclick="_pebStockItems(_p())">&#8592; Back to Items</button>';
+    var html = '<button class="btn" style="font-size:.7rem;margin-bottom:12px;border:1px solid #cbd5e1;color:#475569;background:#f8fafc;border-radius:6px;cursor:pointer" onclick="_pebStockItems(_p())">&#8592; Back to Items</button>';
     html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:12px">';
     html += _pebStat(data.unit+' in stock', Number(data.current_stock).toLocaleString('en-IN'), data.current_stock<=data.min_stock_level?'#ef4444':'#22c55e');
     html += _pebStat('Min Level', data.min_stock_level);
@@ -268,7 +268,7 @@ async function _pebViewItem(id) {
 function _pebShowAddItem(editData) {
   var d = editData || {};
   var el = _p();
-  el.innerHTML = '<button class="btn btn-white-outline" style="font-size:.7rem;margin-bottom:12px" onclick="_pebStockItems(_p())">&#8592; Back</button>' +
+  el.innerHTML = '<button class="btn" style="font-size:.7rem;margin-bottom:12px;border:1px solid #cbd5e1;color:#475569;background:#f8fafc;border-radius:6px;cursor:pointer" onclick="_pebStockItems(_p())">&#8592; Back</button>' +
     '<div class="card" style="padding:16px"><h3 style="font-size:.85rem;font-weight:600;margin-bottom:12px">'+(d.id?'Edit Item':'Add New Stock Item')+'</h3>' +
     _pebForm([
       {label:'Item Name',id:'pF_name',value:d.item_name,required:true},
@@ -276,6 +276,7 @@ function _pebShowAddItem(editData) {
         {label:'Category',id:'pF_cat',type:'select',required:true,options:'<option value="">Select</option><option'+(d.category==='RAW MATERIAL'?' selected':'')+'>RAW MATERIAL</option><option'+(d.category==='CONSUMABLE'?' selected':'')+'>CONSUMABLE</option><option'+(d.category==='TOOL'?' selected':'')+'>TOOL</option><option'+(d.category==='HARDWARE'?' selected':'')+'>HARDWARE</option><option'+(d.category==='SAFETY'?' selected':'')+'>SAFETY</option><option'+(d.category==='OTHER'?' selected':'')+'>OTHER</option>'},
         {label:'Unit',id:'pF_unit',type:'select',required:true,options:'<option value="">Select</option><option'+(d.unit==='KG'?' selected':'')+'>KG</option><option'+(d.unit==='METER'?' selected':'')+'>METER</option><option'+(d.unit==='PIECE'?' selected':'')+'>PIECE</option><option'+(d.unit==='BUNDLE'?' selected':'')+'>BUNDLE</option><option'+(d.unit==='SQ_METER'?' selected':'')+'>SQ_METER</option><option'+(d.unit==='TON'?' selected':'')+'>TON</option><option'+(d.unit==='SET'?' selected':'')+'>SET</option><option'+(d.unit==='LITER'?' selected':'')+'>LITER</option>'}
       ]},
+      {label:'Sub Category',id:'pF_subcat',value:d.sub_category||'',placeholder:'e.g. WELDING, CUTTING, ELECTRICAL'},
       {type:'row',fields:[{label:'Min Stock',id:'pF_min',type:'number',value:d.min_stock_level||''},{label:'Max Stock',id:'pF_max',type:'number',value:d.max_stock_level||''}]},
       {type:'row',fields:[{label:'HSN Code',id:'pF_hsn',value:d.hsn_code||''},{label:'Unit Price',id:'pF_price',type:'number',value:d.unit_price||'',step:'0.01'}]},
       {label:'Location',id:'pF_loc',value:d.location||'',placeholder:'Warehouse, Rack'}
@@ -285,6 +286,7 @@ function _pebShowAddItem(editData) {
 
 async function _pebSaveItem(id) {
   var data = {item_name:document.getElementById('pF_name').value,category:document.getElementById('pF_cat').value,unit:document.getElementById('pF_unit').value,
+    sub_category:document.getElementById('pF_subcat').value||null,
     min_stock_level:+(document.getElementById('pF_min').value)||0,max_stock_level:+(document.getElementById('pF_max').value)||0,
     hsn_code:document.getElementById('pF_hsn').value||null,unit_price:+(document.getElementById('pF_price').value)||0,location:document.getElementById('pF_loc').value||null};
   if (!data.item_name||!data.category||!data.unit) { showToast('Name, category, unit required','error'); return; }
@@ -304,7 +306,7 @@ async function _pebShowStockTxn() {
   var items = await _pebApi('/api/peb/store/items');
   var opts = items.map(function(i){return '<option value="'+i.id+'">'+escapeHTML(i.item_code)+' — '+escapeHTML(i.item_name)+' ('+i.current_stock+' '+i.unit+')</option>';}).join('');
   var el = _p();
-  el.innerHTML = '<button class="btn btn-white-outline" style="font-size:.7rem;margin-bottom:12px" onclick="_pebStockItems(_p())">&#8592; Back</button>' +
+  el.innerHTML = '<button class="btn" style="font-size:.7rem;margin-bottom:12px;border:1px solid #cbd5e1;color:#475569;background:#f8fafc;border-radius:6px;cursor:pointer" onclick="_pebStockItems(_p())">&#8592; Back</button>' +
     '<div class="card" style="padding:16px"><h3 style="font-size:.85rem;font-weight:600;margin-bottom:12px">Stock Entry / Adjustment</h3>' +
     _pebForm([
       {type:'row',fields:[
@@ -341,7 +343,7 @@ async function _pebViewGRN(id) {
   try {
     var data = await _pebApi('/api/peb/store/grn/'+id);
     var el = _p();
-    var html = '<button class="btn btn-white-outline" style="font-size:.7rem;margin-bottom:12px" onclick="_pebGRN(_p())">&#8592; Back</button>';
+    var html = '<button class="btn" style="font-size:.7rem;margin-bottom:12px;border:1px solid #cbd5e1;color:#475569;background:#f8fafc;border-radius:6px;cursor:pointer" onclick="_pebGRN(_p())">&#8592; Back</button>';
     html += '<div class="card" style="padding:14px;margin-bottom:12px"><h3 style="font-size:.85rem;font-weight:600;margin-bottom:8px">'+escapeHTML(data.grn_number)+'</h3>';
     html += '<p style="font-size:.75rem;color:var(--gray-500)"><strong>Vendor:</strong> '+escapeHTML(data.vendor_name||'-')+' | <strong>Invoice:</strong> '+escapeHTML(data.invoice_number||'-')+' | <strong>Date:</strong> '+_pebDate(data.received_date)+' | <strong>Quality:</strong> '+_pebStatus(data.quality_status)+'</p></div>';
     html += '<h3 style="font-size:.82rem;font-weight:700;margin-bottom:8px">Items Received</h3>';
@@ -359,17 +361,17 @@ async function _pebShowAddGRN() {
     window._pebGRNItems = items;
     var vendorOpts = vendors.map(function(v){return '<option value="'+v.id+'">'+escapeHTML(v.company_name)+'</option>';}).join('');
     var el = _p();
-    el.innerHTML = '<button class="btn btn-white-outline" style="font-size:.7rem;margin-bottom:12px" onclick="_pebGRN(_p())">&#8592; Back</button>' +
+    el.innerHTML = '<button class="btn" style="font-size:.7rem;margin-bottom:12px;border:1px solid #cbd5e1;color:#475569;background:#f8fafc;border-radius:6px;cursor:pointer" onclick="_pebGRN(_p())">&#8592; Back</button>' +
       '<div class="card" style="padding:16px"><h3 style="font-size:.85rem;font-weight:600;margin-bottom:12px">Create GRN</h3>' +
       _pebForm([
         {type:'row',fields:[{label:'Vendor',id:'pGRN_vnd',type:'select',required:true,options:'<option value="">Select</option>'+vendorOpts},{label:'Received Date',id:'pGRN_date',type:'date',value:new Date().toISOString().split('T')[0]}]},
         {type:'row',fields:[{label:'Invoice Number',id:'pGRN_inv'},{label:'Quality Status',id:'pGRN_qual',type:'select',options:'<option value="PASSED">Passed</option><option value="PARTIAL">Partial</option><option value="REJECTED">Rejected</option>'}]}
       ]) +
       '<div style="margin:10px 0"><label style="font-size:.7rem;font-weight:600;display:block;margin-bottom:4px">Invoice Photo</label>' +
-      '<div style="display:flex;gap:8px;align-items:center"><button class="btn btn-white-outline" style="font-size:.68rem;padding:5px 10px" onclick="scanAndUploadGeneric(function(url){document.getElementById(\'pGRN_invoiceUrl\').value=url;document.getElementById(\'pGRN_invoicePreview\').innerHTML=\'<a href=\\\'\'+url+\'\\\' target=\\\'_blank\\\' style=\\\'font-size:.7rem;color:var(--primary)\\\'>View uploaded</a>\';})"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>Scan Invoice</button><span id="pGRN_invoicePreview" style="font-size:.7rem;color:var(--gray-400)">No file</span><input type="hidden" id="pGRN_invoiceUrl"></div></div>' +
+      '<div style="display:flex;gap:8px;align-items:center"><button class="btn" style="font-size:.68rem;padding:5px 10px;border:1px solid #cbd5e1;color:#475569;background:#f8fafc;border-radius:6px;cursor:pointer" onclick="scanAndUploadGeneric(function(url){document.getElementById(\'pGRN_invoiceUrl\').value=url;document.getElementById(\'pGRN_invoicePreview\').innerHTML=\'<a href=\\\'\'+url+\'\\\' target=\\\'_blank\\\' style=\\\'font-size:.7rem;color:var(--primary)\\\'>View uploaded</a>\';})"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>Scan Invoice</button><span id="pGRN_invoicePreview" style="font-size:.7rem;color:var(--gray-400)">No file</span><input type="hidden" id="pGRN_invoiceUrl"></div></div>' +
       '<h4 style="margin:14px 0 8px;font-size:.78rem;font-weight:600">Items</h4>' +
       '<div id="pGRN_items"></div>' +
-      '<button class="btn btn-white-outline" style="font-size:.65rem;padding:4px 10px;margin-bottom:12px" onclick="_pebAddGRNRow()">+ Add Item</button>' +
+      '<button class="btn" style="font-size:.65rem;padding:4px 10px;margin-bottom:12px;border:1px solid #cbd5e1;color:#475569;background:#f8fafc;border-radius:6px;cursor:pointer" onclick="_pebAddGRNRow()">+ Add Item</button>' +
       '<button class="btn btn-golden" style="display:block;width:100%" onclick="_pebSaveGRN()">Create GRN</button></div>';
     _pebAddGRNRow();
   } catch(e) { showToast(e.message,'error'); }
@@ -438,7 +440,7 @@ async function _pebViewMR(id) {
   try {
     var data = await _pebApi('/api/peb/store/material-requests/'+id);
     var el = _p();
-    var html = '<button class="btn btn-white-outline" style="font-size:.7rem;margin-bottom:12px" onclick="_pebMaterialRequests(_p())">&#8592; Back</button>';
+    var html = '<button class="btn" style="font-size:.7rem;margin-bottom:12px;border:1px solid #cbd5e1;color:#475569;background:#f8fafc;border-radius:6px;cursor:pointer" onclick="_pebMaterialRequests(_p())">&#8592; Back</button>';
     html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:12px">';
     html += '<div class="card" style="padding:10px;text-align:center"><div style="font-size:.6rem;color:var(--gray-500)">Stage</div>'+_pebStatus(data.stage)+'</div>';
     html += '<div class="card" style="padding:10px;text-align:center"><div style="font-size:.6rem;color:var(--gray-500)">Urgency</div>'+_pebStatus(data.urgency)+'</div>';
@@ -476,7 +478,7 @@ async function _pebDispatchMR(id) {
     var data = await _pebApi('/api/peb/store/material-requests/'+id);
     var items = data.items||[];
     var el = _p();
-    var html = '<button class="btn btn-white-outline" style="font-size:.7rem;margin-bottom:12px" onclick="_pebMaterialRequests(_p())">&#8592; Back</button>';
+    var html = '<button class="btn" style="font-size:.7rem;margin-bottom:12px;border:1px solid #cbd5e1;color:#475569;background:#f8fafc;border-radius:6px;cursor:pointer" onclick="_pebMaterialRequests(_p())">&#8592; Back</button>';
     html += '<div class="card" style="padding:16px"><h3 style="font-size:.85rem;font-weight:600;margin-bottom:12px">Dispatch: '+escapeHTML(data.request_code)+'</h3>';
     html += '<p style="font-size:.75rem;margin-bottom:12px;color:var(--gray-500)">Enter issued quantities for each item (stock will be deducted):</p>';
     items.forEach(function(i,idx) {
@@ -506,7 +508,7 @@ async function _pebShowAddMR() {
     var items = await _pebApi('/api/peb/store/items');
     window._pebMRItems = items;
     var el = _p();
-    el.innerHTML = '<button class="btn btn-white-outline" style="font-size:.7rem;margin-bottom:12px" onclick="_pebMaterialRequests(_p())">&#8592; Back</button>' +
+    el.innerHTML = '<button class="btn" style="font-size:.7rem;margin-bottom:12px;border:1px solid #cbd5e1;color:#475569;background:#f8fafc;border-radius:6px;cursor:pointer" onclick="_pebMaterialRequests(_p())">&#8592; Back</button>' +
       '<div class="card" style="padding:16px"><h3 style="font-size:.85rem;font-weight:600;margin-bottom:12px">New Material Request</h3>' +
       _pebForm([
         {type:'row',fields:[{label:'Site',id:'pMR_site',required:true,placeholder:'e.g. Site A - Chennai'},{label:'Urgency',id:'pMR_urg',type:'select',options:'<option value="NORMAL">Normal</option><option value="URGENT">Urgent</option>'}]},
@@ -514,7 +516,7 @@ async function _pebShowAddMR() {
         {label:'Purpose',id:'pMR_purpose',type:'textarea',rows:2}
       ]) +
       '<h4 style="margin:14px 0 8px;font-size:.78rem;font-weight:600">Items</h4><div id="pMR_items"></div>' +
-      '<button class="btn btn-white-outline" style="font-size:.65rem;padding:4px 10px;margin-bottom:12px" onclick="_pebAddMRRow()">+ Add Item</button>' +
+      '<button class="btn" style="font-size:.65rem;padding:4px 10px;margin-bottom:12px;border:1px solid #cbd5e1;color:#475569;background:#f8fafc;border-radius:6px;cursor:pointer" onclick="_pebAddMRRow()">+ Add Item</button>' +
       '<button class="btn btn-golden" style="display:block;width:100%" onclick="_pebSaveMR()">Submit Request</button></div>';
     _pebAddMRRow();
   } catch(e) { showToast(e.message,'error'); }
@@ -581,11 +583,11 @@ async function _pebShowAddReturn() {
   var items = await _pebApi('/api/peb/store/items');
   window._pebRetItems = items;
   var el = _p();
-  el.innerHTML = '<button class="btn btn-white-outline" style="font-size:.7rem;margin-bottom:12px" onclick="_pebReturnsScrap(_p())">&#8592; Back</button>' +
+  el.innerHTML = '<button class="btn" style="font-size:.7rem;margin-bottom:12px;border:1px solid #cbd5e1;color:#475569;background:#f8fafc;border-radius:6px;cursor:pointer" onclick="_pebReturnsScrap(_p())">&#8592; Back</button>' +
     '<div class="card" style="padding:16px"><h3 style="font-size:.85rem;font-weight:600;margin-bottom:12px">Create Material Return</h3>' +
     _pebForm([{type:'row',fields:[{label:'Site',id:'pRet_site',required:true},{label:'Return Date',id:'pRet_date',type:'date',value:new Date().toISOString().split('T')[0]}]}]) +
     '<h4 style="margin:14px 0 8px;font-size:.78rem;font-weight:600">Items (with condition)</h4><div id="pRet_items"></div>' +
-    '<button class="btn btn-white-outline" style="font-size:.65rem;padding:4px 10px;margin-bottom:12px" onclick="_pebAddRetRow()">+ Add Item</button>' +
+    '<button class="btn" style="font-size:.65rem;padding:4px 10px;margin-bottom:12px;border:1px solid #cbd5e1;color:#475569;background:#f8fafc;border-radius:6px;cursor:pointer" onclick="_pebAddRetRow()">+ Add Item</button>' +
     '<button class="btn btn-golden" style="display:block;width:100%" onclick="_pebSaveReturn()">Create Return</button></div>';
   _pebAddRetRow();
 }
@@ -618,7 +620,7 @@ async function _pebSaveReturn() {
 
 function _pebShowAddScrap() {
   var el = _p();
-  el.innerHTML = '<button class="btn btn-white-outline" style="font-size:.7rem;margin-bottom:12px" onclick="_pebReturnsScrap(_p())">&#8592; Back</button>' +
+  el.innerHTML = '<button class="btn" style="font-size:.7rem;margin-bottom:12px;border:1px solid #cbd5e1;color:#475569;background:#f8fafc;border-radius:6px;cursor:pointer" onclick="_pebReturnsScrap(_p())">&#8592; Back</button>' +
     '<div class="card" style="padding:16px"><h3 style="font-size:.85rem;font-weight:600;margin-bottom:12px">New Scrap Batch</h3>' +
     _pebForm([{label:'Total Weight (Kg)',id:'pScr_wt',type:'number',required:true,step:'0.01'}]) +
     '<button class="btn btn-golden" style="margin-top:12px" onclick="_pebSaveScrap()">Create Batch</button></div>';
@@ -638,8 +640,8 @@ async function _pebVendors(el) {
       (_pebCanEdit() ? '<button class="btn btn-golden" style="font-size:.7rem;padding:5px 12px" onclick="_pebShowAddVendor()">+ Add Vendor</button>' : '') + '</div>';
     html += _pebTbl(['Code','Company','Contact','Phone','GST','Rating','Status','Actions'], vendors.map(function(v) {
       var actions = '<div style="display:flex;gap:4px;flex-wrap:wrap">';
-      actions += '<button class="btn btn-white-outline" style="font-size:.6rem;padding:2px 8px" onclick="_pebToggleBlacklist('+v.id+','+v.is_blacklisted+')">'+(v.is_blacklisted?'Unblock':'Blacklist')+'</button>';
-      if (_pebCanEdit()) actions += '<button class="btn btn-white-outline" style="font-size:.6rem;padding:2px 8px;color:#ef4444;border-color:#ef4444" onclick="_pebDeleteVendor('+v.id+',\''+escapeHTML(v.company_name).replace(/'/g,"\\'")+'\')">Delete</button>';
+      actions += '<button class="btn" style="font-size:.6rem;padding:2px 8px;border:1px solid '+(v.is_blacklisted?'#22c55e':'#ef4444')+';color:'+(v.is_blacklisted?'#22c55e':'#ef4444')+';background:transparent;border-radius:6px;cursor:pointer" onclick="_pebToggleBlacklist('+v.id+','+v.is_blacklisted+')">'+(v.is_blacklisted?'Unblock':'Blacklist')+'</button>';
+      if (_pebCanEdit()) actions += '<button class="btn" style="font-size:.6rem;padding:2px 8px;color:#ef4444;border:1px solid #ef4444;background:transparent;border-radius:6px;cursor:pointer" onclick="_pebDeleteVendor('+v.id+',\''+escapeHTML(v.company_name).replace(/'/g,"\\'")+'\')">Delete</button>';
       actions += '</div>';
       return [escapeHTML(v.vendor_code), escapeHTML(v.company_name), escapeHTML(v.contact_person||'-'), escapeHTML(v.phone||'-'),
         escapeHTML(v.gst_number||'-'), v.rating ? v.rating+'/5' : '-',
@@ -652,7 +654,7 @@ async function _pebVendors(el) {
 
 function _pebShowAddVendor() {
   var el = _p();
-  el.innerHTML = '<button class="btn btn-white-outline" style="font-size:.7rem;margin-bottom:12px" onclick="_pebVendors(_p())">&#8592; Back</button>' +
+  el.innerHTML = '<button class="btn" style="font-size:.7rem;margin-bottom:12px;border:1px solid #cbd5e1;color:#475569;background:#f8fafc;border-radius:6px;cursor:pointer" onclick="_pebVendors(_p())">&#8592; Back</button>' +
     '<div class="card" style="padding:16px"><h3 style="font-size:.85rem;font-weight:600;margin-bottom:12px">Add Vendor</h3>' +
     '<div style="padding:8px 12px;background:#f0f9ff;border-left:3px solid #3b82f6;margin-bottom:12px;font-size:.72rem;border-radius:4px"><strong>Note:</strong> GST and PAN are mandatory for vendor qualification. Only qualified vendors can provide quotations.</div>' +
     _pebForm([
@@ -725,7 +727,7 @@ async function _pebViewIndent(id) {
     var data = await _pebApi('/api/peb/purchase/indents/'+id);
     var quots = data.quotations||[];
     var el = _p();
-    var html = '<button class="btn btn-white-outline" style="font-size:.7rem;margin-bottom:12px" onclick="_pebIndents(_p())">&#8592; Back</button>';
+    var html = '<button class="btn" style="font-size:.7rem;margin-bottom:12px;border:1px solid #cbd5e1;color:#475569;background:#f8fafc;border-radius:6px;cursor:pointer" onclick="_pebIndents(_p())">&#8592; Back</button>';
 
     // Status cards
     html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:12px">';
@@ -786,7 +788,7 @@ async function _pebAddQuotation(indentId) {
     var vendors = await _pebApi('/api/peb/purchase/vendors?qualified=true');
     var el = _p();
     var vendorOpts = vendors.map(function(v){return '<option value="'+v.id+'">'+escapeHTML(v.company_name)+' (GST: '+v.gst_number+')</option>';}).join('');
-    el.innerHTML = '<button class="btn btn-white-outline" style="font-size:.7rem;margin-bottom:12px" onclick="_pebViewIndent('+indentId+')">&#8592; Back</button>' +
+    el.innerHTML = '<button class="btn" style="font-size:.7rem;margin-bottom:12px;border:1px solid #cbd5e1;color:#475569;background:#f8fafc;border-radius:6px;cursor:pointer" onclick="_pebViewIndent('+indentId+')">&#8592; Back</button>' +
       '<div class="card" style="padding:10px 14px;background:#f0f9ff;border-left:3px solid #3b82f6;margin-bottom:12px;font-size:.72rem"><strong>Rules:</strong> 3 quotations from 3 different qualified vendors. Upload bill mandatory.</div>' +
       '<div class="card" style="padding:16px"><h3 style="font-size:.85rem;font-weight:600;margin-bottom:12px">Add Vendor Quotation</h3>' +
       _pebForm([
@@ -820,7 +822,7 @@ async function _pebGMReview(indentId) {
     if(quots.length<3){showToast('3 quotations required','error');return;}
     var l1 = quots[0];
     var el = _p();
-    var html = '<button class="btn btn-white-outline" style="font-size:.7rem;margin-bottom:12px" onclick="_pebViewIndent('+indentId+')">&#8592; Back</button>';
+    var html = '<button class="btn" style="font-size:.7rem;margin-bottom:12px;border:1px solid #cbd5e1;color:#475569;background:#f8fafc;border-radius:6px;cursor:pointer" onclick="_pebViewIndent('+indentId+')">&#8592; Back</button>';
     html += '<div class="card" style="padding:10px 14px;background:#fffbeb;border-left:3px solid #f59e0b;margin-bottom:12px;font-size:.72rem"><strong>Review Rules:</strong> L1 (lowest landed cost) recommended. If selecting L2/L3, price matched to L1. Non-L1 needs MD special approval.</div>';
     html += '<h3 style="font-size:.82rem;font-weight:700;margin-bottom:8px">L1/L2/L3 Comparison</h3>';
     html += _pebTbl(['Rank','Vendor','Material','Transport','Landed Cost','Lead','Terms'], quots.map(function(q,idx) {
@@ -866,7 +868,7 @@ async function _pebMDApprove(indentId) {
     var quots = comp.quotations||[];
     var isSpecial = data.needs_special_approval;
     var el = _p();
-    var html = '<button class="btn btn-white-outline" style="font-size:.7rem;margin-bottom:12px" onclick="_pebViewIndent('+indentId+')">&#8592; Back</button>';
+    var html = '<button class="btn" style="font-size:.7rem;margin-bottom:12px;border:1px solid #cbd5e1;color:#475569;background:#f8fafc;border-radius:6px;cursor:pointer" onclick="_pebViewIndent('+indentId+')">&#8592; Back</button>';
 
     if(isSpecial) html += '<div class="card" style="padding:10px 14px;background:#fef2f2;border-left:3px solid #ef4444;margin-bottom:12px;font-size:.72rem"><p style="font-weight:700;color:#ef4444">SPECIAL APPROVAL REQUIRED</p><p>Non-L1 vendor selected. Your remarks are mandatory.</p><p><strong>GM Justification:</strong> '+escapeHTML(data.selection_justification||'-')+'</p></div>';
 
@@ -903,7 +905,7 @@ function _pebShowAddIndent() {
   _pebApi('/api/peb/store/items').then(function(items) {
     window._pebIndItems = items;
     var el = _p();
-    el.innerHTML = '<button class="btn btn-white-outline" style="font-size:.7rem;margin-bottom:12px" onclick="_pebIndents(_p())">&#8592; Back</button>' +
+    el.innerHTML = '<button class="btn" style="font-size:.7rem;margin-bottom:12px;border:1px solid #cbd5e1;color:#475569;background:#f8fafc;border-radius:6px;cursor:pointer" onclick="_pebIndents(_p())">&#8592; Back</button>' +
       '<div class="card" style="padding:16px"><h3 style="font-size:.85rem;font-weight:600;margin-bottom:12px">New Purchase Indent</h3>' +
       _pebForm([
         {type:'row',fields:[{label:'Site',id:'pInd_site',placeholder:'Site name'},{label:'Urgency',id:'pInd_urg',type:'select',options:'<option value="ROUTINE">Routine</option><option value="URGENT">Urgent</option><option value="CRITICAL">Critical</option>'}]},
@@ -911,7 +913,7 @@ function _pebShowAddIndent() {
         {label:'Reason / Purpose',id:'pInd_reason',type:'textarea',required:true,rows:2,placeholder:'Why is this purchase needed?'}
       ]) +
       '<h4 style="margin:14px 0 8px;font-size:.78rem;font-weight:600">Items Required</h4><div id="pInd_items"></div>' +
-      '<button class="btn btn-white-outline" style="font-size:.65rem;padding:4px 10px;margin-bottom:12px" onclick="_pebAddIndentRow()">+ Add Item</button>' +
+      '<button class="btn" style="font-size:.65rem;padding:4px 10px;margin-bottom:12px;border:1px solid #cbd5e1;color:#475569;background:#f8fafc;border-radius:6px;cursor:pointer" onclick="_pebAddIndentRow()">+ Add Item</button>' +
       '<div class="card" style="padding:10px;background:#f0f9ff;border-left:3px solid #3b82f6;margin-bottom:12px;font-size:.72rem"><strong>Next step:</strong> After creating, add 3 vendor quotations. System auto-ranks L1/L2/L3.</div>' +
       '<button class="btn btn-golden" style="display:block;width:100%" onclick="_pebSaveIndent()">Create Indent</button></div>';
     _pebAddIndentRow();
@@ -964,7 +966,7 @@ async function _pebViewPO(id) {
   try {
     var data = await _pebApi('/api/peb/purchase/orders/'+id);
     var el = _p();
-    var html = '<button class="btn btn-white-outline" style="font-size:.7rem;margin-bottom:12px" onclick="_pebOrders(_p())">&#8592; Back</button>';
+    var html = '<button class="btn" style="font-size:.7rem;margin-bottom:12px;border:1px solid #cbd5e1;color:#475569;background:#f8fafc;border-radius:6px;cursor:pointer" onclick="_pebOrders(_p())">&#8592; Back</button>';
     html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:12px">';
     html += _pebStat('Total', _pebCurr(data.total_amount));
     html += _pebStat('Paid', _pebCurr(data.total_paid), '#22c55e');
@@ -997,7 +999,7 @@ async function _pebApprovePO(id) {
 
 function _pebShowPayment(poId) {
   var el = _p();
-  el.innerHTML = '<button class="btn btn-white-outline" style="font-size:.7rem;margin-bottom:12px" onclick="_pebViewPO('+poId+')">&#8592; Back</button>' +
+  el.innerHTML = '<button class="btn" style="font-size:.7rem;margin-bottom:12px;border:1px solid #cbd5e1;color:#475569;background:#f8fafc;border-radius:6px;cursor:pointer" onclick="_pebViewPO('+poId+')">&#8592; Back</button>' +
     '<div class="card" style="padding:16px"><h3 style="font-size:.85rem;font-weight:600;margin-bottom:12px">Record Payment</h3>' +
     _pebForm([
       {type:'row',fields:[{label:'Amount',id:'pPay_amt',type:'number',required:true,step:'0.01'},{label:'Date',id:'pPay_date',type:'date',required:true,value:new Date().toISOString().split('T')[0]}]},
@@ -1031,7 +1033,7 @@ async function _pebViewTransport(id) {
   try {
     var t = await _pebApi('/api/peb/purchase/transport/'+id);
     var el = _p();
-    var html = '<button class="btn btn-white-outline" style="font-size:.7rem;margin-bottom:12px" onclick="_pebTransport(_p())">&#8592; Back</button>';
+    var html = '<button class="btn" style="font-size:.7rem;margin-bottom:12px;border:1px solid #cbd5e1;color:#475569;background:#f8fafc;border-radius:6px;cursor:pointer" onclick="_pebTransport(_p())">&#8592; Back</button>';
     html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:12px">';
     html += '<div class="card" style="padding:10px;text-align:center"><div style="font-size:.6rem;color:var(--gray-500)">Status</div>'+_pebStatus(t.status)+'</div>';
     html += '<div class="card" style="padding:10px;text-align:center"><div style="font-size:.6rem;color:var(--gray-500)">Type</div><div style="font-size:.7rem;font-weight:600">'+escapeHTML((t.type||'').replace(/_/g,' '))+'</div></div>';
@@ -1055,7 +1057,7 @@ async function _pebViewTransport(id) {
 
 function _pebApproveTransport(id) {
   var el = _p();
-  el.innerHTML = '<button class="btn btn-white-outline" style="font-size:.7rem;margin-bottom:12px" onclick="_pebTransport(_p())">&#8592; Back</button>' +
+  el.innerHTML = '<button class="btn" style="font-size:.7rem;margin-bottom:12px;border:1px solid #cbd5e1;color:#475569;background:#f8fafc;border-radius:6px;cursor:pointer" onclick="_pebTransport(_p())">&#8592; Back</button>' +
     '<div class="card" style="padding:16px"><h3 style="font-size:.85rem;font-weight:600;margin-bottom:12px">Approve Transport</h3>' +
     _pebForm([
       {label:'Vehicle Number',id:'pTR_veh',placeholder:'TN-01-AB-1234'},
@@ -1079,7 +1081,7 @@ async function _pebStartTransit(id) {
 
 function _pebCompleteTransport(id) {
   var el = _p();
-  el.innerHTML = '<button class="btn btn-white-outline" style="font-size:.7rem;margin-bottom:12px" onclick="_pebTransport(_p())">&#8592; Back</button>' +
+  el.innerHTML = '<button class="btn" style="font-size:.7rem;margin-bottom:12px;border:1px solid #cbd5e1;color:#475569;background:#f8fafc;border-radius:6px;cursor:pointer" onclick="_pebTransport(_p())">&#8592; Back</button>' +
     '<div class="card" style="padding:16px"><h3 style="font-size:.85rem;font-weight:600;margin-bottom:12px">Complete Transport</h3>' +
     _pebForm([
       {type:'row',fields:[{label:'Actual KM',id:'pTC_km',type:'number',step:'0.1'},{label:'Transport Cost (Rs)',id:'pTC_cost',type:'number',step:'0.01'}]},
@@ -1095,7 +1097,7 @@ async function _pebSaveCompleteTransport(id) {
 
 function _pebShowAddTransport() {
   var el = _p();
-  el.innerHTML = '<button class="btn btn-white-outline" style="font-size:.7rem;margin-bottom:12px" onclick="_pebTransport(_p())">&#8592; Back</button>' +
+  el.innerHTML = '<button class="btn" style="font-size:.7rem;margin-bottom:12px;border:1px solid #cbd5e1;color:#475569;background:#f8fafc;border-radius:6px;cursor:pointer" onclick="_pebTransport(_p())">&#8592; Back</button>' +
     '<div class="card" style="padding:16px"><h3 style="font-size:.85rem;font-weight:600;margin-bottom:12px">New Transport Request</h3>' +
     _pebForm([
       {label:'Type',id:'pTR_type',type:'select',required:true,options:'<option value="COMPANY_TO_SITE">Company to Site</option><option value="SITE_TO_COMPANY">Site to Company</option><option value="SITE_TO_SITE">Site to Site</option><option value="SITE_TO_SCRAP">Site to Scrap</option>'},

@@ -293,7 +293,11 @@ router.post('/items', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS),
       [item_code, item_name, category, sub_category||null, unit, hsn_code||null, min_stock_level||0, max_stock_level||0, unit_price||0, location||null, req.user.empCode]
     );
     res.status(201).json({ id: result.insertId, item_code, message: 'Stock item created' });
-  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+  } catch (err) {
+    console.error('[PEB-STORE] Item creation error:', err.message);
+    const msg = err.code === 'ER_DUP_ENTRY' ? 'Item with this code already exists' : 'Failed to create stock item';
+    res.status(500).json({ error: msg });
+  }
 });
 
 router.put('/items/:id', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
@@ -308,7 +312,10 @@ router.put('/items/:id', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPT
        unit_price??old[0].unit_price, location??old[0].location, req.user.empCode, req.params.id]
     );
     res.json({ message: 'Item updated' });
-  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+  } catch (err) {
+    console.error('[PEB-STORE] Item update error:', err.message);
+    res.status(500).json({ error: 'Failed to update stock item' });
+  }
 });
 
 // ========================================
