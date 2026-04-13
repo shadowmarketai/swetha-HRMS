@@ -280,7 +280,7 @@ router.get('/items/:id', verifyToken, requireRole('MD', 'HR', 'Employee'), async
        WHERE st.item_id = ? ORDER BY st.created_at DESC`, [req.params.id]
     );
     res.json({ ...item[0], ledger });
-  } catch (err) { res.status(500).json({ error: 'Server error' }); }
+  } catch (err) { console.error('[PEB-STORE] Get item error:', err.message); res.status(500).json({ error: 'Failed to load item: ' + err.message }); }
 });
 
 router.post('/items', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
@@ -329,8 +329,8 @@ router.put('/items/:id', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPT
     }
     res.json({ message: 'Item updated' });
   } catch (err) {
-    console.error('[PEB-STORE] Item update error:', err.message);
-    res.status(500).json({ error: 'Failed to update stock item' });
+    console.error('[PEB-STORE] Item update error:', err.message, err.sql || '');
+    res.status(500).json({ error: 'Failed to update stock item: ' + err.message });
   }
 });
 

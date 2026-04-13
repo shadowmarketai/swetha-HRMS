@@ -291,12 +291,18 @@ async function _pebSaveItem(id) {
     min_stock_level:+(document.getElementById('pF_min').value)||0,max_stock_level:+(document.getElementById('pF_max').value)||0,
     hsn_code:document.getElementById('pF_hsn').value||null,unit_price:+(document.getElementById('pF_price').value)||0,location:document.getElementById('pF_loc').value||null};
   if (!data.item_name||!data.category||!data.unit) { showToast('Name, category, unit required','error'); return; }
+  var btn = event && event.target ? event.target : null;
+  if (btn) { btn.disabled = true; btn.textContent = id ? 'Updating...' : 'Creating...'; }
   try {
     if (id) await _pebPut('/api/peb/store/items/'+id, data);
     else await _pebPost('/api/peb/store/items', data);
+    if (btn) { btn.textContent = id ? 'Updated ✓' : 'Created ✓'; btn.style.background = '#22c55e'; }
     showToast(id?'Updated':'Item created','success');
-    _pebStockItems(_p());
-  } catch(e) { showToast(e.message,'error'); }
+    setTimeout(function(){ _pebStockItems(_p()); }, 800);
+  } catch(e) {
+    showToast(e.message,'error');
+    if (btn) { btn.disabled = false; btn.textContent = id ? 'Update' : 'Create Item'; }
+  }
 }
 
 async function _pebEditItem(id) {
