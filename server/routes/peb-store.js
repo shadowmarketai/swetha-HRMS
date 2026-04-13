@@ -42,7 +42,7 @@ async function generateSimpleCode(prefix, table, column) {
       max_stock_level DECIMAL(12,2) DEFAULT 0,
       unit_price DECIMAL(12,2) DEFAULT 0,
       location VARCHAR(100),
-      last_updated_by INT,
+      last_updated_by VARCHAR(20),
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )`);
@@ -58,7 +58,7 @@ async function generateSimpleCode(prefix, table, column) {
       reference_id INT,
       reference_type VARCHAR(50),
       notes TEXT,
-      created_by INT,
+      created_by VARCHAR(20),
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`);
 
@@ -74,7 +74,7 @@ async function generateSimpleCode(prefix, table, column) {
       quality_status VARCHAR(20) DEFAULT 'PASSED',
       quality_remarks TEXT,
       invoice_photo_url VARCHAR(500),
-      created_by INT,
+      created_by VARCHAR(20),
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`);
 
@@ -94,7 +94,7 @@ async function generateSimpleCode(prefix, table, column) {
     await db.query(`CREATE TABLE IF NOT EXISTS peb_material_requests (
       id INT AUTO_INCREMENT PRIMARY KEY,
       request_code VARCHAR(30) UNIQUE NOT NULL,
-      requested_by INT,
+      requested_by VARCHAR(20),
       site_id INT,
       site_name VARCHAR(200),
       project_name VARCHAR(200),
@@ -125,11 +125,11 @@ async function generateSimpleCode(prefix, table, column) {
       mrn_code VARCHAR(30) UNIQUE NOT NULL,
       site_id INT,
       site_name VARCHAR(200),
-      returned_by INT,
+      returned_by VARCHAR(20),
       returned_by_name VARCHAR(100),
       return_date DATE,
       status VARCHAR(20) DEFAULT 'PENDING',
-      verified_by_store INT,
+      verified_by_store VARCHAR(20),
       verified_at TIMESTAMP NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`);
@@ -155,7 +155,7 @@ async function generateSimpleCode(prefix, table, column) {
       sale_amount DECIMAL(14,2) DEFAULT 0,
       sale_date DATE,
       receipt_number VARCHAR(50),
-      created_by INT,
+      created_by VARCHAR(20),
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )`);
@@ -171,6 +171,27 @@ async function generateSimpleCode(prefix, table, column) {
     )`);
 
     console.log('[PEB-STORE] All tables ready');
+
+    // Fix INT columns that should be VARCHAR for emp_code values like "HR001"
+    const colFixes = [
+      { table: 'peb_stock_items', col: 'last_updated_by' },
+      { table: 'peb_stock_transactions', col: 'created_by' },
+      { table: 'peb_grn', col: 'received_by' },
+      { table: 'peb_material_requests', col: 'requested_by' },
+      { table: 'peb_material_requests', col: 'approved_by' },
+      { table: 'peb_material_requests', col: 'dispatched_by' },
+      { table: 'peb_material_returns', col: 'verified_by' },
+      { table: 'peb_scrap_batches', col: 'created_by' }
+    ];
+    for (const { table, col } of colFixes) {
+      try {
+        const [cols] = await db.query(`SHOW COLUMNS FROM ${table} WHERE Field = ?`, [col]);
+        if (cols.length > 0 && cols[0].Type.toLowerCase().startsWith('int')) {
+          await db.query(`ALTER TABLE ${table} MODIFY COLUMN ${col} VARCHAR(20)`);
+          console.log(`[PEB-STORE] Fixed ${table}.${col} INT→VARCHAR(20)`);
+        }
+      } catch (e) { /* table may not exist yet */ }
+    }
 
     // Auto-seed if empty
     const [[{ cnt }]] = await db.query('SELECT COUNT(*) as cnt FROM peb_stock_items');

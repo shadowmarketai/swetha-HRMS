@@ -50,7 +50,7 @@ async function generateSimpleCode(prefix, table, column) {
     await db.query(`CREATE TABLE IF NOT EXISTS peb_purchase_indents (
       id INT AUTO_INCREMENT PRIMARY KEY,
       indent_code VARCHAR(30) UNIQUE NOT NULL,
-      requested_by INT,
+      requested_by VARCHAR(20),
       requested_by_name VARCHAR(100),
       site_name VARCHAR(200),
       urgency VARCHAR(20) DEFAULT 'ROUTINE',
@@ -58,10 +58,10 @@ async function generateSimpleCode(prefix, table, column) {
       reason TEXT,
       project_reference VARCHAR(100),
       status VARCHAR(30) DEFAULT 'QUOTATION_PENDING',
-      gm_approved_by INT,
+      gm_approved_by VARCHAR(20),
       gm_approved_at TIMESTAMP NULL,
       gm_remarks TEXT,
-      md_approved_by INT,
+      md_approved_by VARCHAR(20),
       md_approved_at TIMESTAMP NULL,
       md_remarks TEXT,
       selected_vendor_id INT,
@@ -122,7 +122,7 @@ async function generateSimpleCode(prefix, table, column) {
       status VARCHAR(20) DEFAULT 'DRAFT',
       approved_by_md BOOLEAN DEFAULT FALSE,
       approval_date DATE,
-      created_by INT,
+      created_by VARCHAR(20),
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )`);
@@ -146,7 +146,7 @@ async function generateSimpleCode(prefix, table, column) {
       payment_date DATE NOT NULL,
       mode VARCHAR(30) NOT NULL,
       reference VARCHAR(100),
-      recorded_by INT,
+      recorded_by VARCHAR(20),
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`);
 
@@ -154,7 +154,7 @@ async function generateSimpleCode(prefix, table, column) {
     await db.query(`CREATE TABLE IF NOT EXISTS peb_transport_requests (
       id INT AUTO_INCREMENT PRIMARY KEY,
       request_code VARCHAR(30) UNIQUE NOT NULL,
-      requested_by INT,
+      requested_by VARCHAR(20),
       type VARCHAR(30) NOT NULL,
       origin_name VARCHAR(200),
       destination_name VARCHAR(200),
@@ -164,7 +164,7 @@ async function generateSimpleCode(prefix, table, column) {
       estimated_weight DECIMAL(12,2),
       reason TEXT,
       status VARCHAR(20) DEFAULT 'REQUESTED',
-      approved_by INT,
+      approved_by VARCHAR(20),
       vehicle_number VARCHAR(30),
       driver_name VARCHAR(100),
       driver_phone VARCHAR(20),
@@ -172,13 +172,34 @@ async function generateSimpleCode(prefix, table, column) {
       transport_cost DECIMAL(14,2),
       delivery_condition VARCHAR(20),
       damage_notes TEXT,
-      received_by INT,
+      received_by VARCHAR(20),
       received_at TIMESTAMP NULL,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     )`);
 
     console.log('[PEB-PURCHASE] All tables ready');
+
+    // Fix INT columns that should be VARCHAR for emp_code values like "HR001"
+    const purchaseColFixes = [
+      { table: 'peb_purchase_indents', col: 'requested_by' },
+      { table: 'peb_purchase_indents', col: 'gm_approved_by' },
+      { table: 'peb_purchase_indents', col: 'md_approved_by' },
+      { table: 'peb_purchase_orders', col: 'created_by' },
+      { table: 'peb_po_payments', col: 'recorded_by' },
+      { table: 'peb_transport_requests', col: 'requested_by' },
+      { table: 'peb_transport_requests', col: 'approved_by' },
+      { table: 'peb_transport_requests', col: 'received_by' }
+    ];
+    for (const { table, col } of purchaseColFixes) {
+      try {
+        const [cols] = await db.query(`SHOW COLUMNS FROM ${table} WHERE Field = ?`, [col]);
+        if (cols.length > 0 && cols[0].Type.toLowerCase().startsWith('int')) {
+          await db.query(`ALTER TABLE ${table} MODIFY COLUMN ${col} VARCHAR(20)`);
+          console.log(`[PEB-PURCHASE] Fixed ${table}.${col} INT→VARCHAR(20)`);
+        }
+      } catch (e) { /* table may not exist yet */ }
+    }
 
     // Auto-seed if empty
     const [[{ cnt }]] = await db.query('SELECT COUNT(*) as cnt FROM peb_vendors');
