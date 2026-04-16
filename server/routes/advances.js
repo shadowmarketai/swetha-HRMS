@@ -20,13 +20,17 @@ async function getEmpCodesByRole(pool, roles) {
   return rows.map(r => r.emp_code);
 }
 
+// New approval flow: Employee → Accounts (review) → MD (approve) → Accounts (mark paid).
+// HR no longer participates in advance approvals — they're routed to Accounts instead.
+const REVIEWER_ROLES = ['MD', 'Accounts'];
+
 // GET /api/advances — list advances
 router.get('/', verifyToken, async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
     const offset = (page - 1) * limit;
-    if (!['MD', 'HR'].includes(req.user.role)) {
+    if (!REVIEWER_ROLES.includes(req.user.role)) {
       const [countResult1] = await pool.query('SELECT COUNT(*) as total FROM advance_requests WHERE emp_code = ?', [req.user.empCode]);
       const empTotal = (countResult1 && countResult1[0]) ? countResult1[0].total : 0;
       const [rows] = await pool.query('SELECT * FROM advance_requests WHERE emp_code = ? ORDER BY applied_date DESC LIMIT ? OFFSET ?', [req.user.empCode, limit, offset]);
@@ -69,17 +73,17 @@ router.post('/', verifyToken, [
        travelFrom || '', travelTo || '', vehicle || '', travelKm || 0, emiAmount || 0, emiMonths || 0, urgency || 'medium']
     );
 
-    // Notify all HR and MD users about new advance request
+    // Notify Accounts + MD about new advance request (HR no longer in the loop)
     const typeLabels = { salary: 'Salary Advance', travel: 'Travel Advance', site: 'Site Advance' };
     const typeLabel = typeLabels[type] || type;
-    const managers = await getEmpCodesByRole(pool, ['HR', 'MD']);
-    const targets = managers.filter(c => c !== req.user.empCode);
+    const reviewers = await getEmpCodesByRole(pool, REVIEWER_ROLES);
+    const targets = reviewers.filter(c => c !== req.user.empCode);
     await notifyUsers(pool, targets, 'Advance Request', empName + ' submitted ' + typeLabel + ' for Rs.' + Number(amount).toLocaleString('en-IN'), 'advance');
 
-    // Real-time: notify MD/HR instantly
+    // Real-time: notify Accounts/MD instantly
     const io = req.app.get('io');
     if (io) {
-      io.to('role:MD').to('role:HR').emit('advance:new', { empCode: req.user.empCode, empName, type: typeLabel, amount });
+      io.to('role:MD').to('role:Accounts').emit('advance:new', { id: result.insertId, empCode: req.user.empCode, empName, type: typeLabel, amount });
     }
     res.status(201).json({ message: 'Advance request submitted', id: result.insertId });
   } catch (err) {
@@ -88,14 +92,15 @@ router.post('/', verifyToken, [
   }
 });
 
-// PATCH /api/advances/:id/hr-accept — HR accepts (Pending → HR_Accepted)
-router.patch('/:id/hr-accept', verifyToken, requireRole('HR'), auditLog('hr-accept', 'advance'), async (req, res) => {
+// PATCH /api/advances/:id/accounts-accept — Accounts accepts (Pending → Accounts_Accepted)
+// New endpoint for the Accounts-first workflow.
+router.patch('/:id/accounts-accept', verifyToken, requireRole('Accounts'), auditLog('accounts-accept', 'advance'), async (req, res) => {
   try {
     const [existing] = await pool.query('SELECT * FROM advance_requests WHERE id = ?', [req.params.id]);
     if (existing.length === 0) return res.status(404).json({ error: 'Advance request not found' });
     if (existing[0].status !== 'Pending') return res.status(400).json({ error: `Cannot accept: status is ${existing[0].status}` });
     await pool.query(
-      'UPDATE advance_requests SET status = "HR_Accepted", reviewed_by = ?, review_date = CURDATE() WHERE id = ?',
+      'UPDATE advance_requests SET status = "Accounts_Accepted", reviewed_by = ?, review_date = CURDATE() WHERE id = ?',
       [req.user.empCode, req.params.id]
     );
 
@@ -103,43 +108,49 @@ router.patch('/:id/hr-accept', verifyToken, requireRole('HR'), auditLog('hr-acce
     const adv = existing[0];
     const mdUsers = await getEmpCodesByRole(pool, ['MD']);
     const targets = [adv.emp_code, ...mdUsers].filter(c => c !== req.user.empCode);
-    await notifyUsers(pool, targets, 'Advance Accepted by HR', adv.emp_name + '\'s ' + adv.type + ' advance (Rs.' + Number(adv.amount).toLocaleString('en-IN') + ') accepted by HR, awaiting MD', 'advance');
+    await notifyUsers(pool, targets, 'Advance Accepted by Accounts', adv.emp_name + '\'s ' + adv.type + ' advance (Rs.' + Number(adv.amount).toLocaleString('en-IN') + ') accepted by Accounts, awaiting MD', 'advance');
 
     // Real-time socket events
     const io = req.app.get('io');
     if (io) {
-      io.to('user:' + adv.emp_code).emit('advance:hr_accepted', { id: adv.id, empName: adv.emp_name, type: adv.type, amount: adv.amount });
+      io.to('user:' + adv.emp_code).emit('advance:accounts_accepted', { id: adv.id, empName: adv.emp_name, type: adv.type, amount: adv.amount });
       io.to('role:MD').emit('advance:pending_approval', { id: adv.id, empName: adv.emp_name, type: adv.type, amount: adv.amount });
-      io.to('role:HR').emit('advance:updated', { id: adv.id });
+      io.to('role:Accounts').emit('advance:updated', { id: adv.id, status: 'Accounts_Accepted' });
     }
 
-    res.json({ message: 'Advance accepted by HR' });
+    res.json({ message: 'Advance accepted by Accounts' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
 
-// PATCH /api/advances/:id/approve — final approve (MD only, requires HR acceptance first)
+// PATCH /api/advances/:id/approve — final approve (MD only, requires Accounts acceptance first)
 router.patch('/:id/approve', verifyToken, requireRole('MD'), auditLog('approve', 'advance'), async (req, res) => {
   try {
     const [existing] = await pool.query('SELECT * FROM advance_requests WHERE id = ?', [req.params.id]);
     if (existing.length === 0) return res.status(404).json({ error: 'Advance request not found' });
-    if (existing[0].status !== 'HR_Accepted') return res.status(400).json({ error: existing[0].status === 'Pending' ? 'HR must accept this advance first' : `Cannot approve: status is ${existing[0].status}` });
+    if (existing[0].status !== 'Accounts_Accepted') {
+      return res.status(400).json({
+        error: existing[0].status === 'Pending' ? 'Accounts must accept this advance first' : `Cannot approve: status is ${existing[0].status}`
+      });
+    }
     await pool.query(
       'UPDATE advance_requests SET status = "Approved", reviewed_by = ?, review_date = CURDATE() WHERE id = ?',
       [req.user.empCode, req.params.id]
     );
 
-    // Notify the employee that their advance was approved
+    // Notify the employee + send back to Accounts for disbursement
     const adv = existing[0];
-    await notifyUsers(pool, [adv.emp_code], 'Advance Approved', 'Your ' + adv.type + ' advance (Rs.' + Number(adv.amount).toLocaleString('en-IN') + ') has been approved', 'advance');
+    await notifyUsers(pool, [adv.emp_code], 'Advance Approved', 'Your ' + adv.type + ' advance (Rs.' + Number(adv.amount).toLocaleString('en-IN') + ') has been approved by MD', 'advance');
+    const acctUsers = await getEmpCodesByRole(pool, ['Accounts']);
+    await notifyUsers(pool, acctUsers, 'Advance Ready to Pay', 'MD approved ' + adv.emp_name + '\'s ' + adv.type + ' advance (Rs.' + Number(adv.amount).toLocaleString('en-IN') + ') — please disburse', 'advance');
 
     // Real-time socket events
     const io = req.app.get('io');
     if (io) {
       io.to('user:' + adv.emp_code).emit('advance:approved', { id: adv.id, empName: adv.emp_name, type: adv.type, amount: adv.amount });
-      io.to('role:MD').to('role:HR').emit('advance:updated', { id: adv.id });
+      io.to('role:MD').to('role:Accounts').emit('advance:updated', { id: adv.id, status: 'Approved' });
     }
 
     res.json({ message: 'Advance approved' });
@@ -149,12 +160,43 @@ router.patch('/:id/approve', verifyToken, requireRole('MD'), auditLog('approve',
   }
 });
 
-// PATCH /api/advances/:id/reject — can reject Pending or HR_Accepted
-router.patch('/:id/reject', verifyToken, requireRole('MD', 'HR'), auditLog('reject', 'advance'), async (req, res) => {
+// PATCH /api/advances/:id/mark-paid — Accounts marks an MD-Approved advance as Paid (final disbursement)
+router.patch('/:id/mark-paid', verifyToken, requireRole('Accounts'), auditLog('mark-paid', 'advance'), async (req, res) => {
   try {
     const [existing] = await pool.query('SELECT * FROM advance_requests WHERE id = ?', [req.params.id]);
     if (existing.length === 0) return res.status(404).json({ error: 'Advance request not found' });
-    if (existing[0].status !== 'Pending' && existing[0].status !== 'HR_Accepted') return res.status(400).json({ error: `Cannot reject: status is ${existing[0].status}` });
+    const adv = existing[0];
+    if (adv.status !== 'Approved') return res.status(400).json({ error: `Cannot mark paid: status is ${adv.status}. Expected: Approved` });
+
+    await pool.query(
+      'UPDATE advance_requests SET status = "Paid", paid_by = ?, paid_date = CURDATE() WHERE id = ?',
+      [req.user.empCode, req.params.id]
+    );
+
+    // Notify employee + MD
+    await notifyUsers(pool, [adv.emp_code], 'Advance Paid', 'Your ' + adv.type + ' advance (Rs.' + Number(adv.amount).toLocaleString('en-IN') + ') has been disbursed by Accounts', 'advance');
+    const mdUsers = await getEmpCodesByRole(pool, ['MD']);
+    await notifyUsers(pool, mdUsers, 'Advance Disbursed', adv.emp_name + '\'s ' + adv.type + ' advance (Rs.' + Number(adv.amount).toLocaleString('en-IN') + ') has been paid', 'advance');
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to('user:' + adv.emp_code).emit('advance:paid', { id: adv.id, type: adv.type, amount: adv.amount });
+      io.to('role:MD').to('role:Accounts').emit('advance:updated', { id: adv.id, status: 'Paid' });
+    }
+
+    res.json({ message: 'Advance marked as paid' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PATCH /api/advances/:id/reject — Accounts or MD reject (only from Pending or Accounts_Accepted)
+router.patch('/:id/reject', verifyToken, requireRole('MD', 'Accounts'), auditLog('reject', 'advance'), async (req, res) => {
+  try {
+    const [existing] = await pool.query('SELECT * FROM advance_requests WHERE id = ?', [req.params.id]);
+    if (existing.length === 0) return res.status(404).json({ error: 'Advance request not found' });
+    if (existing[0].status !== 'Pending' && existing[0].status !== 'Accounts_Accepted') return res.status(400).json({ error: `Cannot reject: status is ${existing[0].status}` });
     const { reason } = req.body;
     await pool.query(
       'UPDATE advance_requests SET status = "Rejected", reviewed_by = ?, review_date = CURDATE(), reject_reason = ? WHERE id = ?',
@@ -169,13 +211,97 @@ router.patch('/:id/reject', verifyToken, requireRole('MD', 'HR'), auditLog('reje
     const io = req.app.get('io');
     if (io) {
       io.to('user:' + adv.emp_code).emit('advance:rejected', { id: adv.id, empName: adv.emp_name, type: adv.type, amount: adv.amount, reason: reason || '' });
-      io.to('role:MD').to('role:HR').emit('advance:updated', { id: adv.id });
+      io.to('role:MD').to('role:Accounts').emit('advance:updated', { id: adv.id, status: 'Rejected' });
     }
 
     res.json({ message: 'Advance rejected' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Build a parameterised WHERE for export queries — keeps Excel + PDF in sync.
+function buildFilters(query) {
+  const where = [];
+  const params = [];
+  if (query.status) { where.push('status = ?'); params.push(query.status); }
+  if (query.empCode) { where.push('emp_code = ?'); params.push(query.empCode); }
+  if (query.type) { where.push('type = ?'); params.push(query.type); }
+  if (query.from) { where.push('applied_date >= ?'); params.push(query.from); }
+  if (query.to) { where.push('applied_date <= ?'); params.push(query.to); }
+  return { sql: where.length ? ' WHERE ' + where.join(' AND ') : '', params };
+}
+
+// GET /api/advances/export — download filtered list as Excel (.xlsx)
+router.get('/export', verifyToken, requireRole('MD', 'Accounts'), async (req, res) => {
+  try {
+    const XLSX = require('xlsx');
+    const { sql, params } = buildFilters(req.query);
+    const [rows] = await pool.query(
+      'SELECT id, type, emp_code, emp_name, dept, amount, reason, details, project, category, ' +
+      'travel_from, travel_to, vehicle, travel_km, emi_amount, emi_months, urgency, status, ' +
+      'applied_date, reviewed_by, review_date, reject_reason, paid_by, paid_date FROM advance_requests' + sql + ' ORDER BY applied_date DESC',
+      params
+    );
+    const data = rows.map(r => ({
+      'ID': r.id,
+      'Type': r.type,
+      'Employee Code': r.emp_code,
+      'Employee Name': r.emp_name,
+      'Department': r.dept,
+      'Amount (INR)': Number(r.amount || 0),
+      'Reason': r.reason || '',
+      'Details': r.details || '',
+      'Project': r.project || '',
+      'Category': r.category || '',
+      'Travel From': r.travel_from || '',
+      'Travel To': r.travel_to || '',
+      'Vehicle': r.vehicle || '',
+      'Travel KM': r.travel_km || '',
+      'EMI Amount': r.emi_amount || '',
+      'EMI Months': r.emi_months || '',
+      'Urgency': r.urgency,
+      'Status': r.status,
+      'Applied Date': r.applied_date ? new Date(r.applied_date).toISOString().slice(0, 10) : '',
+      'Reviewed By': r.reviewed_by || '',
+      'Review Date': r.review_date ? new Date(r.review_date).toISOString().slice(0, 10) : '',
+      'Reject Reason': r.reject_reason || '',
+      'Paid By': r.paid_by || '',
+      'Paid Date': r.paid_date ? new Date(r.paid_date).toISOString().slice(0, 10) : ''
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    ws['!cols'] = [
+      { wch: 6 }, { wch: 10 }, { wch: 12 }, { wch: 22 }, { wch: 14 }, { wch: 14 }, { wch: 30 }, { wch: 30 },
+      { wch: 18 }, { wch: 14 }, { wch: 18 }, { wch: 18 }, { wch: 12 }, { wch: 10 }, { wch: 12 }, { wch: 10 },
+      { wch: 10 }, { wch: 18 }, { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 30 }, { wch: 14 }, { wch: 12 }
+    ];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Advances');
+    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' });
+    const filename = 'advances_' + new Date().toISOString().slice(0, 10) + '.xlsx';
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="' + filename + '"');
+    res.send(buf);
+  } catch (err) {
+    console.error('[advances/export]', err);
+    res.status(500).json({ error: 'Failed to generate Excel export' });
+  }
+});
+
+// GET /api/advances/:id/voucher — single advance as a printable PDF voucher
+router.get('/:id/voucher', verifyToken, requireRole('MD', 'Accounts'), async (req, res) => {
+  try {
+    const [rows] = await pool.query('SELECT * FROM advance_requests WHERE id = ?', [req.params.id]);
+    if (rows.length === 0) return res.status(404).json({ error: 'Advance not found' });
+    const { generateVoucherPDF } = require('../utils/voucher-pdf');
+    const buf = await generateVoucherPDF({ kind: 'advance', record: rows[0] });
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', 'attachment; filename="advance_ADV-' + String(rows[0].id).padStart(6, '0') + '.pdf"');
+    res.send(buf);
+  } catch (err) {
+    console.error('[advances/voucher]', err);
+    res.status(500).json({ error: 'Failed to generate PDF voucher' });
   }
 });
 

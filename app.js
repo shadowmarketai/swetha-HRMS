@@ -2091,6 +2091,7 @@ function renderRolesList() {
         `<select class="emp-role-select" onclick="event.stopPropagation()" onchange="changeRole('${e.code}',this.value)">
         <option value="Employee"${e.role==='Employee'?' selected':''}>Employee</option>
         <option value="HR"${e.role==='HR'?' selected':''}>HR</option>
+        <option value="Accounts"${e.role==='Accounts'?' selected':''}>Accounts</option>
         <option value="Manager"${e.role==='Manager'?' selected':''}>Manager</option>
         <option value="MD"${e.role==='MD'?' selected':''}>MD</option>
       </select>` : `<span class="role-badge ${e.role.toLowerCase()}" style="font-size:.65rem">${e.role}</span>`)}
@@ -3413,11 +3414,21 @@ function filterAdvReqByType(type, btn) {
 
 function renderAdvanceRequests(filter) {
   const container = document.getElementById('advReqList');
+  // Render Excel export buttons for MD/Accounts (visible only for these reviewer roles)
+  _renderAdvExportBar(filter);
   // Combine advance requests + expense reimbursements (mapped to same shape)
+  // Status mapping handles both new (accounts_accepted/Paid) and legacy (hr_accepted) values.
   var expItems = expenseReimbursements.filter(function(e) {
     return e.expenseType === 'site_expense' || e.expenseType === 'travel_expense';
   }).map(function(e) {
-    var mappedStatus = e.status === 'Approved' ? 'approved' : e.status === 'Rejected' ? 'rejected' : e.status === 'hr_accepted' ? 'hr_accepted' : 'pending';
+    var s = String(e.status || '').toLowerCase();
+    var mappedStatus =
+      s === 'approved'                    ? 'approved'           :
+      s === 'rejected'                    ? 'rejected'           :
+      s === 'paid'                        ? 'paid'               :
+      s === 'accounts_accepted'           ? 'accounts_accepted'  :
+      s === 'hr_accepted'                 ? 'accounts_accepted'  :  // legacy → treat as accounts_accepted
+                                            'pending';
     return {
       id: e.id, _isExpense: true, type: e.expenseType || 'site_expense',
       empCode: e.empCode, empName: e.empName || '', dept: e.dept || '',
@@ -3432,14 +3443,17 @@ function renderAdvanceRequests(filter) {
   });
   var allItems = advanceRequests.concat(expItems);
   var isMD = currentUser && currentUser.role === 'MD';
-  var isHR = currentUser && currentUser.role === 'HR';
+  var isAccounts = currentUser && currentUser.role === 'Accounts';
   let reqs;
   if (filter === 'all') {
     reqs = [...allItems];
   } else if (filter === 'pending') {
-    // MD sees hr_accepted (awaiting MD confirm) + pending; HR sees pending only
+    // Accounts sees Pending (to accept) + Approved (to mark Paid).
+    // MD sees pending + accounts_accepted (awaiting their confirm).
     if (isMD) {
-      reqs = allItems.filter(r => r.status === 'pending' || r.status === 'hr_accepted');
+      reqs = allItems.filter(r => r.status === 'pending' || r.status === 'accounts_accepted');
+    } else if (isAccounts) {
+      reqs = allItems.filter(r => r.status === 'pending' || r.status === 'approved');
     } else {
       reqs = allItems.filter(r => r.status === 'pending');
     }
@@ -3458,25 +3472,39 @@ function renderAdvanceRequests(filter) {
     var statusBadge = getAdvanceStatusBadge(r.status);
     var stepHtml = getAdvanceStepIndicator(r.status);
     var actionsHtml = '';
+    var checkSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/></svg>';
+    var crossSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+    var paySvg   = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/></svg>';
+
     if (r._isExpense) {
-      // Expense items: HR accept → MD confirm (same dual flow)
-      if (isHR && r.status === 'pending') {
-        actionsHtml = `<div class="adv-actions"><button class="approve-btn" onclick="hrAcceptExpense(${r.id})" aria-label="Accept expense ${r.id}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/></svg> Accept</button><button class="reject-btn" onclick="rejectExpense(${r.id})" aria-label="Reject expense ${r.id}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Reject</button></div>`;
-      } else if (isMD && r.status === 'hr_accepted') {
-        actionsHtml = `<div class="adv-actions"><button class="approve-btn" onclick="approveExpense(${r.id})" aria-label="Confirm expense ${r.id}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/></svg> Confirm</button><button class="reject-btn" onclick="rejectExpense(${r.id})" aria-label="Reject expense ${r.id}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Reject</button></div>`;
+      // EXPENSE items — Accounts → MD → Accounts(Mark Paid)
+      if (isAccounts && r.status === 'pending') {
+        actionsHtml = `<div class="adv-actions"><button class="approve-btn" onclick="accountsAcceptExpense(${r.id})">${checkSvg} Accept &amp; Forward to MD</button><button class="reject-btn" onclick="rejectExpense(${r.id})">${crossSvg} Reject</button></div>`;
+      } else if (isMD && r.status === 'accounts_accepted') {
+        actionsHtml = `<div class="adv-actions"><button class="approve-btn" onclick="approveExpense(${r.id})">${checkSvg} Confirm</button><button class="reject-btn" onclick="rejectExpense(${r.id})">${crossSvg} Reject</button></div>`;
+      } else if (isAccounts && r.status === 'approved') {
+        actionsHtml = `<div class="adv-actions"><button class="approve-btn" onclick="markExpensePaid(${r.id})" style="background:#10B981">${paySvg} Mark Paid</button></div>`;
       }
     } else {
-      // Advance items: existing HR accept → MD confirm flow
-      if (isHR && r.status === 'pending') {
-        actionsHtml = `<div class="adv-actions"><button class="approve-btn" onclick="approveAdvance(${r.id})" aria-label="Accept advance ${r.id}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/></svg> Accept</button><button class="reject-btn" onclick="rejectAdvance(${r.id})" aria-label="Reject advance ${r.id}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Reject</button></div>`;
-      } else if (isMD && r.status === 'hr_accepted') {
-        actionsHtml = `<div class="adv-actions"><button class="approve-btn" onclick="approveAdvance(${r.id})" aria-label="Confirm advance ${r.id}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/></svg> Confirm</button><button class="reject-btn" onclick="rejectAdvance(${r.id})" aria-label="Reject advance ${r.id}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> Reject</button></div>`;
+      // ADVANCE items — same flow
+      if (isAccounts && r.status === 'pending') {
+        actionsHtml = `<div class="adv-actions"><button class="approve-btn" onclick="accountsAcceptAdvance(${r.id})">${checkSvg} Accept &amp; Forward to MD</button><button class="reject-btn" onclick="rejectAdvance(${r.id})">${crossSvg} Reject</button></div>`;
+      } else if (isMD && r.status === 'accounts_accepted') {
+        actionsHtml = `<div class="adv-actions"><button class="approve-btn" onclick="approveAdvance(${r.id})">${checkSvg} Confirm</button><button class="reject-btn" onclick="rejectAdvance(${r.id})">${crossSvg} Reject</button></div>`;
+      } else if (isAccounts && r.status === 'approved') {
+        actionsHtml = `<div class="adv-actions"><button class="approve-btn" onclick="markAdvancePaid(${r.id})" style="background:#10B981">${paySvg} Mark Paid</button></div>`;
       }
+    }
+    // Voucher PDF download button (MD + Accounts only). Opens in a new tab via blob.
+    var pdfBtn = '';
+    if (isMD || isAccounts) {
+      var voucherKind = r._isExpense ? 'expenses' : 'advances';
+      pdfBtn = '<button onclick="downloadVoucherPDF(\'' + voucherKind + '\',' + r.id + ')" title="Download PDF voucher" style="background:none;border:1px solid var(--gray-200);padding:3px 8px;border-radius:6px;cursor:pointer;font-size:.68rem;color:var(--gray-600);display:inline-flex;align-items:center;gap:3px;margin-left:4px"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> PDF</button>';
     }
     return `<div class="adv-request-card ${r.status}">
       <div class="adv-request-header">
         <h4><span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:8px;background:var(--primary-50);color:var(--primary);font-size:.65rem;font-weight:700;margin-right:4px">${escapeHTML(initials)}</span>${escapeHTML(r.empName)}</h4>
-        ${statusBadge}
+        ${statusBadge}${pdfBtn}
       </div>
       <div class="adv-request-meta">
         ${typeBadge} <span class="adv-urgency ${r.urgency || 'normal'}">${escapeHTML(r.urgency || 'normal')}</span> &middot; <strong>\u20B9${r.amount.toLocaleString('en-IN')}</strong> &middot; ${escapeHTML(r.dept)}<br>
@@ -3492,37 +3520,56 @@ function renderAdvanceRequests(filter) {
   }).join('');
 }
 
+// Accounts step: Pending → accounts_accepted (forwarded to MD)
+async function accountsAcceptAdvance(id) {
+  try {
+    const req = advanceRequests.find(r => r.id === id);
+    if (!req) return;
+    await apiCall('PATCH', '/advances/' + id + '/accounts-accept');
+    req.status = 'accounts_accepted';
+    req.reviewedBy = currentUser.name + ' (Accounts)';
+    req.reviewDate = new Date().toISOString().split('T')[0];
+    showToast('Accepted \u20B9' + req.amount.toLocaleString('en-IN') + ' — forwarded to MD');
+    renderAdvanceRequests(advReqActiveTab);
+    renderAllPendingBanners();
+    refreshNotifications();
+  } catch (err) { showToast(err.message || 'Error accepting advance'); }
+}
+
+// MD step: accounts_accepted → Approved (then routed back to Accounts for disbursement)
 async function approveAdvance(id) {
   try {
     const req = advanceRequests.find(r => r.id === id);
     if (!req) return;
-    // HR can only accept (not final approve)
-    if (currentUser.role === 'HR' && req.status === 'pending') {
-      await apiCall('PATCH', '/advances/' + id + '/hr-accept');
-      req.status = 'hr_accepted';
-      req.reviewedBy = currentUser.name + ' (HR)';
-      req.reviewDate = new Date().toISOString().split('T')[0];
-      showToast('Accepted \u20B9' + req.amount.toLocaleString('en-IN') + ' — forwarded to MD');
-      renderAdvanceRequests(advReqActiveTab);
-      renderAllPendingBanners();
-      refreshNotifications();
-      return;
-    }
-    // MD can only approve after HR has accepted
+    // MD must wait for Accounts to accept first
     if (currentUser.role === 'MD' && req.status === 'pending') {
-      showToast('HR must accept this advance first');
+      showToast('Accounts must accept this advance first');
       return;
     }
-    // MD confirms (from hr_accepted only)
     await apiCall('PATCH', '/advances/' + id + '/approve');
     req.status = 'approved';
     req.reviewedBy = currentUser.name + ' (' + currentUser.role + ')';
     req.reviewDate = new Date().toISOString().split('T')[0];
-    showToast('Approved \u20B9' + req.amount.toLocaleString('en-IN') + ' for ' + req.empName);
+    showToast('Approved \u20B9' + req.amount.toLocaleString('en-IN') + ' for ' + req.empName + ' — sent back to Accounts to disburse');
     renderAdvanceRequests(advReqActiveTab);
     renderAllPendingBanners();
     refreshNotifications();
   } catch (err) { showToast(err.message || 'Error approving advance'); }
+}
+
+// Accounts final step: Approved → Paid (records who paid + when)
+async function markAdvancePaid(id) {
+  try {
+    const req = advanceRequests.find(r => r.id === id);
+    if (!req) return;
+    if (!confirm('Confirm: \u20B9' + req.amount.toLocaleString('en-IN') + ' has been disbursed to ' + req.empName + '?')) return;
+    await apiCall('PATCH', '/advances/' + id + '/mark-paid');
+    req.status = 'paid';
+    showToast('Marked as paid — \u20B9' + req.amount.toLocaleString('en-IN'));
+    renderAdvanceRequests(advReqActiveTab);
+    renderAllPendingBanners();
+    refreshNotifications();
+  } catch (err) { showToast(err.message || 'Error marking as paid'); }
 }
 
 async function rejectAdvance(id) {
@@ -3541,6 +3588,74 @@ async function rejectAdvance(id) {
     renderAllPendingBanners();
     refreshNotifications();
   } catch (err) { showToast(err.message || 'Error rejecting advance'); }
+}
+
+// Render the "Download Excel" buttons above the request list — only for MD & Accounts.
+// Translates the active UI filter (Pending / Approved / Rejected / All) into the
+// query params expected by /api/expenses/export and /api/advances/export.
+function _renderAdvExportBar(uiFilter) {
+  var bar = document.getElementById('advReqExportBar');
+  if (!bar) return;
+  var canExport = currentUser && (currentUser.role === 'MD' || currentUser.role === 'Accounts');
+  if (!canExport) { bar.style.display = 'none'; bar.innerHTML = ''; return; }
+  // Map UI filter → backend status query.
+  // For 'pending' we don't pin a single status because reviewers often want all unsettled
+  // items in one sheet — leaving status unset returns everything filtered, which Excel
+  // can re-filter. For approved/rejected we pin the single status.
+  var statusParam = '';
+  if (uiFilter === 'approved') statusParam = '&status=Approved';
+  else if (uiFilter === 'rejected') statusParam = '&status=Rejected';
+  // 'pending' and 'all' → no status filter, lets Accounts see everything
+  var dlSvg = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+  bar.style.display = 'flex';
+  bar.innerHTML =
+    '<button class="nf-btn nf-btn-sm" onclick="downloadAdvExport(\'advances\',\'' + uiFilter + '\')" style="display:inline-flex;align-items:center;gap:4px;font-size:.7rem">' + dlSvg + ' Advances (.xlsx)</button>' +
+    '<button class="nf-btn nf-btn-sm" onclick="downloadAdvExport(\'expenses\',\'' + uiFilter + '\')" style="display:inline-flex;align-items:center;gap:4px;font-size:.7rem">' + dlSvg + ' Expenses (.xlsx)</button>';
+}
+
+// Triggers an authenticated download by hitting the export endpoint with the bearer token
+// (server uses verifyToken middleware) and saving the resulting blob.
+// NOTE: uses the project's existing API_BASE + JWT_TOKEN globals (defined at line ~6599)
+// instead of fetch defaults, so it works with the same auth as apiCall().
+async function downloadAdvExport(kind, uiFilter) {
+  try {
+    var statusQ = '';
+    if (uiFilter === 'approved') statusQ = '?status=Approved';
+    else if (uiFilter === 'rejected') statusQ = '?status=Rejected';
+    var url = API_BASE + '/' + kind + '/export' + statusQ;
+    var headers = (typeof apiHeaders === 'function') ? apiHeaders() : (JWT_TOKEN ? { 'Authorization': 'Bearer ' + JWT_TOKEN } : {});
+    // Excel endpoint returns a binary buffer; don't send/expect JSON content-type on the response
+    delete headers['Content-Type'];
+    var res = await fetch(url, { headers: headers });
+    if (!res.ok) { showToast('Export failed (' + res.status + ')'); return; }
+    var blob = await res.blob();
+    var dlUrl = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = dlUrl;
+    a.download = kind + '_' + new Date().toISOString().slice(0, 10) + '.xlsx';
+    document.body.appendChild(a); a.click();
+    setTimeout(function() { URL.revokeObjectURL(dlUrl); a.remove(); }, 0);
+  } catch (e) { showToast('Download error: ' + (e.message || e)); }
+}
+
+// Download a single record as a branded PDF voucher (MD/Accounts only — gated by backend).
+// kind: 'expenses' | 'advances'
+async function downloadVoucherPDF(kind, id) {
+  try {
+    var url = API_BASE + '/' + kind + '/' + id + '/voucher';
+    var headers = (typeof apiHeaders === 'function') ? apiHeaders() : (JWT_TOKEN ? { 'Authorization': 'Bearer ' + JWT_TOKEN } : {});
+    delete headers['Content-Type'];
+    var res = await fetch(url, { headers: headers });
+    if (!res.ok) { showToast('PDF generation failed (' + res.status + ')'); return; }
+    var blob = await res.blob();
+    var dlUrl = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = dlUrl;
+    var prefix = kind === 'expenses' ? 'EXP' : 'ADV';
+    a.download = prefix + '-' + String(id).padStart(6, '0') + '.pdf';
+    document.body.appendChild(a); a.click();
+    setTimeout(function() { URL.revokeObjectURL(dlUrl); a.remove(); }, 0);
+  } catch (e) { showToast('PDF download error: ' + (e.message || e)); }
 }
 
 function formatAdvDate(dateStr) {
@@ -8067,18 +8182,50 @@ function initWebSocket() {
     if (typeof renderLeaveScreen === 'function') renderLeaveScreen();
   });
 
+  // Helper: keep the local leaveApplications array in sync with status changes
+  // received over the socket. Without this, getCasualLeavesUsedThisMonth() and
+  // the permission badge will keep showing the request as still pending/used
+  // even after the server updated it.
+  function _patchLocalLeaveStatus(id, newStatus) {
+    if (typeof leaveApplications === 'undefined' || !id) return;
+    var app = leaveApplications.find(function(a) { return a.id === id; });
+    if (app) app.status = newStatus;
+  }
+  // Helper: re-fetch leave balance after server-side change, so the displayed
+  // remaining count matches the DB (esp. for permission which is server-authoritative).
+  async function _refreshLeaveBalance() {
+    try {
+      if (!currentUser) return;
+      var role = currentUser.role;
+      if (role === 'MD' || role === 'HR') {
+        var all = await apiCall('GET', '/leaves/balance/all');
+        if (all && typeof all === 'object') {
+          Object.keys(leaveBalances).forEach(function(k) { delete leaveBalances[k]; });
+          Object.assign(leaveBalances, all);
+        }
+      } else {
+        var mine = await apiCall('GET', '/leaves/balance');
+        if (mine) leaveBalances[currentUser.code] = mine;
+      }
+    } catch (e) { /* non-fatal — UI will recover on next render */ }
+  }
+
   // ── Leave: approved ──
   _hrmsSocket.on('leave:approved', function(data) {
+    _patchLocalLeaveStatus(data && data.id, 'approved');
     showToast('Your ' + data.type + ' leave (' + data.days + ' days) has been approved!', 'success');
     showNotifPopup('Leave Approved', 'Your ' + data.type + ' leave has been approved');
     refreshNotifications();
-    if (typeof renderLeaveScreen === 'function') renderLeaveScreen();
+    _refreshLeaveBalance().then(function() {
+      if (typeof renderLeaveScreen === 'function') renderLeaveScreen();
+    });
     renderRecentActivity();
     renderHomeQuickStats();
   });
 
   // ── Leave: HR accepted ──
   _hrmsSocket.on('leave:hr_accepted', function(data) {
+    _patchLocalLeaveStatus(data && data.id, 'hr_accepted');
     showToast('Your ' + data.type + ' leave has been accepted by HR, awaiting MD approval', 'info');
     refreshNotifications();
     if (typeof renderLeaveScreen === 'function') renderLeaveScreen();
@@ -8086,11 +8233,18 @@ function initWebSocket() {
   });
 
   // ── Leave: rejected ──
+  // IMPORTANT: server does NOT decrement balance on reject (leaves.js:204-207),
+  // so we must NOT decrement locally either. Just mark the local app as rejected
+  // and refresh the balance from server so any stale optimistic decrement is
+  // reverted, restoring the count to what it was before the request.
   _hrmsSocket.on('leave:rejected', function(data) {
+    _patchLocalLeaveStatus(data && data.id, 'rejected');
     showToast('Your ' + data.type + ' leave has been rejected', 'error');
     showNotifPopup('Leave Rejected', 'Your ' + data.type + ' leave was rejected');
     refreshNotifications();
-    if (typeof renderLeaveScreen === 'function') renderLeaveScreen();
+    _refreshLeaveBalance().then(function() {
+      if (typeof renderLeaveScreen === 'function') renderLeaveScreen();
+    });
     renderRecentActivity();
   });
 
@@ -8104,8 +8258,13 @@ function initWebSocket() {
   });
 
   // ── Leave: any update (for MD/HR dashboard refresh) ──
-  _hrmsSocket.on('leave:updated', function() {
-    if (typeof renderLeaveScreen === 'function') renderLeaveScreen();
+  // Server emits { id, empCode, status } so we can sync local state directly,
+  // avoiding stale "used this month" counts on the team view after a reject.
+  _hrmsSocket.on('leave:updated', function(data) {
+    if (data && data.id && data.status) _patchLocalLeaveStatus(data.id, data.status);
+    _refreshLeaveBalance().then(function() {
+      if (typeof renderLeaveScreen === 'function') renderLeaveScreen();
+    });
     renderRecentActivity();
   });
 
@@ -9440,29 +9599,55 @@ async function submitExpenseReimbursement() {
     showToast(e.message || 'Error submitting expense');
   }
 }
-async function hrAcceptExpense(id) {
+// Accounts step: Pending → accounts_accepted (forwarded to MD)
+async function accountsAcceptExpense(id) {
   try {
     var exp = expenseReimbursements.find(function(e) { return e.id === id; });
     if (!exp) return;
-    await apiCall('PUT', '/expenses/' + id + '/approve', { hrAccept: true });
-    exp.status = 'hr_accepted'; exp.approvedBy = currentUser.name + ' (HR)'; exp.approvedOn = new Date().toISOString().split('T')[0];
+    await apiCall('PUT', '/expenses/' + id + '/approve', {});
+    exp.status = 'accounts_accepted';
+    exp.approvedBy = currentUser.name + ' (Accounts)';
+    exp.approvedOn = new Date().toISOString().split('T')[0];
     showToast('Accepted Rs.' + exp.amount.toLocaleString('en-IN') + ' — forwarded to MD');
     renderAdvanceRequests(advReqActiveTab);
   } catch (e) { showToast(e.message || 'Error accepting expense'); }
 }
+// Backwards-compatible alias for any stale UI references (older overlays might still call hrAcceptExpense).
+async function hrAcceptExpense(id) { return accountsAcceptExpense(id); }
+
 async function approveExpense(id) {
   try {
     var exp = expenseReimbursements.find(function(e) { return e.id === id; });
     if (!exp) return;
-    // MD can only approve from hr_accepted state
-    if (currentUser.role === 'MD' && exp.status !== 'hr_accepted' && exp.status !== 'Pending') {
-      showToast('HR must accept this expense first'); return;
+    // MD must wait for Accounts to accept first
+    var s = String(exp.status || '').toLowerCase();
+    if (currentUser.role === 'MD' && s !== 'accounts_accepted' && s !== 'pending') {
+      showToast('Accounts must accept this expense first'); return;
     }
     await apiCall('PUT', '/expenses/' + id + '/approve', {});
-    exp.status = 'Approved'; exp.approvedBy = currentUser.name + ' (' + currentUser.role + ')'; exp.approvedOn = new Date().toISOString().split('T')[0];
-    renderExpenseOverlay(); renderAdvanceRequests(advReqActiveTab); showToast('Expense approved');
+    exp.status = 'Approved';
+    exp.approvedBy = currentUser.name + ' (' + currentUser.role + ')';
+    exp.approvedOn = new Date().toISOString().split('T')[0];
+    renderExpenseOverlay(); renderAdvanceRequests(advReqActiveTab);
+    showToast('Expense approved — sent back to Accounts to disburse');
   } catch (e) { showToast(e.message || 'Error approving expense'); }
 }
+
+// Accounts final step: Approved → Paid (records who paid + when)
+async function markExpensePaid(id) {
+  try {
+    var exp = expenseReimbursements.find(function(e) { return e.id === id; });
+    if (!exp) return;
+    if (!confirm('Confirm: Rs.' + exp.amount.toLocaleString('en-IN') + ' has been disbursed for this expense?')) return;
+    await apiCall('PUT', '/expenses/' + id + '/mark-paid', {});
+    exp.status = 'Paid';
+    exp.paidBy = currentUser.code;
+    exp.paidDate = new Date().toISOString().split('T')[0];
+    renderExpenseOverlay(); renderAdvanceRequests(advReqActiveTab);
+    showToast('Marked as paid — Rs.' + exp.amount.toLocaleString('en-IN'));
+  } catch (e) { showToast(e.message || 'Error marking as paid'); }
+}
+
 async function rejectExpense(id) {
   try {
     var exp = expenseReimbursements.find(function(e) { return e.id === id; });
@@ -9475,25 +9660,45 @@ async function rejectExpense(id) {
 function renderExpenseOverlay() {
   const c = document.getElementById('expensesContent');
   if (!c) return;
-  const isMdHr = currentUser && (currentUser.role === 'MD' || currentUser.role === 'HR');
+  // Reviewers (MD + Accounts) see everyone's claims; everyone else sees their own.
+  // HR no longer reviews expenses — they only see their own personal claims.
+  const isMD = currentUser && currentUser.role === 'MD';
+  const isAccounts = currentUser && currentUser.role === 'Accounts';
+  const isReviewer = isMD || isAccounts;
   let html = '<div style="display:flex;gap:8px;margin-bottom:12px"><button class="nf-btn nf-btn-primary" onclick="openExpenseApplyForm()">+ New Claim</button></div>';
-  const myExps = isMdHr ? expenseReimbursements : expenseReimbursements.filter(e => e.empCode === currentUser.code);
+  const myExps = isReviewer ? expenseReimbursements : expenseReimbursements.filter(e => e.empCode === currentUser.code);
   if (myExps.length === 0) {
     html += '<div class="nf-empty">No expense claims yet</div>';
   } else {
     myExps.sort((a,b) => b.id - a.id).forEach(exp => {
-      const badgeCls = exp.status === 'Approved' ? 'badge-approved' : exp.status === 'Rejected' ? 'badge-rejected' : 'badge-pending';
+      var sLower = String(exp.status || '').toLowerCase();
+      var badgeCls =
+        sLower === 'approved'           ? 'badge-approved' :
+        sLower === 'rejected'           ? 'badge-rejected' :
+        sLower === 'paid'               ? 'badge-approved' :
+                                          'badge-pending';
+      var statusLabel =
+        sLower === 'accounts_accepted'  ? 'Accounts Accepted' :
+        sLower === 'hr_accepted'        ? 'Accounts Accepted' :  // legacy display
+        sLower === 'paid'               ? 'Paid'                :
+                                          exp.status;
       const catIcons = {'Travel':'🚗','Food':'🍽️','Accommodation':'🏨','Equipment':'🔧','Office Supplies':'📎','Medical':'🏥','Fuel':'⛽','Other':'📦'};
-      html += `<div class="expense-item"><div class="expense-cat-icon" style="background:var(--gray-100)">${catIcons[exp.category]||'📦'}</div><div style="flex:1"><div style="font-weight:600;font-size:.82rem">${escapeHTML(exp.category)}</div><div style="font-size:.72rem;color:var(--gray-500)">${escapeHTML(exp.empName)} &middot; ${exp.date}</div>${exp.description?'<div style="font-size:.68rem;color:var(--gray-400);margin-top:2px">'+escapeHTML(exp.description)+'</div>':''}${exp.billUrl?'<a href="'+escapeHTML(exp.billUrl)+'" target="_blank" style="font-size:.68rem;color:var(--primary);font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:3px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>View Bill</a>':''}</div><div style="text-align:right"><div class="expense-amount">Rs.${exp.amount.toLocaleString('en-IN')}</div><span class="badge-status ${badgeCls}">${exp.status}</span>`;
-      if (isMdHr && (exp.status === 'Pending' || exp.status === 'hr_accepted')) {
-        html += `<div style="margin-top:4px;display:flex;gap:4px">`;
-        if (currentUser.role === 'HR' && exp.status === 'Pending') {
-          html += `<button class="nf-btn nf-btn-warning nf-btn-sm" onclick="hrAcceptExpense(${exp.id})" aria-label="Accept expense ${exp.id}" style="font-size:.6rem">Accept</button>`;
-        }
-        if (currentUser.role === 'MD' || exp.status === 'Pending') {
-          html += `<button class="nf-btn nf-btn-success nf-btn-sm" onclick="approveExpense(${exp.id})" aria-label="Approve expense ${exp.id}">✓</button>`;
-        }
-        html += `<button class="nf-btn nf-btn-danger nf-btn-sm" onclick="rejectExpense(${exp.id})" aria-label="Reject expense ${exp.id}">✗</button></div>`;
+      html += `<div class="expense-item"><div class="expense-cat-icon" style="background:var(--gray-100)">${catIcons[exp.category]||'📦'}</div><div style="flex:1"><div style="font-weight:600;font-size:.82rem">${escapeHTML(exp.category)}</div><div style="font-size:.72rem;color:var(--gray-500)">${escapeHTML(exp.empName)} &middot; ${exp.date}</div>${exp.description?'<div style="font-size:.68rem;color:var(--gray-400);margin-top:2px">'+escapeHTML(exp.description)+'</div>':''}${exp.billUrl?'<a href="'+escapeHTML(exp.billUrl)+'" target="_blank" style="font-size:.68rem;color:var(--primary);font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:3px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>View Bill</a>':''}</div><div style="text-align:right"><div class="expense-amount">Rs.${exp.amount.toLocaleString('en-IN')}</div><span class="badge-status ${badgeCls}">${escapeHTML(statusLabel)}</span>`;
+      // Action buttons — Accounts accepts Pending, MD confirms accounts_accepted, Accounts marks Paid
+      if (isAccounts && exp.status === 'Pending') {
+        html += `<div style="margin-top:4px;display:flex;gap:4px">
+          <button class="nf-btn nf-btn-warning nf-btn-sm" onclick="accountsAcceptExpense(${exp.id})" style="font-size:.6rem">Accept</button>
+          <button class="nf-btn nf-btn-danger nf-btn-sm" onclick="rejectExpense(${exp.id})">✗</button>
+        </div>`;
+      } else if (isMD && (sLower === 'accounts_accepted' || sLower === 'hr_accepted' || exp.status === 'Pending')) {
+        html += `<div style="margin-top:4px;display:flex;gap:4px">
+          <button class="nf-btn nf-btn-success nf-btn-sm" onclick="approveExpense(${exp.id})">✓</button>
+          <button class="nf-btn nf-btn-danger nf-btn-sm" onclick="rejectExpense(${exp.id})">✗</button>
+        </div>`;
+      } else if (isAccounts && exp.status === 'Approved') {
+        html += `<div style="margin-top:4px;display:flex;gap:4px">
+          <button class="nf-btn nf-btn-success nf-btn-sm" onclick="markExpensePaid(${exp.id})" style="background:#10B981" title="Mark as paid">Mark Paid</button>
+        </div>`;
       }
       html += '</div></div>';
     });
@@ -10356,12 +10561,51 @@ function renderHomeAnalytics() {
           options:{responsive:true,cutout:'65%',plugins:{legend:{position:'bottom',labels:{font:{size:11},padding:12}}}} });
       }
 
-      // Today's attendance
+      // Today's attendance — with absent-employee hover tooltip for HR/MD
       var at = data.attendanceToday || {};
       var a3 = document.getElementById('chartAttendanceToday');
       if (a3) {
-        new Chart(a3, { type:'doughnut', data:{ labels:['Present ('+at.present+')','Absent ('+at.absent+')'], datasets:[{data:[at.present||0,at.absent||0],backgroundColor:['#22c55e','#fee2e2'],borderColor:['#22c55e','#ef4444'],borderWidth:2,hoverOffset:6}] },
-          options:{responsive:true,cutout:'65%',plugins:{legend:{position:'bottom',labels:{font:{size:11},padding:12}}}} });
+        var absentList = Array.isArray(at.absentList) ? at.absentList : [];
+        // Build grouped-by-dept label lines for a tidy tooltip (max 20 rows + "+N more")
+        var _absentTooltipLines = (function(){
+          if (absentList.length === 0) return ['\u2713 Everyone checked in today'];
+          var byDept = {};
+          absentList.forEach(function(e){ (byDept[e.dept||'Other'] = byDept[e.dept||'Other'] || []).push(e.name + ' (' + e.code + ')'); });
+          var lines = [];
+          Object.keys(byDept).sort().forEach(function(d){
+            lines.push(d + ':');
+            byDept[d].forEach(function(n){ lines.push('  • ' + n); });
+          });
+          if (lines.length > 22) { var extra = lines.length - 22; lines = lines.slice(0, 22); lines.push('\u2026 +' + extra + ' more'); }
+          return lines;
+        })();
+        new Chart(a3, {
+          type:'doughnut',
+          data:{ labels:['Present ('+at.present+')','Absent ('+at.absent+')'], datasets:[{data:[at.present||0,at.absent||0],backgroundColor:['#22c55e','#fee2e2'],borderColor:['#22c55e','#ef4444'],borderWidth:2,hoverOffset:6}] },
+          options:{
+            responsive:true, cutout:'65%',
+            plugins:{
+              legend:{position:'bottom',labels:{font:{size:11},padding:12}},
+              tooltip:{
+                backgroundColor:'rgba(17,24,39,0.95)', titleColor:'#fff', bodyColor:'#e5e7eb',
+                padding:10, cornerRadius:6, bodyFont:{size:11}, titleFont:{size:12,weight:'bold'},
+                displayColors:false, boxPadding:4,
+                callbacks:{
+                  title: function(items){
+                    if (!items || !items[0]) return '';
+                    var i = items[0].dataIndex;
+                    return i === 1 ? ('Absent today (' + absentList.length + ')') : ('Present today (' + (at.present||0) + ')');
+                  },
+                  label: function(ctx){
+                    if (ctx.dataIndex !== 1) return 'Present: ' + (at.present||0);
+                    // Absent slice — return the per-employee list
+                    return _absentTooltipLines;
+                  }
+                }
+              }
+            }
+          }
+        });
       }
 
       // Dept distribution
@@ -13542,25 +13786,32 @@ async function hrAcceptLeave(id) {
 // CHANGE 3: ADVANCE DUAL APPROVAL (HR Accept → MD Confirm)
 // =====================================================
 function getAdvanceStatusBadge(status) {
-  if (status === 'hr_accepted') return '<span class="badge-status" style="background:#DBEAFE;color:#1D4ED8">HR Accepted</span>';
-  if (status === 'approved') return '<span class="badge-status badge-approved">Approved</span>';
-  if (status === 'rejected') return '<span class="badge-status badge-rejected">Rejected</span>';
+  // New canonical statuses use the Accounts → MD → Accounts(Paid) flow.
+  // Legacy hr_accepted/HR_Accepted values are kept for backwards display only —
+  // the backend migration rewrites them to accounts_accepted on next deploy.
+  if (status === 'accounts_accepted' || status === 'Accounts_Accepted') return '<span class="badge-status" style="background:#DBEAFE;color:#1D4ED8">Accounts Accepted</span>';
+  if (status === 'hr_accepted' || status === 'HR_Accepted') return '<span class="badge-status" style="background:#FEF3C7;color:#92400E">HR Accepted (legacy)</span>';
+  if (status === 'approved' || status === 'Approved') return '<span class="badge-status badge-approved">MD Approved</span>';
+  if (status === 'paid' || status === 'Paid') return '<span class="badge-status" style="background:#D1FAE5;color:#065F46">Paid</span>';
+  if (status === 'rejected' || status === 'Rejected') return '<span class="badge-status badge-rejected">Rejected</span>';
   return '<span class="badge-status badge-pending">Pending</span>';
 }
 
 function getAdvanceStepIndicator(status) {
+  var s = String(status || '').toLowerCase();
+  if (s === 'rejected') return '<div style="font-size:.65rem;color:var(--danger);margin-top:4px">Rejected</div>';
   var steps = [
-    {label:'Pending', active: true, done: status !== 'pending'},
-    {label:'HR Accepted', active: status === 'hr_accepted' || status === 'approved', done: status === 'approved'},
-    {label:'MD Confirmed', active: status === 'approved', done: false}
+    {label:'Submitted',         active: true,                                          done: s !== 'pending'},
+    {label:'Accounts Accepted', active: s === 'accounts_accepted' || s === 'approved' || s === 'paid', done: s === 'approved' || s === 'paid'},
+    {label:'MD Approved',       active: s === 'approved' || s === 'paid',              done: s === 'paid'},
+    {label:'Paid',              active: s === 'paid',                                  done: false}
   ];
-  if (status === 'rejected') return '<div style="font-size:.65rem;color:var(--danger);margin-top:4px">Rejected</div>';
-  var html = '<div style="display:flex;gap:2px;margin-top:6px;font-size:.6rem;align-items:center">';
-  steps.forEach(function(s, i) {
-    var bg = s.done ? 'var(--success)' : s.active ? 'var(--primary)' : 'var(--gray-200)';
-    var color = s.done || s.active ? '#fff' : 'var(--gray-500)';
-    html += '<span style="padding:2px 6px;border-radius:8px;background:' + bg + ';color:' + color + '">' + s.label + '</span>';
-    if (i < 2) html += '<span style="color:var(--gray-300)">\u2192</span>';
+  var html = '<div style="display:flex;gap:2px;margin-top:6px;font-size:.6rem;align-items:center;flex-wrap:wrap">';
+  steps.forEach(function(st, i) {
+    var bg = st.done ? 'var(--success)' : st.active ? 'var(--primary)' : 'var(--gray-200)';
+    var color = st.done || st.active ? '#fff' : 'var(--gray-500)';
+    html += '<span style="padding:2px 6px;border-radius:8px;background:' + bg + ';color:' + color + '">' + st.label + '</span>';
+    if (i < steps.length - 1) html += '<span style="color:var(--gray-300)">\u2192</span>';
   });
   html += '</div>';
   return html;

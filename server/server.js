@@ -503,6 +503,24 @@ app.get('*', (req, res) => {
     // Ensure profile_details is in the section ENUM (for existing tables)
     await pool.query("ALTER TABLE document_edit_requests MODIFY COLUMN section ENUM('profile_details','educational_certs','bank_passbook','bank_details','experience_certs') NOT NULL").catch(() => {});
 
+    // Phase H: Accounts role + new approval flow for expenses & advances
+    // 1. Add 'Accounts' to role ENUMs (idempotent — re-running is a no-op)
+    await pool.query("ALTER TABLE users MODIFY COLUMN role ENUM('MD','HR','Manager','Employee','Accounts') DEFAULT 'Employee'").catch((e) => { console.error('users.role enum migration:', e.message); });
+    await pool.query("ALTER TABLE employees MODIFY COLUMN role ENUM('MD','HR','Manager','Employee','Accounts') DEFAULT 'Employee'").catch((e) => { console.error('employees.role enum migration:', e.message); });
+
+    // 2. Expense reimbursements — add accounts_accepted, Paid statuses + paid_by, paid_date columns
+    await pool.query("ALTER TABLE expense_reimbursements MODIFY COLUMN status ENUM('Pending','accounts_accepted','hr_accepted','Approved','Paid','Rejected') DEFAULT 'Pending'").catch((e) => { console.error('expense.status enum migration:', e.message); });
+    await pool.query("ALTER TABLE expense_reimbursements ADD COLUMN paid_by VARCHAR(20)").catch(() => {});
+    await pool.query("ALTER TABLE expense_reimbursements ADD COLUMN paid_date DATE").catch(() => {});
+    // Migrate any legacy hr_accepted rows to the new accounts_accepted state
+    await pool.query("UPDATE expense_reimbursements SET status = 'accounts_accepted' WHERE status = 'hr_accepted'").catch(() => {});
+
+    // 3. Advance requests — same treatment (note: ENUM is case-sensitive on values, keep existing casing)
+    await pool.query("ALTER TABLE advance_requests MODIFY COLUMN status ENUM('Pending','Accounts_Accepted','HR_Accepted','Approved','Paid','Rejected') DEFAULT 'Pending'").catch((e) => { console.error('advance.status enum migration:', e.message); });
+    await pool.query("ALTER TABLE advance_requests ADD COLUMN paid_by VARCHAR(20)").catch(() => {});
+    await pool.query("ALTER TABLE advance_requests ADD COLUMN paid_date DATE").catch(() => {});
+    await pool.query("UPDATE advance_requests SET status = 'Accounts_Accepted' WHERE status = 'HR_Accepted'").catch(() => {});
+
     console.log('DB migrations applied');
   } catch (e) { console.error('Migration error (non-fatal):', e.message); }
 })();
