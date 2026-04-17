@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
-const { verifyToken, requireRole, requireRoleOrDept } = require('../middleware/auth');
+const { verifyToken, requireRole, requireRoleOrDept, requireFeatureAccess } = require('../middleware/auth');
 const SITE_DEPTS = ['Site Engineer']; // Departments with PEB store access (stock, material request, returns, scrap, transport)
 const ADMIN_DEPTS = ['Admin', 'Site Engineer', 'Accounts']; // Departments with full PEB access (dashboard, inventory, procurement)
 
@@ -253,7 +253,7 @@ async function generateSimpleCode(prefix, table, column) {
 // ========================================
 // DASHBOARD
 // ========================================
-router.get('/dashboard', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
+router.get('/dashboard', verifyToken, requireFeatureAccess('peb_stock_items', ['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
   try {
     const [[{ totalItems }]] = await db.query('SELECT COUNT(*) as totalItems FROM peb_stock_items');
     const [[{ lowStock }]] = await db.query('SELECT COUNT(*) as lowStock FROM peb_stock_items WHERE current_stock <= min_stock_level AND min_stock_level > 0');
@@ -277,7 +277,7 @@ router.get('/dashboard', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPT
 // ========================================
 // STOCK ITEMS
 // ========================================
-router.get('/items', verifyToken, requireRole('MD', 'HR', 'Employee'), async (req, res) => {
+router.get('/items', verifyToken, requireFeatureAccess('peb_stock_items', ['MD', 'HR', 'Employee'], []), async (req, res) => {
   try {
     const { category, search, low_stock } = req.query;
     let q = 'SELECT * FROM peb_stock_items WHERE 1=1';
@@ -291,7 +291,7 @@ router.get('/items', verifyToken, requireRole('MD', 'HR', 'Employee'), async (re
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
-router.get('/items/:id', verifyToken, requireRole('MD', 'HR', 'Employee'), async (req, res) => {
+router.get('/items/:id', verifyToken, requireFeatureAccess('peb_stock_items', ['MD', 'HR', 'Employee'], []), async (req, res) => {
   try {
     const [item] = await db.query('SELECT * FROM peb_stock_items WHERE id = ?', [req.params.id]);
     if (item.length === 0) return res.status(404).json({ error: 'Item not found' });
@@ -304,7 +304,7 @@ router.get('/items/:id', verifyToken, requireRole('MD', 'HR', 'Employee'), async
   } catch (err) { console.error('[PEB-STORE] Get item error:', err.message); res.status(500).json({ error: 'Failed to load item: ' + err.message }); }
 });
 
-router.post('/items', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
+router.post('/items', verifyToken, requireFeatureAccess('peb_stock_items', ['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
   try {
     const { item_name, category, sub_category, unit, hsn_code, current_stock, min_stock_level, max_stock_level, unit_price, location } = req.body;
     if (!item_name || !category || !unit) return res.status(400).json({ error: 'item_name, category, unit required' });
@@ -329,7 +329,7 @@ router.post('/items', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS),
   }
 });
 
-router.put('/items/:id', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
+router.put('/items/:id', verifyToken, requireFeatureAccess('peb_stock_items', ['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
   try {
     const [old] = await db.query('SELECT * FROM peb_stock_items WHERE id = ?', [req.params.id]);
     if (old.length === 0) return res.status(404).json({ error: 'Item not found' });
@@ -358,7 +358,7 @@ router.put('/items/:id', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPT
 // ========================================
 // STOCK TRANSACTIONS (manual entry)
 // ========================================
-router.post('/transactions', verifyToken, requireRoleOrDept(['MD', 'HR'], SITE_DEPTS), async (req, res) => {
+router.post('/transactions', verifyToken, requireFeatureAccess('peb_stock_items', ['MD', 'HR'], SITE_DEPTS), async (req, res) => {
   try {
     const { type, item_id, quantity, unit_cost, notes } = req.body;
     if (!type || !item_id || quantity === undefined) return res.status(400).json({ error: 'type, item_id, quantity required' });
@@ -384,7 +384,7 @@ router.post('/transactions', verifyToken, requireRoleOrDept(['MD', 'HR'], SITE_D
 // ========================================
 // GRN (Goods Receipt Note) — TRANSACTIONAL
 // ========================================
-router.get('/grn', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
+router.get('/grn', verifyToken, requireFeatureAccess('peb_grn', ['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
   try {
     const [grns] = await db.query(
       `SELECT g.*, v.company_name as vendor_name FROM peb_grn g
@@ -394,7 +394,7 @@ router.get('/grn', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS), as
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
-router.get('/grn/:id', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
+router.get('/grn/:id', verifyToken, requireFeatureAccess('peb_grn', ['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
   try {
     const [grn] = await db.query(
       `SELECT g.*, v.company_name as vendor_name FROM peb_grn g LEFT JOIN peb_vendors v ON g.vendor_id = v.id WHERE g.id = ?`, [req.params.id]
@@ -407,7 +407,7 @@ router.get('/grn/:id', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS)
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
-router.post('/grn', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
+router.post('/grn', verifyToken, requireFeatureAccess('peb_grn', ['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
@@ -444,7 +444,7 @@ router.post('/grn', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS), a
 // ========================================
 // MATERIAL REQUESTS — Full workflow
 // ========================================
-router.get('/material-requests', verifyToken, requireRole('MD', 'HR', 'Employee'), async (req, res) => {
+router.get('/material-requests', verifyToken, requireFeatureAccess('peb_material_requests', ['MD', 'HR', 'Employee'], []), async (req, res) => {
   try {
     const { status } = req.query;
     let q = 'SELECT * FROM peb_material_requests WHERE 1=1';
@@ -456,7 +456,7 @@ router.get('/material-requests', verifyToken, requireRole('MD', 'HR', 'Employee'
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
-router.get('/material-requests/:id', verifyToken, requireRole('MD', 'HR', 'Employee'), async (req, res) => {
+router.get('/material-requests/:id', verifyToken, requireFeatureAccess('peb_material_requests', ['MD', 'HR', 'Employee'], []), async (req, res) => {
   try {
     const [req_] = await db.query('SELECT * FROM peb_material_requests WHERE id = ?', [req.params.id]);
     if (req_.length === 0) return res.status(404).json({ error: 'Not found' });
@@ -469,7 +469,7 @@ router.get('/material-requests/:id', verifyToken, requireRole('MD', 'HR', 'Emplo
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
-router.post('/material-requests', verifyToken, requireRole('MD', 'HR', 'Employee'), async (req, res) => {
+router.post('/material-requests', verifyToken, requireFeatureAccess('peb_material_requests', ['MD', 'HR', 'Employee'], []), async (req, res) => {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
@@ -497,7 +497,7 @@ router.post('/material-requests', verifyToken, requireRole('MD', 'HR', 'Employee
 
 // Approve material request
 // Admin accepts material request → forwards to MD for final approval
-router.post('/material-requests/:id/admin-accept', verifyToken, requireRoleOrDept(['HR'], ADMIN_DEPTS), async (req, res) => {
+router.post('/material-requests/:id/admin-accept', verifyToken, requireFeatureAccess('peb_material_requests', ['HR'], ADMIN_DEPTS), async (req, res) => {
   try {
     const { remarks, items } = req.body;
     const [rows] = await db.query('SELECT * FROM peb_material_requests WHERE id = ?', [req.params.id]);
@@ -522,7 +522,7 @@ router.post('/material-requests/:id/admin-accept', verifyToken, requireRoleOrDep
 });
 
 // MD gives final approval for material request
-router.post('/material-requests/:id/approve', verifyToken, requireRoleOrDept(['MD'], []), async (req, res) => {
+router.post('/material-requests/:id/approve', verifyToken, requireFeatureAccess('peb_material_requests', ['MD'], []), async (req, res) => {
   try {
     const { action, remarks, items } = req.body;
     if (!['APPROVED','REJECTED'].includes(action)) return res.status(400).json({ error: 'action must be APPROVED or REJECTED' });
@@ -549,7 +549,7 @@ router.post('/material-requests/:id/approve', verifyToken, requireRoleOrDept(['M
 });
 
 // Dispatch — deducts stock (MD only after admin acceptance)
-router.post('/material-requests/:id/dispatch', verifyToken, requireRoleOrDept(['MD'], ADMIN_DEPTS), async (req, res) => {
+router.post('/material-requests/:id/dispatch', verifyToken, requireFeatureAccess('peb_material_requests', ['MD'], ADMIN_DEPTS), async (req, res) => {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
@@ -591,14 +591,14 @@ router.post('/material-requests/:id/dispatch', verifyToken, requireRoleOrDept(['
 // ========================================
 // MATERIAL RETURNS — with verification + restocking
 // ========================================
-router.get('/returns', verifyToken, requireRole('MD', 'HR', 'Employee'), async (req, res) => {
+router.get('/returns', verifyToken, requireFeatureAccess('peb_returns', ['MD', 'HR', 'Employee'], []), async (req, res) => {
   try {
     const [rows] = await db.query('SELECT * FROM peb_material_returns ORDER BY created_at DESC');
     res.json(rows);
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
-router.get('/returns/:id', verifyToken, requireRole('MD', 'HR', 'Employee'), async (req, res) => {
+router.get('/returns/:id', verifyToken, requireFeatureAccess('peb_returns', ['MD', 'HR', 'Employee'], []), async (req, res) => {
   try {
     const [ret] = await db.query('SELECT * FROM peb_material_returns WHERE id = ?', [req.params.id]);
     if (ret.length === 0) return res.status(404).json({ error: 'Not found' });
@@ -610,7 +610,7 @@ router.get('/returns/:id', verifyToken, requireRole('MD', 'HR', 'Employee'), asy
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
-router.post('/returns', verifyToken, requireRoleOrDept(['MD', 'HR'], SITE_DEPTS), async (req, res) => {
+router.post('/returns', verifyToken, requireFeatureAccess('peb_returns', ['MD', 'HR'], SITE_DEPTS), async (req, res) => {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
@@ -639,7 +639,7 @@ router.post('/returns', verifyToken, requireRoleOrDept(['MD', 'HR'], SITE_DEPTS)
 });
 
 // Admin accepts return — forwards to MD
-router.post('/returns/:id/admin-accept', verifyToken, requireRoleOrDept(['HR'], ADMIN_DEPTS), async (req, res) => {
+router.post('/returns/:id/admin-accept', verifyToken, requireFeatureAccess('peb_returns', ['HR'], ADMIN_DEPTS), async (req, res) => {
   try {
     const [ret] = await db.query('SELECT * FROM peb_material_returns WHERE id = ?', [req.params.id]);
     if (ret.length === 0) return res.status(404).json({ error: 'Return not found' });
@@ -652,7 +652,7 @@ router.post('/returns/:id/admin-accept', verifyToken, requireRoleOrDept(['HR'], 
 });
 
 // MD verifies return — restocks usable items
-router.post('/returns/:id/verify', verifyToken, requireRoleOrDept(['MD'], []), async (req, res) => {
+router.post('/returns/:id/verify', verifyToken, requireFeatureAccess('peb_returns', ['MD'], []), async (req, res) => {
   const conn = await db.getConnection();
   try {
     // Verify status is ADMIN_ACCEPTED before proceeding
@@ -685,14 +685,14 @@ router.post('/returns/:id/verify', verifyToken, requireRoleOrDept(['MD'], []), a
 // ========================================
 // SCRAP BATCHES
 // ========================================
-router.get('/scrap', verifyToken, requireRole('MD', 'HR', 'Employee'), async (req, res) => {
+router.get('/scrap', verifyToken, requireFeatureAccess('peb_returns', ['MD', 'HR', 'Employee'], []), async (req, res) => {
   try {
     const [rows] = await db.query('SELECT * FROM peb_scrap_batches ORDER BY created_at DESC');
     res.json(rows);
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
-router.post('/scrap', verifyToken, requireRoleOrDept(['MD', 'HR'], SITE_DEPTS), async (req, res) => {
+router.post('/scrap', verifyToken, requireFeatureAccess('peb_returns', ['MD', 'HR'], SITE_DEPTS), async (req, res) => {
   try {
     const { total_weight, items } = req.body;
     const batch_code = await generateCode('SCR', 'peb_scrap_batches', 'batch_code');
@@ -715,7 +715,7 @@ router.post('/scrap', verifyToken, requireRoleOrDept(['MD', 'HR'], SITE_DEPTS), 
 });
 
 // Admin accepts scrap for sale — forwards to MD
-router.post('/scrap/:id/admin-accept', verifyToken, requireRoleOrDept(['HR'], ADMIN_DEPTS), async (req, res) => {
+router.post('/scrap/:id/admin-accept', verifyToken, requireFeatureAccess('peb_returns', ['HR'], ADMIN_DEPTS), async (req, res) => {
   try {
     const [batch] = await db.query('SELECT * FROM peb_scrap_batches WHERE id = ?', [req.params.id]);
     if (batch.length === 0) return res.status(404).json({ error: 'Batch not found' });
@@ -728,7 +728,7 @@ router.post('/scrap/:id/admin-accept', verifyToken, requireRoleOrDept(['HR'], AD
 });
 
 // Sell scrap — MD only (after Admin acceptance)
-router.post('/scrap/:id/sell', verifyToken, requireRoleOrDept(['MD'], []), async (req, res) => {
+router.post('/scrap/:id/sell', verifyToken, requireFeatureAccess('peb_returns', ['MD'], []), async (req, res) => {
   try {
     const { sale_amount, receipt_number } = req.body;
     if (!sale_amount) return res.status(400).json({ error: 'sale_amount required' });
@@ -753,7 +753,7 @@ router.post('/scrap/:id/sell', verifyToken, requireRoleOrDept(['MD'], []), async
 });
 
 // Low stock alerts
-router.get('/alerts', verifyToken, requireRoleOrDept(['MD', 'HR'], SITE_DEPTS), async (req, res) => {
+router.get('/alerts', verifyToken, requireFeatureAccess('peb_stock_items', ['MD', 'HR'], SITE_DEPTS), async (req, res) => {
   try {
     const [items] = await db.query('SELECT * FROM peb_stock_items WHERE current_stock <= min_stock_level AND min_stock_level > 0 ORDER BY (current_stock / min_stock_level) ASC');
     res.json(items);

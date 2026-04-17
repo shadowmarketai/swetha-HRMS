@@ -62,4 +62,36 @@ function requireRoleOrDept(roles, depts) {
   };
 }
 
-module.exports = { generateToken, verifyToken, requireRole, requireRoleOrDept };
+// Allow access if user has an explicit feature_access grant OR passes the role/dept check.
+// featureKey: key in feature_access table; roles/depts: fallback role and dept checks.
+function requireFeatureAccess(featureKey, roles, depts) {
+  depts = depts || [];
+  return async (req, res, next) => {
+    if (!req.user) return res.status(403).json({ error: 'Insufficient permissions' });
+    // 1. Check explicit feature_access grant from SuperAdmin
+    try {
+      const pool = require('../config/db');
+      const [rows] = await pool.query(
+        'SELECT is_enabled FROM feature_access WHERE emp_code = ? AND feature_key = ?',
+        [req.user.empCode, featureKey]
+      );
+      if (rows.length > 0 && rows[0].is_enabled) return next();
+    } catch (e) { /* fall through to role check */ }
+    // 2. Fall back to role check
+    const effectiveRole = req.user.role === 'Manager' && roles.includes('HR') ? 'HR' : req.user.role;
+    if (roles.includes(effectiveRole)) return next();
+    // 3. Fall back to dept check
+    if (depts.length > 0) {
+      try {
+        const pool = require('../config/db');
+        const [rows] = await pool.query('SELECT dept FROM employees WHERE code = ? AND is_active = 1', [req.user.empCode]);
+        if (rows.length > 0 && depts.some(d => rows[0].dept && rows[0].dept.toLowerCase() === d.toLowerCase())) {
+          return next();
+        }
+      } catch (e) { /* fall through */ }
+    }
+    return res.status(403).json({ error: 'Insufficient permissions' });
+  };
+}
+
+module.exports = { generateToken, verifyToken, requireRole, requireRoleOrDept, requireFeatureAccess };

@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
-const { verifyToken, requireRole, requireRoleOrDept } = require('../middleware/auth');
+const { verifyToken, requireRole, requireRoleOrDept, requireFeatureAccess } = require('../middleware/auth');
 const SITE_DEPTS = ['Site Engineer'];
 const ADMIN_DEPTS = ['Admin', 'Site Engineer', 'Accounts'];
 
@@ -251,7 +251,7 @@ async function generateSimpleCode(prefix, table, column) {
 // ========================================
 // VENDORS
 // ========================================
-router.get('/vendors', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
+router.get('/vendors', verifyToken, requireFeatureAccess('peb_vendors', ['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
   try {
     const { search, qualified } = req.query;
     let q = 'SELECT * FROM peb_vendors WHERE is_active = TRUE';
@@ -264,7 +264,7 @@ router.get('/vendors', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS)
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
-router.post('/vendors', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
+router.post('/vendors', verifyToken, requireFeatureAccess('peb_vendors', ['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
   try {
     const { company_name, contact_person, phone, email, address, gst_number, pan_number, payment_terms, rating } = req.body;
     if (!company_name) return res.status(400).json({ error: 'Company name required' });
@@ -281,7 +281,7 @@ router.post('/vendors', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS
   }
 });
 
-router.put('/vendors/:id', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
+router.put('/vendors/:id', verifyToken, requireFeatureAccess('peb_vendors', ['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
   try {
     const fields = ['company_name','contact_person','phone','email','address','gst_number','pan_number','payment_terms','rating','is_blacklisted','blacklist_reason','status'];
     const updates = [], values = [];
@@ -293,7 +293,7 @@ router.put('/vendors/:id', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DE
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
-router.delete('/vendors/:id', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
+router.delete('/vendors/:id', verifyToken, requireFeatureAccess('peb_vendors', ['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
   try {
     // Check if vendor has any linked POs or GRNs
     const [[{ poCount }]] = await db.query('SELECT COUNT(*) as poCount FROM peb_purchase_orders WHERE vendor_id = ?', [req.params.id]);
@@ -306,7 +306,7 @@ router.delete('/vendors/:id', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN
 // ========================================
 // PURCHASE INDENTS — Full L1/L2/L3 workflow
 // ========================================
-router.get('/indents', verifyToken, requireRoleOrDept(['MD', 'HR'], SITE_DEPTS), async (req, res) => {
+router.get('/indents', verifyToken, requireFeatureAccess('peb_purchase_indents', ['MD', 'HR'], SITE_DEPTS), async (req, res) => {
   try {
     const { status } = req.query;
     let q = `SELECT pi.*, (SELECT COUNT(*) FROM peb_vendor_quotations vq WHERE vq.indent_id = pi.id) as quotation_count FROM peb_purchase_indents pi WHERE 1=1`;
@@ -318,7 +318,7 @@ router.get('/indents', verifyToken, requireRoleOrDept(['MD', 'HR'], SITE_DEPTS),
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
-router.get('/indents/:id', verifyToken, requireRoleOrDept(['MD', 'HR'], SITE_DEPTS), async (req, res) => {
+router.get('/indents/:id', verifyToken, requireFeatureAccess('peb_purchase_indents', ['MD', 'HR'], SITE_DEPTS), async (req, res) => {
   try {
     const [indent] = await db.query('SELECT * FROM peb_purchase_indents WHERE id = ?', [req.params.id]);
     if (indent.length === 0) return res.status(404).json({ error: 'Indent not found' });
@@ -336,7 +336,7 @@ router.get('/indents/:id', verifyToken, requireRoleOrDept(['MD', 'HR'], SITE_DEP
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
-router.post('/indents', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
+router.post('/indents', verifyToken, requireFeatureAccess('peb_purchase_indents', ['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
@@ -368,7 +368,7 @@ router.post('/indents', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS
 // ========================================
 // VENDOR QUOTATIONS (3 required, auto-rank)
 // ========================================
-router.post('/quotations', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
+router.post('/quotations', verifyToken, requireFeatureAccess('peb_purchase_indents', ['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
@@ -416,7 +416,7 @@ router.post('/quotations', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DE
 });
 
 // L1/L2/L3 comparison
-router.get('/comparison/:indentId', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
+router.get('/comparison/:indentId', verifyToken, requireFeatureAccess('peb_purchase_indents', ['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
   try {
     const [quotations] = await db.query(
       `SELECT vq.*, v.company_name, v.rating, v.gst_number as vendor_gst, v.pan_number as vendor_pan
@@ -433,7 +433,7 @@ router.get('/comparison/:indentId', verifyToken, requireRoleOrDept(['MD', 'HR'],
 
 // GM Approval (Step 1)
 // Step 1: Admin accepts indent — forwards to MD
-router.post('/indents/:id/gm-approve', verifyToken, requireRoleOrDept(['HR'], ADMIN_DEPTS), async (req, res) => {
+router.post('/indents/:id/gm-approve', verifyToken, requireFeatureAccess('peb_purchase_indents', ['HR'], ADMIN_DEPTS), async (req, res) => {
   try {
     const { action, remarks, selected_vendor_id, selection_justification } = req.body;
     if (!['APPROVED','REJECTED'].includes(action)) return res.status(400).json({ error: 'action must be APPROVED or REJECTED' });
@@ -474,7 +474,7 @@ router.post('/indents/:id/gm-approve', verifyToken, requireRoleOrDept(['HR'], AD
 });
 
 // Step 2: MD final approval
-router.post('/indents/:id/md-approve', verifyToken, requireRoleOrDept(['MD'], []), async (req, res) => {
+router.post('/indents/:id/md-approve', verifyToken, requireFeatureAccess('peb_purchase_indents', ['MD'], []), async (req, res) => {
   try {
     const { action, remarks, override_price } = req.body;
     if (!['APPROVED','REJECTED'].includes(action)) return res.status(400).json({ error: 'action must be APPROVED or REJECTED' });
@@ -502,7 +502,7 @@ router.post('/indents/:id/md-approve', verifyToken, requireRoleOrDept(['MD'], []
 // ========================================
 // PURCHASE ORDERS — with payment tracking
 // ========================================
-router.get('/orders', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
+router.get('/orders', verifyToken, requireFeatureAccess('peb_purchase_orders', ['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
   try {
     const { status } = req.query;
     let q = `SELECT po.*, v.company_name as vendor_name, pi.indent_code
@@ -516,7 +516,7 @@ router.get('/orders', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS),
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
-router.get('/orders/:id', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
+router.get('/orders/:id', verifyToken, requireFeatureAccess('peb_purchase_orders', ['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
   try {
     const [po] = await db.query(
       'SELECT po.*, v.company_name as vendor_name FROM peb_purchase_orders po LEFT JOIN peb_vendors v ON po.vendor_id = v.id WHERE po.id = ?', [req.params.id]
@@ -530,7 +530,7 @@ router.get('/orders/:id', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEP
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
-router.post('/orders', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
+router.post('/orders', verifyToken, requireFeatureAccess('peb_purchase_orders', ['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
@@ -565,7 +565,7 @@ router.post('/orders', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS)
 });
 
 // PO Approve — MD only
-router.post('/orders/:id/approve', verifyToken, requireRoleOrDept(['MD'], []), async (req, res) => {
+router.post('/orders/:id/approve', verifyToken, requireFeatureAccess('peb_purchase_orders', ['MD'], []), async (req, res) => {
   try {
     await db.query("UPDATE peb_purchase_orders SET approved_by_md=TRUE, approval_date=CURDATE(), status='SENT' WHERE id=?", [req.params.id]);
     res.json({ message: 'PO approved and sent' });
@@ -573,7 +573,7 @@ router.post('/orders/:id/approve', verifyToken, requireRoleOrDept(['MD'], []), a
 });
 
 // PO Payment
-router.post('/orders/:id/payment', verifyToken, requireRoleOrDept(['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
+router.post('/orders/:id/payment', verifyToken, requireFeatureAccess('peb_purchase_orders', ['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
   try {
     const { amount, payment_date, mode, reference } = req.body;
     if (!amount || !payment_date || !mode) return res.status(400).json({ error: 'amount, payment_date, mode required' });
@@ -587,7 +587,7 @@ router.post('/orders/:id/payment', verifyToken, requireRoleOrDept(['MD', 'HR'], 
 // ========================================
 // TRANSPORT — full approve + complete
 // ========================================
-router.get('/transport', verifyToken, requireRole('MD', 'HR', 'Employee'), async (req, res) => {
+router.get('/transport', verifyToken, requireFeatureAccess('peb_transport', ['MD', 'HR', 'Employee'], []), async (req, res) => {
   try {
     const { status } = req.query;
     let q = 'SELECT * FROM peb_transport_requests WHERE 1=1';
@@ -599,7 +599,7 @@ router.get('/transport', verifyToken, requireRole('MD', 'HR', 'Employee'), async
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
-router.get('/transport/:id', verifyToken, requireRole('MD', 'HR', 'Employee'), async (req, res) => {
+router.get('/transport/:id', verifyToken, requireFeatureAccess('peb_transport', ['MD', 'HR', 'Employee'], []), async (req, res) => {
   try {
     const [t] = await db.query('SELECT * FROM peb_transport_requests WHERE id = ?', [req.params.id]);
     if (t.length === 0) return res.status(404).json({ error: 'Not found' });
@@ -607,7 +607,7 @@ router.get('/transport/:id', verifyToken, requireRole('MD', 'HR', 'Employee'), a
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
-router.post('/transport', verifyToken, requireRole('MD', 'HR', 'Employee'), async (req, res) => {
+router.post('/transport', verifyToken, requireFeatureAccess('peb_transport', ['MD', 'HR', 'Employee'], []), async (req, res) => {
   try {
     const { type, origin_name, destination_name, scheduled_date, urgency, vehicle_type, estimated_weight, reason } = req.body;
     if (!type || !scheduled_date) return res.status(400).json({ error: 'type and scheduled_date required' });
@@ -622,7 +622,7 @@ router.post('/transport', verifyToken, requireRole('MD', 'HR', 'Employee'), asyn
 
 // Approve with vehicle/driver details
 // Transport approve — Admin accepts, then MD can approve
-router.post('/transport/:id/approve', verifyToken, requireRoleOrDept(['MD'], ADMIN_DEPTS), async (req, res) => {
+router.post('/transport/:id/approve', verifyToken, requireFeatureAccess('peb_transport', ['MD'], ADMIN_DEPTS), async (req, res) => {
   try {
     const { action, vehicle_number, driver_name, driver_phone } = req.body;
     if (!['APPROVED','REJECTED'].includes(action)) return res.status(400).json({ error: 'Invalid action' });
@@ -634,7 +634,7 @@ router.post('/transport/:id/approve', verifyToken, requireRoleOrDept(['MD'], ADM
 });
 
 // Start transit
-router.post('/transport/:id/start', verifyToken, requireRoleOrDept(['MD', 'HR'], SITE_DEPTS), async (req, res) => {
+router.post('/transport/:id/start', verifyToken, requireFeatureAccess('peb_transport', ['MD', 'HR'], SITE_DEPTS), async (req, res) => {
   try {
     await db.query("UPDATE peb_transport_requests SET status='IN_TRANSIT' WHERE id=?", [req.params.id]);
     res.json({ message: 'Transport in transit' });
@@ -642,7 +642,7 @@ router.post('/transport/:id/start', verifyToken, requireRoleOrDept(['MD', 'HR'],
 });
 
 // Complete with km/cost/condition
-router.post('/transport/:id/complete', verifyToken, requireRoleOrDept(['MD', 'HR'], SITE_DEPTS), async (req, res) => {
+router.post('/transport/:id/complete', verifyToken, requireFeatureAccess('peb_transport', ['MD', 'HR'], SITE_DEPTS), async (req, res) => {
   try {
     const { actual_km, transport_cost, delivery_condition, damage_notes } = req.body;
     await db.query("UPDATE peb_transport_requests SET status='DELIVERED',received_by=?,received_at=NOW(),actual_km=?,transport_cost=?,delivery_condition=?,damage_notes=? WHERE id=?",
@@ -652,7 +652,7 @@ router.post('/transport/:id/complete', verifyToken, requireRoleOrDept(['MD', 'HR
 });
 
 // Summary for dashboard
-router.get('/summary', verifyToken, requireRoleOrDept(['MD', 'HR'], SITE_DEPTS), async (req, res) => {
+router.get('/summary', verifyToken, requireFeatureAccess('peb_purchase_indents', ['MD', 'HR'], SITE_DEPTS), async (req, res) => {
   try {
     const [[{ total_vendors }]] = await db.query('SELECT COUNT(*) as total_vendors FROM peb_vendors WHERE is_active = TRUE');
     const [[{ pending_indents }]] = await db.query("SELECT COUNT(*) as pending_indents FROM peb_purchase_indents WHERE status IN ('QUOTATION_PENDING','COMPARISON_READY','GM_APPROVED')");

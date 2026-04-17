@@ -1622,7 +1622,7 @@ function switchTab(id, el, _fromPopstate) {
 }
 let _overlayPreviousFocus = [];
 function showOverlay(id) {
-  if (id === 'superadmin' && !_isSuperAdmin) return;
+  if (id === 'superadmin' && !_isSuperAdmin && currentUser.role !== 'MD') return;
   if (id === 'admin' && currentUser.role !== 'MD' && currentUser.role !== 'HR') return;
   if (id === 'location' && currentUser.role !== 'MD') return;
   if (id === 'peb' && currentUser.role !== 'MD' && currentUser.role !== 'HR' && !(['Site Engineer','Admin','Accounts','Execution','Production'].indexOf(currentUser.dept) >= 0)) return;
@@ -2129,8 +2129,14 @@ var SA_FEATURES = [
   { key:'tax',           label:'Form 16 & Tax',          cat:'Finance' },
   { key:'projects',      label:'Project Progress',       cat:'Operations' },
   { key:'tasks',         label:'Task Management',        cat:'Operations' },
-  { key:'peb_stock',     label:'PEB Stock / Inventory',  cat:'PEB' },
-  { key:'peb_purchase',  label:'PEB Procurement',        cat:'PEB' },
+  { key:'peb_stock_items',       label:'PEB – Stock Items',         cat:'PEB' },
+  { key:'peb_grn',               label:'PEB – GRN (Goods Receipt)', cat:'PEB' },
+  { key:'peb_material_requests', label:'PEB – Material Requests',   cat:'PEB' },
+  { key:'peb_returns',           label:'PEB – Returns & Scrap',     cat:'PEB' },
+  { key:'peb_vendors',           label:'PEB – Vendors',             cat:'PEB' },
+  { key:'peb_purchase_indents',  label:'PEB – Purchase Indents',    cat:'PEB' },
+  { key:'peb_purchase_orders',   label:'PEB – Purchase Orders',     cat:'PEB' },
+  { key:'peb_transport',         label:'PEB – Transport',           cat:'PEB' },
   { key:'recruitment',   label:'Recruitment',            cat:'HR' },
   { key:'kpi',           label:'KPI & Performance',      cat:'HR' },
   { key:'shifts',        label:'Shift Management',       cat:'HR' },
@@ -2200,9 +2206,17 @@ function _computeRoleDefaults(role, dept) {
     });
     // Some features are universally available (home, settings, attendance, leaves)
     if (['attendance', 'leaves', 'settings'].indexOf(f.key) >= 0) hasAccess = true;
-    // Dept-gated items (PEB for Site Engineer/Admin/Accounts, etc.)
-    if (f.key === 'peb_stock' && ['Site Engineer', 'Admin', 'Accounts', 'Execution', 'Production'].indexOf(dept) >= 0) hasAccess = true;
-    if (f.key === 'peb_purchase' && ['Accounts', 'Admin'].indexOf(dept) >= 0) hasAccess = true;
+    // Dept-gated PEB items
+    var pebStoreDepts = ['Site Engineer', 'Admin', 'Accounts', 'Execution', 'Production'];
+    var pebPurchDepts = ['Accounts', 'Admin'];
+    if (f.key === 'peb_stock_items' && pebStoreDepts.indexOf(dept) >= 0) hasAccess = true;
+    if (f.key === 'peb_grn' && pebStoreDepts.indexOf(dept) >= 0) hasAccess = true;
+    if (f.key === 'peb_material_requests' && pebStoreDepts.indexOf(dept) >= 0) hasAccess = true;
+    if (f.key === 'peb_returns' && pebStoreDepts.indexOf(dept) >= 0) hasAccess = true;
+    if (f.key === 'peb_vendors' && pebPurchDepts.indexOf(dept) >= 0) hasAccess = true;
+    if (f.key === 'peb_purchase_indents' && pebPurchDepts.indexOf(dept) >= 0) hasAccess = true;
+    if (f.key === 'peb_purchase_orders' && pebPurchDepts.indexOf(dept) >= 0) hasAccess = true;
+    if (f.key === 'peb_transport' && pebStoreDepts.indexOf(dept) >= 0) hasAccess = true;
     defaults[f.key] = { enabled: hasAccess, level: hasAccess ? 'edit' : 'read' };
   });
   return defaults;
@@ -7791,8 +7805,8 @@ var NAV_FEATURE_MAP = {
   'tax':'tax', 'md-tax':'tax', 'hr-tax':'tax',
   'progress':'projects', 'md-progress':'projects', 'emp-progress':'projects',
   'tasks':'tasks',
-  'peb_stock':'peb_stock', 'md-inventory':'peb_stock', 'hr-inventory':'peb_stock', 'emp-store':'peb_stock', 'emp-admin-peb':'peb_stock',
-  'peb_purchase':'peb_purchase', 'md-procurement':'peb_purchase', 'hr-procurement':'peb_purchase', 'emp-acc-procurement':'peb_purchase',
+  'md-inventory':'peb_stock_items', 'hr-inventory':'peb_stock_items', 'emp-store':'peb_stock_items', 'emp-admin-peb':'peb_stock_items',
+  'md-procurement':'peb_purchase_indents', 'hr-procurement':'peb_purchase_indents', 'emp-acc-procurement':'peb_purchase_indents',
   'recruitment':'recruitment', 'hr-recruit':'recruitment',
   'kpi':'kpi', 'md-performance':'kpi', 'hr-performance':'kpi',
   'shifts':'shifts',
@@ -7813,7 +7827,7 @@ var NAV_FEATURE_MAP = {
 function filterNavByAccess(items) {
   return items.filter(function(item) {
     // SuperAdmin-only items (e.g. Access Control)
-    if (item.superAdminOnly && !_isSuperAdmin) return false;
+    if (item.superAdminOnly && !_isSuperAdmin && (!currentUser || currentUser.role !== 'MD')) return false;
     // Check feature access
     var featureKey = NAV_FEATURE_MAP[item.id];
     if (featureKey) {
