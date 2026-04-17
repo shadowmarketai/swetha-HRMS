@@ -1776,37 +1776,123 @@ function changeCalendarMonth(dir) {
   buildCalendar();
 }
 
-function buildCalendar() {
+// Shared helper: determine per-day attendance status from real data.
+// Returns a map { dayNum: 'present'|'half'|'absent'|'leave'|'holiday' }
+// Rules:
+//   Sunday           → holiday
+//   Has log, ≥8h     → present  (P)
+//   Has log, <8h     → half     (H)
+//   No log, on leave → leave    (L)
+//   No log           → absent   (A)
+function _computeCalendarStatuses(logs, empCode, year, month, maxDay) {
+  // Group attendance sessions by day number
+  var dayData = {};
+  logs.forEach(function(row) {
+    var ec = row.emp_code || row.empCode || '';
+    if (empCode && ec !== empCode) return;
+    var d = row.log_date || row.logDate || '';
+    if (!d) return;
+    var dayNum = parseInt(String(d).substring(String(d).lastIndexOf('-') + 1), 10);
+    if (isNaN(dayNum) || dayNum < 1 || dayNum > 31) return;
+    if (!dayData[dayNum]) dayData[dayNum] = [];
+    dayData[dayNum].push({
+      checkIn: row.check_in || row.checkIn || null,
+      checkOut: row.check_out || row.checkOut || null
+    });
+  });
+
+  // Build a set of dates that have an approved leave for this employee
+  var leaveDates = {};
+  if (typeof leaveApplications !== 'undefined' && empCode) {
+    leaveApplications.forEach(function(la) {
+      if (la.empCode !== empCode) return;
+      if (la.status !== 'approved') return;
+      // Mark every day in the leave range that falls in this month
+      var from = new Date(la.from + 'T00:00:00');
+      var to = new Date(la.to + 'T00:00:00');
+      for (var ld = new Date(from); ld <= to; ld.setDate(ld.getDate() + 1)) {
+        if (ld.getFullYear() === year && ld.getMonth() === month) {
+          leaveDates[ld.getDate()] = true;
+        }
+      }
+    });
+  }
+
+  var now = new Date();
+  var isCurrentMonth = (year === now.getFullYear() && month === now.getMonth());
+  var att = {};
+  var dayHoursMap = {};
+  for (var dd = 1; dd <= maxDay; dd++) {
+    var dow = new Date(year, month, dd).getDay();
+    if (dow === 0) { att[dd] = 'holiday'; continue; }
+    if (dayData[dd] && dayData[dd].length > 0) {
+      var totalMin = 0;
+      dayData[dd].forEach(function(s) {
+        if (s.checkIn) {
+          var start = new Date(s.checkIn).getTime();
+          var end = s.checkOut ? new Date(s.checkOut).getTime() : (isCurrentMonth && dd === now.getDate() ? Date.now() : start);
+          if (end > start) totalMin += (end - start) / 60000;
+        }
+      });
+      dayHoursMap[dd] = totalMin;
+      // ≥ 8 hours → Present, < 8 hours → Half day
+      att[dd] = (totalMin >= 480) ? 'present' : 'half';
+    } else if (leaveDates[dd]) {
+      att[dd] = 'leave';
+    } else {
+      att[dd] = 'absent';
+    }
+  }
+  return { att: att, dayHours: dayHoursMap, dayData: dayData };
+}
+
+async function buildCalendar() {
   const c = document.getElementById('calDays');
+  if (!c) return;
   c.innerHTML = '';
   ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(d => { c.innerHTML += '<div class="cal-day-label">'+d+'</div>'; });
   var year = calendarMonth.getFullYear();
   var month = calendarMonth.getMonth();
   const now = new Date();
   const isCurrentMonth = (year === now.getFullYear() && month === now.getMonth());
-  const todayDate = isCurrentMonth ? now.getDate() : -1;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const firstDayOfWeek = new Date(year, month, 1).getDay();
-  // Seeded attendance for this month
-  var seed = 0;
-  if (currentUser) for (var si = 0; si < currentUser.code.length; si++) seed += currentUser.code.charCodeAt(si);
-  var att = {};
-  var maxDay = isCurrentMonth ? Math.min(daysInMonth, now.getDate()) : daysInMonth;
-  for (var dd = 1; dd <= maxDay; dd++) {
-    var dow = new Date(year, month, dd).getDay();
-    if (dow === 0) { att[dd] = 'holiday'; continue; }
-    var h = ((seed * 31 + dd * 17 + month * 53 + year * 7) % 100);
-    if (h < 65) att[dd] = 'present';
-    else if (h < 75) att[dd] = 'absent';
-    else if (h < 85) att[dd] = 'half';
-    else if (h < 92) att[dd] = 'leave';
-    else att[dd] = 'holiday';
+  var maxDay = isCurrentMonth ? now.getDate() : daysInMonth;
+  var monthStr = year + '-' + String(month + 1).padStart(2, '0');
+
+  // Fetch REAL attendance data for this month from the API.
+  // For the current month we can also use the pre-loaded attendanceLogs global,
+  // but for past months we must call the API since the bulk fetch only loads the
+  // current month.
+  var logs = [];
+  if (currentUser) {
+    try {
+      logs = await apiCall('GET', '/attendance?month=' + monthStr);
+      if (!Array.isArray(logs)) logs = [];
+    } catch (e) {
+      // Fall back to pre-loaded global for current month
+      if (isCurrentMonth && typeof attendanceLogs !== 'undefined') {
+        logs = attendanceLogs.filter(function(l) { return l.empCode === currentUser.code; }).map(function(l) {
+          return { log_date: l.logDate, check_in: l.checkIn, check_out: l.checkOut, emp_code: l.empCode };
+        });
+      }
+    }
   }
+
+  var result = _computeCalendarStatuses(logs, currentUser ? currentUser.code : '', year, month, maxDay);
+  var att = result.att;
+
   for (let e = 0; e < firstDayOfWeek; e++) { c.innerHTML += '<div class="cal-day"></div>'; }
-  var badgeMap = {present:{label:'P',cls:'cal-badge-present'},absent:{label:'A',cls:'cal-badge-absent'},holiday:{label:'H',cls:'cal-badge-holiday'},half:{label:'\u00BD',cls:'cal-badge-half'},leave:{label:'L',cls:'cal-badge-leave'}};
+  var badgeMap = {
+    present: {label:'P', cls:'cal-badge-present'},
+    absent:  {label:'A', cls:'cal-badge-absent'},
+    holiday: {label:'H', cls:'cal-badge-holiday'},
+    half:    {label:'H', cls:'cal-badge-half'},
+    leave:   {label:'L', cls:'cal-badge-leave'}
+  };
   for (let d = 1; d <= daysInMonth; d++) {
     const isToday = isCurrentMonth && d === now.getDate();
-    const st = att[d] || '';
+    const st = d <= maxDay ? (att[d] || '') : '';
     const badge = st && badgeMap[st] ? '<span class="cal-status-badge '+badgeMap[st].cls+'">'+badgeMap[st].label+'</span>' : '';
     c.innerHTML += '<div class="cal-day'+(isToday?' today':'')+'">'+d+badge+'</div>';
   }
@@ -13423,7 +13509,7 @@ async function selectAttEmployee(empCode) {
     if (!Array.isArray(logs)) logs = [];
   } catch(e) { logs = []; }
 
-  // Group sessions by day number
+  // Group sessions by day number (keep extra fields for detail view)
   var dayData = {};
   logs.forEach(function(row) {
     var d = row.log_date;
@@ -13441,31 +13527,17 @@ async function selectAttEmployee(empCode) {
     });
   });
 
-  // Calculate per-day stats
-  var att = {};
-  var presentCount = 0, absentCount = 0;
+  // Calculate per-day stats using the shared helper (handles P/H/L/A/holiday)
+  var result = _computeCalendarStatuses(logs, empCode, year, month, todayDate);
+  var att = result.att;
+  var dayHours = result.dayHours;
+  var presentCount = 0, halfCount = 0, absentCount = 0, leaveCount = 0;
   var monthTotalMin = 0;
-  var dayHours = {};
   for (var d = 1; d <= todayDate; d++) {
-    var dow = new Date(year, month, d).getDay();
-    if (dow === 0) { att[d] = 'holiday'; continue; }
-    if (dayData[d] && dayData[d].length > 0) {
-      att[d] = 'present';
-      presentCount++;
-      var dayMin = 0;
-      dayData[d].forEach(function(s) {
-        if (s.checkIn) {
-          var start = new Date(s.checkIn).getTime();
-          var end = s.checkOut ? new Date(s.checkOut).getTime() : (isCurrentMonth && d === now.getDate() ? Date.now() : start);
-          if (end > start) dayMin += (end - start) / 60000;
-        }
-      });
-      dayHours[d] = dayMin;
-      monthTotalMin += dayMin;
-    } else {
-      att[d] = 'absent';
-      absentCount++;
-    }
+    if (att[d] === 'present') { presentCount++; monthTotalMin += (dayHours[d] || 0); }
+    else if (att[d] === 'half') { halfCount++; monthTotalMin += (dayHours[d] || 0); }
+    else if (att[d] === 'leave') { leaveCount++; }
+    else if (att[d] === 'absent') { absentCount++; }
   }
   var monthHrs = Math.floor(monthTotalMin / 60);
   var monthMins = Math.round(monthTotalMin % 60);
@@ -13482,16 +13554,18 @@ async function selectAttEmployee(empCode) {
   html += '<button class="cal-nav-btn" onclick="changeHrAttMonth(1)" style="background:var(--gray-100);border:none;border-radius:8px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;cursor:pointer' + (isCurrentMonth ? ';opacity:.3;pointer-events:none' : '') + '"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg></button>';
   html += '</div>';
   // Summary stats
-  html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px">';
+  html += '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:12px">';
   html += '<div class="summary-card" style="padding:8px;text-align:center"><div style="font-size:1.1rem;font-weight:700;color:var(--success)">' + presentCount + '</div><div style="font-size:.65rem;color:var(--gray-500)">Present</div></div>';
+  html += '<div class="summary-card" style="padding:8px;text-align:center"><div style="font-size:1.1rem;font-weight:700;color:#d97706">' + halfCount + '</div><div style="font-size:.65rem;color:var(--gray-500)">Half Day</div></div>';
   html += '<div class="summary-card" style="padding:8px;text-align:center"><div style="font-size:1.1rem;font-weight:700;color:var(--danger)">' + absentCount + '</div><div style="font-size:.65rem;color:var(--gray-500)">Absent</div></div>';
+  html += '<div class="summary-card" style="padding:8px;text-align:center"><div style="font-size:1.1rem;font-weight:700;color:#6366f1">' + leaveCount + '</div><div style="font-size:.65rem;color:var(--gray-500)">Leave</div></div>';
   html += '<div class="summary-card" style="padding:8px;text-align:center"><div style="font-size:1.1rem;font-weight:700;color:var(--primary)">' + monthHrs + 'h ' + monthMins + 'm</div><div style="font-size:.65rem;color:var(--gray-500)">Total Hours</div></div>';
   html += '</div>';
   // Calendar grid
   html += '<div class="cal-days" style="grid-template-columns:repeat(7,1fr);display:grid;gap:2px">';
   ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(function(dn) { html += '<div class="cal-day-label">' + dn + '</div>'; });
   for (var e2 = 0; e2 < firstDayOfWeek; e2++) html += '<div class="cal-day"></div>';
-  var badgeMap = {present:{label:'P',cls:'cal-badge-present'},absent:{label:'A',cls:'cal-badge-absent'},holiday:{label:'H',cls:'cal-badge-holiday'}};
+  var badgeMap = {present:{label:'P',cls:'cal-badge-present'},half:{label:'H',cls:'cal-badge-half'},absent:{label:'A',cls:'cal-badge-absent'},leave:{label:'L',cls:'cal-badge-leave'},holiday:{label:'H',cls:'cal-badge-holiday'}};
   for (var d2 = 1; d2 <= daysInMonth; d2++) {
     var isToday = isCurrentMonth && d2 === now.getDate();
     var st = d2 <= todayDate ? att[d2] || '' : '';
