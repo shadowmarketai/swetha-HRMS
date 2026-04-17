@@ -1859,11 +1859,14 @@ function _computeCalendarStatuses(logs, empCode, year, month, maxDay) {
   return { att: att, dayHours: dayHoursMap, dayData: dayData };
 }
 
+// Guard: only the latest buildCalendar call should render. This prevents two
+// concurrent async calls from both appending dates → "double calendar" bug.
+var _calBuildSeq = 0;
+
 async function buildCalendar() {
+  var mySeq = ++_calBuildSeq; // stamp this call
   const c = document.getElementById('calDays');
   if (!c) return;
-  c.innerHTML = '';
-  ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(d => { c.innerHTML += '<div class="cal-day-label">'+d+'</div>'; });
   var year = calendarMonth.getFullYear();
   var month = calendarMonth.getMonth();
   const now = new Date();
@@ -1874,9 +1877,6 @@ async function buildCalendar() {
   var monthStr = year + '-' + String(month + 1).padStart(2, '0');
 
   // Fetch REAL attendance data for this month from the API.
-  // For the current month we can also use the pre-loaded attendanceLogs global,
-  // but for past months we must call the API since the bulk fetch only loads the
-  // current month.
   var logs = [];
   if (currentUser) {
     try {
@@ -1892,10 +1892,16 @@ async function buildCalendar() {
     }
   }
 
+  // If another buildCalendar call started while we were awaiting, abandon this one
+  if (mySeq !== _calBuildSeq) return;
+
   var result = _computeCalendarStatuses(logs, currentUser ? currentUser.code : '', year, month, maxDay);
   var att = result.att;
 
-  for (let e = 0; e < firstDayOfWeek; e++) { c.innerHTML += '<div class="cal-day"></div>'; }
+  // Build the entire grid as a string, then set innerHTML ONCE (no incremental +=)
+  var html = '';
+  ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(function(d) { html += '<div class="cal-day-label">'+d+'</div>'; });
+  for (var e = 0; e < firstDayOfWeek; e++) { html += '<div class="cal-day"></div>'; }
   var badgeMap = {
     present: {label:'P', cls:'cal-badge-present'},
     absent:  {label:'A', cls:'cal-badge-absent'},
@@ -1903,12 +1909,13 @@ async function buildCalendar() {
     half:    {label:'H', cls:'cal-badge-half'},
     leave:   {label:'L', cls:'cal-badge-leave'}
   };
-  for (let d = 1; d <= daysInMonth; d++) {
-    const isToday = isCurrentMonth && d === now.getDate();
-    const st = d <= maxDay ? (att[d] || '') : '';
-    const badge = st && badgeMap[st] ? '<span class="cal-status-badge '+badgeMap[st].cls+'">'+badgeMap[st].label+'</span>' : '';
-    c.innerHTML += '<div class="cal-day'+(isToday?' today':'')+'">'+d+badge+'</div>';
+  for (var d = 1; d <= daysInMonth; d++) {
+    var isToday = isCurrentMonth && d === now.getDate();
+    var st = d <= maxDay ? (att[d] || '') : '';
+    var badge = st && badgeMap[st] ? '<span class="cal-status-badge '+badgeMap[st].cls+'">'+badgeMap[st].label+'</span>' : '';
+    html += '<div class="cal-day'+(isToday?' today':'')+'">'+d+badge+'</div>';
   }
+  c.innerHTML = html; // single DOM write — no double-render possible
   // Update month title
   var monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   var titleEl = document.getElementById('calMonthTitle');
@@ -10317,12 +10324,22 @@ function renderAttendanceLogList() {
     var theLog = pair.checkin || pair.checkout || pair.log;
     var ciTime = theLog && theLog.checkIn ? new Date(theLog.checkIn).toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'}) : '--:--';
     var coLog = pair.checkout || theLog;
-    var coTime = coLog && coLog.checkOut ? new Date(coLog.checkOut).toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'}) : '--:--';
+    var hasRealCheckout = !!(coLog && coLog.checkOut);
+    var coTime = hasRealCheckout ? new Date(coLog.checkOut).toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'}) : '--:--';
     var loc = (theLog && theLog.location) ? theLog.location : 'Unknown';
     var duration = '';
-    if (theLog && theLog.checkIn && (coLog && coLog.checkOut)) {
-      var diff = (new Date(coLog.checkOut) - new Date(theLog.checkIn)) / 60000;
-      if (diff > 0) { var hrs = Math.floor(diff / 60), mins = Math.round(diff % 60); duration = hrs + 'h ' + mins + 'm'; }
+    var isToday = (dt === new Date().toISOString().split('T')[0]);
+    if (theLog && theLog.checkIn) {
+      if (hasRealCheckout) {
+        var diff = (new Date(coLog.checkOut) - new Date(theLog.checkIn)) / 60000;
+        // Cap displayed duration at 8h to match calendar logic
+        if (diff > 480) diff = 480;
+        if (diff > 0) { var hrs = Math.floor(diff / 60), mins = Math.round(diff % 60); duration = hrs + 'h ' + mins + 'm'; }
+      } else if (!isToday) {
+        // Past day with no checkout — show 8h (auto-closed by server cron)
+        duration = '8h 0m';
+        coTime = 'auto-closed';
+      }
     }
     var statusHtml = '';
     if (theLog && theLog.checkIn) {

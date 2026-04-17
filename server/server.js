@@ -592,29 +592,28 @@ setInterval(cleanupOldSelfies, 60 * 60 * 1000);
 // =====================================================
 // AUTO-CHECKOUT — At 9 PM, auto-checkout anyone who forgot
 // =====================================================
-async function autoCheckoutAt9PM() {
+async function autoCheckoutStale() {
   try {
     const pool = require('./config/db');
-    const now = new Date();
-    const hour = now.getHours();
-    // Only run between 21:00 and 22:00 (server timezone)
-    if (hour < 21 || hour >= 22) return;
-    const today = now.toISOString().split('T')[0];
-    // Set check_out to 21:00:00 for today's logs that have check_in but no check_out
+    // Close any attendance log where check_in exists, check_out is NULL,
+    // and check_in was more than 18 hours ago.
+    // Sets check_out = check_in + 8 hours (credited work time), not 9 PM,
+    // so past "Active" entries get properly closed with a reasonable duration.
     const [result] = await pool.query(
       `UPDATE attendance_logs
-       SET check_out = CONCAT(log_date, ' 21:00:00'),
+       SET check_out = DATE_ADD(check_in, INTERVAL 8 HOUR),
            check_out_lat = check_in_lat, check_out_lng = check_in_lng
-       WHERE log_date = ? AND check_in IS NOT NULL AND check_out IS NULL`,
-      [today]
+       WHERE check_in IS NOT NULL AND check_out IS NULL
+         AND check_in < DATE_SUB(NOW(), INTERVAL 18 HOUR)`
     );
     if (result.affectedRows > 0) {
-      console.log('[AUTO-CHECKOUT] Auto-checked out ' + result.affectedRows + ' employee(s) at 9 PM');
+      console.log('[AUTO-CHECKOUT] Closed ' + result.affectedRows + ' stale checkout(s) (check_in > 18h ago, set check_out = check_in + 8h)');
     }
   } catch (e) { console.error('[AUTO-CHECKOUT] Error:', e.message); }
 }
-// Check every 15 minutes; the function itself only acts during the 21:xx hour
-setInterval(autoCheckoutAt9PM, 15 * 60 * 1000);
+// Run on startup (catch any stale from previous days) and then every 30 minutes
+setTimeout(autoCheckoutStale, 20000);
+setInterval(autoCheckoutStale, 30 * 60 * 1000);
 
 // =====================================================
 // SOCKET.IO — Real-time updates
