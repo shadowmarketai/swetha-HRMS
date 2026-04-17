@@ -36,12 +36,11 @@ const FEATURES = [
   { key: 'settings',      label: 'Settings',               category: 'Admin' }
 ];
 
-// Middleware: require SuperAdmin
+// Middleware: require SuperAdmin or MD
 function requireSuperAdmin(req, res, next) {
-  if (!req.user || !req.user.isSuperAdmin) {
-    return res.status(403).json({ error: 'SuperAdmin access required' });
-  }
-  next();
+  if (!req.user) return res.status(403).json({ error: 'SuperAdmin access required' });
+  if (req.user.isSuperAdmin || req.user.role === 'MD') return next();
+  return res.status(403).json({ error: 'SuperAdmin access required' });
 }
 
 // GET /api/admin/features — list all features (catalogue)

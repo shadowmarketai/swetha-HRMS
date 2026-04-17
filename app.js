@@ -2334,8 +2334,15 @@ async function saSaveAccess() {
   });
   try {
     await apiCall('PUT', '/admin/access/' + encodeURIComponent(_saSelectedEmp), { features: features });
-    showToast('Access updated for ' + _saSelectedEmp);
     _saEmpAccess = features; // update local cache
+    showToast('Saved! Access permissions updated for ' + _saSelectedEmp);
+    // Flash the save button green to confirm
+    var saveBtn = document.querySelector('#saFeatureGrid .nf-btn-primary');
+    if (saveBtn) {
+      saveBtn.textContent = 'Saved';
+      saveBtn.style.background = '#10b981';
+      setTimeout(function() { saveBtn.textContent = 'Save Changes'; saveBtn.style.background = ''; }, 2000);
+    }
   } catch (e) {
     showToast(e.message || 'Error saving access');
   }
@@ -7789,7 +7796,22 @@ async function loadFromBackend() {
 function filterNavByDept(items) {
   if (!currentUser) return items;
   return items.filter(function(item) {
-    if (item.deptOnly && item.deptOnly.indexOf(currentUser.dept) === -1) return false;
+    if (item.deptOnly && item.deptOnly.indexOf(currentUser.dept) === -1) {
+      // Bypass dept restriction if SuperAdmin granted access to this or any child feature
+      var keys = [];
+      var pk = NAV_FEATURE_MAP[item.id];
+      if (pk) keys.push(pk);
+      if (item.children) {
+        item.children.forEach(function(c) {
+          var ck = NAV_FEATURE_MAP[c.id];
+          if (ck && keys.indexOf(ck) === -1) keys.push(ck);
+        });
+      }
+      for (var i = 0; i < keys.length; i++) {
+        if (_myFeatureAccess[keys[i]] && _myFeatureAccess[keys[i]].enabled) return true;
+      }
+      return false;
+    }
     return true;
   });
 }
@@ -7805,8 +7827,21 @@ var NAV_FEATURE_MAP = {
   'tax':'tax', 'md-tax':'tax', 'hr-tax':'tax',
   'progress':'projects', 'md-progress':'projects', 'emp-progress':'projects',
   'tasks':'tasks',
-  'md-inventory':'peb_stock_items', 'hr-inventory':'peb_stock_items', 'emp-store':'peb_stock_items', 'emp-admin-peb':'peb_stock_items',
+  'md-peb-dash':'peb_stock_items', 'md-inventory':'peb_stock_items', 'hr-inventory':'peb_stock_items', 'emp-store':'peb_stock_items', 'emp-admin-peb':'peb_stock_items',
   'md-procurement':'peb_purchase_indents', 'hr-procurement':'peb_purchase_indents', 'emp-acc-procurement':'peb_purchase_indents',
+  // MD/HR PEB child nav IDs
+  'md-inv-stock':'peb_stock_items', 'md-inv-grn':'peb_grn', 'md-inv-requests':'peb_material_requests', 'md-inv-returns':'peb_returns',
+  'md-proc-vendors':'peb_vendors', 'md-proc-indents':'peb_purchase_indents', 'md-proc-orders':'peb_purchase_orders', 'md-proc-transport':'peb_transport',
+  // PEB child nav IDs — granular feature gating
+  'emp-adm-peb-dash':'peb_stock_items', 'emp-adm-inv-stock':'peb_stock_items', 'emp-adm-inv-grn':'peb_grn',
+  'emp-adm-inv-requests':'peb_material_requests', 'emp-adm-inv-returns':'peb_returns',
+  'emp-adm-proc-vendors':'peb_vendors', 'emp-adm-proc-indents':'peb_purchase_indents',
+  'emp-adm-proc-orders':'peb_purchase_orders', 'emp-adm-proc-transport':'peb_transport',
+  'emp-inv-stock':'peb_stock_items', 'emp-inv-requests':'peb_material_requests',
+  'emp-inv-returns':'peb_returns', 'emp-proc-transport':'peb_transport',
+  'emp-acc-proc-grn':'peb_grn', 'emp-acc-proc-vendors':'peb_vendors',
+  'emp-acc-proc-indents':'peb_purchase_indents', 'emp-acc-proc-orders':'peb_purchase_orders',
+  'emp-acc-proc-transport':'peb_transport',
   'recruitment':'recruitment', 'hr-recruit':'recruitment',
   'kpi':'kpi', 'md-performance':'kpi', 'hr-performance':'kpi',
   'shifts':'shifts',
