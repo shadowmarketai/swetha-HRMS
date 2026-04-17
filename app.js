@@ -6232,35 +6232,66 @@ function captureSelfiForAttendance() {
   });
 }
 
+// ── GPS Pre-warming ──
+// Start watching position as soon as the attendance screen is visible so the
+// browser already has a fix cached when the user presses Check In. This
+// eliminates the 10–30s GPS cold-start that was making check-in feel slow.
+var _gpsWarmPos = null;
+var _gpsWarmTs = 0;
+var _gpsWarmWatchId = null;
+function _startGpsWarm() {
+  if (_gpsWarmWatchId || !navigator.geolocation) return;
+  _gpsWarmWatchId = navigator.geolocation.watchPosition(
+    function(pos) { _gpsWarmPos = pos; _gpsWarmTs = Date.now(); },
+    function() {},
+    { enableHighAccuracy: false, timeout: 8000, maximumAge: 15000 }
+  );
+}
+function _stopGpsWarm() {
+  if (_gpsWarmWatchId && navigator.geolocation) navigator.geolocation.clearWatch(_gpsWarmWatchId);
+  _gpsWarmWatchId = null;
+}
+// Kick off warm as soon as page loads (non-blocking)
+setTimeout(_startGpsWarm, 2000);
+
+// Fast location getter — returns cached warm position if < 30s old, otherwise
+// gets a quick network fix (no GPS hardware needed for 200m geofence).
+function _getLocationFast() {
+  return new Promise(function(resolve, reject) {
+    // Use warm cache if fresh enough
+    if (_gpsWarmPos && (Date.now() - _gpsWarmTs) < 30000) {
+      return resolve(_gpsWarmPos);
+    }
+    if (!navigator.geolocation) return reject(new Error('Geolocation not supported'));
+    // Try fast network-based location first (usually < 3s)
+    navigator.geolocation.getCurrentPosition(resolve,
+      function(err1) {
+        // Fallback: allow slightly stale cache or try GPS
+        navigator.geolocation.getCurrentPosition(resolve, reject,
+          { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
+        );
+      },
+      { enableHighAccuracy: false, timeout: 5000, maximumAge: 15000 }
+    );
+  });
+}
+
 function gpsCheckIn() {
   if (!navigator.geolocation) { showToast('Geolocation not supported'); return; }
   var btn = document.getElementById('gpsCheckinBtn');
-  if (btn) btn.textContent = 'Opening camera...';
+  if (btn) btn.textContent = 'Getting ready...';
 
-  // Step 1: Capture selfie first
-  captureSelfiForAttendance().then(function(selfieFile) {
+  // Run selfie capture and GPS fetch IN PARALLEL for speed
+  var selfiePromise = captureSelfiForAttendance().catch(function() { return null; });
+  var gpsPromise = _getLocationFast();
+
+  Promise.all([selfiePromise, gpsPromise]).then(function(results) {
+    var selfieFile = results[0];
+    var pos = results[1];
     window._attendanceSelfie = selfieFile;
-    if (btn) btn.textContent = 'Getting location...';
-    // Step 2: Get GPS location
-    navigator.geolocation.getCurrentPosition(onSuccess,
-      function(err) {
-        if (err.code === 3) {
-          if (btn) btn.textContent = 'Retrying...';
-          navigator.geolocation.getCurrentPosition(onSuccess,
-            function(err2) {
-              showToast('Location error: ' + err2.message);
-              if (btn) btn.textContent = 'Check In';
-            },
-            { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
-          );
-        } else {
-          showToast('Location error: ' + err.message);
-          if (btn) btn.textContent = 'Check In';
-        }
-      },
-      { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 }
-    );
-  }).catch(function() {
+    onSuccess(pos);
+  }).catch(function(err) {
+    showToast('Location error: ' + (err.message || err));
     if (btn) btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Check In';
   });
 
@@ -6322,24 +6353,16 @@ function gpsCheckIn() {
 function gpsCheckOut() {
   if (!navigator.geolocation) { showToast('Geolocation not supported'); return; }
 
-  // Step 1: Capture selfie first
-  captureSelfiForAttendance().then(function(selfieFile) {
-    window._attendanceSelfie = selfieFile;
-    // Step 2: Get GPS location
-    navigator.geolocation.getCurrentPosition(onSuccess,
-      function(err) {
-        if (err.code === 3) {
-          navigator.geolocation.getCurrentPosition(onSuccess,
-            function(err2) { showToast('Location error: ' + err2.message); },
-            { enableHighAccuracy: false, timeout: 15000, maximumAge: 60000 }
-          );
-        } else {
-          showToast('Location error: ' + err.message);
-        }
-      },
-      { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 }
-    );
-  }).catch(function() { /* selfie cancelled */ });
+  // Run selfie + GPS in parallel for speed
+  var selfiePromise = captureSelfiForAttendance().catch(function() { return null; });
+  var gpsPromise = _getLocationFast();
+
+  Promise.all([selfiePromise, gpsPromise]).then(function(results) {
+    window._attendanceSelfie = results[0];
+    onSuccess(results[1]);
+  }).catch(function(err) {
+    showToast('Location error: ' + (err.message || err));
+  });
 
   async function onSuccess(pos) {
     var geoResult = checkGeofence(pos.coords.latitude, pos.coords.longitude);
@@ -10216,13 +10239,16 @@ function checkGeofence(lat, lng) {
 }
 var _lastGeoPos = null;
 function getGeofenceStatusHTML() {
-  // Use real GPS — show placeholder then update async
+  // Use warm-cached position if available (from GPS pre-warm)
+  if (_gpsWarmPos && (Date.now() - _gpsWarmTs) < 60000) {
+    _lastGeoPos = { lat: _gpsWarmPos.coords.latitude, lng: _gpsWarmPos.coords.longitude };
+  }
   if (_lastGeoPos) {
     var result = checkGeofence(_lastGeoPos.lat, _lastGeoPos.lng);
     if (result.inside) return '<span class="geofence-status geofence-inside">\ud83d\udccd ' + escapeHTML(result.location) + ' (' + result.distance + 'm)</span>';
     return '<span class="geofence-status geofence-outside">\u26a0 Outside geofence</span>';
   }
-  // Request GPS and update when available
+  // Request GPS and update when available — use fast network fix
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(function(pos) {
       _lastGeoPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
@@ -10236,7 +10262,7 @@ function getGeofenceStatusHTML() {
     }, function() {
       var el = document.getElementById('geofenceStatusContainer');
       if (el) el.innerHTML = '<span class="geofence-status geofence-outside">\u26a0 Location unavailable</span>';
-    }, { enableHighAccuracy: true, timeout: 10000 });
+    }, { enableHighAccuracy: false, timeout: 5000, maximumAge: 15000 });
   }
   return '<span id="geofenceStatusContainer"><span class="geofence-status" style="opacity:.6">\u23f3 Detecting location...</span></span>';
 }
@@ -10850,7 +10876,7 @@ function useCurrentLocationForGeo() {
     showToast('GPS coordinates filled');
   }, function(err) {
     showToast('Location error: ' + err.message);
-  }, { enableHighAccuracy: true, timeout: 15000 });
+  }, { enableHighAccuracy: false, timeout: 5000, maximumAge: 15000 });
 }
 
 // =====================================================
