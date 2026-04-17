@@ -188,6 +188,7 @@ const NAV_ICONS = {
   profile:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
   settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1.08-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1.08 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1.08 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.604.852.997 1.51 1.08H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1.08z"/></svg>',
   admin:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>',
+  shield:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>',
   logout:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>',
   ta:       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>',
   store:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l1-4h16l1 4"/><path d="M3 9v11a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V9"/><path d="M9 21V13h6v8"/><path d="M3 9h18"/></svg>',
@@ -230,7 +231,7 @@ const NAV_CONFIG = {
     // Footer items
     { id:'md-profile', label:'Profile', icon:'profile', action:{type:'overlay',target:'profile'}, isFooter:true },
     { id:'md-admin', label:'Admin Panel', icon:'admin', action:{type:'overlay',target:'admin'}, isFooter:true },
-    { id:'md-superadmin', label:'Access Control', icon:'admin', action:{type:'overlay',target:'superadmin'}, isFooter:true, superAdminOnly:true },
+    { id:'md-superadmin', label:'Access Control', icon:'shield', action:{type:'overlay',target:'superadmin'}, isFooter:true, superAdminOnly:true },
     { id:'md-settings', label:'Settings', icon:'settings', action:{type:'overlay',target:'settings'}, isFooter:true },
     { id:'md-logout', label:'Log Out', icon:'logout', action:{type:'logout'}, isFooter:true, isDanger:true }
   ],
@@ -536,6 +537,8 @@ async function doLogin() {
     if (!res.ok) { err.textContent = data.error || 'Login failed'; return; }
     JWT_TOKEN = data.token;
     safeStorage.set('hrms_jwt', data.token);
+    // Capture isSuperAdmin from login response immediately so loginAs can use it
+    if (data.user && data.user.isSuperAdmin) _isSuperAdmin = true;
     var rememberMe = document.getElementById('rememberMe');
     var session = { empCode: id, token: data.token, expiry: Date.now() + 24*60*60*1000, rememberMe: rememberMe ? rememberMe.checked : false };
     safeStorage.set(STORAGE_KEYS.session, JSON.stringify(session));
@@ -2166,13 +2169,49 @@ function checkFeatureAccess(featureKey) {
   if (override !== undefined) {
     return { allowed: override.enabled, level: override.level || 'read' };
   }
-  // No explicit override → allow (preserves existing role-based nav visibility)
+  // No explicit override → allow by default (existing role-based nav handles visibility).
+  // The actual nav filtering is done by NAV_CONFIG per-role + filterNavByDept,
+  // so returning allowed:true here just means "don't add extra restrictions".
   return { allowed: true, level: 'edit' };
+}
+
+// Compute default feature access based on role + department.
+// Returns { feature_key: { enabled: bool, level: 'read'|'edit' } }
+// This mirrors the NAV_CONFIG visibility — if a role's nav doesn't include
+// a feature, it's OFF by default. SuperAdmin overrides take precedence.
+function _computeRoleDefaults(role, dept) {
+  var roleNav = NAV_CONFIG[role] || NAV_CONFIG.Employee;
+  // Collect all nav IDs present in this role's config (including children)
+  var navIds = {};
+  function walkNav(items) {
+    items.forEach(function(item) {
+      navIds[item.id] = true;
+      if (item.children) walkNav(item.children);
+    });
+  }
+  walkNav(roleNav);
+  // For each feature, check if ANY mapped nav ID exists in the role's config
+  var defaults = {};
+  SA_FEATURES.forEach(function(f) {
+    var hasAccess = false;
+    // Check if any NAV_FEATURE_MAP key that maps to this feature exists in navIds
+    Object.keys(NAV_FEATURE_MAP).forEach(function(navId) {
+      if (NAV_FEATURE_MAP[navId] === f.key && navIds[navId]) hasAccess = true;
+    });
+    // Some features are universally available (home, settings, attendance, leaves)
+    if (['attendance', 'leaves', 'settings'].indexOf(f.key) >= 0) hasAccess = true;
+    // Dept-gated items (PEB for Site Engineer/Admin/Accounts, etc.)
+    if (f.key === 'peb_stock' && ['Site Engineer', 'Admin', 'Accounts', 'Execution', 'Production'].indexOf(dept) >= 0) hasAccess = true;
+    if (f.key === 'peb_purchase' && ['Accounts', 'Admin'].indexOf(dept) >= 0) hasAccess = true;
+    defaults[f.key] = { enabled: hasAccess, level: hasAccess ? 'edit' : 'read' };
+  });
+  return defaults;
 }
 
 // Selected employee for access editing
 var _saSelectedEmp = null;
 var _saEmpAccess = {}; // loaded access for selected employee
+var _saRoleDefaults = {}; // computed role defaults for selected employee
 
 function renderSuperAdminPage() {
   var c = document.getElementById('superadminContent');
@@ -2197,9 +2236,12 @@ function renderSuperAdminPage() {
 }
 
 async function saSelectEmployee(empCode) {
-  if (!empCode) { _saSelectedEmp = null; _saEmpAccess = {}; document.getElementById('saFeatureGrid').innerHTML = ''; return; }
+  if (!empCode) { _saSelectedEmp = null; _saEmpAccess = {}; _saRoleDefaults = {}; document.getElementById('saFeatureGrid').innerHTML = ''; return; }
   _saSelectedEmp = empCode;
-  // Fetch existing access overrides
+  var emp = EMPLOYEES.find(function(e) { return e.code === empCode; });
+  // Compute what this employee's role normally grants
+  _saRoleDefaults = emp ? _computeRoleDefaults(emp.role, emp.dept) : {};
+  // Fetch any existing SuperAdmin overrides
   try {
     _saEmpAccess = await apiCall('GET', '/admin/access/' + encodeURIComponent(empCode));
     if (!_saEmpAccess || typeof _saEmpAccess !== 'object') _saEmpAccess = {};
@@ -2234,8 +2276,10 @@ function saRenderFeatureGrid() {
     html += '<div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:' + (catColors[cat] || '#6b7280') + ';margin-bottom:6px;border-bottom:1px solid var(--gray-100);padding-bottom:4px">' + cat + '</div>';
     categories[cat].forEach(function(f) {
       var existing = _saEmpAccess[f.key];
-      var isOn = existing ? existing.enabled : true; // default on if no override
-      var level = existing ? (existing.level || 'read') : 'edit'; // default edit if no override
+      var roleDef = _saRoleDefaults[f.key] || { enabled: false, level: 'read' };
+      // Use explicit override if SuperAdmin set one, otherwise use role default
+      var isOn = existing !== undefined ? existing.enabled : roleDef.enabled;
+      var level = existing !== undefined ? (existing.level || 'read') : roleDef.level;
       html += '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--gray-50)">';
       // Feature label
       html += '<div style="flex:1;font-size:.82rem;font-weight:500">' + escapeHTML(f.label) + '</div>';
