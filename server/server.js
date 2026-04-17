@@ -553,6 +553,23 @@ app.get('*', (req, res) => {
       console.log('[SUPERADMIN] Default SuperAdmin account created (SADMIN / Swetha@Super2026)');
     }
 
+    // Migrate old broad PEB feature keys to new granular keys
+    const pebMigrations = [
+      { old: 'peb_stock',    newKeys: ['peb_stock_items','peb_grn','peb_material_requests','peb_returns'] },
+      { old: 'peb_purchase', newKeys: ['peb_vendors','peb_purchase_indents','peb_purchase_orders','peb_transport'] }
+    ];
+    for (const m of pebMigrations) {
+      const [oldRows] = await pool.query('SELECT emp_code, is_enabled, access_level FROM feature_access WHERE feature_key = ?', [m.old]).catch(() => [[]]);
+      for (const row of (oldRows || [])) {
+        for (const nk of m.newKeys) {
+          await pool.query(
+            'INSERT IGNORE INTO feature_access (emp_code, feature_key, is_enabled, access_level) VALUES (?, ?, ?, ?)',
+            [row.emp_code, nk, row.is_enabled, row.access_level]
+          ).catch(() => {});
+        }
+      }
+    }
+
     console.log('DB migrations applied');
   } catch (e) { console.error('Migration error (non-fatal):', e.message); }
 })();
