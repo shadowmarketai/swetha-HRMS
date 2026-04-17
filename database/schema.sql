@@ -758,3 +758,18 @@ CREATE TABLE IF NOT EXISTS document_edit_requests (
 ALTER TABLE employees ADD COLUMN IF NOT EXISTS ifsc_code VARCHAR(20);
 ALTER TABLE employees ADD COLUMN IF NOT EXISTS bank_branch VARCHAR(100);
 ALTER TABLE employees ADD COLUMN IF NOT EXISTS profile_sections_locked JSON DEFAULT (JSON_OBJECT());
+
+-- SuperAdmin flag
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_superadmin TINYINT(1) DEFAULT 0;
+
+-- Feature Access Management (per-employee overrides managed by SuperAdmin)
+CREATE TABLE IF NOT EXISTS feature_access (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  emp_code VARCHAR(20) NOT NULL,
+  feature_key VARCHAR(50) NOT NULL,
+  is_enabled TINYINT(1) DEFAULT 1,
+  access_level ENUM('read','edit') DEFAULT 'read',
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY unique_emp_feature (emp_code, feature_key),
+  INDEX idx_fa_emp (emp_code)
+);

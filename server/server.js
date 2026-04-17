@@ -193,6 +193,7 @@ app.use('/api/peb/store', require('./routes/peb-store'));
 app.use('/api/peb/purchase', require('./routes/peb-purchase'));
 app.use('/api/edit-requests', require('./routes/edit-requests'));
 app.use('/api/departments', require('./routes/departments'));
+app.use('/api/admin', require('./routes/admin'));
 // Health check — always responds 200 quickly so Traefik keeps routing during slow DB migrations.
 // DB status is reported in the payload for observability but never fails the check.
 app.get('/api/health', async (req, res) => {
@@ -520,6 +521,37 @@ app.get('*', (req, res) => {
     await pool.query("ALTER TABLE advance_requests ADD COLUMN paid_by VARCHAR(20)").catch(() => {});
     await pool.query("ALTER TABLE advance_requests ADD COLUMN paid_date DATE").catch(() => {});
     await pool.query("UPDATE advance_requests SET status = 'Accounts_Accepted' WHERE status = 'HR_Accepted'").catch(() => {});
+
+    // Phase I: SuperAdmin + Feature Access Management
+    await pool.query("ALTER TABLE users ADD COLUMN is_superadmin TINYINT(1) DEFAULT 0").catch(() => {});
+
+    // Feature access per-employee overrides (SuperAdmin manages these)
+    await pool.query(`CREATE TABLE IF NOT EXISTS feature_access (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      emp_code VARCHAR(20) NOT NULL,
+      feature_key VARCHAR(50) NOT NULL,
+      is_enabled TINYINT(1) DEFAULT 1,
+      access_level ENUM('read','edit') DEFAULT 'read',
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY unique_emp_feature (emp_code, feature_key),
+      INDEX idx_fa_emp (emp_code)
+    )`).catch((e) => { console.error('feature_access migration:', e.message); });
+
+    // Seed default SuperAdmin account (emp_code: SADMIN, password: Swetha@Super2026)
+    // Only creates if SADMIN doesn't exist yet. Password can be changed via Settings.
+    const bcrypt = require('bcryptjs');
+    const [saCheck] = await pool.query("SELECT id FROM users WHERE emp_code = 'SADMIN'").catch(() => [[]]);
+    if (!saCheck || saCheck.length === 0) {
+      const saHash = await bcrypt.hash('Swetha@Super2026', 12);
+      await pool.query(
+        "INSERT IGNORE INTO employees (code, name, dept, designation, role, is_active) VALUES ('SADMIN', 'Super Admin', 'Administration', 'System Administrator', 'MD', 1)"
+      ).catch(() => {});
+      await pool.query(
+        "INSERT IGNORE INTO users (emp_code, password_hash, role, is_active, is_superadmin) VALUES ('SADMIN', ?, 'MD', 1, 1)",
+        [saHash]
+      ).catch(() => {});
+      console.log('[SUPERADMIN] Default SuperAdmin account created (SADMIN / Swetha@Super2026)');
+    }
 
     console.log('DB migrations applied');
   } catch (e) { console.error('Migration error (non-fatal):', e.message); }

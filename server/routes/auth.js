@@ -43,10 +43,10 @@ router.post('/login', [
       return res.status(401).json({ error: 'Invalid credentials' });
     }
     await pool.query('UPDATE users SET last_login = NOW() WHERE emp_code = ?', [empCode]);
-    const token = generateToken({ empCode: user.emp_code, role: user.role, name: user.name });
+    const token = generateToken({ empCode: user.emp_code, role: user.role, name: user.name, isSuperAdmin: !!user.is_superadmin });
     res.json({
       token,
-      user: { empCode: user.emp_code, name: user.name, role: user.role, dept: user.dept, designation: user.designation }
+      user: { empCode: user.emp_code, name: user.name, role: user.role, dept: user.dept, designation: user.designation, isSuperAdmin: !!user.is_superadmin }
     });
   } catch (err) {
     console.error(err);
@@ -108,10 +108,10 @@ router.post('/google', [
 
     const user = rows[0];
     await pool.query('UPDATE users SET last_login = NOW() WHERE emp_code = ?', [user.emp_code]);
-    const token = generateToken({ empCode: user.emp_code, role: user.role, name: user.name });
+    const token = generateToken({ empCode: user.emp_code, role: user.role, name: user.name, isSuperAdmin: !!user.is_superadmin });
     res.json({
       token,
-      user: { empCode: user.emp_code, name: user.name, role: user.role, dept: user.dept, designation: user.designation }
+      user: { empCode: user.emp_code, name: user.name, role: user.role, dept: user.dept, designation: user.designation, isSuperAdmin: !!user.is_superadmin }
     });
   } catch (err) {
     console.error(err);
@@ -126,13 +126,13 @@ router.post('/google', [
 router.get('/me', verifyToken, async (req, res) => {
   try {
     const [rows] = await pool.query(
-      'SELECT u.role, e.name, e.dept, e.designation FROM users u JOIN employees e ON u.emp_code = e.code WHERE u.emp_code = ? AND u.is_active = 1',
+      'SELECT u.role, u.is_superadmin, e.name, e.dept, e.designation FROM users u JOIN employees e ON u.emp_code = e.code WHERE u.emp_code = ? AND u.is_active = 1',
       [req.user.empCode]
     );
     if (rows.length === 0) return res.status(401).json({ error: 'User not found' });
     const user = rows[0];
-    const token = generateToken({ empCode: req.user.empCode, role: user.role, name: user.name });
-    res.json({ token, user: { empCode: req.user.empCode, name: user.name, role: user.role, dept: user.dept, designation: user.designation } });
+    const token = generateToken({ empCode: req.user.empCode, role: user.role, name: user.name, isSuperAdmin: !!user.is_superadmin });
+    res.json({ token, user: { empCode: req.user.empCode, name: user.name, role: user.role, dept: user.dept, designation: user.designation, isSuperAdmin: !!user.is_superadmin } });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
@@ -350,10 +350,10 @@ router.post('/biometric-login', [
     }
     const user = rows[0];
     await pool.query('UPDATE users SET last_login = NOW() WHERE emp_code = ?', [empCode]);
-    const token = generateToken({ empCode: user.emp_code, role: user.role, name: user.name });
+    const token = generateToken({ empCode: user.emp_code, role: user.role, name: user.name, isSuperAdmin: !!user.is_superadmin });
     res.json({
       token,
-      user: { empCode: user.emp_code, name: user.name, role: user.role, dept: user.dept, designation: user.designation }
+      user: { empCode: user.emp_code, name: user.name, role: user.role, dept: user.dept, designation: user.designation, isSuperAdmin: !!user.is_superadmin }
     });
   } catch (err) {
     console.error(err);

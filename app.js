@@ -230,6 +230,7 @@ const NAV_CONFIG = {
     // Footer items
     { id:'md-profile', label:'Profile', icon:'profile', action:{type:'overlay',target:'profile'}, isFooter:true },
     { id:'md-admin', label:'Admin Panel', icon:'admin', action:{type:'overlay',target:'admin'}, isFooter:true },
+    { id:'md-superadmin', label:'Access Control', icon:'admin', action:{type:'overlay',target:'superadmin'}, isFooter:true, superAdminOnly:true },
     { id:'md-settings', label:'Settings', icon:'settings', action:{type:'overlay',target:'settings'}, isFooter:true },
     { id:'md-logout', label:'Log Out', icon:'logout', action:{type:'logout'}, isFooter:true, isDanger:true }
   ],
@@ -593,6 +594,9 @@ async function loginAs(empCode) {
         if (meData.user && meData.user.role) {
           currentUser.role = meData.user.role;
         }
+        if (meData.user && meData.user.isSuperAdmin) {
+          currentUser.isSuperAdmin = true;
+        }
       }
     } catch (e) { /* non-fatal — stale JWT still works for this session */ }
 
@@ -603,6 +607,11 @@ async function loginAs(empCode) {
     document.getElementById('bottomTabs').style.display = '';
     _activeNavId = 'home';
     _navExpandedGroups = {};
+
+    // Load feature access overrides (SuperAdmin-managed) before rendering nav
+    await loadMyFeatureAccess();
+    // Detect SuperAdmin from JWT or server response
+    if (currentUser.isSuperAdmin) _isSuperAdmin = true;
 
     applyRole();
     renderNavigation();
@@ -1610,6 +1619,7 @@ function switchTab(id, el, _fromPopstate) {
 }
 let _overlayPreviousFocus = [];
 function showOverlay(id) {
+  if (id === 'superadmin' && !_isSuperAdmin) return;
   if (id === 'admin' && currentUser.role !== 'MD' && currentUser.role !== 'HR') return;
   if (id === 'location' && currentUser.role !== 'MD') return;
   if (id === 'peb' && currentUser.role !== 'MD' && currentUser.role !== 'HR' && !(['Site Engineer','Admin','Accounts','Execution','Production'].indexOf(currentUser.dept) >= 0)) return;
@@ -1619,6 +1629,7 @@ function showOverlay(id) {
   try {
     if (id === 'profile') renderProfileOverlay();
     if (id === 'admin') renderAdminPanel();
+    if (id === 'superadmin') renderSuperAdminPage();
     if (id === 'onboarding') resetWizard();
     if (id === 'notifications') renderNotifications();
     if (id === 'location') openLocationTracker();
@@ -2100,6 +2111,176 @@ function renderAdminPanel() {
   renderRolesList();
   renderDeptsList();
   renderAllEmpList();
+}
+
+// =====================================================
+// SUPERADMIN — Access Management
+// =====================================================
+// Feature catalogue (must match server/routes/admin.js FEATURES)
+var SA_FEATURES = [
+  { key:'attendance',    label:'Attendance & Check-in',  cat:'Core' },
+  { key:'leaves',        label:'Leave Management',       cat:'Core' },
+  { key:'advances',      label:'Advance Requests',       cat:'Finance' },
+  { key:'expenses',      label:'Expense Claims',         cat:'Finance' },
+  { key:'salary',        label:'Salary Statement',       cat:'Finance' },
+  { key:'tax',           label:'Form 16 & Tax',          cat:'Finance' },
+  { key:'projects',      label:'Project Progress',       cat:'Operations' },
+  { key:'tasks',         label:'Task Management',        cat:'Operations' },
+  { key:'peb_stock',     label:'PEB Stock / Inventory',  cat:'PEB' },
+  { key:'peb_purchase',  label:'PEB Procurement',        cat:'PEB' },
+  { key:'recruitment',   label:'Recruitment',            cat:'HR' },
+  { key:'kpi',           label:'KPI & Performance',      cat:'HR' },
+  { key:'shifts',        label:'Shift Management',       cat:'HR' },
+  { key:'exit',          label:'Exit & F&F',             cat:'HR' },
+  { key:'compliance',    label:'Compliance & Filings',   cat:'HR' },
+  { key:'documents',     label:'Documents',              cat:'General' },
+  { key:'assets',        label:'Asset Management',       cat:'General' },
+  { key:'events',        label:'Events & Awards',        cat:'General' },
+  { key:'announcements', label:'Announcements',          cat:'General' },
+  { key:'geofence',      label:'Geofence Sites',         cat:'Admin' },
+  { key:'reports',       label:'Reports & Analytics',    cat:'Admin' },
+  { key:'admin_panel',   label:'Admin Panel (Roles)',    cat:'Admin' },
+  { key:'settings',      label:'Settings',               cat:'Admin' }
+];
+
+// Current user's own feature access overrides (loaded on login)
+var _myFeatureAccess = {}; // { feature_key: { enabled: bool, level: 'read'|'edit' } }
+var _isSuperAdmin = false;
+
+// Load logged-in user's feature access from backend
+async function loadMyFeatureAccess() {
+  try {
+    var data = await apiCall('GET', '/admin/my-access');
+    _myFeatureAccess = (data && data.access) || {};
+    _isSuperAdmin = !!(data && data.isSuperAdmin);
+  } catch (e) { /* non-fatal — no overrides applied */ }
+}
+
+// Feature gating: check if the current user has access to a feature.
+// Returns { allowed: bool, level: 'read'|'edit' }
+// Logic: if feature_access row exists → use it (explicit override by superadmin).
+//        if no row → allow by default (existing role-based behaviour).
+function checkFeatureAccess(featureKey) {
+  if (_isSuperAdmin) return { allowed: true, level: 'edit' }; // superadmin sees everything
+  var override = _myFeatureAccess[featureKey];
+  if (override !== undefined) {
+    return { allowed: override.enabled, level: override.level || 'read' };
+  }
+  // No explicit override → allow (preserves existing role-based nav visibility)
+  return { allowed: true, level: 'edit' };
+}
+
+// Selected employee for access editing
+var _saSelectedEmp = null;
+var _saEmpAccess = {}; // loaded access for selected employee
+
+function renderSuperAdminPage() {
+  var c = document.getElementById('superadminContent');
+  if (!c) return;
+  var html = '<div class="section-title" style="margin-top:4px">Feature Access Management</div>';
+  html += '<p style="font-size:.75rem;color:var(--gray-500);margin-bottom:12px">Select an employee to manage their feature access. Toggle features on/off and set read-only or edit permissions.</p>';
+
+  // Employee selector
+  html += '<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center">';
+  html += '<select id="saEmpSelect" onchange="saSelectEmployee(this.value)" style="flex:1;min-width:180px;padding:8px 12px;border:1.5px solid var(--gray-200);border-radius:var(--radius);font-size:.82rem">';
+  html += '<option value="">— Select Employee —</option>';
+  EMPLOYEES.filter(function(e) { return e.code !== 'SADMIN' && e.isActive !== false; }).forEach(function(e) {
+    var sel = (_saSelectedEmp === e.code) ? ' selected' : '';
+    html += '<option value="' + escapeAttr(e.code) + '"' + sel + '>' + escapeHTML(e.name) + ' (' + escapeHTML(e.code) + ') — ' + escapeHTML(e.role) + '</option>';
+  });
+  html += '</select></div>';
+
+  // Feature access grid (shown when an employee is selected)
+  html += '<div id="saFeatureGrid"></div>';
+  c.innerHTML = html;
+  if (_saSelectedEmp) saRenderFeatureGrid();
+}
+
+async function saSelectEmployee(empCode) {
+  if (!empCode) { _saSelectedEmp = null; _saEmpAccess = {}; document.getElementById('saFeatureGrid').innerHTML = ''; return; }
+  _saSelectedEmp = empCode;
+  // Fetch existing access overrides
+  try {
+    _saEmpAccess = await apiCall('GET', '/admin/access/' + encodeURIComponent(empCode));
+    if (!_saEmpAccess || typeof _saEmpAccess !== 'object') _saEmpAccess = {};
+  } catch (e) { _saEmpAccess = {}; }
+  saRenderFeatureGrid();
+}
+
+function saRenderFeatureGrid() {
+  var grid = document.getElementById('saFeatureGrid');
+  if (!grid || !_saSelectedEmp) return;
+  var emp = EMPLOYEES.find(function(e) { return e.code === _saSelectedEmp; });
+  if (!emp) { grid.innerHTML = '<div class="nf-empty">Employee not found</div>'; return; }
+
+  var html = '<div class="card" style="padding:16px;margin-bottom:12px">';
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">';
+  html += '<div><h4 style="font-size:.9rem;margin:0">' + escapeHTML(emp.name) + '</h4>';
+  html += '<span style="font-size:.72rem;color:var(--gray-500)">' + escapeHTML(emp.code) + ' — ' + escapeHTML(emp.role) + ' — ' + escapeHTML(emp.dept) + '</span></div>';
+  html += '<button class="nf-btn nf-btn-primary nf-btn-sm" onclick="saSaveAccess()" style="font-size:.75rem">Save Changes</button>';
+  html += '</div>';
+
+  // Group features by category
+  var categories = {};
+  SA_FEATURES.forEach(function(f) {
+    if (!categories[f.cat]) categories[f.cat] = [];
+    categories[f.cat].push(f);
+  });
+
+  var catColors = { Core:'#3b82f6', Finance:'#10b981', Operations:'#f59e0b', PEB:'#8b5cf6', HR:'#ec4899', General:'#6b7280', Admin:'#ef4444' };
+
+  Object.keys(categories).forEach(function(cat) {
+    html += '<div style="margin-bottom:16px">';
+    html += '<div style="font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:' + (catColors[cat] || '#6b7280') + ';margin-bottom:6px;border-bottom:1px solid var(--gray-100);padding-bottom:4px">' + cat + '</div>';
+    categories[cat].forEach(function(f) {
+      var existing = _saEmpAccess[f.key];
+      var isOn = existing ? existing.enabled : true; // default on if no override
+      var level = existing ? (existing.level || 'read') : 'edit'; // default edit if no override
+      html += '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--gray-50)">';
+      // Feature label
+      html += '<div style="flex:1;font-size:.82rem;font-weight:500">' + escapeHTML(f.label) + '</div>';
+      // Read / Edit dropdown
+      html += '<select id="sa-level-' + f.key + '" style="padding:4px 8px;border:1px solid var(--gray-200);border-radius:6px;font-size:.72rem;' + (!isOn ? 'opacity:.3;pointer-events:none' : '') + '">';
+      html += '<option value="read"' + (level === 'read' ? ' selected' : '') + '>Read Only</option>';
+      html += '<option value="edit"' + (level === 'edit' ? ' selected' : '') + '>Full Edit</option>';
+      html += '</select>';
+      // Toggle switch
+      html += '<label class="toggle-switch" style="margin:0"><input type="checkbox" id="sa-toggle-' + f.key + '"' + (isOn ? ' checked' : '') + ' onchange="saToggleFeature(\'' + f.key + '\',this.checked)"><span class="toggle-slider"></span></label>';
+      html += '</div>';
+    });
+    html += '</div>';
+  });
+
+  html += '</div>';
+  grid.innerHTML = html;
+}
+
+function saToggleFeature(key, isOn) {
+  var levelEl = document.getElementById('sa-level-' + key);
+  if (levelEl) {
+    levelEl.style.opacity = isOn ? '' : '.3';
+    levelEl.style.pointerEvents = isOn ? '' : 'none';
+  }
+}
+
+async function saSaveAccess() {
+  if (!_saSelectedEmp) return;
+  var features = {};
+  SA_FEATURES.forEach(function(f) {
+    var toggle = document.getElementById('sa-toggle-' + f.key);
+    var levelEl = document.getElementById('sa-level-' + f.key);
+    features[f.key] = {
+      enabled: toggle ? toggle.checked : true,
+      level: levelEl ? levelEl.value : 'read'
+    };
+  });
+  try {
+    await apiCall('PUT', '/admin/access/' + encodeURIComponent(_saSelectedEmp), { features: features });
+    showToast('Access updated for ' + _saSelectedEmp);
+    _saEmpAccess = features; // update local cache
+  } catch (e) {
+    showToast(e.message || 'Error saving access');
+  }
 }
 
 // ===== HR Edit Requests Panel =====
@@ -7554,9 +7735,64 @@ function filterNavByDept(items) {
     return true;
   });
 }
+
+// Map nav item IDs to feature keys for SuperAdmin access gating.
+// Only the top-level nav items are gated — children inherit from parent.
+var NAV_FEATURE_MAP = {
+  'attendance':'attendance', 'md-attendance':'attendance', 'hr-attendance':'attendance', 'emp-attendance':'attendance', 'mgr-attendance':'attendance',
+  'leaves':'leaves', 'md-att-leave':'leaves', 'hr-att-leave':'leaves', 'emp-att-leave':'leaves',
+  'advance':'advances', 'md-advance':'advances', 'hr-advance':'advances', 'emp-advance':'advances',
+  'expense':'expenses', 'emp-expense':'expenses',
+  'salary':'salary', 'md-salary':'salary', 'hr-salary':'salary', 'emp-salary':'salary', 'emp-acc-salary':'salary',
+  'tax':'tax', 'md-tax':'tax', 'hr-tax':'tax',
+  'progress':'projects', 'md-progress':'projects', 'emp-progress':'projects',
+  'tasks':'tasks',
+  'peb_stock':'peb_stock', 'md-inventory':'peb_stock', 'hr-inventory':'peb_stock', 'emp-store':'peb_stock', 'emp-admin-peb':'peb_stock',
+  'peb_purchase':'peb_purchase', 'md-procurement':'peb_purchase', 'hr-procurement':'peb_purchase', 'emp-acc-procurement':'peb_purchase',
+  'recruitment':'recruitment', 'hr-recruit':'recruitment',
+  'kpi':'kpi', 'md-performance':'kpi', 'hr-performance':'kpi',
+  'shifts':'shifts',
+  'exit':'exit',
+  'compliance':'compliance',
+  'documents':'documents',
+  'assets':'assets',
+  'events':'events',
+  'announcements':'announcements',
+  'geofence':'geofence',
+  'reports':'reports',
+  'admin_panel':'admin_panel', 'md-admin':'admin_panel', 'hr-admin':'admin_panel',
+  'settings':'settings', 'md-settings':'settings', 'hr-settings':'settings', 'emp-settings':'settings'
+};
+
+// Filter nav items by SuperAdmin-managed feature access.
+// Items with superAdminOnly:true are only shown for superadmin users.
+function filterNavByAccess(items) {
+  return items.filter(function(item) {
+    // SuperAdmin-only items (e.g. Access Control)
+    if (item.superAdminOnly && !_isSuperAdmin) return false;
+    // Check feature access
+    var featureKey = NAV_FEATURE_MAP[item.id];
+    if (featureKey) {
+      var access = checkFeatureAccess(featureKey);
+      if (!access.allowed) return false;
+    }
+    // Filter children too
+    if (item.children) {
+      item = Object.assign({}, item); // shallow copy to avoid mutating config
+      item.children = item.children.filter(function(child) {
+        var ck = NAV_FEATURE_MAP[child.id];
+        if (ck) { var ca = checkFeatureAccess(ck); if (!ca.allowed) return false; }
+        return true;
+      });
+      if (item.children.length === 0) return false; // hide parent if all children filtered
+    }
+    return true;
+  });
+}
+
 function renderNavigation() {
   if (!currentUser) return;
-  var config = filterNavByDept(NAV_CONFIG[currentUser.role] || NAV_CONFIG.Employee);
+  var config = filterNavByAccess(filterNavByDept(NAV_CONFIG[currentUser.role] || NAV_CONFIG.Employee));
   var container = document.getElementById('bottomTabs');
   if (!container) return;
   var isDesktop = window.innerWidth >= 768;
