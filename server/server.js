@@ -590,6 +590,33 @@ setTimeout(cleanupOldSelfies, 10000);
 setInterval(cleanupOldSelfies, 60 * 60 * 1000);
 
 // =====================================================
+// AUTO-CHECKOUT — At 9 PM, auto-checkout anyone who forgot
+// =====================================================
+async function autoCheckoutAt9PM() {
+  try {
+    const pool = require('./config/db');
+    const now = new Date();
+    const hour = now.getHours();
+    // Only run between 21:00 and 22:00 (server timezone)
+    if (hour < 21 || hour >= 22) return;
+    const today = now.toISOString().split('T')[0];
+    // Set check_out to 21:00:00 for today's logs that have check_in but no check_out
+    const [result] = await pool.query(
+      `UPDATE attendance_logs
+       SET check_out = CONCAT(log_date, ' 21:00:00'),
+           check_out_lat = check_in_lat, check_out_lng = check_in_lng
+       WHERE log_date = ? AND check_in IS NOT NULL AND check_out IS NULL`,
+      [today]
+    );
+    if (result.affectedRows > 0) {
+      console.log('[AUTO-CHECKOUT] Auto-checked out ' + result.affectedRows + ' employee(s) at 9 PM');
+    }
+  } catch (e) { console.error('[AUTO-CHECKOUT] Error:', e.message); }
+}
+// Check every 15 minutes; the function itself only acts during the 21:xx hour
+setInterval(autoCheckoutAt9PM, 15 * 60 * 1000);
+
+// =====================================================
 // SOCKET.IO — Real-time updates
 // =====================================================
 const http = require('http');

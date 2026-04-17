@@ -1830,10 +1830,23 @@ function _computeCalendarStatuses(logs, empCode, year, month, maxDay) {
       dayData[dd].forEach(function(s) {
         if (s.checkIn) {
           var start = new Date(s.checkIn).getTime();
-          var end = s.checkOut ? new Date(s.checkOut).getTime() : (isCurrentMonth && dd === now.getDate() ? Date.now() : start);
+          var end;
+          if (s.checkOut) {
+            end = new Date(s.checkOut).getTime();
+          } else if (isCurrentMonth && dd === now.getDate()) {
+            // Still active today — count up to current time
+            end = Date.now();
+          } else {
+            // Past day with no checkout → treat as auto-checkout at 9 PM,
+            // but cap the credited hours at 8 (480 min) max.
+            var autoOut = new Date(year, month, dd, 21, 0, 0).getTime();
+            end = Math.min(autoOut, start + 480 * 60000);
+          }
           if (end > start) totalMin += (end - start) / 60000;
         }
       });
+      // Cap total credited hours at 8 per day (even if logged > 8)
+      if (totalMin > 480) totalMin = 480;
       dayHoursMap[dd] = totalMin;
       // ≥ 8 hours → Present, < 8 hours → Half day
       att[dd] = (totalMin >= 480) ? 'present' : 'half';
@@ -10228,12 +10241,9 @@ function getGeofenceStatusHTML() {
   return '<span id="geofenceStatusContainer"><span class="geofence-status" style="opacity:.6">\u23f3 Detecting location...</span></span>';
 }
 function getAttendanceStatus(checkInTime) {
+  // Only show Present status — no Late/On-time distinction per user request
   if (!checkInTime) return '';
-  const parts = checkInTime.split(':');
-  const hour = parseInt(parts[0], 10), min = parseInt(parts[1], 10);
-  const totalMin = hour * 60 + min;
-  if (totalMin > 9 * 60 + 15) return '<span class="log-late" style="font-size:.7rem"> (Late)</span>';
-  return '<span style="font-size:.7rem;color:var(--success)"> (On-time)</span>';
+  return '<span style="font-size:.7rem;color:var(--success)"> (Present)</span>';
 }
 function renderAttendanceLogOverlay() {
   const c = document.getElementById('attendanceLogContent');
@@ -10290,10 +10300,7 @@ function renderAttendanceLogList() {
     }
     var statusHtml = '';
     if (theLog && theLog.checkIn) {
-      var ciDate = new Date(theLog.checkIn);
-      var totalMin = ciDate.getHours() * 60 + ciDate.getMinutes();
-      if (totalMin > 9 * 60 + 15) statusHtml = '<span style="font-size:.65rem;color:var(--danger);font-weight:600">Late</span>';
-      else statusHtml = '<span style="font-size:.65rem;color:var(--success);font-weight:600">On-time</span>';
+      statusHtml = '<span style="font-size:.65rem;color:var(--success);font-weight:600">Present</span>';
     }
     var dateLabel = new Date(dt + 'T00:00:00').toLocaleDateString('en-IN', {day:'2-digit',month:'short',year:'numeric',weekday:'short'});
     html += '<div class="attendance-log-row" style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--gray-100)">';
