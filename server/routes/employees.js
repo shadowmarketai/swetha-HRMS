@@ -403,15 +403,35 @@ router.put('/:code', verifyToken, requireRole('MD', 'HR'), auditLog('update', 'e
   }
 });
 
-// DELETE /api/employees/:code — soft delete
-router.delete('/:code', verifyToken, requireRole('MD'), auditLog('delete', 'employee'), async (req, res) => {
+// DELETE /api/employees/:code — hard delete (permanently removes employee + auth + cascaded data)
+// Allowed for MD or SuperAdmin
+router.delete('/:code', verifyToken, auditLog('delete', 'employee'), async (req, res) => {
+  if (!req.user || (req.user.role !== 'MD' && !req.user.isSuperAdmin)) {
+    return res.status(403).json({ error: 'Insufficient permissions' });
+  }
+  const code = req.params.code;
+  if (code === 'MD001' || code === 'SADMIN') {
+    return res.status(400).json({ error: 'Cannot delete protected account' });
+  }
+  const conn = await pool.getConnection();
   try {
-    await pool.query('UPDATE employees SET is_active = 0 WHERE code = ?', [req.params.code]);
-    await pool.query('UPDATE users SET is_active = 0 WHERE emp_code = ?', [req.params.code]);
-    res.json({ message: 'Employee deactivated' });
+    await conn.beginTransaction();
+    // Tables without ON DELETE CASCADE FK to employees — clear manually
+    await conn.query('DELETE FROM feature_access WHERE emp_code = ?', [code]);
+    await conn.query('DELETE FROM users WHERE emp_code = ?', [code]);
+    // Employees row — all related rows with ON DELETE CASCADE are removed automatically
+    const [result] = await conn.query('DELETE FROM employees WHERE code = ?', [code]);
+    await conn.commit();
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'Employee not found' });
+    }
+    res.json({ message: 'Employee permanently deleted' });
   } catch (err) {
+    await conn.rollback();
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    conn.release();
   }
 });
 

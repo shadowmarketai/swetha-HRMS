@@ -126,6 +126,9 @@ let wizardStep = 1;
 let originalSalaryHTML = '';
 let leaveApplications = [];
 let leaveBalances = {};
+// Public holidays — { 'YYYY-MM-DD': { id, name, description } }
+let publicHolidays = {};
+let publicHolidaysList = [];
 let selectedLeaveType = 'casual';
 let NOTIF_HISTORY = [];
 let notifPrefs = { salary: true, leave: true, advance: true, payroll: true, expense: true, exit: true, celebration: true, compliance: true, announcement: true, asset: true };
@@ -615,6 +618,9 @@ async function loginAs(empCode) {
     await loadMyFeatureAccess();
     // Detect SuperAdmin from JWT or server response
     if (currentUser.isSuperAdmin) _isSuperAdmin = true;
+
+    // Load public holidays so calendar badges work everywhere; refresh calendar once loaded
+    loadPublicHolidays().then(function() { if (typeof buildCalendar === 'function') buildCalendar(); });
 
     applyRole();
     renderNavigation();
@@ -1839,6 +1845,8 @@ function _computeCalendarStatuses(logs, empCode, year, month, maxDay) {
   for (var dd = 1; dd <= maxDay; dd++) {
     var dow = new Date(year, month, dd).getDay();
     if (dow === 0) { att[dd] = 'holiday'; continue; }
+    var ymd = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(dd).padStart(2, '0');
+    if (publicHolidays[ymd]) { att[dd] = 'holiday'; continue; }
     if (dayData[dd] && dayData[dd].length > 0) {
       var totalMin = 0;
       dayData[dd].forEach(function(s) {
@@ -1926,8 +1934,11 @@ async function buildCalendar() {
   for (var d = 1; d <= daysInMonth; d++) {
     var isToday = isCurrentMonth && d === now.getDate();
     var st = d <= maxDay ? (att[d] || '') : '';
+    var ymd = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+    if (!st && publicHolidays[ymd]) st = 'holiday';
     var badge = st && badgeMap[st] ? '<span class="cal-status-badge '+badgeMap[st].cls+'">'+badgeMap[st].label+'</span>' : '';
-    html += '<div class="cal-day'+(isToday?' today':'')+'">'+d+badge+'</div>';
+    var holidayTitle = publicHolidays[ymd] ? ' title="' + escapeAttr(publicHolidays[ymd].name) + '"' : '';
+    html += '<div class="cal-day'+(isToday?' today':'')+'"'+holidayTitle+'>'+d+badge+'</div>';
   }
   c.innerHTML = html; // single DOM write — no double-render possible
   // Update month title
@@ -2788,8 +2799,8 @@ function renderAllEmpList() {
   const container = document.getElementById('allEmpList');
   const colors = ['#E85D04','#D62828','#14B8A6','#22C55E','#EC4899'];
   const isMD = currentUser && currentUser.role === 'MD';
-  const canDelete = isMD && !isTemporaryMD();
-  const isHRorMD = currentUser && (currentUser.role === 'MD' || currentUser.role === 'HR' || currentUser.role === 'Manager');
+  const canDelete = (isMD && !isTemporaryMD()) || _isSuperAdmin;
+  const isHRorMD = currentUser && (currentUser.role === 'MD' || currentUser.role === 'HR' || currentUser.role === 'Manager' || _isSuperAdmin);
   let html = '';
   departments.forEach((dept, di) => {
     const emps = EMPLOYEES.filter(e => e.dept === dept);
@@ -2995,9 +3006,9 @@ async function deactivateEmployee(code) {
 }
 
 async function deleteEmployeePermanently(code) {
-  if (!currentUser || currentUser.role !== 'MD') { showToast('Only MD can delete employees'); return; }
-  if (isTemporaryMD()) { showToast('Temporary MD does not have delete permissions'); return; }
-  if (code === 'MD001') { showToast('Cannot delete MD account'); return; }
+  var allowed = (currentUser && currentUser.role === 'MD' && !isTemporaryMD()) || _isSuperAdmin;
+  if (!allowed) { showToast('Only MD or SuperAdmin can delete employees'); return; }
+  if (code === 'MD001' || code === 'SADMIN') { showToast('Cannot delete protected account'); return; }
   var emp = EMPLOYEES.find(function(e) { return e.code === code; });
   if (!emp) return;
   var confirmCode = prompt('To permanently delete ' + emp.name + ', type their employee code (' + code + '):');
@@ -7604,7 +7615,10 @@ async function loadFromBackend() {
     if (annData.length > 0) {
       announcements.length = 0;
       annData.map(mapAnnouncement).forEach(function(a) { announcements.push(a); });
-      announcementNextId = announcements.reduce(function(mx, a) { return Math.max(mx, a.id || 0); }, 0) + 1;
+      // Only consider numeric ids when computing nextId (holiday-* are virtual string ids)
+      announcementNextId = announcements.reduce(function(mx, a) {
+        return typeof a.id === 'number' ? Math.max(mx, a.id) : mx;
+      }, 0) + 1;
     }
 
     // 8. Tasks
@@ -11774,7 +11788,8 @@ function renderAnnouncementDashboard() {
   if (unread.length === 0) { el.innerHTML = ''; return; }
   let html = '<div class="section-title">Announcements</div><div class="dashboard-announcements">';
   unread.forEach(a => {
-    html += `<div class="dashboard-announce-item" onclick="markAnnouncementRead(${a.id});showOverlay('hr-announcements')"><h4>${escapeHTML(a.title)}</h4><p>${a.date} &middot; ${escapeHTML(a.category)}</p></div>`;
+    var idAttr = JSON.stringify(a.id);
+    html += `<div class="dashboard-announce-item" onclick="markAnnouncementRead(${idAttr});showOverlay('hr-announcements')"><h4>${escapeHTML(a.title)}</h4><p>${a.date} &middot; ${escapeHTML(a.category)}</p></div>`;
   });
   html += '</div>';
   el.innerHTML = html;
@@ -11790,12 +11805,22 @@ function renderAnnouncementsOverlay() {
   if (announcements.length === 0) {
     html += '<div class="nf-empty">No announcements yet</div>';
   } else {
-    announcements.sort((a,b) => b.id - a.id).forEach(a => {
+    // Holiday items (string ids) sort to the top; numeric ids sort descending
+    var sorted = announcements.slice().sort(function(a, b) {
+      var aHol = typeof a.id === 'string' && a.id.indexOf('holiday-') === 0;
+      var bHol = typeof b.id === 'string' && b.id.indexOf('holiday-') === 0;
+      if (aHol && !bHol) return -1;
+      if (!aHol && bHol) return 1;
+      return (b.id || 0) - (a.id || 0);
+    });
+    sorted.forEach(a => {
+      const isHoliday = typeof a.id === 'string' && a.id.indexOf('holiday-') === 0;
       const isRead = announcementReadStatus[currentUser.code + '_' + a.id];
       const catCls = 'announce-' + (a.category||'general').toLowerCase().replace(/ /g,'-').replace('policy-update','policy');
       const author = EMPLOYEES.find(e => e.code === a.author);
-      html += `<div class="announcement-card ${isRead?'read':'unread'}" onclick="markAnnouncementRead(${a.id})"><div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:6px"><span class="announcement-cat ${catCls}">${escapeHTML(a.category)}</span><span style="font-size:.68rem;color:var(--gray-400)">${a.date}</span></div><div style="font-weight:600;font-size:.88rem;margin-bottom:4px">${escapeHTML(a.title)}</div><div style="font-size:.78rem;color:var(--gray-600);margin-bottom:6px">${escapeHTML(a.body)}</div><div style="font-size:.68rem;color:var(--gray-400)">By ${author?escapeHTML(author.name):'Admin'}`;
-      if (isMdHr) html += ` <button class="nf-btn nf-btn-danger nf-btn-sm" style="margin-left:8px;padding:2px 8px;font-size:.65rem" onclick="event.stopPropagation();deleteAnnouncement(${a.id})">Delete</button>`;
+      const idJson = JSON.stringify(a.id);
+      html += `<div class="announcement-card ${isRead?'read':'unread'}" onclick="markAnnouncementRead(${idJson})"><div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:6px"><span class="announcement-cat ${catCls}">${escapeHTML(a.category)}</span><span style="font-size:.68rem;color:var(--gray-400)">${a.date}</span></div><div style="font-weight:600;font-size:.88rem;margin-bottom:4px">${escapeHTML(a.title)}</div><div style="font-size:.78rem;color:var(--gray-600);margin-bottom:6px">${escapeHTML(a.body)}</div><div style="font-size:.68rem;color:var(--gray-400)">By ${author?escapeHTML(author.name):'Admin'}`;
+      if (isMdHr && !isHoliday) html += ` <button class="nf-btn nf-btn-danger nf-btn-sm" style="margin-left:8px;padding:2px 8px;font-size:.65rem" onclick="event.stopPropagation();deleteAnnouncement(${idJson})">Delete</button>`;
       html += '</div></div>';
     });
   }
@@ -13712,6 +13737,8 @@ function renderEmployeeAttendanceView() {
   html += '</div>';
   html += '<div id="attEmpListArea" class="card fade-in" style="max-height:260px;overflow-y:auto"></div>';
   html += '<div id="attEmpCalendarArea" style="margin-top:12px"></div>';
+  // Public Holidays manager (HR/MD only)
+  html += '<div id="publicHolidaysArea" style="margin-top:16px"></div>';
   // Daily attendance summary table
   html += '<div style="margin-top:16px">';
   html += '<div class="section-title">Daily Attendance Summary</div>';
@@ -13727,6 +13754,8 @@ function renderEmployeeAttendanceView() {
   container.innerHTML = html;
   filterAttEmpList();
   loadAttendanceSummaryTable();
+  // Load + render public holidays panel for HR/MD
+  loadPublicHolidays().then(renderPublicHolidaysPanel);
 }
 
 async function loadAttendanceSummaryTable() {
@@ -13948,9 +13977,12 @@ async function selectAttEmployee(empCode) {
   for (var d2 = 1; d2 <= daysInMonth; d2++) {
     var isToday = isCurrentMonth && d2 === now.getDate();
     var st = d2 <= todayDate ? att[d2] || '' : '';
+    var ymd2 = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(d2).padStart(2, '0');
+    if (!st && publicHolidays[ymd2]) st = 'holiday';
     var badge = st && badgeMap[st] ? '<span class="cal-status-badge ' + badgeMap[st].cls + '">' + badgeMap[st].label + '</span>' : '';
     var clickAttr = (dayData[d2] && dayData[d2].length > 0) ? ' onclick="showAttDayDetail(' + d2 + ')" style="cursor:pointer"' : '';
-    html += '<div class="cal-day' + (isToday ? ' today' : '') + '"' + clickAttr + '>' + d2 + badge + '</div>';
+    var holidayTitle2 = publicHolidays[ymd2] ? ' title="' + escapeAttr(publicHolidays[ymd2].name) + '"' : '';
+    html += '<div class="cal-day' + (isToday ? ' today' : '') + '"' + clickAttr + holidayTitle2 + '>' + d2 + badge + '</div>';
   }
   html += '</div>';
   // Day detail area
@@ -14067,6 +14099,97 @@ async function submitMissedAttendance() {
     showToast(e.message || 'Error submitting request');
     if (btn) { btn.disabled = false; btn.textContent = 'Submit Request'; }
   }
+}
+
+// =====================================================
+// PUBLIC HOLIDAYS (HR/MD manage; visible on every employee's calendar)
+// =====================================================
+async function loadPublicHolidays() {
+  try {
+    var resp = await apiCall('GET', '/holidays');
+    var list = (resp && resp.data) || [];
+    publicHolidaysList = list;
+    publicHolidays = {};
+    list.forEach(function(h) { publicHolidays[h.holiday_date] = h; });
+  } catch (e) { /* non-fatal */ }
+}
+
+function renderPublicHolidaysPanel() {
+  var area = document.getElementById('publicHolidaysArea');
+  if (!area) return;
+  if (!currentUser || (currentUser.role !== 'MD' && currentUser.role !== 'HR' && currentUser.role !== 'Manager')) { area.innerHTML = ''; return; }
+  var todayIso = new Date().toISOString().split('T')[0];
+  var html = '<div class="section-title" style="margin-top:4px">Public Holidays</div>';
+  html += '<div class="card fade-in" style="padding:12px">';
+  html += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px">';
+  html += '<div style="flex:0 0 150px"><label style="font-size:.7rem;color:var(--gray-500);display:block;margin-bottom:3px">Date</label>';
+  html += '<input type="date" id="phDate" min="' + todayIso + '" style="width:100%;padding:6px 10px;border:1px solid var(--gray-200);border-radius:var(--radius);font-size:.78rem"></div>';
+  html += '<div style="flex:1;min-width:160px"><label style="font-size:.7rem;color:var(--gray-500);display:block;margin-bottom:3px">Holiday Name</label>';
+  html += '<input type="text" id="phName" placeholder="e.g. Foundation Day" style="width:100%;padding:6px 10px;border:1px solid var(--gray-200);border-radius:var(--radius);font-size:.78rem"></div>';
+  html += '<div style="flex:1;min-width:160px"><label style="font-size:.7rem;color:var(--gray-500);display:block;margin-bottom:3px">Description (optional)</label>';
+  html += '<input type="text" id="phDesc" placeholder="Short note" style="width:100%;padding:6px 10px;border:1px solid var(--gray-200);border-radius:var(--radius);font-size:.78rem"></div>';
+  html += '<button class="nf-btn nf-btn-primary nf-btn-sm" onclick="addPublicHoliday()" style="font-size:.75rem">Add Holiday</button>';
+  html += '</div>';
+
+  // Sorted list (upcoming first, then past)
+  var upcoming = publicHolidaysList.filter(function(h) { return h.holiday_date >= todayIso; });
+  var past = publicHolidaysList.filter(function(h) { return h.holiday_date < todayIso; });
+  if (publicHolidaysList.length === 0) {
+    html += '<div style="text-align:center;padding:14px;color:var(--gray-400);font-size:.78rem">No public holidays declared yet.</div>';
+  } else {
+    html += '<div style="font-size:.7rem;color:var(--gray-500);margin-bottom:4px;font-weight:600">Upcoming (' + upcoming.length + ')</div>';
+    if (upcoming.length === 0) {
+      html += '<div style="font-size:.72rem;color:var(--gray-400);padding:6px 0">No upcoming holidays.</div>';
+    } else {
+      upcoming.forEach(function(h) { html += renderHolidayRow(h, false); });
+    }
+    if (past.length > 0) {
+      html += '<div style="font-size:.7rem;color:var(--gray-500);margin:10px 0 4px;font-weight:600">Past (' + past.length + ')</div>';
+      past.slice(-5).reverse().forEach(function(h) { html += renderHolidayRow(h, true); });
+    }
+  }
+  html += '</div>';
+  area.innerHTML = html;
+}
+
+function renderHolidayRow(h, isPast) {
+  var dateLabel = new Date(h.holiday_date + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', weekday: 'short' });
+  var canDelete = currentUser && (currentUser.role === 'MD' || currentUser.role === 'HR');
+  var s = '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--gray-100);' + (isPast ? 'opacity:.6' : '') + '">';
+  s += '<div style="flex:1"><div style="font-size:.8rem;font-weight:600">' + escapeHTML(h.name) + '</div>';
+  s += '<div style="font-size:.68rem;color:var(--gray-500)">' + escapeHTML(dateLabel) + (h.description ? ' &middot; ' + escapeHTML(h.description) : '') + '</div></div>';
+  if (canDelete) {
+    s += '<button onclick="deletePublicHoliday(' + h.id + ')" style="font-size:.68rem;padding:4px 10px;border:1px solid #EF4444;color:#EF4444;background:transparent;border-radius:6px;cursor:pointer">Remove</button>';
+  }
+  s += '</div>';
+  return s;
+}
+
+async function addPublicHoliday() {
+  var date = (document.getElementById('phDate') || {}).value;
+  var name = ((document.getElementById('phName') || {}).value || '').trim();
+  var desc = ((document.getElementById('phDesc') || {}).value || '').trim();
+  if (!date) { showToast('Please pick a date'); return; }
+  if (!name) { showToast('Please enter the holiday name'); return; }
+  try {
+    await apiCall('POST', '/holidays', { date: date, name: name, description: desc });
+    showToast('Holiday added');
+    await loadPublicHolidays();
+    renderPublicHolidaysPanel();
+    // Refresh attendance calendar so new H badge appears
+    if (typeof buildCalendar === 'function') buildCalendar();
+  } catch (e) { showToast(e.message || 'Error adding holiday'); }
+}
+
+async function deletePublicHoliday(id) {
+  if (!confirm('Remove this public holiday?')) return;
+  try {
+    await apiCall('DELETE', '/holidays/' + id);
+    showToast('Holiday removed');
+    await loadPublicHolidays();
+    renderPublicHolidaysPanel();
+    if (typeof buildCalendar === 'function') buildCalendar();
+  } catch (e) { showToast(e.message || 'Error removing holiday'); }
 }
 
 async function loadMissedAttRequests() {

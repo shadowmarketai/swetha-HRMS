@@ -184,6 +184,7 @@ app.use('/api/compliance', require('./routes/compliance'));
 app.use('/api/assets', require('./routes/assets'));
 app.use('/api/exit', require('./routes/exit'));
 app.use('/api/announcements', require('./routes/announcements'));
+app.use('/api/holidays', require('./routes/holidays'));
 app.use('/api/geofence', require('./routes/geofence'));
 app.use('/api/projects', require('./routes/projects'));
 app.use('/api/sitetrack', require('./routes/sitetrack'));
@@ -521,6 +522,18 @@ app.get('*', (req, res) => {
     await pool.query("ALTER TABLE advance_requests ADD COLUMN paid_by VARCHAR(20)").catch(() => {});
     await pool.query("ALTER TABLE advance_requests ADD COLUMN paid_date DATE").catch(() => {});
     await pool.query("UPDATE advance_requests SET status = 'Accounts_Accepted' WHERE status = 'HR_Accepted'").catch(() => {});
+
+    // Public Holidays — managed by HR/MD, shown on every employee's calendar + announcement feed
+    await pool.query(`CREATE TABLE IF NOT EXISTS public_holidays (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      holiday_date DATE NOT NULL,
+      name VARCHAR(200) NOT NULL,
+      description VARCHAR(500),
+      created_by VARCHAR(20),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uniq_holiday_date (holiday_date),
+      INDEX idx_holiday_date (holiday_date)
+    )`).catch((e) => { console.error('public_holidays migration:', e.message); });
 
     // Phase I: SuperAdmin + Feature Access Management
     await pool.query("ALTER TABLE users ADD COLUMN is_superadmin TINYINT(1) DEFAULT 0").catch(() => {});

@@ -3,7 +3,7 @@ const pool = require('../config/db');
 const { verifyToken, requireRole } = require('../middleware/auth');
 const { auditLog } = require('../middleware/audit');
 
-// GET /api/announcements — list active announcements
+// GET /api/announcements — list active announcements (with upcoming holidays injected within 2 days)
 router.get('/', verifyToken, async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page) || 1);
@@ -20,6 +20,41 @@ router.get('/', verifyToken, async (req, res) => {
     );
     const readIds = new Set(reads.map(r => r.announcement_id));
     const result = rows.map(a => ({ ...a, is_read: readIds.has(a.id) }));
+
+    // Inject upcoming public holidays as virtual announcements (today + next 2 days)
+    // Only on the first page so they don't duplicate across paginated requests.
+    if (page === 1) {
+      try {
+        const [holidays] = await pool.query(
+          `SELECT id, DATE_FORMAT(holiday_date, '%Y-%m-%d') AS holiday_date, name, description
+             FROM public_holidays
+            WHERE holiday_date >= CURDATE()
+              AND holiday_date <= DATE_ADD(CURDATE(), INTERVAL 2 DAY)
+            ORDER BY holiday_date ASC`
+        );
+        const holidayItems = holidays.map(h => {
+          const dateLabel = new Date(h.holiday_date + 'T00:00:00').toLocaleDateString('en-IN', {
+            day: '2-digit', month: 'short', year: 'numeric', weekday: 'long'
+          });
+          return {
+            id: 'holiday-' + h.id,
+            title: 'Upcoming Holiday: ' + h.name,
+            content: dateLabel + (h.description ? ' — ' + h.description : '') + ' is a declared public holiday.',
+            category: 'Holiday',
+            priority: 'High',
+            author_name: 'HR / Admin',
+            created_by: null,
+            is_active: 1,
+            created_at: new Date().toISOString(),
+            is_read: false,
+            is_holiday: true
+          };
+        });
+        // Prepend so upcoming holidays appear at the top of the feed
+        result.unshift(...holidayItems);
+      } catch (e) { /* holidays table may not exist yet — non-fatal */ }
+    }
+
     res.json({ data: result, total, page, limit });
   } catch (err) {
     console.error(err);
@@ -67,6 +102,10 @@ router.delete('/:id', verifyToken, requireRole('MD', 'HR'), auditLog('delete', '
 // POST /api/announcements/:id/read — mark as read
 router.post('/:id/read', verifyToken, async (req, res) => {
   try {
+    // Holiday-prefixed IDs are virtual announcements, not persisted — skip silently
+    if (typeof req.params.id === 'string' && req.params.id.startsWith('holiday-')) {
+      return res.json({ success: true });
+    }
     await pool.query(
       'INSERT IGNORE INTO announcement_reads (announcement_id, emp_code) VALUES (?, ?)',
       [req.params.id, req.user.empCode]
