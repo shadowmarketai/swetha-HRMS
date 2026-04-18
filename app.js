@@ -7897,9 +7897,21 @@ function filterNavByAccess(items) {
   });
 }
 
+// PEB Management (emp-admin-peb / mgr-admin-peb) is a comprehensive group covering
+// every PEB sub-feature. When it's visible, the dept-specialised Store and Procurement
+// groups become redundant duplicates of the same screens — suppress them.
+function dedupePebGroups(items) {
+  var hasComprehensive = items.some(function(it) {
+    return it && (it.id === 'emp-admin-peb' || it.id === 'mgr-admin-peb');
+  });
+  if (!hasComprehensive) return items;
+  var REDUNDANT = { 'emp-store': 1, 'mgr-store': 1, 'emp-acc-procurement': 1 };
+  return items.filter(function(it) { return !it || !REDUNDANT[it.id]; });
+}
+
 function renderNavigation() {
   if (!currentUser) return;
-  var config = filterNavByAccess(filterNavByDept(NAV_CONFIG[currentUser.role] || NAV_CONFIG.Employee));
+  var config = dedupePebGroups(filterNavByAccess(filterNavByDept(NAV_CONFIG[currentUser.role] || NAV_CONFIG.Employee)));
   var container = document.getElementById('bottomTabs');
   if (!container) return;
   var isDesktop = window.innerWidth >= 768;
