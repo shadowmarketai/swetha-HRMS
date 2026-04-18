@@ -760,4 +760,101 @@ router.get('/alerts', verifyToken, requireFeatureAccess('peb_stock_items', ['MD'
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
+// ========================================
+// FACTORY ISSUE LOG — manual stock issues to people working in the factory
+// (Store manager records: who took what, for which project, when)
+// ========================================
+(async function migrateFactoryIssues() {
+  try {
+    await db.query(`CREATE TABLE IF NOT EXISTS peb_factory_issues (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      item_id INT NOT NULL,
+      quantity DECIMAL(12,2) NOT NULL,
+      taken_by_emp_code VARCHAR(20) NOT NULL,
+      taken_by_name VARCHAR(100),
+      project_id INT,
+      project_name VARCHAR(200),
+      taken_at DATETIME NOT NULL,
+      notes TEXT,
+      created_by VARCHAR(20),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_fi_item (item_id),
+      INDEX idx_fi_emp (taken_by_emp_code),
+      INDEX idx_fi_project (project_id)
+    )`);
+  } catch (e) { console.error('[PEB-STORE] factory_issues migrate:', e.message); }
+})();
+
+// GET /api/peb/store/factory-issues — list past issues (newest first)
+router.get('/factory-issues', verifyToken, requireFeatureAccess('peb_stock_items', ['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
+  try {
+    const limit = Math.min(500, Math.max(1, parseInt(req.query.limit) || 100));
+    const [rows] = await db.query(
+      `SELECT fi.*, si.item_name, si.item_code, si.unit
+         FROM peb_factory_issues fi
+         LEFT JOIN peb_stock_items si ON fi.item_id = si.id
+        ORDER BY fi.taken_at DESC, fi.id DESC
+        LIMIT ?`, [limit]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('[PEB-STORE] factory-issues list error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST /api/peb/store/factory-issues — record a new issue and decrement stock
+router.post('/factory-issues', verifyToken, requireFeatureAccess('peb_stock_items', ['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
+  const { item_id, quantity, taken_by_emp_code, project_id, taken_at, notes } = req.body || {};
+  const qty = parseFloat(quantity);
+  if (!item_id || !taken_by_emp_code || !qty || qty <= 0) {
+    return res.status(400).json({ error: 'item_id, quantity (>0), taken_by_emp_code required' });
+  }
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    // Resolve names + validate stock
+    const [stock] = await conn.query('SELECT current_stock, item_name FROM peb_stock_items WHERE id = ? FOR UPDATE', [item_id]);
+    if (stock.length === 0) { await conn.rollback(); return res.status(404).json({ error: 'Stock item not found' }); }
+    if (parseFloat(stock[0].current_stock) < qty) {
+      await conn.rollback();
+      return res.status(400).json({ error: `Insufficient stock for ${stock[0].item_name}: available ${stock[0].current_stock}, requested ${qty}` });
+    }
+    const [emp] = await conn.query('SELECT name FROM employees WHERE code = ?', [taken_by_emp_code]);
+    const takenByName = emp.length > 0 ? emp[0].name : taken_by_emp_code;
+
+    let projectName = null;
+    if (project_id) {
+      const [proj] = await conn.query('SELECT name FROM projects WHERE id = ?', [project_id]);
+      if (proj.length > 0) projectName = proj[0].name;
+    }
+
+    const issuedAt = taken_at ? new Date(taken_at) : new Date();
+
+    // Insert factory issue row
+    const [fi] = await conn.query(
+      `INSERT INTO peb_factory_issues (item_id, quantity, taken_by_emp_code, taken_by_name, project_id, project_name, taken_at, notes, created_by)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [item_id, qty, taken_by_emp_code, takenByName, project_id || null, projectName, issuedAt, (notes || '').trim() || null, req.user.empCode]
+    );
+
+    // Decrement stock + log a transaction row for the dashboard recent-activity feed
+    await conn.query(
+      `INSERT INTO peb_stock_transactions (type, item_id, quantity, reference_id, reference_type, notes, created_by)
+       VALUES ('MIS', ?, ?, ?, 'factory_issue', ?, ?)`,
+      [item_id, qty, fi.insertId, ('Factory issue to ' + takenByName + (projectName ? ' for ' + projectName : '')), req.user.empCode]
+    );
+    await conn.query('UPDATE peb_stock_items SET current_stock = current_stock - ?, last_updated_by = ? WHERE id = ?',
+      [qty, req.user.empCode, item_id]);
+
+    await conn.commit();
+    res.status(201).json({ id: fi.insertId, success: true });
+  } catch (err) {
+    await conn.rollback();
+    console.error('[PEB-STORE] factory-issue create error:', err);
+    res.status(500).json({ error: 'Server error' });
+  } finally { conn.release(); }
+});
+
 module.exports = router;

@@ -231,6 +231,10 @@ const NAV_CONFIG = {
       { id:'md-proc-orders', label:'Purchase Orders', action:{type:'overlay',target:'peb'} },
       { id:'md-proc-transport', label:'Transport', action:{type:'overlay',target:'peb'} }
     ]},
+    { id:'md-stock-outlet', label:'Stock Outlet', icon:'store', children:[
+      { id:'md-so-approved', label:'Approved Requests', action:{type:'overlay',target:'peb'} },
+      { id:'md-so-factory', label:'Factory Issue Log', action:{type:'overlay',target:'peb'} }
+    ]},
     // Footer items
     { id:'md-profile', label:'Profile', icon:'profile', action:{type:'overlay',target:'profile'}, isFooter:true },
     { id:'md-admin', label:'Admin Panel', icon:'admin', action:{type:'overlay',target:'admin'}, isFooter:true },
@@ -275,6 +279,10 @@ const NAV_CONFIG = {
       { id:'hr-proc-indents', label:'Purchase Indents', action:{type:'overlay',target:'peb'} },
       { id:'hr-proc-orders', label:'Purchase Orders', action:{type:'overlay',target:'peb'} },
       { id:'hr-proc-transport', label:'Transport', action:{type:'overlay',target:'peb'} }
+    ]},
+    { id:'hr-stock-outlet', label:'Stock Outlet', icon:'store', children:[
+      { id:'hr-so-approved', label:'Approved Requests', action:{type:'overlay',target:'peb'} },
+      { id:'hr-so-factory', label:'Factory Issue Log', action:{type:'overlay',target:'peb'} }
     ]},
     // Footer
     { id:'hr-profile', label:'Profile', icon:'profile', action:{type:'overlay',target:'profile'}, isFooter:true },
@@ -327,7 +335,9 @@ const NAV_CONFIG = {
       { id:'emp-adm-proc-vendors', label:'Vendors', action:{type:'overlay',target:'peb'} },
       { id:'emp-adm-proc-indents', label:'Purchase Indents', action:{type:'overlay',target:'peb'} },
       { id:'emp-adm-proc-orders', label:'Purchase Orders', action:{type:'overlay',target:'peb'} },
-      { id:'emp-adm-proc-transport', label:'Transport', action:{type:'overlay',target:'peb'} }
+      { id:'emp-adm-proc-transport', label:'Transport', action:{type:'overlay',target:'peb'} },
+      { id:'emp-adm-so-approved', label:'Stock Outlet — Approved Requests', action:{type:'overlay',target:'peb'} },
+      { id:'emp-adm-so-factory', label:'Stock Outlet — Factory Issue', action:{type:'overlay',target:'peb'} }
     ]},
     // Footer
     { id:'emp-profile', label:'Profile', icon:'profile', action:{type:'overlay',target:'profile'}, isFooter:true },
@@ -369,7 +379,9 @@ const NAV_CONFIG = {
       { id:'mgr-adm-proc-vendors', label:'Vendors', action:{type:'overlay',target:'peb'} },
       { id:'mgr-adm-proc-indents', label:'Purchase Indents', action:{type:'overlay',target:'peb'} },
       { id:'mgr-adm-proc-orders', label:'Purchase Orders', action:{type:'overlay',target:'peb'} },
-      { id:'mgr-adm-proc-transport', label:'Transport', action:{type:'overlay',target:'peb'} }
+      { id:'mgr-adm-proc-transport', label:'Transport', action:{type:'overlay',target:'peb'} },
+      { id:'mgr-adm-so-approved', label:'Stock Outlet — Approved Requests', action:{type:'overlay',target:'peb'} },
+      { id:'mgr-adm-so-factory', label:'Stock Outlet — Factory Issue', action:{type:'overlay',target:'peb'} }
     ]},
     // Footer
     { id:'mgr-profile', label:'Profile', icon:'profile', action:{type:'overlay',target:'profile'}, isFooter:true },
@@ -7843,6 +7855,13 @@ var NAV_FEATURE_MAP = {
   'tasks':'tasks',
   'md-peb-dash':'peb_stock_items', 'md-inventory':'peb_stock_items', 'hr-inventory':'peb_stock_items', 'emp-store':'peb_stock_items', 'emp-admin-peb':'peb_stock_items',
   'md-procurement':'peb_purchase_indents', 'hr-procurement':'peb_purchase_indents', 'emp-acc-procurement':'peb_purchase_indents',
+  // Stock Outlet — fulfilling approved material requests (gated on peb_material_requests)
+  'md-stock-outlet':'peb_material_requests', 'hr-stock-outlet':'peb_material_requests',
+  'md-so-approved':'peb_material_requests', 'hr-so-approved':'peb_material_requests',
+  'emp-adm-so-approved':'peb_material_requests', 'mgr-adm-so-approved':'peb_material_requests',
+  // Factory Issue Log (gated on peb_stock_items since it deducts stock)
+  'md-so-factory':'peb_stock_items', 'hr-so-factory':'peb_stock_items',
+  'emp-adm-so-factory':'peb_stock_items', 'mgr-adm-so-factory':'peb_stock_items',
   // MD/HR PEB child nav IDs
   'md-inv-stock':'peb_stock_items', 'md-inv-grn':'peb_grn', 'md-inv-requests':'peb_material_requests', 'md-inv-returns':'peb_returns',
   'md-proc-vendors':'peb_vendors', 'md-proc-indents':'peb_purchase_indents', 'md-proc-orders':'peb_purchase_orders', 'md-proc-transport':'peb_transport',

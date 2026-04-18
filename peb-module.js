@@ -32,10 +32,15 @@ var _pebSectionMap = {
   'mgr-adm-peb-dash':'dashboard','mgr-adm-inv-stock':'stock-items','mgr-adm-inv-grn':'grn',
   'mgr-adm-inv-requests':'material-requests','mgr-adm-inv-returns':'returns-scrap',
   'mgr-adm-proc-vendors':'vendors','mgr-adm-proc-indents':'purchase-indents',
-  'mgr-adm-proc-orders':'purchase-orders','mgr-adm-proc-transport':'transport'
+  'mgr-adm-proc-orders':'purchase-orders','mgr-adm-proc-transport':'transport',
+  // Stock Outlet sub-screens (MD / HR / Admin Employee / Admin Manager)
+  'md-so-approved':'so-approved','hr-so-approved':'so-approved',
+  'emp-adm-so-approved':'so-approved','mgr-adm-so-approved':'so-approved',
+  'md-so-factory':'so-factory','hr-so-factory':'so-factory',
+  'emp-adm-so-factory':'so-factory','mgr-adm-so-factory':'so-factory'
 };
 var _pebSection = 'dashboard';
-var _pebTitles = {'dashboard':'PEB Dashboard','stock-items':'Stock Items','grn':'Goods Receipt Notes','material-requests':'Material Requests','returns-scrap':'Returns & Scrap','vendors':'Vendors','purchase-indents':'Purchase Indents','purchase-orders':'Purchase Orders','transport':'Transport Requests'};
+var _pebTitles = {'dashboard':'PEB Dashboard','stock-items':'Stock Items','grn':'Goods Receipt Notes','material-requests':'Material Requests','returns-scrap':'Returns & Scrap','vendors':'Vendors','purchase-indents':'Purchase Indents','purchase-orders':'Purchase Orders','transport':'Transport Requests','so-approved':'Stock Outlet — Approved Requests','so-factory':'Stock Outlet — Factory Issue Log'};
 
 // ========== API HELPERS ==========
 // Use main app's apiCall — strips /api prefix since apiCall adds it
@@ -114,7 +119,8 @@ function renderPebOverlay() {
     'dashboard':_pebDashboard,'stock-items':_pebStockItems,'grn':_pebGRN,
     'material-requests':_pebMaterialRequests,'returns-scrap':_pebReturnsScrap,
     'vendors':_pebVendors,'purchase-indents':_pebIndents,
-    'purchase-orders':_pebOrders,'transport':_pebTransport
+    'purchase-orders':_pebOrders,'transport':_pebTransport,
+    'so-approved':_pebSoApproved,'so-factory':_pebSoFactory
   }[_pebSection];
   if (fn) fn(el); else el.innerHTML = '<div class="card" style="padding:20px;text-align:center">Section not found</div>';
 }
@@ -1124,5 +1130,172 @@ async function _pebSaveTransport() {
     await _pebPost('/api/peb/purchase/transport',{type:type,origin_name:document.getElementById('pTR_from').value||null,destination_name:document.getElementById('pTR_to').value||null,scheduled_date:date,urgency:document.getElementById('pTR_urg').value,vehicle_type:document.getElementById('pTR_vtype').value||null,estimated_weight:+document.getElementById('pTR_wt').value||null,reason:document.getElementById('pTR_reason').value||null});
     showToast('Transport request created','success');_pebTransport(_p());
   }catch(e){showToast(e.message,'error');}
+}
+
+// ==========================================================================
+// STOCK OUTLET — Approved Requests (mark-as-given) + Factory Issue Log
+// ==========================================================================
+
+// ----- Approved Requests -----
+async function _pebSoApproved(el) {
+  try {
+    var reqs = await _pebApi('/api/peb/store/material-requests');
+    var approved = (reqs || []).filter(function(r) { return r.stage === 'APPROVED'; });
+    var html = '<div style="margin-bottom:10px;font-size:.78rem;color:var(--gray-600)">Material requests approved by MD and ready for the store to fulfil. Click <strong>Mark as Given</strong> to dispatch and decrement stock.</div>';
+    if (approved.length === 0) {
+      html += '<div class="card" style="padding:20px;text-align:center;color:var(--gray-500);font-size:.82rem">No approved requests waiting to be issued.</div>';
+    } else {
+      html += _pebTbl(['Code', 'Site', 'Project', 'Urgency', 'Approved On', 'Action'], approved.map(function(r) {
+        return [
+          '<span style="font-weight:600;font-size:.7rem;color:#6366f1">' + escapeHTML(r.request_code || '') + '</span>',
+          escapeHTML(r.site_name || '-'),
+          escapeHTML(r.project_name || '-'),
+          _pebBadge(r.urgency || 'NORMAL', r.urgency === 'URGENT' ? '#ef4444' : '#3b82f6'),
+          _pebDate(r.updated_at || r.created_at),
+          '<button class="btn btn-golden" style="font-size:.65rem;padding:3px 10px" onclick="_pebSoOpenGive(' + r.id + ')">Mark as Given</button>'
+        ];
+      }), '700px');
+    }
+    el.innerHTML = html;
+  } catch (e) {
+    el.innerHTML = '<div class="card" style="padding:20px;text-align:center;color:var(--danger)">' + escapeHTML(e.message) + '</div>';
+  }
+}
+
+async function _pebSoOpenGive(id) {
+  // Reuse the existing dispatch UI which already lets the issuer set issued_qty per item.
+  try {
+    var data = await _pebApi('/api/peb/store/material-requests/' + id);
+    var el = _p();
+    var html = '<button class="btn" style="font-size:.7rem;margin-bottom:12px;border:1px solid #cbd5e1;color:#475569;background:#f8fafc;border-radius:6px;cursor:pointer" onclick="_pebSoApproved(_p())">&#8592; Back to Approved Requests</button>';
+    html += '<div class="card" style="padding:14px"><h3 style="font-size:.85rem;font-weight:700;margin-bottom:8px">Issue Materials — ' + escapeHTML(data.request_code || '') + '</h3>';
+    html += '<div style="font-size:.72rem;color:var(--gray-500);margin-bottom:10px">Site: ' + escapeHTML(data.site_name || '-') + (data.project_name ? ' &middot; Project: ' + escapeHTML(data.project_name) : '') + '</div>';
+    (data.items || []).forEach(function(i, idx) {
+      html += '<div style="display:flex;gap:8px;margin-bottom:6px;align-items:end">' +
+        '<input type="hidden" id="pSoG_id_' + idx + '" value="' + i.id + '"><input type="hidden" id="pSoG_item_' + idx + '" value="' + i.item_id + '">' +
+        '<div style="flex:2"><label style="font-size:.65rem;font-weight:600">' + escapeHTML(i.item_name || '') + ' <span style="color:var(--gray-400)">(' + escapeHTML(i.unit || '') + ')</span></label>' +
+        '<input disabled value="Requested: ' + i.requested_qty + ' | Approved: ' + (i.approved_qty != null ? i.approved_qty : i.requested_qty) + ' | In stock: ' + (i.current_stock != null ? i.current_stock : '?') + '" style="width:100%;padding:6px;border:1px solid var(--gray-200);border-radius:6px;font-size:.7rem;background:#f8f9fa"></div>' +
+        '<div style="flex:1;min-width:80px"><label style="font-size:.65rem;font-weight:600">Issue Qty</label><input id="pSoG_qty_' + idx + '" type="number" step="0.01" min="0" value="' + (i.approved_qty != null ? i.approved_qty : i.requested_qty) + '" style="width:100%;padding:6px;border:1px solid var(--gray-200);border-radius:6px;font-size:.75rem"></div>' +
+        '</div>';
+    });
+    html += '<div style="margin-top:8px"><label style="font-size:.65rem;font-weight:600">Store Remarks (optional)</label><textarea id="pSoG_rem" rows="2" style="width:100%;padding:6px;border:1px solid var(--gray-200);border-radius:6px;font-size:.75rem"></textarea></div>';
+    html += '<button class="btn btn-golden" style="margin-top:10px" onclick="_pebSoConfirmGive(' + id + ',' + (data.items || []).length + ')">Confirm — Mark as Given</button>';
+    html += '</div>';
+    el.innerHTML = html;
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+async function _pebSoConfirmGive(id, itemCount) {
+  var items = [];
+  for (var i = 0; i < itemCount; i++) {
+    var qty = parseFloat(document.getElementById('pSoG_qty_' + i).value);
+    if (!qty || qty <= 0) { showToast('Issue qty must be > 0 for every item', 'error'); return; }
+    items.push({
+      id: parseInt(document.getElementById('pSoG_id_' + i).value, 10),
+      item_id: parseInt(document.getElementById('pSoG_item_' + i).value, 10),
+      issued_qty: qty
+    });
+  }
+  try {
+    await _pebPost('/api/peb/store/material-requests/' + id + '/dispatch', {
+      items: items,
+      store_remarks: document.getElementById('pSoG_rem').value || null
+    });
+    showToast('Marked as given — stock decremented', 'success');
+    _pebSoApproved(_p());
+  } catch (e) { showToast(e.message, 'error'); }
+}
+
+// ----- Factory Issue Log -----
+var _pebSoStockCache = null;
+var _pebSoProjCache = null;
+async function _pebSoLoadLookups() {
+  if (!_pebSoStockCache) {
+    try { _pebSoStockCache = await _pebApi('/api/peb/store/items'); } catch (e) { _pebSoStockCache = []; }
+  }
+  if (!_pebSoProjCache) {
+    try {
+      var p = await _pebApi('/api/projects');
+      _pebSoProjCache = Array.isArray(p) ? p : (p && p.data ? p.data : []);
+    } catch (e) { _pebSoProjCache = []; }
+  }
+}
+
+async function _pebSoFactory(el) {
+  el.innerHTML = '<div style="text-align:center;padding:30px;color:var(--gray-400)">Loading...</div>';
+  try {
+    await _pebSoLoadLookups();
+    var issues = await _pebApi('/api/peb/store/factory-issues?limit=100');
+    var stockOpts = (_pebSoStockCache || []).map(function(s) {
+      return '<option value="' + s.id + '">' + escapeHTML(s.item_code || '') + ' — ' + escapeHTML(s.item_name || '') + ' (' + s.current_stock + ' ' + escapeHTML(s.unit || '') + ')</option>';
+    }).join('');
+    var empOpts = (typeof EMPLOYEES !== 'undefined' ? EMPLOYEES : [])
+      .filter(function(e) { return e.status !== 'Inactive' && e.code !== 'SADMIN'; })
+      .sort(function(a, b) { return a.name.localeCompare(b.name); })
+      .map(function(e) { return '<option value="' + escapeAttr(e.code) + '">' + escapeHTML(e.name) + ' (' + escapeHTML(e.code) + ')</option>'; })
+      .join('');
+    var projOpts = (_pebSoProjCache || [])
+      .map(function(p) { return '<option value="' + p.id + '">' + escapeHTML(p.name || ('Project #' + p.id)) + '</option>'; })
+      .join('');
+
+    var nowLocal = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+
+    var html = '<div class="card" style="padding:14px;margin-bottom:14px"><h3 style="font-size:.85rem;font-weight:700;margin-bottom:8px">Record Factory Issue</h3>';
+    html += '<div style="font-size:.72rem;color:var(--gray-500);margin-bottom:10px">Use this when someone working in the factory takes an item directly from the store. Submitting deducts the quantity from stock immediately.</div>';
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px">';
+    html += '<div><label style="font-size:.7rem;font-weight:600">Item *</label><select id="pSoF_item" style="width:100%;padding:6px;border:1px solid var(--gray-200);border-radius:6px;font-size:.75rem"><option value="">— Select item —</option>' + stockOpts + '</select></div>';
+    html += '<div><label style="font-size:.7rem;font-weight:600">Quantity *</label><input id="pSoF_qty" type="number" step="0.01" min="0.01" style="width:100%;padding:6px;border:1px solid var(--gray-200);border-radius:6px;font-size:.75rem"></div>';
+    html += '<div><label style="font-size:.7rem;font-weight:600">Person Taking *</label><select id="pSoF_emp" style="width:100%;padding:6px;border:1px solid var(--gray-200);border-radius:6px;font-size:.75rem"><option value="">— Select person —</option>' + empOpts + '</select></div>';
+    html += '<div><label style="font-size:.7rem;font-weight:600">Project</label><select id="pSoF_proj" style="width:100%;padding:6px;border:1px solid var(--gray-200);border-radius:6px;font-size:.75rem"><option value="">— None —</option>' + projOpts + '</select></div>';
+    html += '<div><label style="font-size:.7rem;font-weight:600">Taken At *</label><input id="pSoF_at" type="datetime-local" value="' + nowLocal + '" style="width:100%;padding:6px;border:1px solid var(--gray-200);border-radius:6px;font-size:.75rem"></div>';
+    html += '<div style="grid-column:1/-1"><label style="font-size:.7rem;font-weight:600">Notes (optional)</label><textarea id="pSoF_notes" rows="2" style="width:100%;padding:6px;border:1px solid var(--gray-200);border-radius:6px;font-size:.75rem"></textarea></div>';
+    html += '</div>';
+    html += '<button class="btn btn-golden" style="margin-top:10px" onclick="_pebSoSaveIssue()">Save & Decrement Stock</button>';
+    html += '</div>';
+
+    html += '<div class="card" style="padding:14px"><h3 style="font-size:.85rem;font-weight:700;margin-bottom:8px">Recent Issues</h3>';
+    if (!issues || issues.length === 0) {
+      html += '<div style="text-align:center;padding:14px;color:var(--gray-500);font-size:.8rem">No factory issues recorded yet.</div>';
+    } else {
+      html += _pebTbl(['Date', 'Item', 'Qty', 'Taken By', 'Project', 'Notes'], issues.map(function(it) {
+        return [
+          _pebDate(it.taken_at),
+          escapeHTML(it.item_name || '') + (it.item_code ? ' <span style="color:var(--gray-400);font-size:.65rem">(' + escapeHTML(it.item_code) + ')</span>' : ''),
+          '<span style="font-weight:600">' + it.quantity + '</span> ' + escapeHTML(it.unit || ''),
+          escapeHTML(it.taken_by_name || it.taken_by_emp_code || ''),
+          escapeHTML(it.project_name || '-'),
+          escapeHTML(it.notes || '-')
+        ];
+      }), '700px');
+    }
+    html += '</div>';
+
+    el.innerHTML = html;
+  } catch (e) {
+    el.innerHTML = '<div class="card" style="padding:20px;text-align:center;color:var(--danger)">' + escapeHTML(e.message) + '</div>';
+  }
+}
+
+async function _pebSoSaveIssue() {
+  var item_id = parseInt(document.getElementById('pSoF_item').value, 10);
+  var quantity = parseFloat(document.getElementById('pSoF_qty').value);
+  var taken_by_emp_code = document.getElementById('pSoF_emp').value;
+  var project_id = parseInt(document.getElementById('pSoF_proj').value, 10) || null;
+  var taken_at = document.getElementById('pSoF_at').value;
+  var notes = document.getElementById('pSoF_notes').value;
+  if (!item_id || !quantity || quantity <= 0 || !taken_by_emp_code || !taken_at) {
+    showToast('Item, quantity (>0), person and date are required', 'error');
+    return;
+  }
+  try {
+    await _pebPost('/api/peb/store/factory-issues', {
+      item_id: item_id, quantity: quantity, taken_by_emp_code: taken_by_emp_code,
+      project_id: project_id, taken_at: taken_at, notes: notes || null
+    });
+    showToast('Factory issue recorded — stock decremented', 'success');
+    // Invalidate stock cache so the dropdown shows fresh balances next render
+    _pebSoStockCache = null;
+    _pebSoFactory(_p());
+  } catch (e) { showToast(e.message, 'error'); }
 }
 
