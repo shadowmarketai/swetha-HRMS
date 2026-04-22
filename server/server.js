@@ -583,13 +583,11 @@ app.get('*', (req, res) => {
       }
     }
 
-    // Ensure SS031 (Accounts dept) has the Accounts role
-    const [ss031] = await pool.query("SELECT role FROM users WHERE emp_code = 'SS031'");
-    if (ss031.length && ss031[0].role !== 'Accounts') {
-      await pool.query("UPDATE users SET role = 'Accounts' WHERE emp_code = 'SS031'");
-      await pool.query("UPDATE employees SET role = 'Accounts' WHERE code = 'SS031'").catch(() => {});
-      console.log('[migration] SS031 role updated to Accounts');
-    }
+    // Ensure SS031 (Accounts dept) has the Accounts role — force update every startup
+    await pool.query("UPDATE users SET role = 'Accounts' WHERE emp_code = 'SS031'").catch(() => {});
+    await pool.query("UPDATE employees SET role = 'Accounts' WHERE code = 'SS031'").catch(() => {});
+    const [ss031Check] = await pool.query("SELECT role FROM users WHERE emp_code = 'SS031'").catch(() => [[]]);
+    console.log('[migration] SS031 role is now:', ss031Check.length ? ss031Check[0].role : 'NOT FOUND');
 
     console.log('DB migrations applied');
   } catch (e) { console.error('Migration error (non-fatal):', e.message); }
