@@ -1677,7 +1677,7 @@ function showOverlay(id) {
   if (id === 'location' && currentUser.role !== 'MD') return;
   if (id === 'peb' && currentUser.role !== 'MD' && currentUser.role !== 'HR' && !(['Site Engineer','Admin','Accounts','Execution','Production'].indexOf(currentUser.dept) >= 0)) return;
   if (id === 'onboarding' && currentUser.role !== 'MD' && currentUser.role !== 'HR' && currentUser.role !== 'Manager') return;
-  if (id === 'advance-requests' && currentUser.role !== 'MD' && currentUser.role !== 'HR' && currentUser.role !== 'Manager') return;
+  if (id === 'advance-requests' && currentUser.role !== 'MD' && currentUser.role !== 'HR' && currentUser.role !== 'Manager' && currentUser.role !== 'Accounts') return;
   // Render content (wrapped in try-catch so errors don't block overlay display)
   try {
     if (id === 'profile') renderProfileOverlay();
