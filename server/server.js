@@ -583,6 +583,14 @@ app.get('*', (req, res) => {
       }
     }
 
+    // Ensure SS031 (Accounts dept) has the Accounts role
+    const [ss031] = await pool.query("SELECT role FROM users WHERE emp_code = 'SS031'");
+    if (ss031.length && ss031[0].role !== 'Accounts') {
+      await pool.query("UPDATE users SET role = 'Accounts' WHERE emp_code = 'SS031'");
+      await pool.query("UPDATE employees SET role = 'Accounts' WHERE code = 'SS031'").catch(() => {});
+      console.log('[migration] SS031 role updated to Accounts');
+    }
+
     console.log('DB migrations applied');
   } catch (e) { console.error('Migration error (non-fatal):', e.message); }
 })();
@@ -732,19 +740,9 @@ io.on('connection', (socket) => {
 // Make io accessible in routes
 app.set('io', io);
 
-server.listen(PORT, HOST, async () => {
+server.listen(PORT, HOST, () => {
   console.log(`HRMS Server running on ${HOST}:${PORT}`);
   console.log(`Frontend: http://localhost:${PORT}`);
   console.log(`API: http://localhost:${PORT}/api`);
   console.log(`WebSocket: ws://localhost:${PORT}`);
-
-  // One-time migration: ensure SS031 has Accounts role
-  try {
-    const pool = require('./config/db');
-    const [rows] = await pool.query("SELECT role FROM users WHERE emp_code = 'SS031'");
-    if (rows.length && rows[0].role !== 'Accounts') {
-      await pool.query("UPDATE users SET role = 'Accounts' WHERE emp_code = 'SS031'");
-      console.log('[migration] SS031 role updated to Accounts');
-    }
-  } catch (e) { console.log('[migration] accounts role fix skipped:', e.message); }
 });
