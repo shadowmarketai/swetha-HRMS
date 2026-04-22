@@ -105,7 +105,7 @@ const EMPLOYEES = [
   {code:'SS028',name:'Dinesh Jayabal',dept:'Admin',designation:'Driver',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'dineshindira2024@gmail.com'},
   {code:'SS029',name:'Depsingh R',dept:'Admin',designation:'Security',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'depsinghrokaya@gmail.com'},
   {code:'SS030',name:'Kathirvel N',dept:'Design',designation:'Designing',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'kathirveln2588@gmail.com'},
-  {code:'SS031',name:'Shiyam Raj E',dept:'Accounts',designation:'Accounts',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'shiyam0905@gmail.com'},
+  {code:'SS031',name:'Shiyam Raj E',dept:'Accounts',designation:'Accounts',salary:0,bank:'',accNo:'',role:'Accounts',phone:'',doj:'',email:'shiyam0905@gmail.com'},
   {code:'SS032',name:'Dharmaraj',dept:'Design',designation:'Designing',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'thedharmarajm@gmail.com'},
   {code:'SS033',name:'Sakthi Murugan',dept:'Execution',designation:'Execution',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'sakthi252636@gmail.com'},
   {code:'SS034',name:'Praveen Kumar J',dept:'Marketing',designation:'Marketing',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'forpraveenvideos@gmail.com'},
@@ -387,6 +387,35 @@ const NAV_CONFIG = {
     { id:'mgr-profile', label:'Profile', icon:'profile', action:{type:'overlay',target:'profile'}, isFooter:true },
     { id:'mgr-settings', label:'Settings', icon:'settings', action:{type:'overlay',target:'settings'}, isFooter:true },
     { id:'mgr-logout', label:'Log Out', icon:'logout', action:{type:'logout'}, isFooter:true, isDanger:true }
+  ],
+  Accounts: [
+    { id:'home', label:'Home', icon:'home', action:{type:'tab',target:'home'} },
+    { id:'acc-attendance', label:'Attendance', icon:'attendance', children:[
+      { id:'acc-att-cal', label:'Calendar', action:{type:'tab',target:'attendance'} },
+      { id:'acc-att-leave', label:'Apply Leave', action:{type:'tab',target:'leaves'} }
+    ]},
+    { id:'acc-advance', label:'Advance & Expense', icon:'advance', action:{type:'overlay',target:'advance-requests'} },
+    { id:'acc-payments', label:'Payments', icon:'salary', children:[
+      { id:'acc-approved-adv', label:'Approved Advances', action:{type:'overlay',target:'accounts-payments'} },
+      { id:'acc-approved-exp', label:'Approved Expenses', action:{type:'overlay',target:'accounts-payments'} },
+      { id:'acc-settlement', label:'Settlement Tracker', action:{type:'overlay',target:'accounts-payments'} }
+    ]},
+    { id:'acc-salary', label:'Salary', icon:'salary', children:[
+      { id:'acc-sal-self', label:'Self Salary', action:{type:'tab',target:'salary'} },
+      { id:'acc-sal-list', label:'Employee List', action:{type:'tab',target:'salary'} }
+    ]},
+    { id:'acc-progress', label:'Project Progress', icon:'progress', action:{type:'tab',target:'progress'} },
+    { id:'acc-procurement', label:'Procurement', icon:'purchase', children:[
+      { id:'acc-proc-grn', label:'GRN', action:{type:'overlay',target:'peb'} },
+      { id:'acc-proc-vendors', label:'Vendors', action:{type:'overlay',target:'peb'} },
+      { id:'acc-proc-indents', label:'Purchase Indents', action:{type:'overlay',target:'peb'} },
+      { id:'acc-proc-orders', label:'Purchase Orders', action:{type:'overlay',target:'peb'} },
+      { id:'acc-proc-transport', label:'Transport', action:{type:'overlay',target:'peb'} }
+    ]},
+    // Footer
+    { id:'acc-profile', label:'Profile', icon:'profile', action:{type:'overlay',target:'profile'}, isFooter:true },
+    { id:'acc-settings', label:'Settings', icon:'settings', action:{type:'overlay',target:'settings'}, isFooter:true },
+    { id:'acc-logout', label:'Log Out', icon:'logout', action:{type:'logout'}, isFooter:true, isDanger:true }
   ]
 };
 
@@ -7845,16 +7874,16 @@ function filterNavByDept(items) {
 // Map nav item IDs to feature keys for SuperAdmin access gating.
 // Only the top-level nav items are gated — children inherit from parent.
 var NAV_FEATURE_MAP = {
-  'attendance':'attendance', 'md-attendance':'attendance', 'hr-attendance':'attendance', 'emp-attendance':'attendance', 'mgr-attendance':'attendance',
+  'attendance':'attendance', 'md-attendance':'attendance', 'hr-attendance':'attendance', 'emp-attendance':'attendance', 'mgr-attendance':'attendance', 'acc-attendance':'attendance',
   'leaves':'leaves', 'md-att-leave':'leaves', 'hr-att-leave':'leaves', 'emp-att-leave':'leaves',
-  'advance':'advances', 'md-advance':'advances', 'hr-advance':'advances', 'emp-advance':'advances',
+  'advance':'advances', 'md-advance':'advances', 'hr-advance':'advances', 'emp-advance':'advances', 'acc-advance':'advances',
   'expense':'expenses', 'emp-expense':'expenses',
-  'salary':'salary', 'md-salary':'salary', 'hr-salary':'salary', 'emp-salary':'salary', 'emp-acc-salary':'salary',
+  'salary':'salary', 'md-salary':'salary', 'hr-salary':'salary', 'emp-salary':'salary', 'emp-acc-salary':'salary', 'acc-salary':'salary',
   'tax':'tax', 'md-tax':'tax', 'hr-tax':'tax',
-  'progress':'projects', 'md-progress':'projects', 'emp-progress':'projects',
+  'progress':'projects', 'md-progress':'projects', 'emp-progress':'projects', 'acc-progress':'projects',
   'tasks':'tasks',
   'md-peb-dash':'peb_stock_items', 'md-inventory':'peb_stock_items', 'hr-inventory':'peb_stock_items', 'emp-store':'peb_stock_items', 'emp-admin-peb':'peb_stock_items',
-  'md-procurement':'peb_purchase_indents', 'hr-procurement':'peb_purchase_indents', 'emp-acc-procurement':'peb_purchase_indents',
+  'md-procurement':'peb_purchase_indents', 'hr-procurement':'peb_purchase_indents', 'emp-acc-procurement':'peb_purchase_indents', 'acc-procurement':'peb_purchase_indents',
   // Stock Outlet — fulfilling approved material requests (gated on peb_material_requests)
   'md-stock-outlet':'peb_material_requests', 'hr-stock-outlet':'peb_material_requests',
   'md-so-approved':'peb_material_requests', 'hr-so-approved':'peb_material_requests',
