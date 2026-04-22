@@ -394,7 +394,10 @@ const NAV_CONFIG = {
       { id:'acc-att-cal', label:'Calendar', action:{type:'tab',target:'attendance'} },
       { id:'acc-att-leave', label:'Apply Leave', action:{type:'tab',target:'leaves'} }
     ]},
-    { id:'acc-advance', label:'Advance & Expense', icon:'advance', action:{type:'overlay',target:'advance-requests'} },
+    { id:'acc-advance', label:'Advance', icon:'advance', children:[
+      { id:'acc-adv-salary', label:'Salary Advance', action:{type:'tab',target:'advance'} },
+      { id:'acc-adv-requests', label:'Approve Requests', action:{type:'overlay',target:'advance-requests'} }
+    ]},
     { id:'acc-payments', label:'Payments', icon:'salary', children:[
       { id:'acc-approved-adv', label:'Approved Advances', action:{type:'overlay',target:'accounts-payments'} },
       { id:'acc-approved-exp', label:'Approved Expenses', action:{type:'overlay',target:'accounts-payments'} },
@@ -13648,8 +13651,8 @@ function renderAccountsPayments() {
   var titleEl = document.getElementById('accPaymentsTitle');
 
   var section = 'approved-advances';
-  if (_activeNavId === 'emp-acc-approved-exp') section = 'approved-expenses';
-  if (_activeNavId === 'emp-acc-settlement') section = 'settlement';
+  if (_activeNavId === 'emp-acc-approved-exp' || _activeNavId === 'acc-approved-exp') section = 'approved-expenses';
+  if (_activeNavId === 'emp-acc-settlement' || _activeNavId === 'acc-settlement') section = 'settlement';
 
   if (titleEl) {
     var titles = {'approved-advances':'Approved Advances','approved-expenses':'Approved Expenses','settlement':'Settlement Tracker'};
@@ -13680,7 +13683,9 @@ function renderAccApprovedAdvances(c) {
       if (r.details) html += '<div style="font-size:.68rem;color:var(--gray-400)">' + escapeHTML(r.details) + '</div>';
       html += '</div>';
       html += '<div style="text-align:right"><div style="font-weight:700;font-size:.88rem;color:var(--primary)">Rs.' + (r.amount || 0).toLocaleString('en-IN') + '</div>';
-      html += '<span class="badge-status badge-approved">Approved</span></div></div>';
+      html += '<span class="badge-status badge-approved">Approved</span>';
+      html += '<div style="margin-top:6px"><button onclick="markAdvancePaid(' + r.id + ')" style="padding:5px 12px;font-size:.7rem;font-weight:600;background:#10B981;color:#fff;border:none;border-radius:6px;cursor:pointer">Mark Paid</button></div>';
+      html += '</div></div>';
     });
     html += '<div style="display:flex;justify-content:space-between;padding:12px 0;font-weight:700;font-size:.85rem;border-top:2px solid var(--gray-200)"><span>Total Payout</span><span style="color:var(--primary)">Rs.' + totalAmt.toLocaleString('en-IN') + '</span></div>';
     html += '</div>';
@@ -13704,10 +13709,12 @@ function renderAccApprovedExpenses(c) {
       html += '<div style="flex:1"><div style="font-weight:600;font-size:.82rem">' + escapeHTML(e.empName || e.empCode) + '</div>';
       html += '<div style="font-size:.72rem;color:var(--gray-500)">' + escapeHTML(e.category || '') + ' &middot; ' + escapeHTML(e.date || '') + '</div>';
       if (e.description) html += '<div style="font-size:.68rem;color:var(--gray-400)">' + escapeHTML(e.description) + '</div>';
-      if (e.billUrl) html += '<a href="' + escapeHTML(e.billUrl) + '" target="_blank" style="font-size:.68rem;color:var(--primary);font-weight:600">View Bill</a>';
+      if (e.billUrl) html += '<a href="' + escapeHTML(e.billUrl) + '" target="_blank" style="font-size:.68rem;color:var(--primary);font-weight:600">📎 View Bill</a>';
       html += '</div>';
       html += '<div style="text-align:right"><div style="font-weight:700;font-size:.88rem;color:var(--primary)">Rs.' + (e.amount || 0).toLocaleString('en-IN') + '</div>';
-      html += '<span class="badge-status badge-approved">Approved</span></div></div>';
+      html += '<span class="badge-status badge-approved">Approved</span>';
+      html += '<div style="margin-top:6px"><button onclick="markExpensePaid(' + e.id + ')" style="padding:5px 12px;font-size:.7rem;font-weight:600;background:#10B981;color:#fff;border:none;border-radius:6px;cursor:pointer">Mark Reimbursed</button></div>';
+      html += '</div></div>';
     });
     html += '<div style="display:flex;justify-content:space-between;padding:12px 0;font-weight:700;font-size:.85rem;border-top:2px solid var(--gray-200)"><span>Total Reimbursement</span><span style="color:var(--primary)">Rs.' + totalAmt.toLocaleString('en-IN') + '</span></div>';
     html += '</div>';
