@@ -3851,15 +3851,17 @@ function renderAdvanceRequests(filter) {
   var allItems = advanceRequests.concat(expItems);
   var isMD = currentUser && currentUser.role === 'MD';
   var isAccounts = currentUser && currentUser.role === 'Accounts';
+  var isHR = currentUser && currentUser.role === 'HR';
+  var isReviewerRole = isAccounts || isHR;
   let reqs;
   if (filter === 'all') {
     reqs = [...allItems];
   } else if (filter === 'pending') {
-    // Accounts sees Pending (to accept) + Approved (to mark Paid).
+    // Accounts/HR sees Pending (to accept) + Approved (to mark Paid).
     // MD sees pending + accounts_accepted (awaiting their confirm).
     if (isMD) {
       reqs = allItems.filter(r => r.status === 'pending' || r.status === 'accounts_accepted');
-    } else if (isAccounts) {
+    } else if (isReviewerRole) {
       reqs = allItems.filter(r => r.status === 'pending' || r.status === 'approved');
     } else {
       reqs = allItems.filter(r => r.status === 'pending');
@@ -3884,27 +3886,27 @@ function renderAdvanceRequests(filter) {
     var paySvg   = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/></svg>';
 
     if (r._isExpense) {
-      // EXPENSE items — Accounts → MD → Accounts(Mark Paid)
-      if (isAccounts && r.status === 'pending') {
+      // EXPENSE items — Accounts/HR → MD → Accounts/HR(Mark Paid)
+      if (isReviewerRole && r.status === 'pending') {
         actionsHtml = `<div class="adv-actions"><button class="approve-btn" onclick="accountsAcceptExpense(${r.id})">${checkSvg} Accept &amp; Forward to MD</button><button class="reject-btn" onclick="rejectExpense(${r.id})">${crossSvg} Reject</button></div>`;
       } else if (isMD && r.status === 'accounts_accepted') {
         actionsHtml = `<div class="adv-actions"><button class="approve-btn" onclick="approveExpense(${r.id})">${checkSvg} Confirm</button><button class="reject-btn" onclick="rejectExpense(${r.id})">${crossSvg} Reject</button></div>`;
-      } else if (isAccounts && r.status === 'approved') {
+      } else if (isReviewerRole && r.status === 'approved') {
         actionsHtml = `<div class="adv-actions"><button class="approve-btn" onclick="markExpensePaid(${r.id})" style="background:#10B981">${paySvg} Mark Paid</button></div>`;
       }
     } else {
       // ADVANCE items — same flow
-      if (isAccounts && r.status === 'pending') {
+      if (isReviewerRole && r.status === 'pending') {
         actionsHtml = `<div class="adv-actions"><button class="approve-btn" onclick="accountsAcceptAdvance(${r.id})">${checkSvg} Accept &amp; Forward to MD</button><button class="reject-btn" onclick="rejectAdvance(${r.id})">${crossSvg} Reject</button></div>`;
       } else if (isMD && r.status === 'accounts_accepted') {
         actionsHtml = `<div class="adv-actions"><button class="approve-btn" onclick="approveAdvance(${r.id})">${checkSvg} Confirm</button><button class="reject-btn" onclick="rejectAdvance(${r.id})">${crossSvg} Reject</button></div>`;
-      } else if (isAccounts && r.status === 'approved') {
+      } else if (isReviewerRole && r.status === 'approved') {
         actionsHtml = `<div class="adv-actions"><button class="approve-btn" onclick="markAdvancePaid(${r.id})" style="background:#10B981">${paySvg} Mark Paid</button></div>`;
       }
     }
-    // Voucher PDF download button (MD + Accounts only). Opens in a new tab via blob.
+    // Voucher PDF download button (MD + Accounts + HR). Opens in a new tab via blob.
     var pdfBtn = '';
-    if (isMD || isAccounts) {
+    if (isMD || isReviewerRole) {
       var voucherKind = r._isExpense ? 'expenses' : 'advances';
       pdfBtn = '<button onclick="downloadVoucherPDF(\'' + voucherKind + '\',' + r.id + ')" title="Download PDF voucher" style="background:none;border:1px solid var(--gray-200);padding:3px 8px;border-radius:6px;cursor:pointer;font-size:.68rem;color:var(--gray-600);display:inline-flex;align-items:center;gap:3px;margin-left:4px"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> PDF</button>';
     }
@@ -4003,7 +4005,7 @@ async function rejectAdvance(id) {
 function _renderAdvExportBar(uiFilter) {
   var bar = document.getElementById('advReqExportBar');
   if (!bar) return;
-  var canExport = currentUser && (currentUser.role === 'MD' || currentUser.role === 'Accounts');
+  var canExport = currentUser && (currentUser.role === 'MD' || currentUser.role === 'Accounts' || currentUser.role === 'HR');
   if (!canExport) { bar.style.display = 'none'; bar.innerHTML = ''; return; }
   // Map UI filter → backend status query.
   // For 'pending' we don't pin a single status because reviewers often want all unsettled
@@ -10195,11 +10197,11 @@ async function rejectExpense(id) {
 function renderExpenseOverlay() {
   const c = document.getElementById('expensesContent');
   if (!c) return;
-  // Reviewers (MD + Accounts) see everyone's claims; everyone else sees their own.
-  // HR no longer reviews expenses — they only see their own personal claims.
+  // Reviewers (MD + Accounts + HR) see everyone's claims; everyone else sees their own.
   const isMD = currentUser && currentUser.role === 'MD';
   const isAccounts = currentUser && currentUser.role === 'Accounts';
-  const isReviewer = isMD || isAccounts;
+  const isHR = currentUser && currentUser.role === 'HR';
+  const isReviewer = isMD || isAccounts || isHR;
   let html = '<div style="display:flex;gap:8px;margin-bottom:12px"><button class="nf-btn nf-btn-primary" onclick="openExpenseApplyForm()">+ New Claim</button></div>';
   const myExps = isReviewer ? expenseReimbursements : expenseReimbursements.filter(e => e.empCode === currentUser.code);
   if (myExps.length === 0) {
@@ -10219,8 +10221,8 @@ function renderExpenseOverlay() {
                                           exp.status;
       const catIcons = {'Travel':'🚗','Food':'🍽️','Accommodation':'🏨','Equipment':'🔧','Office Supplies':'📎','Medical':'🏥','Fuel':'⛽','Other':'📦'};
       html += `<div class="expense-item"><div class="expense-cat-icon" style="background:var(--gray-100)">${catIcons[exp.category]||'📦'}</div><div style="flex:1"><div style="font-weight:600;font-size:.82rem">${escapeHTML(exp.category)}</div><div style="font-size:.72rem;color:var(--gray-500)">${escapeHTML(exp.empName)} &middot; ${exp.date}</div>${exp.description?'<div style="font-size:.68rem;color:var(--gray-400);margin-top:2px">'+escapeHTML(exp.description)+'</div>':''}${exp.billUrl?'<a href="'+escapeHTML(exp.billUrl)+'" target="_blank" style="font-size:.68rem;color:var(--primary);font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:3px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>View Bill</a>':''}</div><div style="text-align:right"><div class="expense-amount">Rs.${exp.amount.toLocaleString('en-IN')}</div><span class="badge-status ${badgeCls}">${escapeHTML(statusLabel)}</span>`;
-      // Action buttons — Accounts accepts Pending, MD confirms accounts_accepted, Accounts marks Paid
-      if (isAccounts && exp.status === 'Pending') {
+      // Action buttons — Accounts/HR accepts Pending, MD confirms accounts_accepted, Accounts/HR marks Paid
+      if ((isAccounts || isHR) && exp.status === 'Pending') {
         html += `<div style="margin-top:4px;display:flex;gap:4px">
           <button class="nf-btn nf-btn-warning nf-btn-sm" onclick="accountsAcceptExpense(${exp.id})" style="font-size:.6rem">Accept</button>
           <button class="nf-btn nf-btn-danger nf-btn-sm" onclick="rejectExpense(${exp.id})">✗</button>
@@ -10230,7 +10232,7 @@ function renderExpenseOverlay() {
           <button class="nf-btn nf-btn-success nf-btn-sm" onclick="approveExpense(${exp.id})">✓</button>
           <button class="nf-btn nf-btn-danger nf-btn-sm" onclick="rejectExpense(${exp.id})">✗</button>
         </div>`;
-      } else if (isAccounts && exp.status === 'Approved') {
+      } else if ((isAccounts || isHR) && exp.status === 'Approved') {
         html += `<div style="margin-top:4px;display:flex;gap:4px">
           <button class="nf-btn nf-btn-success nf-btn-sm" onclick="markExpensePaid(${exp.id})" style="background:#10B981" title="Mark as paid">Mark Paid</button>
         </div>`;

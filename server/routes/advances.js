@@ -22,7 +22,7 @@ async function getEmpCodesByRole(pool, roles) {
 
 // New approval flow: Employee → Accounts (review) → MD (approve) → Accounts (mark paid).
 // HR no longer participates in advance approvals — they're routed to Accounts instead.
-const REVIEWER_ROLES = ['MD', 'Accounts'];
+const REVIEWER_ROLES = ['MD', 'Accounts', 'HR'];
 
 // GET /api/advances — list advances
 router.get('/', verifyToken, async (req, res) => {
@@ -94,7 +94,7 @@ router.post('/', verifyToken, [
 
 // PATCH /api/advances/:id/accounts-accept — Accounts accepts (Pending → Accounts_Accepted)
 // New endpoint for the Accounts-first workflow.
-router.patch('/:id/accounts-accept', verifyToken, requireRole('Accounts'), auditLog('accounts-accept', 'advance'), async (req, res) => {
+router.patch('/:id/accounts-accept', verifyToken, requireRole('Accounts', 'HR'), auditLog('accounts-accept', 'advance'), async (req, res) => {
   try {
     const [existing] = await pool.query('SELECT * FROM advance_requests WHERE id = ?', [req.params.id]);
     if (existing.length === 0) return res.status(404).json({ error: 'Advance request not found' });
@@ -161,7 +161,7 @@ router.patch('/:id/approve', verifyToken, requireRole('MD'), auditLog('approve',
 });
 
 // PATCH /api/advances/:id/mark-paid — Accounts marks an MD-Approved advance as Paid (final disbursement)
-router.patch('/:id/mark-paid', verifyToken, requireRole('Accounts'), auditLog('mark-paid', 'advance'), async (req, res) => {
+router.patch('/:id/mark-paid', verifyToken, requireRole('Accounts', 'HR'), auditLog('mark-paid', 'advance'), async (req, res) => {
   try {
     const [existing] = await pool.query('SELECT * FROM advance_requests WHERE id = ?', [req.params.id]);
     if (existing.length === 0) return res.status(404).json({ error: 'Advance request not found' });
@@ -192,7 +192,7 @@ router.patch('/:id/mark-paid', verifyToken, requireRole('Accounts'), auditLog('m
 });
 
 // PATCH /api/advances/:id/reject — Accounts or MD reject (only from Pending or Accounts_Accepted)
-router.patch('/:id/reject', verifyToken, requireRole('MD', 'Accounts'), auditLog('reject', 'advance'), async (req, res) => {
+router.patch('/:id/reject', verifyToken, requireRole('MD', 'Accounts', 'HR'), auditLog('reject', 'advance'), async (req, res) => {
   try {
     const [existing] = await pool.query('SELECT * FROM advance_requests WHERE id = ?', [req.params.id]);
     if (existing.length === 0) return res.status(404).json({ error: 'Advance request not found' });
@@ -234,7 +234,7 @@ function buildFilters(query) {
 }
 
 // GET /api/advances/export — download filtered list as Excel (.xlsx)
-router.get('/export', verifyToken, requireRole('MD', 'Accounts'), async (req, res) => {
+router.get('/export', verifyToken, requireRole('MD', 'Accounts', 'HR'), async (req, res) => {
   try {
     const XLSX = require('xlsx');
     const { sql, params } = buildFilters(req.query);
@@ -290,7 +290,7 @@ router.get('/export', verifyToken, requireRole('MD', 'Accounts'), async (req, re
 });
 
 // GET /api/advances/:id/voucher — single advance as a printable PDF voucher
-router.get('/:id/voucher', verifyToken, requireRole('MD', 'Accounts'), async (req, res) => {
+router.get('/:id/voucher', verifyToken, requireRole('MD', 'Accounts', 'HR'), async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM advance_requests WHERE id = ?', [req.params.id]);
     if (rows.length === 0) return res.status(404).json({ error: 'Advance not found' });

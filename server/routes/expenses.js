@@ -23,7 +23,7 @@ async function getEmpCodesByRole(pool, roles) {
 // Roles allowed to see/manage every expense (vs only their own).
 // New flow: Employee → Accounts (review) → MD (approve) → Accounts (mark paid).
 // HR is intentionally NOT in this list — expenses & advances no longer route through HR.
-const REVIEWER_ROLES = ['MD', 'Accounts'];
+const REVIEWER_ROLES = ['MD', 'Accounts', 'HR'];
 
 // GET /api/expenses — list expense reimbursements
 router.get('/', verifyToken, async (req, res) => {
@@ -83,15 +83,15 @@ router.post('/', verifyToken, upload.single('bill'), async (req, res) => {
 });
 
 // PUT /api/expenses/:id/approve — Accounts accept (Pending → accounts_accepted) OR MD final approve (accounts_accepted → Approved)
-router.put('/:id/approve', verifyToken, requireRole('MD', 'Accounts'), auditLog('approve', 'expense'), async (req, res) => {
+router.put('/:id/approve', verifyToken, requireRole('MD', 'Accounts', 'HR'), auditLog('approve', 'expense'), async (req, res) => {
   try {
     const [existing] = await pool.query('SELECT * FROM expense_reimbursements WHERE id = ?', [req.params.id]);
     if (existing.length === 0) return res.status(404).json({ error: 'Expense not found' });
     const exp = existing[0];
     const currentStatus = exp.status;
     let newStatus;
-    if (req.user.role === 'Accounts') {
-      // Accounts can only accept (Pending → accounts_accepted)
+    if (req.user.role === 'Accounts' || req.user.role === 'HR') {
+      // Accounts/HR can only accept (Pending → accounts_accepted)
       if (currentStatus !== 'Pending') return res.status(400).json({ error: `Cannot accept: status is ${currentStatus}` });
       newStatus = 'accounts_accepted';
       await pool.query(
@@ -137,7 +137,7 @@ router.put('/:id/approve', verifyToken, requireRole('MD', 'Accounts'), auditLog(
 });
 
 // PUT /api/expenses/:id/mark-paid — Accounts marks an MD-Approved expense as Paid (final disbursement step)
-router.put('/:id/mark-paid', verifyToken, requireRole('Accounts'), auditLog('mark-paid', 'expense'), async (req, res) => {
+router.put('/:id/mark-paid', verifyToken, requireRole('Accounts', 'HR'), auditLog('mark-paid', 'expense'), async (req, res) => {
   try {
     const [existing] = await pool.query('SELECT * FROM expense_reimbursements WHERE id = ?', [req.params.id]);
     if (existing.length === 0) return res.status(404).json({ error: 'Expense not found' });
@@ -168,7 +168,7 @@ router.put('/:id/mark-paid', verifyToken, requireRole('Accounts'), auditLog('mar
 });
 
 // PUT /api/expenses/:id/reject — Accounts or MD reject (only from Pending or accounts_accepted)
-router.put('/:id/reject', verifyToken, requireRole('MD', 'Accounts'), auditLog('reject', 'expense'), async (req, res) => {
+router.put('/:id/reject', verifyToken, requireRole('MD', 'Accounts', 'HR'), auditLog('reject', 'expense'), async (req, res) => {
   try {
     const [existing] = await pool.query('SELECT * FROM expense_reimbursements WHERE id = ?', [req.params.id]);
     if (existing.length === 0) return res.status(404).json({ error: 'Expense not found' });
@@ -209,7 +209,7 @@ function buildFilters(query) {
 
 // GET /api/expenses/export — download filtered list as Excel (.xlsx)
 // Filters: ?status=Pending&from=2025-01-01&to=2025-12-31&empCode=E001
-router.get('/export', verifyToken, requireRole('MD', 'Accounts'), async (req, res) => {
+router.get('/export', verifyToken, requireRole('MD', 'Accounts', 'HR'), async (req, res) => {
   try {
     const XLSX = require('xlsx');
     const { sql, params } = buildFilters(req.query);
@@ -263,7 +263,7 @@ router.get('/export', verifyToken, requireRole('MD', 'Accounts'), async (req, re
 });
 
 // GET /api/expenses/:id/voucher — single expense as a printable PDF voucher
-router.get('/:id/voucher', verifyToken, requireRole('MD', 'Accounts'), async (req, res) => {
+router.get('/:id/voucher', verifyToken, requireRole('MD', 'Accounts', 'HR'), async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM expense_reimbursements WHERE id = ?', [req.params.id]);
     if (rows.length === 0) return res.status(404).json({ error: 'Expense not found' });
