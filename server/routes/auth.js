@@ -31,7 +31,7 @@ router.post('/login', [
       return res.status(400).json({ error: 'Employee code and password required' });
     }
     const [rows] = await pool.query(
-      'SELECT u.*, e.name, e.dept, e.designation FROM users u JOIN employees e ON u.emp_code = e.code WHERE u.emp_code = ? AND u.is_active = 1',
+      'SELECT u.*, e.name, e.dept, e.designation, e.role AS emp_role FROM users u JOIN employees e ON u.emp_code = e.code WHERE u.emp_code = ? AND u.is_active = 1',
       [empCode]
     );
     if (rows.length === 0) {
@@ -42,11 +42,13 @@ router.post('/login', [
     if (!valid) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
-    await pool.query('UPDATE users SET last_login = NOW() WHERE emp_code = ?', [empCode]);
-    const token = generateToken({ empCode: user.emp_code, role: user.role, name: user.name, isSuperAdmin: !!user.is_superadmin });
+    // Use employees.role as the authoritative role (employees table is source of truth)
+    const effectiveRole = user.emp_role || user.role;
+    await pool.query('UPDATE users SET last_login = NOW(), role = ? WHERE emp_code = ?', [effectiveRole, empCode]);
+    const token = generateToken({ empCode: user.emp_code, role: effectiveRole, name: user.name, isSuperAdmin: !!user.is_superadmin });
     res.json({
       token,
-      user: { empCode: user.emp_code, name: user.name, role: user.role, dept: user.dept, designation: user.designation, isSuperAdmin: !!user.is_superadmin }
+      user: { empCode: user.emp_code, name: user.name, role: effectiveRole, dept: user.dept, designation: user.designation, isSuperAdmin: !!user.is_superadmin }
     });
   } catch (err) {
     console.error(err);
@@ -126,7 +128,7 @@ router.post('/google', [
 router.get('/me', verifyToken, async (req, res) => {
   try {
     const [rows] = await pool.query(
-      'SELECT u.role, u.is_superadmin, e.name, e.dept, e.designation FROM users u JOIN employees e ON u.emp_code = e.code WHERE u.emp_code = ? AND u.is_active = 1',
+      'SELECT u.is_superadmin, e.role, e.name, e.dept, e.designation FROM users u JOIN employees e ON u.emp_code = e.code WHERE u.emp_code = ? AND u.is_active = 1',
       [req.user.empCode]
     );
     if (rows.length === 0) return res.status(401).json({ error: 'User not found' });
