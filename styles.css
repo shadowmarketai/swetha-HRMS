@@ -1689,7 +1689,7 @@ textarea.form-control{resize:vertical}
 .nf-btn-danger{background:var(--danger);color:white}
 .nf-btn-outline{background:transparent;border:1.5px solid var(--gray-200);color:var(--gray-700)}
 .nf-btn-sm{padding:6px 12px;font-size:.72rem}
-.nf-modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.4);z-index:9500;display:flex;align-items:center;justify-content:center;padding:20px}
+.nf-modal-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.4);z-index:999999!important;display:flex;align-items:center;justify-content:center;padding:20px}
 .nf-modal{background:var(--card);border-radius:var(--radius);padding:20px;width:100%;max-width:380px;max-height:80vh;overflow-y:auto}
 .nf-modal h3{font-family:var(--font-display);font-size:1rem;font-weight:600;margin-bottom:12px}
 .nf-select{width:100%;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:var(--radius-xs);font-size:.82rem;background:white}
