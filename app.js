@@ -13855,7 +13855,7 @@ function renderAccSettlementTracker(c) {
       var balLabel = balance > 0 ? '▲ To Return' : balance < 0 ? '▼ To Reimburse' : '✓ Settled';
       var td = function(v, color, extra) { return '<td style="padding:8px 10px;text-align:right;font-size:.76rem;border-bottom:1px solid var(--gray-100);' + (color ? 'color:'+color+';font-weight:700;' : '') + (extra||'') + '">Rs.' + Math.abs(v).toLocaleString('en-IN') + '</td>'; };
       html += '<tr>';
-      html += '<td style="padding:8px 10px;font-size:.78rem;font-weight:600;border-bottom:1px solid var(--gray-100)">' + escapeHTML(e.name) + '<br><span style="font-size:.65rem;color:var(--gray-400);font-weight:400">' + escapeHTML(code) + '</span></td>';
+      html += '<td style="padding:8px 10px;font-size:.78rem;border-bottom:1px solid var(--gray-100)"><button onclick="showEmpPaymentHistory(' + JSON.stringify(code) + ',' + JSON.stringify(e.name) + ')" style="background:none;border:none;cursor:pointer;text-align:left;padding:0"><span style="font-weight:700;color:var(--primary);font-size:.78rem">' + escapeHTML(e.name) + '</span><br><span style="font-size:.65rem;color:var(--gray-400);font-weight:400">' + escapeHTML(code) + '</span></button></td>';
       html += td(e.advApproved, e.advApproved ? '#b45309' : null);
       html += td(e.advPaid, e.advPaid ? '#16a34a' : null);
       html += td(e.expApproved, e.expApproved ? '#b45309' : null);
@@ -13877,6 +13877,132 @@ function renderAccSettlementTracker(c) {
     html += '</div>';
   }
   c.innerHTML = html;
+}
+
+// =====================================================
+// EMPLOYEE PAYMENT HISTORY MODAL (Settlement Tracker drill-down)
+// =====================================================
+function showEmpPaymentHistory(empCode, empName) {
+  var advances = (typeof advanceRequests !== 'undefined' ? advanceRequests : [])
+    .filter(function(r) { return r.empCode === empCode; })
+    .sort(function(a, b) { return b.id - a.id; });
+  var expenses = (typeof expenseReimbursements !== 'undefined' ? expenseReimbursements : [])
+    .filter(function(e) { return e.empCode === empCode; })
+    .sort(function(a, b) { return b.id - a.id; });
+
+  var STATUS_STYLE = {
+    pending:           { bg:'#FEF3C7', color:'#92400E', label:'Pending' },
+    accounts_accepted: { bg:'#DBEAFE', color:'#1D4ED8', label:'Accts Accepted' },
+    hr_accepted:       { bg:'#FEF3C7', color:'#92400E', label:'HR Accepted' },
+    approved:          { bg:'#D1FAE5', color:'#065F46', label:'MD Approved' },
+    paid:              { bg:'#EDE9FE', color:'#5B21B6', label:'Paid' },
+    rejected:          { bg:'#FEE2E2', color:'#991B1B', label:'Rejected' }
+  };
+
+  function statusBadge(rawStatus) {
+    var s = (rawStatus || '').toLowerCase();
+    var st = STATUS_STYLE[s] || { bg:'var(--gray-100)', color:'var(--gray-500)', label: rawStatus || 'Unknown' };
+    return '<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:.6rem;font-weight:700;background:' + st.bg + ';color:' + st.color + '">' + st.label + '</span>';
+  }
+
+  function advCard(r) {
+    var typeLabel = ADV_TYPE_LABELS[r.type] || r.type || 'Advance';
+    var s = (r.status || '').toLowerCase();
+    var borderColor = s === 'paid' ? '#8b5cf6' : s === 'approved' ? '#10b981' : s === 'rejected' ? '#ef4444' : s === 'accounts_accepted' ? '#3b82f6' : '#f59e0b';
+    var html = '<div style="border-left:3px solid ' + borderColor + ';padding:10px 12px;background:var(--gray-50);border-radius:0 8px 8px 0;margin-bottom:8px">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">';
+    html += '<div style="flex:1">';
+    html += '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px">';
+    html += '<span style="font-size:.72rem;font-weight:700;color:var(--gray-700)">' + escapeHTML(typeLabel) + '</span>';
+    html += statusBadge(r.status);
+    if (r.urgency && r.urgency !== 'normal') html += '<span style="font-size:.6rem;background:#FEE2E2;color:#991B1B;padding:1px 6px;border-radius:8px;font-weight:700">' + escapeHTML(r.urgency) + '</span>';
+    html += '</div>';
+    if (r.reason)   html += '<div style="font-size:.71rem;color:var(--gray-600);margin-bottom:2px">' + escapeHTML(r.reason) + '</div>';
+    if (r.details)  html += '<div style="font-size:.7rem;color:var(--gray-500);margin-bottom:2px">' + escapeHTML(r.details) + '</div>';
+    if (r.project)  html += '<div style="font-size:.68rem;color:var(--gray-400)">Project: ' + escapeHTML(r.project) + '</div>';
+    html += '<div style="font-size:.67rem;color:var(--gray-400);margin-top:4px">Applied: ' + escapeHTML(r.appliedDate || '') + '</div>';
+    if (r.reviewedBy) html += '<div style="font-size:.67rem;color:var(--gray-400)">Reviewed by ' + escapeHTML(r.reviewedBy) + (r.reviewDate ? ' on ' + escapeHTML(r.reviewDate) : '') + '</div>';
+    if (r.rejectReason) html += '<div style="font-size:.68rem;color:#dc2626;margin-top:2px;font-weight:600">Rejected: ' + escapeHTML(r.rejectReason) + '</div>';
+    if (r.paidBy)   html += '<div style="font-size:.67rem;color:#16a34a;font-weight:600">Paid by ' + escapeHTML(r.paidBy) + (r.paidDate ? ' on ' + escapeHTML(r.paidDate) : '') + '</div>';
+    html += '</div>';
+    html += '<div style="text-align:right;flex-shrink:0"><div style="font-size:.88rem;font-weight:800;color:var(--gray-800)">\u20B9' + (r.amount || 0).toLocaleString('en-IN') + '</div></div>';
+    html += '</div></div>';
+    return html;
+  }
+
+  function expCard(e) {
+    var s = (e.status || '').toLowerCase();
+    var borderColor = s === 'paid' ? '#8b5cf6' : s === 'approved' ? '#10b981' : s === 'rejected' ? '#ef4444' : s === 'accounts_accepted' ? '#3b82f6' : '#f59e0b';
+    var typeLabel = e.expenseType ? (ADV_TYPE_LABELS[e.expenseType] || e.expenseType) : (e.category || 'Expense');
+    var html = '<div style="border-left:3px solid ' + borderColor + ';padding:10px 12px;background:var(--gray-50);border-radius:0 8px 8px 0;margin-bottom:8px">';
+    html += '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">';
+    html += '<div style="flex:1">';
+    html += '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:4px">';
+    html += '<span style="font-size:.72rem;font-weight:700;color:var(--gray-700)">' + escapeHTML(typeLabel) + '</span>';
+    html += statusBadge(e.status);
+    html += '</div>';
+    if (e.description)  html += '<div style="font-size:.71rem;color:var(--gray-600);margin-bottom:2px">' + escapeHTML(e.description) + '</div>';
+    if (e.project)      html += '<div style="font-size:.68rem;color:var(--gray-400)">Project: ' + escapeHTML(e.project) + '</div>';
+    if (e.travelFrom && e.travelTo) html += '<div style="font-size:.68rem;color:var(--gray-400)">Route: ' + escapeHTML(e.travelFrom) + ' → ' + escapeHTML(e.travelTo) + (e.travelKm ? ' (' + e.travelKm + ' km)' : '') + '</div>';
+    if (e.billUrl)      html += '<a href="' + escapeHTML(e.billUrl) + '" target="_blank" style="font-size:.68rem;color:var(--primary);font-weight:600">📎 View Bill</a>';
+    html += '<div style="font-size:.67rem;color:var(--gray-400);margin-top:4px">Date: ' + escapeHTML(e.date || e.submittedOn || '') + '</div>';
+    if (e.reviewedBy)   html += '<div style="font-size:.67rem;color:var(--gray-400)">Reviewed by ' + escapeHTML(e.reviewedBy) + (e.reviewDate ? ' on ' + escapeHTML(e.reviewDate) : '') + '</div>';
+    if (e.paidBy)       html += '<div style="font-size:.67rem;color:#16a34a;font-weight:600">Reimbursed by ' + escapeHTML(e.paidBy) + (e.paidDate ? ' on ' + escapeHTML(e.paidDate) : '') + '</div>';
+    html += '</div>';
+    html += '<div style="text-align:right;flex-shrink:0"><div style="font-size:.88rem;font-weight:800;color:var(--gray-800)">\u20B9' + (e.amount || 0).toLocaleString('en-IN') + '</div></div>';
+    html += '</div></div>';
+    return html;
+  }
+
+  // Summary numbers
+  var advTotal = advances.filter(function(r){ var s=(r.status||'').toLowerCase(); return s==='approved'||s==='paid'; }).reduce(function(s,r){return s+(r.amount||0);},0);
+  var expTotal = expenses.filter(function(e){ return e.status==='Approved'||e.status==='Paid'; }).reduce(function(s,e){return s+(e.amount||0);},0);
+  var netBalance = advTotal - expTotal;
+  var netColor = netBalance > 0 ? '#dc2626' : netBalance < 0 ? '#16a34a' : '#6b7280';
+  var netLabel = netBalance > 0 ? 'Employee owes return' : netBalance < 0 ? 'Company owes reimbursement' : 'Settled';
+
+  var modalHtml = '<div class="nf-modal-overlay" id="empHistoryModal" onclick="if(event.target===this)this.remove()" style="align-items:flex-start;padding:16px">';
+  modalHtml += '<div class="nf-modal" style="max-width:560px;width:100%;max-height:90vh;padding:0;overflow:hidden;display:flex;flex-direction:column">';
+
+  // Header
+  modalHtml += '<div style="padding:16px 18px;border-bottom:1px solid var(--gray-100);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">';
+  modalHtml += '<div><div style="font-size:.95rem;font-weight:700;color:var(--gray-800)">' + escapeHTML(empName) + '</div>';
+  modalHtml += '<div style="font-size:.7rem;color:var(--gray-400);margin-top:1px">' + escapeHTML(empCode) + ' — Complete Payment History</div></div>';
+  modalHtml += '<button onclick="document.getElementById(\'empHistoryModal\').remove()" style="background:none;border:none;cursor:pointer;color:var(--gray-400);padding:4px;border-radius:6px;display:flex"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>';
+  modalHtml += '</div>';
+
+  // Summary bar
+  modalHtml += '<div style="display:flex;gap:0;border-bottom:1px solid var(--gray-100);flex-shrink:0">';
+  modalHtml += '<div style="flex:1;padding:10px 14px;border-right:1px solid var(--gray-100)"><div style="font-size:.65rem;color:var(--gray-400);font-weight:600;text-transform:uppercase;letter-spacing:.04em">Total Advanced</div><div style="font-size:.9rem;font-weight:800;color:#b45309;margin-top:2px">\u20B9' + advTotal.toLocaleString('en-IN') + '</div></div>';
+  modalHtml += '<div style="flex:1;padding:10px 14px;border-right:1px solid var(--gray-100)"><div style="font-size:.65rem;color:var(--gray-400);font-weight:600;text-transform:uppercase;letter-spacing:.04em">Total Expenses</div><div style="font-size:.9rem;font-weight:800;color:#7c3aed;margin-top:2px">\u20B9' + expTotal.toLocaleString('en-IN') + '</div></div>';
+  modalHtml += '<div style="flex:1;padding:10px 14px"><div style="font-size:.65rem;color:var(--gray-400);font-weight:600;text-transform:uppercase;letter-spacing:.04em">Net Balance</div><div style="font-size:.9rem;font-weight:800;color:' + netColor + ';margin-top:2px">\u20B9' + Math.abs(netBalance).toLocaleString('en-IN') + '</div><div style="font-size:.6rem;color:' + netColor + ';font-weight:600">' + netLabel + '</div></div>';
+  modalHtml += '</div>';
+
+  // Scrollable content
+  modalHtml += '<div style="overflow-y:auto;padding:14px 16px;flex:1">';
+
+  // Advances section
+  modalHtml += '<div style="font-size:.72rem;font-weight:700;color:var(--gray-500);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Advances (' + advances.length + ')</div>';
+  if (advances.length === 0) {
+    modalHtml += '<div style="text-align:center;padding:16px;color:var(--gray-400);font-size:.75rem;background:var(--gray-50);border-radius:8px;margin-bottom:14px">No advance requests</div>';
+  } else {
+    advances.forEach(function(r) { modalHtml += advCard(r); });
+  }
+
+  // Expenses section
+  modalHtml += '<div style="font-size:.72rem;font-weight:700;color:var(--gray-500);text-transform:uppercase;letter-spacing:.05em;margin:14px 0 8px">Expenses (' + expenses.length + ')</div>';
+  if (expenses.length === 0) {
+    modalHtml += '<div style="text-align:center;padding:16px;color:var(--gray-400);font-size:.75rem;background:var(--gray-50);border-radius:8px">No expense claims</div>';
+  } else {
+    expenses.forEach(function(e) { modalHtml += expCard(e); });
+  }
+
+  modalHtml += '</div></div></div>';
+
+  // Remove existing modal if open, then inject
+  var existing = document.getElementById('empHistoryModal');
+  if (existing) existing.remove();
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
 }
 
 // =====================================================
