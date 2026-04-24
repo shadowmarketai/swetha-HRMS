@@ -13855,7 +13855,9 @@ function renderAccSettlementTracker(c) {
       var balLabel = balance > 0 ? '▲ To Return' : balance < 0 ? '▼ To Reimburse' : '✓ Settled';
       var td = function(v, color, extra) { return '<td style="padding:8px 10px;text-align:right;font-size:.76rem;border-bottom:1px solid var(--gray-100);' + (color ? 'color:'+color+';font-weight:700;' : '') + (extra||'') + '">Rs.' + Math.abs(v).toLocaleString('en-IN') + '</td>'; };
       html += '<tr>';
-      html += '<td style="padding:8px 10px;font-size:.78rem;border-bottom:1px solid var(--gray-100)"><button onclick="showEmpPaymentHistory(' + JSON.stringify(code) + ',' + JSON.stringify(e.name) + ')" style="background:none;border:none;cursor:pointer;text-align:left;padding:0"><span style="font-weight:700;color:var(--primary);font-size:.78rem">' + escapeHTML(e.name) + '</span><br><span style="font-size:.65rem;color:var(--gray-400);font-weight:400">' + escapeHTML(code) + '</span></button></td>';
+      var safeCode = code.replace(/'/g, "\\'");
+      var safeName = (e.name || '').replace(/'/g, "\\'");
+      html += '<td style="padding:8px 10px;font-size:.78rem;border-bottom:1px solid var(--gray-100)"><button onclick="showEmpPaymentHistory(\'' + safeCode + '\',\'' + safeName + '\')" style="background:none;border:none;cursor:pointer;text-align:left;padding:0"><span style="font-weight:700;color:var(--primary);font-size:.78rem">' + escapeHTML(e.name) + '</span><br><span style="font-size:.65rem;color:var(--gray-400);font-weight:400">' + escapeHTML(code) + '</span></button></td>';
       html += td(e.advApproved, e.advApproved ? '#b45309' : null);
       html += td(e.advPaid, e.advPaid ? '#16a34a' : null);
       html += td(e.expApproved, e.expApproved ? '#b45309' : null);
