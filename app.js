@@ -1686,7 +1686,7 @@ function showOverlay(id) {
     if (id === 'onboarding') resetWizard();
     if (id === 'notifications') renderNotifications();
     if (id === 'location') openLocationTracker();
-    if (id === 'advance-requests') { advReqActiveTab = 'pending'; advReqTypeFilter = 'all'; renderAdvanceRequests('pending'); document.querySelectorAll('#advReqTabs .tab-pill').forEach((p,i) => p.classList.toggle('active', i===0)); document.querySelectorAll('#advReqTypeFilter .loc-filter-chip').forEach((c,i) => c.classList.toggle('active', i===0)); }
+    if (id === 'advance-requests') { advReqActiveTab = 'pending'; advReqTypeFilter = 'all'; advReqSearchQuery = ''; var srch = document.getElementById('advReqSearch'); if (srch) srch.value = ''; renderAdvanceRequests('pending'); document.querySelectorAll('#advReqTabs .tab-pill').forEach((p,i) => p.classList.toggle('active', i===0)); document.querySelectorAll('#advReqTypeFilter .loc-filter-chip').forEach((c,i) => c.classList.toggle('active', i===0)); }
     if (id === 'settings') initSettingsToggles();
     if (id === 'accounts-payments') renderAccountsPayments();
     if (id === 'peb') renderPebOverlay();
@@ -3804,6 +3804,7 @@ function renderAdvancePendingBanner() { renderAllPendingBanners(); }
 function renderMyAdvanceRequests() { renderAllMyRequests(); }
 
 let advReqTypeFilter = 'all';
+let advReqSearchQuery = '';
 
 function switchAdvReqTab(tab, btn) {
   advReqActiveTab = tab;
@@ -3816,6 +3817,11 @@ function filterAdvReqByType(type, btn) {
   advReqTypeFilter = type;
   document.querySelectorAll('#advReqTypeFilter .loc-filter-chip').forEach(c => c.classList.remove('active'));
   btn.classList.add('active');
+  renderAdvanceRequests(advReqActiveTab);
+}
+
+function filterAdvReqBySearch(query) {
+  advReqSearchQuery = (query || '').toLowerCase().trim();
   renderAdvanceRequests(advReqActiveTab);
 }
 
@@ -3870,60 +3876,84 @@ function renderAdvanceRequests(filter) {
     reqs = allItems.filter(r => r.status === filter);
   }
   if (advReqTypeFilter !== 'all') reqs = reqs.filter(r => r.type === advReqTypeFilter);
+  // Search filter
+  if (advReqSearchQuery) {
+    reqs = reqs.filter(r => {
+      var haystack = [r.empName, r.empCode, r.dept, r.details, r.reason, r.category, r.project].filter(Boolean).join(' ').toLowerCase();
+      return haystack.includes(advReqSearchQuery);
+    });
+  }
   reqs.sort((a, b) => b.id - a.id);
   if (reqs.length === 0) {
-    container.innerHTML = '<div style="text-align:center;padding:32px;color:var(--gray-400);font-size:.82rem">No ' + filter + ' requests</div>';
+    var emptyMsg = advReqSearchQuery ? 'No results for "' + escapeHTML(advReqSearchQuery) + '"' : 'No ' + filter + ' requests';
+    container.innerHTML = '<div style="text-align:center;padding:40px 20px;color:var(--gray-400);font-size:.82rem">' + emptyMsg + '</div>';
     return;
   }
+  var checkSvg = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/></svg>';
+  var crossSvg = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
+  var paySvg   = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/></svg>';
   container.innerHTML = reqs.map(r => {
     const initials = r.empName ? r.empName.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() : '??';
     const typeBadge = `<span class="adv-type-badge ${r.type}">${ADV_TYPE_LABELS[r.type] || r.type}</span>`;
     var statusBadge = getAdvanceStatusBadge(r.status);
     var stepHtml = getAdvanceStepIndicator(r.status);
     var actionsHtml = '';
-    var checkSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/></svg>';
-    var crossSvg = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>';
-    var paySvg   = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2"/></svg>';
 
     if (r._isExpense) {
-      // EXPENSE items — Accounts/HR → MD → Accounts/HR(Mark Paid)
       if (isReviewerRole && r.status === 'pending') {
         actionsHtml = `<div class="adv-actions"><button class="approve-btn" onclick="accountsAcceptExpense(${r.id})">${checkSvg} Accept &amp; Forward to MD</button><button class="reject-btn" onclick="rejectExpense(${r.id})">${crossSvg} Reject</button></div>`;
       } else if (isMD && r.status === 'accounts_accepted') {
-        actionsHtml = `<div class="adv-actions"><button class="approve-btn" onclick="approveExpense(${r.id})">${checkSvg} Confirm</button><button class="reject-btn" onclick="rejectExpense(${r.id})">${crossSvg} Reject</button></div>`;
+        actionsHtml = `<div class="adv-actions"><button class="approve-btn" onclick="approveExpense(${r.id})">${checkSvg} Confirm &amp; Approve</button><button class="reject-btn" onclick="rejectExpense(${r.id})">${crossSvg} Reject</button></div>`;
       } else if (isReviewerRole && r.status === 'approved') {
-        actionsHtml = `<div class="adv-actions"><button class="approve-btn" onclick="markExpensePaid(${r.id})" style="background:#10B981">${paySvg} Mark Paid</button></div>`;
+        actionsHtml = `<div class="adv-actions"><button class="approve-btn" onclick="markExpensePaid(${r.id})" style="background:var(--success);color:#fff">${paySvg} Mark Reimbursed</button></div>`;
       }
     } else {
-      // ADVANCE items — same flow
       if (isReviewerRole && r.status === 'pending') {
         actionsHtml = `<div class="adv-actions"><button class="approve-btn" onclick="accountsAcceptAdvance(${r.id})">${checkSvg} Accept &amp; Forward to MD</button><button class="reject-btn" onclick="rejectAdvance(${r.id})">${crossSvg} Reject</button></div>`;
       } else if (isMD && r.status === 'accounts_accepted') {
-        actionsHtml = `<div class="adv-actions"><button class="approve-btn" onclick="approveAdvance(${r.id})">${checkSvg} Confirm</button><button class="reject-btn" onclick="rejectAdvance(${r.id})">${crossSvg} Reject</button></div>`;
+        actionsHtml = `<div class="adv-actions"><button class="approve-btn" onclick="approveAdvance(${r.id})">${checkSvg} Confirm &amp; Approve</button><button class="reject-btn" onclick="rejectAdvance(${r.id})">${crossSvg} Reject</button></div>`;
       } else if (isReviewerRole && r.status === 'approved') {
-        actionsHtml = `<div class="adv-actions"><button class="approve-btn" onclick="markAdvancePaid(${r.id})" style="background:#10B981">${paySvg} Mark Paid</button></div>`;
+        actionsHtml = `<div class="adv-actions"><button class="approve-btn" onclick="markAdvancePaid(${r.id})" style="background:var(--success);color:#fff">${paySvg} Mark Paid</button></div>`;
       }
     }
-    // Voucher PDF download button (MD + Accounts + HR). Opens in a new tab via blob.
+
     var pdfBtn = '';
     if (isMD || isReviewerRole) {
       var voucherKind = r._isExpense ? 'expenses' : 'advances';
-      pdfBtn = '<button onclick="downloadVoucherPDF(\'' + voucherKind + '\',' + r.id + ')" title="Download PDF voucher" style="background:none;border:1px solid var(--gray-200);padding:3px 8px;border-radius:6px;cursor:pointer;font-size:.68rem;color:var(--gray-600);display:inline-flex;align-items:center;gap:3px;margin-left:4px"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> PDF</button>';
+      pdfBtn = '<button onclick="downloadVoucherPDF(\'' + voucherKind + '\',' + r.id + ')" title="Download PDF voucher" style="background:none;border:1px solid var(--gray-200);padding:3px 8px;border-radius:6px;cursor:pointer;font-size:.65rem;color:var(--gray-500);display:inline-flex;align-items:center;gap:3px;margin-left:6px"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> PDF</button>';
     }
+
+    var metaDetails = getAdvMeta(r);
+    var billLink = r.billUrl ? '<a href="' + escapeHTML(authUrl(r.billUrl)) + '" target="_blank" style="display:inline-flex;align-items:center;gap:3px;font-size:.7rem;color:var(--primary);font-weight:600;text-decoration:none;margin-top:4px"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>View Attached Bill</a>' : '';
+
     return `<div class="adv-request-card ${r.status}">
-      <div class="adv-request-header">
-        <h4><span style="display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:8px;background:var(--primary-50);color:var(--primary);font-size:.65rem;font-weight:700;margin-right:4px">${escapeHTML(initials)}</span>${escapeHTML(r.empName)}</h4>
-        ${statusBadge}${pdfBtn}
+      <!-- Row 1: Employee + Amount + Status -->
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;margin-bottom:8px">
+        <div style="display:flex;align-items:center;gap:8px;min-width:0">
+          <span style="flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:10px;background:var(--primary-50);color:var(--primary);font-size:.68rem;font-weight:700">${escapeHTML(initials)}</span>
+          <div style="min-width:0">
+            <div style="font-size:.85rem;font-weight:700;color:var(--gray-800);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHTML(r.empName)}</div>
+            <div style="font-size:.68rem;color:var(--gray-400);margin-top:1px">${escapeHTML(r.empCode)} &bull; ${escapeHTML(r.dept)}</div>
+          </div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-size:.95rem;font-weight:800;color:var(--gray-800)">\u20B9${r.amount.toLocaleString('en-IN')}</div>
+          <div style="margin-top:3px">${statusBadge}${pdfBtn}</div>
+        </div>
       </div>
-      <div class="adv-request-meta">
-        ${typeBadge} <span class="adv-urgency ${r.urgency || 'normal'}">${escapeHTML(r.urgency || 'normal')}</span> &middot; <strong>\u20B9${r.amount.toLocaleString('en-IN')}</strong> &middot; ${escapeHTML(r.dept)}<br>
-        ${getAdvMeta(r)}<br>
-        Applied: ${formatAdvDate(r.appliedDate)}
-        ${r.reviewedBy ? ' &middot; By: ' + escapeHTML(r.reviewedBy) + ' on ' + formatAdvDate(r.reviewDate) : ''}
-        ${r.rejectReason ? '<br><span style="color:var(--danger)">Reason: ' + escapeHTML(r.rejectReason) + '</span>' : ''}
-        ${r.billUrl ? '<br><a href="' + escapeHTML(authUrl(r.billUrl)) + '" target="_blank" style="font-size:.72rem;color:var(--primary);font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:3px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>View Attached Bill</a>' : ''}
-        ${stepHtml}
+      <!-- Row 2: Type + Urgency + Date -->
+      <div style="display:flex;align-items:center;flex-wrap:wrap;gap:5px;margin-bottom:6px">
+        ${typeBadge}
+        <span class="adv-urgency ${r.urgency || 'normal'}">${escapeHTML(r.urgency || 'normal')}</span>
+        <span style="font-size:.68rem;color:var(--gray-400);margin-left:auto">Applied: ${formatAdvDate(r.appliedDate)}</span>
       </div>
+      <!-- Row 3: Details -->
+      ${metaDetails ? '<div style="font-size:.73rem;color:var(--gray-600);line-height:1.5;margin-bottom:4px">' + metaDetails + '</div>' : ''}
+      ${r.rejectReason ? '<div style="font-size:.7rem;color:var(--danger);margin-bottom:4px">Reject reason: ' + escapeHTML(r.rejectReason) + '</div>' : ''}
+      ${r.reviewedBy ? '<div style="font-size:.68rem;color:var(--gray-400);margin-bottom:4px">Reviewed by ' + escapeHTML(r.reviewedBy) + (r.reviewDate ? ' on ' + formatAdvDate(r.reviewDate) : '') + '</div>' : ''}
+      ${billLink}
+      <!-- Step indicator -->
+      <div style="border-top:1px solid var(--gray-100);margin-top:8px;padding-top:8px">${stepHtml}</div>
       ${actionsHtml}
     </div>`;
   }).join('');
@@ -14528,19 +14558,29 @@ function getAdvanceStatusBadge(status) {
 
 function getAdvanceStepIndicator(status) {
   var s = String(status || '').toLowerCase();
-  if (s === 'rejected') return '<div style="font-size:.65rem;color:var(--danger);margin-top:4px">Rejected</div>';
+  if (s === 'rejected') return '<div style="display:inline-flex;align-items:center;gap:4px;font-size:.65rem;color:var(--danger);font-weight:600"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Rejected</div>';
   var steps = [
-    {label:'Submitted',         active: true,                                          done: s !== 'pending'},
-    {label:'Accounts Accepted', active: s === 'accounts_accepted' || s === 'approved' || s === 'paid', done: s === 'approved' || s === 'paid'},
-    {label:'MD Approved',       active: s === 'approved' || s === 'paid',              done: s === 'paid'},
-    {label:'Paid',              active: s === 'paid',                                  done: false}
+    {label:'Submitted',        done: s !== 'pending',                                              active: s === 'pending'},
+    {label:'Accts Accepted',   done: s === 'approved' || s === 'paid',                             active: s === 'accounts_accepted'},
+    {label:'MD Approved',      done: s === 'paid',                                                 active: s === 'approved'},
+    {label:'Paid',             done: false,                                                        active: s === 'paid'}
   ];
-  var html = '<div style="display:flex;gap:2px;margin-top:6px;font-size:.6rem;align-items:center;flex-wrap:wrap">';
+  var html = '<div style="display:flex;align-items:center;gap:0;font-size:.62rem">';
   steps.forEach(function(st, i) {
-    var bg = st.done ? 'var(--success)' : st.active ? 'var(--primary)' : 'var(--gray-200)';
-    var color = st.done || st.active ? '#fff' : 'var(--gray-500)';
-    html += '<span style="padding:2px 6px;border-radius:8px;background:' + bg + ';color:' + color + '">' + st.label + '</span>';
-    if (i < steps.length - 1) html += '<span style="color:var(--gray-300)">\u2192</span>';
+    var dotBg  = st.done ? 'var(--success)' : st.active ? 'var(--primary)' : 'var(--gray-200)';
+    var dotClr = st.done || st.active ? '#fff' : 'var(--gray-400)';
+    var lblClr = st.done ? 'var(--success-dark)' : st.active ? 'var(--primary)' : 'var(--gray-400)';
+    var weight = st.active ? '700' : '500';
+    html += '<div style="display:flex;flex-direction:column;align-items:center;gap:2px">';
+    html += '<div style="width:16px;height:16px;border-radius:50%;background:' + dotBg + ';color:' + dotClr + ';display:flex;align-items:center;justify-content:center;font-size:.55rem;font-weight:700">';
+    html += st.done ? '<svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5"><polyline points="20 6 9 17 4 12"/></svg>' : (i + 1);
+    html += '</div>';
+    html += '<span style="color:' + lblClr + ';font-weight:' + weight + ';white-space:nowrap">' + st.label + '</span>';
+    html += '</div>';
+    if (i < steps.length - 1) {
+      var lineClr = st.done ? 'var(--success)' : 'var(--gray-200)';
+      html += '<div style="flex:1;height:2px;background:' + lineClr + ';min-width:12px;margin-bottom:14px"></div>';
+    }
   });
   html += '</div>';
   return html;

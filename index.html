@@ -771,13 +771,17 @@
         <button class="tab-pill" onclick="switchAdvReqTab('all',this)">All</button>
       </div>
       <div id="advReqExportBar" style="display:none;justify-content:flex-end;gap:6px;margin-bottom:8px"></div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px" id="advReqTypeFilter">
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px" id="advReqTypeFilter">
         <button class="loc-filter-chip active" onclick="filterAdvReqByType('all',this)">All</button>
         <button class="loc-filter-chip" onclick="filterAdvReqByType('site',this)">Site Adv</button>
         <button class="loc-filter-chip" onclick="filterAdvReqByType('salary',this)">Salary Adv</button>
         <button class="loc-filter-chip" onclick="filterAdvReqByType('travel',this)">Travel Adv</button>
         <button class="loc-filter-chip" onclick="filterAdvReqByType('site_expense',this)">Site Exp</button>
         <button class="loc-filter-chip" onclick="filterAdvReqByType('travel_expense',this)">Travel Exp</button>
+      </div>
+      <div style="position:relative;margin-bottom:12px">
+        <svg style="position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--gray-400);pointer-events:none" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="text" id="advReqSearch" placeholder="Search by employee name, code or details…" oninput="filterAdvReqBySearch(this.value)" style="width:100%;box-sizing:border-box;padding:9px 12px 9px 34px;border:1.5px solid var(--gray-200);border-radius:var(--radius);font-size:.8rem;background:var(--card);color:var(--gray-700);outline:none;transition:border-color .15s" onfocus="this.style.borderColor='var(--primary)'" onblur="this.style.borderColor='var(--gray-200)'">
       </div>
       <div id="advReqList"></div>
     </div>

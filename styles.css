@@ -394,15 +394,18 @@ body{font-family:var(--font-body);color:var(--text);background:#E8EAF0;display:f
 .adv-pending-banner{display:flex;align-items:center;gap:8px;padding:10px 14px;background:linear-gradient(135deg,var(--warning-light),var(--amber-light));border:1px solid #FCD34D;border-radius:var(--radius-sm);margin-bottom:12px;cursor:pointer;transition:all .2s;font-size:.78rem;font-weight:600;color:var(--warning-dark);border:none;width:100%}
 .adv-pending-banner:hover{box-shadow:var(--shadow-lg);transform:translateY(-1px)}
 .adv-pending-banner .count-badge{background:var(--warning);color:white;padding:2px 8px;border-radius:12px;font-size:.7rem;font-weight:700;margin-left:auto}
-.adv-request-card{background:var(--card);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);margin-bottom:8px;border-left:4px solid var(--warning);transition:all .2s}
+.adv-request-card{background:var(--card);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow);margin-bottom:10px;border-left:4px solid var(--warning);transition:box-shadow .2s}
+.adv-request-card:hover{box-shadow:0 4px 16px rgba(0,0,0,.08)}
 .adv-request-card.approved{border-left-color:var(--success)}
+.adv-request-card.paid{border-left-color:#6366f1}
 .adv-request-card.rejected{border-left-color:var(--danger)}
+.adv-request-card.accounts_accepted{border-left-color:#3b82f6}
 .adv-request-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
 .adv-request-header h4{font-size:.82rem;font-weight:600;display:flex;align-items:center;gap:6px}
 .adv-request-meta{font-size:.72rem;color:var(--gray-500);margin-bottom:8px;line-height:1.5}
 .adv-request-meta strong{color:var(--gray-700)}
-.adv-actions{display:flex;gap:8px;margin-top:8px}
-.adv-actions button{padding:7px 14px;border-radius:var(--radius-xs);font-size:.72rem;font-weight:600;border:none;cursor:pointer;transition:all .2s}
+.adv-actions{display:flex;gap:8px;margin-top:10px}
+.adv-actions button{padding:7px 14px;border-radius:var(--radius-xs);font-size:.72rem;font-weight:600;border:none;cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;gap:5px}
 .adv-actions .approve-btn{background:var(--success-light);color:var(--success-dark)}
 .adv-actions .approve-btn:hover{background:var(--success);color:white}
 .adv-actions .reject-btn{background:var(--danger-light);color:var(--danger-dark)}
