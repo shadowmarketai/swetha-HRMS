@@ -6040,72 +6040,114 @@ function exportSalaryReport() {
   ]);
 }
 
-async function exportAttendanceReport() {
+function showAttendanceMonthPicker() {
   if (currentUser && currentUser.role === 'Employee') { showToast('Access denied. Management only.'); return; }
-  showToast('Fetching attendance data...');
   var now = new Date();
-  var monthStr = now.toISOString().slice(0, 7);
+  var prevMonth = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
+  var prevYear = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+  document.getElementById('attExportMonth').value = prevMonth;
+  var yearSel = document.getElementById('attExportYear');
+  yearSel.innerHTML = '';
+  for (var y = now.getFullYear(); y >= now.getFullYear() - 3; y--) {
+    var opt = document.createElement('option');
+    opt.value = y; opt.textContent = y;
+    if (y === prevYear) opt.selected = true;
+    yearSel.appendChild(opt);
+  }
+  document.getElementById('attendanceExportOverlay').classList.add('active');
+}
+
+function closeAttendanceExportModal() {
+  document.getElementById('attendanceExportOverlay').classList.remove('active');
+}
+
+async function exportAttendanceReport() {
+  var selMonth = parseInt(document.getElementById('attExportMonth').value);
+  var selYear = parseInt(document.getElementById('attExportYear').value);
+  var monthStr = selYear + '-' + String(selMonth + 1).padStart(2, '0');
   var monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-  var monthLabel = monthNames[now.getMonth()] + '_' + now.getFullYear();
+  var monthLabel = monthNames[selMonth] + '_' + selYear;
+  closeAttendanceExportModal();
+  showToast('Fetching attendance data...');
   try {
     var logs = await apiCall('GET', '/attendance?month=' + monthStr);
     if (!Array.isArray(logs)) logs = [];
-    // Count working days in the month up to today
-    var daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    var todayDate = now.getDate();
+    var daysInMonth = new Date(selYear, selMonth + 1, 0).getDate();
+    var today = new Date();
+    var isCurrentMonth = (today.getFullYear() === selYear && today.getMonth() === selMonth);
+    var lastCountDay = isCurrentMonth ? today.getDate() : daysInMonth;
+    // Count working days (exclude Sundays and declared public holidays)
     var workingDays = 0;
-    for (var d = 1; d <= todayDate; d++) {
-      if (new Date(now.getFullYear(), now.getMonth(), d).getDay() !== 0) workingDays++;
+    for (var d = 1; d <= lastCountDay; d++) {
+      var _dt = new Date(selYear, selMonth, d);
+      var _ymd = selYear + '-' + String(selMonth + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+      if (_dt.getDay() !== 0 && !publicHolidays[_ymd]) workingDays++;
     }
-    // Group attendance by employee — track days and total hours
-    var empDays = {};
-    var empTotalMin = {};
+    // Build empCode -> dayNum -> { present, minutes }
+    var empDayData = {};
     logs.forEach(function(row) {
       if (!row.emp_code || !row.log_date) return;
-      if (!empDays[row.emp_code]) empDays[row.emp_code] = {};
-      var dayKey = row.log_date.substring(0, 10);
-      empDays[row.emp_code][dayKey] = true;
-      // Calculate hours from check_in/check_out
+      var dateStr = String(row.log_date).substring(0, 10);
+      var dayNum = parseInt(dateStr.split('-')[2], 10);
+      if (!empDayData[row.emp_code]) empDayData[row.emp_code] = {};
+      if (!empDayData[row.emp_code][dayNum]) empDayData[row.emp_code][dayNum] = { present: true, minutes: 0 };
       if (row.check_in) {
         var start = new Date(row.check_in).getTime();
-        var end = row.check_out ? new Date(row.check_out).getTime() : Date.now();
-        if (end > start) {
-          if (!empTotalMin[row.emp_code]) empTotalMin[row.emp_code] = 0;
-          empTotalMin[row.emp_code] += (end - start) / 60000;
-        }
+        var isToday = isCurrentMonth && dayNum === today.getDate();
+        var end = row.check_out ? new Date(row.check_out).getTime() : (isToday ? Date.now() : 0);
+        if (end > start) empDayData[row.emp_code][dayNum].minutes += (end - start) / 60000;
       }
     });
-    // Fetch leave data for the month
-    var leavesByEmp = {};
-    leaveApplications.forEach(function(l) {
-      if (l.status !== 'approved' && l.status !== 'Approved') return;
-      if (!l.empCode) return;
-      if (!leavesByEmp[l.empCode]) leavesByEmp[l.empCode] = 0;
-      // Count leave days that fall in this month
-      var from = new Date(l.fromDate || l.from);
-      var to = new Date(l.toDate || l.to || l.fromDate || l.from);
-      for (var ld = new Date(from); ld <= to; ld.setDate(ld.getDate() + 1)) {
-        if (ld.getFullYear() === now.getFullYear() && ld.getMonth() === now.getMonth()) {
-          leavesByEmp[l.empCode] = (leavesByEmp[l.empCode] || 0) + 1;
+    // Build wide-format CSV
+    var _esc = function(v) {
+      v = String(v === null || v === undefined ? '' : v).replace(/"/g, '""');
+      return (v.indexOf(',') >= 0 || v.indexOf('"') >= 0 || v.indexOf('\n') >= 0) ? '"' + v + '"' : v;
+    };
+    var headers = ['Name', 'Employee Code'];
+    for (var d = 1; d <= daysInMonth; d++) headers.push(String(d).padStart(2, '0'));
+    headers.push('Total Present Days', 'Absent Days', 'Attendance %');
+    var csvRows = [headers.join(',')];
+    EMPLOYEES.filter(function(e) { return e.status !== 'Inactive'; }).forEach(function(emp) {
+      var cols = [_esc(emp.name), _esc(emp.code)];
+      var presentCount = 0;
+      for (var d = 1; d <= daysInMonth; d++) {
+        var dow = new Date(selYear, selMonth, d).getDay();
+        var ymd = selYear + '-' + String(selMonth + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+        var isFuture = isCurrentMonth && d > today.getDate();
+        if (dow === 0) {
+          cols.push('Sun');
+        } else if (publicHolidays[ymd]) {
+          cols.push('Holiday');
+        } else if (isFuture) {
+          cols.push('');
+        } else {
+          var dayData = empDayData[emp.code] && empDayData[emp.code][d];
+          if (dayData) {
+            presentCount++;
+            if (dayData.minutes > 0) {
+              var h = Math.floor(dayData.minutes / 60);
+              var m = Math.round(dayData.minutes % 60);
+              cols.push(h + 'h ' + m + 'm');
+            } else {
+              cols.push('Present');
+            }
+          } else {
+            cols.push('Absent');
+          }
         }
       }
+      var absentDays = Math.max(0, workingDays - presentCount);
+      var attPct = workingDays > 0 ? ((presentCount / workingDays) * 100).toFixed(1) + '%' : '0.0%';
+      cols.push(presentCount, absentDays, attPct);
+      csvRows.push(cols.join(','));
     });
-    var data = EMPLOYEES.filter(function(e) { return e.status !== 'Inactive'; }).map(function(e) {
-      var presentDays = empDays[e.code] ? Object.keys(empDays[e.code]).length : 0;
-      var leaveDays = leavesByEmp[e.code] || 0;
-      var absentDays = Math.max(0, workingDays - presentDays - leaveDays);
-      var totalMin = empTotalMin[e.code] || 0;
-      var h = Math.floor(totalMin / 60), m = Math.round(totalMin % 60);
-      var avgHrs = presentDays > 0 ? (totalMin / presentDays / 60).toFixed(1) : '0.0';
-      return { name: e.name, code: e.code, dept: e.dept, present: presentDays, absent: absentDays, leave: leaveDays, workingDays: workingDays, totalHours: h + 'h ' + m + 'm', avgHoursPerDay: avgHrs + 'h' };
-    });
-    exportToCSV(data, 'attendance_' + monthLabel + '.csv', [
-      {label:'Name', key:'name'}, {label:'Code', key:'code'},
-      {label:'Department', key:'dept'}, {label:'Working Days', key:'workingDays'},
-      {label:'Present', key:'present'}, {label:'Absent', key:'absent'},
-      {label:'Leave', key:'leave'}, {label:'Total Hours Worked', key:'totalHours'},
-      {label:'Avg Hours/Day', key:'avgHoursPerDay'}
-    ]);
+    var blob = new Blob(['﻿' + csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
+    var link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'attendance_' + monthLabel + '.csv';
+    link.click();
+    URL.revokeObjectURL(link.href);
+    showToast('Downloaded: attendance_' + monthLabel + '.csv');
   } catch (e) { showToast(e.message || 'Error exporting attendance'); }
 }
 
