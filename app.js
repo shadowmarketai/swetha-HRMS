@@ -6054,7 +6054,9 @@ function showAttendanceMonthPicker() {
     if (y === prevYear) opt.selected = true;
     yearSel.appendChild(opt);
   }
-  document.getElementById('attendanceExportOverlay').classList.add('active');
+  var overlay = document.getElementById('attendanceExportOverlay');
+  overlay.style.setProperty('z-index', '100000', 'important');
+  overlay.classList.add('active');
 }
 
 function closeAttendanceExportModal() {
