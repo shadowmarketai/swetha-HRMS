@@ -14375,12 +14375,136 @@ async function selectAttEmployee(empCode) {
   // Day detail area
   html += '<div id="attDayDetailArea" style="margin-top:10px"></div>';
   html += '</div>';
+
+  // Multi-month attendance history card (loaded async)
+  html = '<div id="attEmpHistoryCard"></div>' + html;
+
   area.innerHTML = html;
 
   // Store dayData globally for detail view
   window._attDayData = dayData;
   window._attDayYear = year;
   window._attDayMonth = month;
+
+  // Kick off the multi-month history table — focus on Present vs Absent
+  loadAttendanceHistoryTable(empCode, emp);
+}
+
+// Build a 6-month history table for the selected employee.
+// Counts: Present, Half day, Leave (with permission = approved), Absent (without permission).
+async function loadAttendanceHistoryTable(empCode, emp) {
+  var card = document.getElementById('attEmpHistoryCard');
+  if (!card) return;
+  card.innerHTML = '<div class="card fade-in" style="margin-bottom:10px;padding:14px"><div style="color:var(--gray-400);font-size:.78rem;text-align:center">Loading attendance history...</div></div>';
+
+  var now = new Date();
+  var monthsToFetch = 6;
+  var months = [];
+  for (var i = monthsToFetch - 1; i >= 0; i--) {
+    var d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    months.push({
+      year: d.getFullYear(),
+      month: d.getMonth(),
+      label: d.toLocaleString('en-IN', { month: 'short', year: '2-digit' }),
+      monthStr: d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')
+    });
+  }
+
+  // Fetch all months in parallel
+  var fetches = months.map(function(m) {
+    return apiCall('GET', '/attendance?month=' + m.monthStr + '&empCode=' + encodeURIComponent(empCode))
+      .then(function(rows) { return Array.isArray(rows) ? rows : []; })
+      .catch(function() { return []; });
+  });
+
+  var allLogs;
+  try { allLogs = await Promise.all(fetches); }
+  catch (e) { card.innerHTML = '<div class="card" style="padding:12px;color:var(--danger);font-size:.78rem">Failed to load history</div>'; return; }
+
+  // Per-month stats using the shared classifier
+  var totals = { working: 0, present: 0, half: 0, leave: 0, absent: 0, hours: 0 };
+  var rows = months.map(function(m, idx) {
+    var logs = allLogs[idx] || [];
+    var lastDay = new Date(m.year, m.month + 1, 0).getDate();
+    var stopDay = (m.year === now.getFullYear() && m.month === now.getMonth()) ? now.getDate() : lastDay;
+    var result = _computeCalendarStatuses(logs, empCode, m.year, m.month, stopDay);
+    var att = result.att, dh = result.dayHours;
+    var c = { working:0, present:0, half:0, leave:0, absent:0, mins:0 };
+    for (var d = 1; d <= stopDay; d++) {
+      var s = att[d];
+      if (s === 'holiday') continue;
+      c.working++;
+      if (s === 'present') { c.present++; c.mins += (dh[d] || 0); }
+      else if (s === 'half') { c.half++; c.mins += (dh[d] || 0); }
+      else if (s === 'leave') c.leave++;
+      else if (s === 'absent') c.absent++;
+    }
+    totals.working += c.working;
+    totals.present += c.present;
+    totals.half    += c.half;
+    totals.leave   += c.leave;
+    totals.absent  += c.absent;
+    totals.hours   += c.mins / 60;
+    return { label: m.label, c: c };
+  });
+
+  // Build the card
+  var html = '<div class="card fade-in" style="margin-bottom:10px;padding:14px">';
+  html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;gap:8px;flex-wrap:wrap">';
+  html += '<div><h4 style="font-size:.88rem;margin:0;font-weight:700">Attendance History — ' + escapeHTML(emp.name) + '</h4>';
+  html += '<div style="font-size:.68rem;color:var(--gray-500);margin-top:2px">Last ' + monthsToFetch + ' months · ' + escapeHTML(emp.code) + ' · ' + escapeHTML(emp.dept || '') + '</div></div></div>';
+
+  // Headline cards — Present and Absent (the focus)
+  html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-bottom:12px">';
+  html += _attHistTile('Present days', totals.present, '#22c55e', String(Math.round((totals.present / Math.max(1, totals.working)) * 100)) + '% of working');
+  html += _attHistTile('Absent (no permission)', totals.absent, '#ef4444', String(Math.round((totals.absent / Math.max(1, totals.working)) * 100)) + '% of working');
+  html += _attHistTile('Leave (with permission)', totals.leave, '#a855f7', 'Approved leaves');
+  html += _attHistTile('Half days', totals.half, '#f59e0b', '<8h sessions');
+  html += _attHistTile('Working days', totals.working, '#0ea5e9', 'Excl. Sun/holidays');
+  html += _attHistTile('Total hours', Math.round(totals.hours) + 'h', '#3b82f6', 'Last 6 months');
+  html += '</div>';
+
+  // Per-month table
+  html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.74rem;min-width:540px">';
+  html += '<thead><tr style="text-align:left;color:var(--gray-500);background:var(--gray-50);border-bottom:2px solid var(--gray-100)">'
+       + '<th style="padding:8px 10px">Month</th>'
+       + '<th style="padding:8px 10px">Working</th>'
+       + '<th style="padding:8px 10px;color:#16a34a">Present</th>'
+       + '<th style="padding:8px 10px;color:#dc2626">Absent (no permission)</th>'
+       + '<th style="padding:8px 10px;color:#9333ea">Leave (with permission)</th>'
+       + '<th style="padding:8px 10px;color:#d97706">Half</th>'
+       + '</tr></thead><tbody>';
+  rows.forEach(function(r) {
+    html += '<tr style="border-bottom:1px solid var(--gray-100)">'
+         + '<td style="padding:8px 10px;font-weight:600">' + escapeHTML(r.label) + '</td>'
+         + '<td style="padding:8px 10px">' + r.c.working + '</td>'
+         + '<td style="padding:8px 10px;font-weight:700;color:#16a34a">' + r.c.present + '</td>'
+         + '<td style="padding:8px 10px;font-weight:700;color:#dc2626">' + r.c.absent + '</td>'
+         + '<td style="padding:8px 10px;color:#9333ea">' + r.c.leave + '</td>'
+         + '<td style="padding:8px 10px;color:#d97706">' + r.c.half + '</td>'
+         + '</tr>';
+  });
+  // Totals row
+  html += '<tr style="background:var(--gray-50);font-weight:700;border-top:2px solid var(--gray-200)">'
+       + '<td style="padding:8px 10px">Total (6 mo)</td>'
+       + '<td style="padding:8px 10px">' + totals.working + '</td>'
+       + '<td style="padding:8px 10px;color:#16a34a">' + totals.present + '</td>'
+       + '<td style="padding:8px 10px;color:#dc2626">' + totals.absent + '</td>'
+       + '<td style="padding:8px 10px;color:#9333ea">' + totals.leave + '</td>'
+       + '<td style="padding:8px 10px;color:#d97706">' + totals.half + '</td>'
+       + '</tr>';
+  html += '</tbody></table></div>';
+
+  html += '</div>';
+  card.innerHTML = html;
+}
+
+function _attHistTile(label, value, color, sub) {
+  return '<div style="background:var(--card-bg);border:1px solid var(--gray-100);border-left:3px solid ' + color + ';border-radius:6px;padding:10px 12px">'
+    + '<div style="font-size:.6rem;color:var(--gray-500);text-transform:uppercase;letter-spacing:.4px;font-weight:600">' + escapeHTML(label) + '</div>'
+    + '<div style="font-size:1.2rem;font-weight:700;color:' + color + ';margin-top:2px">' + escapeHTML(String(value)) + '</div>'
+    + '<div style="font-size:.62rem;color:var(--gray-500);margin-top:2px">' + sub + '</div>'
+    + '</div>';
 }
 
 function showAttDayDetail(dayNum) {
