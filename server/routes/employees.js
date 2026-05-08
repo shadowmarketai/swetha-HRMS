@@ -142,66 +142,6 @@ router.get('/:code/documents', verifyToken, async (req, res) => {
   }
 });
 
-// GET /api/employees/:code/history — full attendance + leave history (HR/MD only)
-router.get('/:code/history', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
-  try {
-    const code = req.params.code;
-    const [empRows] = await pool.query(
-      'SELECT code, name, dept, designation, doj FROM employees WHERE code = ? LIMIT 1',
-      [code]
-    );
-    if (empRows.length === 0) return res.status(404).json({ error: 'Employee not found' });
-    const emp = empRows[0];
-
-    // Last 12 months attendance logs
-    const [logs] = await pool.query(
-      `SELECT log_date, check_in, check_out
-       FROM attendance_logs
-       WHERE emp_code = ? AND log_date >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
-       ORDER BY log_date ASC, check_in ASC`,
-      [code]
-    );
-
-    // All leave applications (any status)
-    const [leaves] = await pool.query(
-      `SELECT id, leave_type, from_date, to_date, days, reason, status, reviewed_by, review_date, created_at
-       FROM leave_applications
-       WHERE emp_code = ?
-       ORDER BY created_at DESC`,
-      [code]
-    );
-
-    // Current leave balance
-    const [balRows] = await pool.query(
-      'SELECT casual, earned, sick, comp FROM leave_balances WHERE emp_code = ? LIMIT 1',
-      [code]
-    );
-    const leaveBalance = balRows[0] || { casual: 0, earned: 0, sick: 0, comp: 0 };
-
-    // All-time totals
-    const [allTimeRows] = await pool.query(
-      `SELECT COUNT(DISTINCT log_date) as totalDaysPresent,
-              MIN(log_date) as firstLog,
-              MAX(log_date) as lastLog,
-              COUNT(*) as totalCheckIns
-       FROM attendance_logs WHERE emp_code = ?`,
-      [code]
-    );
-    const allTime = allTimeRows[0] || { totalDaysPresent: 0, firstLog: null, lastLog: null, totalCheckIns: 0 };
-
-    res.json({
-      employee: emp,
-      logs,
-      leaves,
-      leaveBalance,
-      allTime
-    });
-  } catch (err) {
-    console.error('history error:', err);
-    res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
 // GET /api/employees/:code — IDOR protected
 router.get('/:code', verifyToken, async (req, res) => {
   try {
