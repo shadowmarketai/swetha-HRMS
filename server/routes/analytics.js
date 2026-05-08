@@ -50,20 +50,39 @@ router.get('/home', verifyToken, async (req, res) => {
       const [presentTodayRows] = await pool.query('SELECT COUNT(DISTINCT emp_code) as presentToday FROM attendance_logs WHERE log_date = ?', [today]);
       const presentToday = (presentTodayRows && presentTodayRows[0]) ? presentTodayRows[0].presentToday : 0;
 
-      // Per-employee absent list for hover tooltip on the doughnut (HR/MD/Manager only)
-      const [absentList] = await pool.query(
-        `SELECT code, name, dept FROM employees
-         WHERE is_active = 1 AND role != 'MD'
-         AND code NOT IN (SELECT DISTINCT emp_code FROM attendance_logs WHERE log_date = ?)
-         ORDER BY dept, name`,
-        [today]
+      // Employees not checked-in today, split into "informed leave" vs "absent"
+      // Informed leave = approved leave covering today
+      const [notCheckedIn] = await pool.query(
+        `SELECT e.code, e.name, e.dept,
+                la.leave_type, la.from_date, la.to_date
+         FROM employees e
+         LEFT JOIN leave_applications la
+           ON la.emp_code = e.code
+          AND la.status = 'approved'
+          AND ? BETWEEN la.from_date AND la.to_date
+         WHERE e.is_active = 1 AND e.role != 'MD'
+           AND e.code NOT IN (SELECT DISTINCT emp_code FROM attendance_logs WHERE log_date = ?)
+         ORDER BY e.dept, e.name`,
+        [today, today]
       ).catch(() => [[]]);
+
+      const leaveList = [];
+      const absentList = [];
+      (notCheckedIn || []).forEach(function(r) {
+        if (r.leave_type) {
+          leaveList.push({ code: r.code, name: r.name, dept: r.dept, leave_type: r.leave_type });
+        } else {
+          absentList.push({ code: r.code, name: r.name, dept: r.dept });
+        }
+      });
 
       data.attendanceToday = {
         total: totalActive,
         present: presentToday,
-        absent: totalActive - presentToday,
-        absentList: absentList || []
+        leave: leaveList.length,
+        absent: (totalActive - presentToday) - leaveList.length,
+        leaveList: leaveList,
+        absentList: absentList
       };
 
       // Monthly attendance trend (last 6 months)
