@@ -14421,15 +14421,22 @@ async function loadAttendanceHistoryTable(empCode, emp) {
   try { allLogs = await Promise.all(fetches); }
   catch (e) { card.innerHTML = '<div class="card" style="padding:12px;color:var(--danger);font-size:.78rem">Failed to load history</div>'; return; }
 
+  // Months before this date have no data — show as all-zero
+  var DATA_START_YM = '2026-04'; // Dec 2025–Mar 2026 → blanked out
+
   // Per-month stats using the shared classifier
   var totals = { working: 0, present: 0, half: 0, leave: 0, absent: 0, hours: 0 };
   var rows = months.map(function(m, idx) {
+    var c = { working:0, present:0, half:0, leave:0, absent:0, mins:0, noData:false };
+    if (m.monthStr < DATA_START_YM) {
+      c.noData = true;
+      return { label: m.label, c: c };
+    }
     var logs = allLogs[idx] || [];
     var lastDay = new Date(m.year, m.month + 1, 0).getDate();
     var stopDay = (m.year === now.getFullYear() && m.month === now.getMonth()) ? now.getDate() : lastDay;
     var result = _computeCalendarStatuses(logs, empCode, m.year, m.month, stopDay);
     var att = result.att, dh = result.dayHours;
-    var c = { working:0, present:0, half:0, leave:0, absent:0, mins:0 };
     for (var d = 1; d <= stopDay; d++) {
       var s = att[d];
       if (s === 'holiday') continue;
@@ -14475,6 +14482,13 @@ async function loadAttendanceHistoryTable(empCode, emp) {
        + '<th style="padding:8px 10px;color:#d97706">Half</th>'
        + '</tr></thead><tbody>';
   rows.forEach(function(r) {
+    if (r.c.noData) {
+      html += '<tr style="border-bottom:1px solid var(--gray-100);color:var(--gray-400)">'
+           + '<td style="padding:8px 10px;font-weight:600">' + escapeHTML(r.label) + '</td>'
+           + '<td style="padding:8px 10px" colspan="5"><span style="font-style:italic;font-size:.7rem">No data — system not yet in use</span></td>'
+           + '</tr>';
+      return;
+    }
     html += '<tr style="border-bottom:1px solid var(--gray-100)">'
          + '<td style="padding:8px 10px;font-weight:600">' + escapeHTML(r.label) + '</td>'
          + '<td style="padding:8px 10px">' + r.c.working + '</td>'
