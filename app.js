@@ -2673,6 +2673,11 @@ function showEmployeeDetailModal(empCode) {
     html += '</div></div>';
   }
 
+  // Attendance & Leave History for MD/HR — loaded asynchronously
+  if (canEdit) {
+    html += '<div class="edm-section"><div class="edm-section-title">Attendance &amp; Leave History</div><div id="edmHistoryBox" style="padding:4px 0"><div style="color:var(--gray-400);font-size:.75rem">Loading history...</div></div></div>';
+  }
+
   // Documents section for MD/HR — loaded asynchronously
   if (canEdit) {
     html += '<div class="edm-section"><div class="edm-section-title">Employee Documents</div><div id="edmDocsList" style="padding:4px 0"><div style="color:var(--gray-400);font-size:.75rem">Loading documents...</div></div></div>';
@@ -2685,6 +2690,11 @@ function showEmployeeDetailModal(empCode) {
 
   container.innerHTML = html;
   showOverlay('emp-detail');
+
+  // Load attendance & leave history for MD/HR
+  if (canEdit) {
+    loadEmployeeHistory(empCode);
+  }
 
   // Load documents for MD/HR
   if (canEdit) {
@@ -2721,6 +2731,230 @@ function showEmployeeDetailModal(empCode) {
     });
   }
 }
+
+// Render full attendance + leave history for an employee inside the detail modal
+function loadEmployeeHistory(empCode) {
+  apiCall('GET', '/employees/' + empCode + '/history').then(function(resp) {
+    var box = document.getElementById('edmHistoryBox');
+    if (!box) return;
+    var logs = (resp && resp.logs) || [];
+    var leaves = (resp && resp.leaves) || [];
+    var bal = (resp && resp.leaveBalance) || {};
+    var allTime = (resp && resp.allTime) || {};
+
+    // ── Group logs by date and compute per-day hours ──
+    var byDate = {};
+    logs.forEach(function(r) {
+      var d = String(r.log_date || '').slice(0, 10);
+      if (!d) return;
+      (byDate[d] = byDate[d] || []).push(r);
+    });
+
+    function computeDayStatus(dateStr, sessions, isToday) {
+      // Sunday → holiday
+      var dt = new Date(dateStr + 'T00:00:00');
+      if (dt.getDay() === 0) return { status: 'holiday', minutes: 0 };
+      // Public holiday
+      if (typeof publicHolidays !== 'undefined' && publicHolidays[dateStr]) return { status: 'holiday', minutes: 0 };
+      if (sessions && sessions.length) {
+        var min = 0;
+        sessions.forEach(function(s) {
+          if (!s.check_in) return;
+          var start = new Date(s.check_in).getTime();
+          var end;
+          if (s.check_out) end = new Date(s.check_out).getTime();
+          else if (isToday) end = Date.now();
+          else {
+            var auto = new Date(dateStr + 'T21:00:00').getTime();
+            end = Math.min(auto, start + 480 * 60000);
+          }
+          if (end > start) min += (end - start) / 60000;
+        });
+        if (min > 480) min = 480;
+        return { status: min >= 480 ? 'present' : 'half', minutes: min };
+      }
+      // No log — was the employee on approved leave?
+      var onLeave = leaves.some(function(la) {
+        return la.status === 'approved'
+          && String(la.from_date).slice(0,10) <= dateStr
+          && String(la.to_date).slice(0,10)   >= dateStr;
+      });
+      return { status: onLeave ? 'leave' : 'absent', minutes: 0 };
+    }
+
+    function ymd(d) { return d.toISOString().slice(0, 10); }
+
+    // ── Stats: this month + last 6 months breakdown ──
+    var today = new Date();
+    var todayStr = ymd(today);
+    function monthBreakdown(year, month) {
+      var first = new Date(year, month, 1);
+      var endDay = new Date(year, month + 1, 0).getDate();
+      var stop = (year === today.getFullYear() && month === today.getMonth()) ? today.getDate() : endDay;
+      var c = { present:0, half:0, leave:0, absent:0, holiday:0, hours:0 };
+      for (var d = 1; d <= stop; d++) {
+        var ds = year + '-' + String(month+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+        var st = computeDayStatus(ds, byDate[ds], ds === todayStr);
+        c[st.status] = (c[st.status] || 0) + 1;
+        c.hours += st.minutes / 60;
+      }
+      return c;
+    }
+    var thisMonth = monthBreakdown(today.getFullYear(), today.getMonth());
+    var monthsList = [];
+    for (var i = 5; i >= 0; i--) {
+      var d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+      var b = monthBreakdown(d.getFullYear(), d.getMonth());
+      monthsList.push({ label: d.toLocaleString('en-IN', { month:'short', year:'2-digit' }), b: b });
+    }
+
+    // ── Build HTML ──
+    var html = '';
+
+    // Stats cards
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:14px">';
+    html += _eh_card('Present this month', thisMonth.present + (thisMonth.half ? ' + ' + thisMonth.half + ' half' : ''), '#22c55e');
+    html += _eh_card('Absent this month', thisMonth.absent, '#ef4444');
+    html += _eh_card('Leave this month', thisMonth.leave, '#f59e0b');
+    html += _eh_card('Hours this month', Math.round(thisMonth.hours) + 'h', '#3b82f6');
+    html += _eh_card('Total days present (all-time)', allTime.totalDaysPresent || 0, '#0ea5e9');
+    html += _eh_card('First log', allTime.firstLog ? String(allTime.firstLog).slice(0,10) : 'N/A', '#6b7280');
+    html += '</div>';
+
+    // Leave balance
+    html += '<div style="margin-bottom:14px"><div style="font-size:.7rem;color:var(--gray-500);font-weight:600;margin-bottom:6px">CURRENT LEAVE BALANCE</div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:6px">';
+    html += _eh_pill('Casual', bal.casual || 0, '#3b82f6');
+    html += _eh_pill('Earned', bal.earned || 0, '#22c55e');
+    html += _eh_pill('Sick',   bal.sick   || 0, '#f59e0b');
+    html += _eh_pill('Comp',   bal.comp   || 0, '#a855f7');
+    html += '</div></div>';
+
+    // Last 6-month breakdown bars
+    html += '<div style="margin-bottom:14px"><div style="font-size:.7rem;color:var(--gray-500);font-weight:600;margin-bottom:6px">LAST 6 MONTHS</div>';
+    html += '<table style="width:100%;border-collapse:collapse;font-size:.72rem">';
+    html += '<thead><tr style="text-align:left;color:var(--gray-500)"><th style="padding:4px 6px">Month</th><th style="padding:4px 6px;color:#22c55e">P</th><th style="padding:4px 6px;color:#f59e0b">H</th><th style="padding:4px 6px;color:#a855f7">L</th><th style="padding:4px 6px;color:#ef4444">A</th><th style="padding:4px 6px">Hours</th></tr></thead><tbody>';
+    monthsList.forEach(function(m){
+      html += '<tr style="border-top:1px solid var(--gray-100)">'
+        + '<td style="padding:4px 6px;font-weight:600">' + escapeHTML(m.label) + '</td>'
+        + '<td style="padding:4px 6px">' + m.b.present + '</td>'
+        + '<td style="padding:4px 6px">' + m.b.half + '</td>'
+        + '<td style="padding:4px 6px">' + m.b.leave + '</td>'
+        + '<td style="padding:4px 6px">' + m.b.absent + '</td>'
+        + '<td style="padding:4px 6px">' + Math.round(m.b.hours) + 'h</td>'
+        + '</tr>';
+    });
+    html += '</tbody></table></div>';
+
+    // Daily heatmap — last 60 days
+    html += '<div style="margin-bottom:14px"><div style="font-size:.7rem;color:var(--gray-500);font-weight:600;margin-bottom:6px">LAST 60 DAYS (P · H · L · A · Holiday)</div>';
+    html += '<div style="display:grid;grid-template-columns:repeat(15,1fr);gap:3px">';
+    var colors = { present:'#22c55e', half:'#f59e0b', leave:'#a855f7', absent:'#ef4444', holiday:'#e5e7eb' };
+    for (var k = 59; k >= 0; k--) {
+      var dd = new Date(today.getFullYear(), today.getMonth(), today.getDate() - k);
+      var dstr = ymd(dd);
+      var st = computeDayStatus(dstr, byDate[dstr], dstr === todayStr);
+      var bg = colors[st.status] || '#e5e7eb';
+      var lab = st.status.charAt(0).toUpperCase() + st.status.slice(1);
+      var hr = st.minutes ? ' (' + Math.round(st.minutes/60*10)/10 + 'h)' : '';
+      html += '<div title="' + escapeHTML(dstr + ' — ' + lab + hr) + '" style="aspect-ratio:1;background:' + bg + ';border-radius:3px;font-size:.55rem;color:#fff;text-align:center;line-height:1.6">' + dd.getDate() + '</div>';
+    }
+    html += '</div>';
+    html += '<div style="display:flex;gap:10px;margin-top:6px;font-size:.65rem;color:var(--gray-500);flex-wrap:wrap">';
+    html += '<span><span style="display:inline-block;width:9px;height:9px;background:#22c55e;border-radius:2px;vertical-align:middle"></span> Present</span>';
+    html += '<span><span style="display:inline-block;width:9px;height:9px;background:#f59e0b;border-radius:2px;vertical-align:middle"></span> Half</span>';
+    html += '<span><span style="display:inline-block;width:9px;height:9px;background:#a855f7;border-radius:2px;vertical-align:middle"></span> Leave</span>';
+    html += '<span><span style="display:inline-block;width:9px;height:9px;background:#ef4444;border-radius:2px;vertical-align:middle"></span> Absent</span>';
+    html += '<span><span style="display:inline-block;width:9px;height:9px;background:#e5e7eb;border-radius:2px;vertical-align:middle"></span> Holiday/Sun</span>';
+    html += '</div></div>';
+
+    // Leave applications history
+    html += '<div><div style="font-size:.7rem;color:var(--gray-500);font-weight:600;margin-bottom:6px">LEAVE APPLICATIONS (' + leaves.length + ')</div>';
+    if (leaves.length === 0) {
+      html += '<div style="color:var(--gray-400);font-size:.75rem;padding:8px 0">No leave applications yet</div>';
+    } else {
+      html += '<div style="max-height:240px;overflow-y:auto;border:1px solid var(--gray-100);border-radius:6px">';
+      html += '<table style="width:100%;border-collapse:collapse;font-size:.7rem">';
+      html += '<thead style="position:sticky;top:0;background:var(--gray-50);z-index:1"><tr style="text-align:left;color:var(--gray-500)"><th style="padding:6px">Type</th><th style="padding:6px">From</th><th style="padding:6px">To</th><th style="padding:6px">Days</th><th style="padding:6px">Status</th><th style="padding:6px">Reason</th></tr></thead><tbody>';
+      var statusColors = { approved:'#22c55e', hr_accepted:'#3b82f6', pending:'#f59e0b', rejected:'#ef4444' };
+      leaves.forEach(function(la){
+        var sc = statusColors[la.status] || '#6b7280';
+        html += '<tr style="border-top:1px solid var(--gray-100)">'
+          + '<td style="padding:6px;text-transform:capitalize">' + escapeHTML(la.leave_type || '') + '</td>'
+          + '<td style="padding:6px">' + escapeHTML(String(la.from_date).slice(0,10)) + '</td>'
+          + '<td style="padding:6px">' + escapeHTML(String(la.to_date).slice(0,10)) + '</td>'
+          + '<td style="padding:6px">' + (la.days || 0) + '</td>'
+          + '<td style="padding:6px"><span style="background:' + sc + ';color:#fff;padding:1px 6px;border-radius:8px;font-size:.62rem;text-transform:capitalize">' + escapeHTML((la.status || '').replace(/_/g,' ')) + '</span></td>'
+          + '<td style="padding:6px;color:var(--gray-500);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeAttr(la.reason || '') + '">' + escapeHTML(la.reason || '') + '</td>'
+          + '</tr>';
+      });
+      html += '</tbody></table></div>';
+    }
+    html += '</div>';
+
+    box.innerHTML = html;
+  }).catch(function(err) {
+    var box = document.getElementById('edmHistoryBox');
+    if (box) box.innerHTML = '<div style="color:var(--gray-400);font-size:.75rem">Failed to load history</div>';
+    console.error('history load failed', err);
+  });
+}
+
+function _eh_card(label, value, color) {
+  return '<div style="background:var(--card-bg);border:1px solid var(--gray-100);border-left:3px solid ' + color + ';border-radius:6px;padding:8px 10px">'
+    + '<div style="font-size:.6rem;color:var(--gray-500);text-transform:uppercase;letter-spacing:.4px">' + escapeHTML(label) + '</div>'
+    + '<div style="font-size:1rem;font-weight:700;color:var(--text-primary);margin-top:2px">' + escapeHTML(String(value)) + '</div>'
+    + '</div>';
+}
+function _eh_pill(label, value, color) {
+  return '<div style="background:' + color + '14;border:1px solid ' + color + '33;border-radius:14px;padding:3px 10px;font-size:.7rem">'
+    + '<span style="color:' + color + ';font-weight:600">' + escapeHTML(label) + '</span> <span style="font-weight:700">' + escapeHTML(String(value)) + '</span>'
+    + '</div>';
+}
+
+// Floating panel listing employees in a clicked attendance slice; each name opens the detail modal
+function _showAttendanceSliceList(title, list, withLeaveType) {
+  var existing = document.getElementById('attSlicePanel');
+  if (existing) existing.remove();
+  var panel = document.createElement('div');
+  panel.id = 'attSlicePanel';
+  panel.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--card-bg);border:1px solid var(--gray-200);border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.25);z-index:100000;width:92%;max-width:420px;max-height:70vh;display:flex;flex-direction:column;overflow:hidden';
+  var byDept = {};
+  (list || []).forEach(function(e){ (byDept[e.dept || 'Other'] = byDept[e.dept || 'Other'] || []).push(e); });
+  var html = '<div style="padding:12px 14px;border-bottom:1px solid var(--gray-100);display:flex;align-items:center;justify-content:space-between">'
+    + '<div><div style="font-weight:700;font-size:.9rem">' + escapeHTML(title) + '</div>'
+    + '<div style="font-size:.7rem;color:var(--gray-500)">' + (list ? list.length : 0) + ' employee(s) — click a name to view full history</div></div>'
+    + '<button onclick="document.getElementById(\'attSlicePanel\').remove()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--gray-500);padding:0 6px">&times;</button>'
+    + '</div>';
+  html += '<div style="overflow-y:auto;padding:8px 0">';
+  if (!list || list.length === 0) {
+    html += '<div style="padding:14px;text-align:center;color:var(--gray-400);font-size:.8rem">No employees in this group</div>';
+  } else {
+    Object.keys(byDept).sort().forEach(function(d){
+      html += '<div style="padding:6px 14px 2px;font-size:.65rem;color:var(--gray-500);text-transform:uppercase;letter-spacing:.5px;font-weight:600">' + escapeHTML(d) + '</div>';
+      byDept[d].forEach(function(e){
+        var meta = withLeaveType && e.leave_type ? ' · ' + escapeHTML(e.leave_type) : '';
+        html += '<div onclick="document.getElementById(\'attSlicePanel\').remove();showEmployeeDetailModal(\'' + escapeAttr(e.code) + '\')" '
+          + 'style="padding:8px 14px;cursor:pointer;font-size:.78rem;display:flex;justify-content:space-between;align-items:center" '
+          + 'onmouseover="this.style.background=\'var(--gray-50)\'" onmouseout="this.style.background=\'transparent\'">'
+          + '<span><span style="font-weight:600">' + escapeHTML(e.name) + '</span> <span style="color:var(--gray-500);font-size:.7rem">(' + escapeHTML(e.code) + ')' + meta + '</span></span>'
+          + '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--gray-400)"><polyline points="9 18 15 12 9 6"/></svg>'
+          + '</div>';
+      });
+    });
+  }
+  html += '</div>';
+  panel.innerHTML = html;
+  document.body.appendChild(panel);
+  // Click-outside to close
+  setTimeout(function(){
+    document.addEventListener('click', function _h(ev){
+      if (!panel.contains(ev.target)) { panel.remove(); document.removeEventListener('click', _h); }
+    });
+  }, 50);
+}
+
+
 
 async function saveEmployeeDetails(empCode) {
   var inputs = document.querySelectorAll('.edm-edit-input');
@@ -11236,6 +11470,17 @@ function renderHomeAnalytics() {
           },
           options:{
             responsive:true, cutout:'65%',
+            onClick: function(evt, elements) {
+              if (!elements || !elements.length) return;
+              var i = elements[0].index;
+              if (i === 0) return; // Present slice — no list to show
+              var list = (i === 1) ? leaveList : absentList;
+              var title = (i === 1) ? 'On Leave Today' : 'Absent Today';
+              _showAttendanceSliceList(title, list, i === 1);
+            },
+            onHover: function(evt, elements) {
+              evt.native.target.style.cursor = (elements && elements.length && elements[0].index !== 0) ? 'pointer' : 'default';
+            },
             plugins:{
               legend:{position:'bottom',labels:{font:{size:11},padding:12}},
               tooltip:{
@@ -11247,8 +11492,8 @@ function renderHomeAnalytics() {
                     if (!items || !items[0]) return '';
                     var i = items[0].dataIndex;
                     if (i === 0) return 'Present today (' + (at.present||0) + ')';
-                    if (i === 1) return 'On leave today (' + (at.leave||0) + ')';
-                    return 'Absent today (' + absentList.length + ')';
+                    if (i === 1) return 'On leave today (' + (at.leave||0) + ') — click to open list';
+                    return 'Absent today (' + absentList.length + ') — click to open list';
                   },
                   label: function(ctx){
                     if (ctx.dataIndex === 0) return 'Present: ' + (at.present||0);
