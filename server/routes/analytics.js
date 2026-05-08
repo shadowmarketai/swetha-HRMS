@@ -43,11 +43,23 @@ router.get('/home', verifyToken, async (req, res) => {
       );
       data.deptDistribution = deptCount;
 
+      // System / shared accounts that don't physically clock in — exclude from attendance math
+      const SYSTEM_CODES = ['HR001', 'MD001', 'SADMIN'];
+      const sysPlaceholders = SYSTEM_CODES.map(() => '?').join(',');
+
       // Attendance summary today
       const today = new Date().toISOString().split('T')[0];
-      const [totalActiveRows] = await pool.query("SELECT COUNT(*) as totalActive FROM employees WHERE is_active = 1 AND role != 'MD'");
+      const [totalActiveRows] = await pool.query(
+        `SELECT COUNT(*) as totalActive FROM employees
+         WHERE is_active = 1 AND role != 'MD' AND code NOT IN (${sysPlaceholders})`,
+        SYSTEM_CODES
+      );
       const totalActive = (totalActiveRows && totalActiveRows[0]) ? totalActiveRows[0].totalActive : 0;
-      const [presentTodayRows] = await pool.query('SELECT COUNT(DISTINCT emp_code) as presentToday FROM attendance_logs WHERE log_date = ?', [today]);
+      const [presentTodayRows] = await pool.query(
+        `SELECT COUNT(DISTINCT emp_code) as presentToday FROM attendance_logs
+         WHERE log_date = ? AND emp_code NOT IN (${sysPlaceholders})`,
+        [today, ...SYSTEM_CODES]
+      );
       const presentToday = (presentTodayRows && presentTodayRows[0]) ? presentTodayRows[0].presentToday : 0;
 
       // Employees not checked-in today, split into "informed leave" vs "absent"
@@ -61,9 +73,10 @@ router.get('/home', verifyToken, async (req, res) => {
           AND la.status = 'approved'
           AND ? BETWEEN la.from_date AND la.to_date
          WHERE e.is_active = 1 AND e.role != 'MD'
+           AND e.code NOT IN (${sysPlaceholders})
            AND e.code NOT IN (SELECT DISTINCT emp_code FROM attendance_logs WHERE log_date = ?)
          ORDER BY e.dept, e.name`,
-        [today, today]
+        [today, ...SYSTEM_CODES, today]
       ).catch(() => [[]]);
 
       const leaveList = [];
@@ -104,8 +117,9 @@ router.get('/home', verifyToken, async (req, res) => {
       const [absentees] = await pool.query(
         `SELECT e.name, e.code, e.dept,
          (SELECT COUNT(DISTINCT log_date) FROM attendance_logs WHERE emp_code = e.code AND DATE_FORMAT(log_date, '%Y-%m') = ?) as days_present
-         FROM employees e WHERE e.is_active = 1 AND e.role != 'MD'
-         ORDER BY days_present ASC LIMIT 10`, [currentMonth]
+         FROM employees e
+         WHERE e.is_active = 1 AND e.role != 'MD' AND e.code NOT IN (${sysPlaceholders})
+         ORDER BY days_present ASC LIMIT 10`, [currentMonth, ...SYSTEM_CODES]
       );
       data.topAbsentees = absentees;
     }
