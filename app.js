@@ -11188,7 +11188,24 @@ function renderHomeAnalytics() {
       var a3 = document.getElementById('chartAttendanceToday');
       if (a3) {
         var absentList = Array.isArray(at.absentList) ? at.absentList : [];
+        var leaveList  = Array.isArray(at.leaveList)  ? at.leaveList  : [];
         // Build grouped-by-dept label lines for a tidy tooltip (max 20 rows + "+N more")
+        function _buildLines(list, emptyMsg, withType) {
+          if (list.length === 0) return [emptyMsg];
+          var byDept = {};
+          list.forEach(function(e){
+            var label = e.name + ' (' + e.code + ')' + (withType && e.leave_type ? ' — ' + e.leave_type : '');
+            (byDept[e.dept||'Other'] = byDept[e.dept||'Other'] || []).push(label);
+          });
+          var lines = [];
+          Object.keys(byDept).sort().forEach(function(d){
+            lines.push(d + ':');
+            byDept[d].forEach(function(n){ lines.push('  • ' + n); });
+          });
+          if (lines.length > 22) { var extra = lines.length - 22; lines = lines.slice(0, 22); lines.push('… +' + extra + ' more'); }
+          return lines;
+        }
+        var _leaveTooltipLines = _buildLines(leaveList, 'No one on approved leave today', true);
         var _absentTooltipLines = (function(){
           if (absentList.length === 0) return ['\u2713 Everyone checked in today'];
           var byDept = {};
@@ -11203,7 +11220,20 @@ function renderHomeAnalytics() {
         })();
         new Chart(a3, {
           type:'doughnut',
-          data:{ labels:['Present ('+at.present+')','Absent ('+at.absent+')'], datasets:[{data:[at.present||0,at.absent||0],backgroundColor:['#22c55e','#fee2e2'],borderColor:['#22c55e','#ef4444'],borderWidth:2,hoverOffset:6}] },
+          data:{
+            labels:[
+              'Present ('+(at.present||0)+')',
+              'Leave ('+(at.leave||0)+')',
+              'Absent ('+(at.absent||0)+')'
+            ],
+            datasets:[{
+              data:[at.present||0, at.leave||0, at.absent||0],
+              backgroundColor:['#22c55e','#f59e0b','#fee2e2'],
+              borderColor:['#22c55e','#f59e0b','#ef4444'],
+              borderWidth:2,
+              hoverOffset:6
+            }]
+          },
           options:{
             responsive:true, cutout:'65%',
             plugins:{
@@ -11216,11 +11246,13 @@ function renderHomeAnalytics() {
                   title: function(items){
                     if (!items || !items[0]) return '';
                     var i = items[0].dataIndex;
-                    return i === 1 ? ('Absent today (' + absentList.length + ')') : ('Present today (' + (at.present||0) + ')');
+                    if (i === 0) return 'Present today (' + (at.present||0) + ')';
+                    if (i === 1) return 'On leave today (' + (at.leave||0) + ')';
+                    return 'Absent today (' + absentList.length + ')';
                   },
                   label: function(ctx){
-                    if (ctx.dataIndex !== 1) return 'Present: ' + (at.present||0);
-                    // Absent slice — return the per-employee list
+                    if (ctx.dataIndex === 0) return 'Present: ' + (at.present||0);
+                    if (ctx.dataIndex === 1) return _leaveTooltipLines;
                     return _absentTooltipLines;
                   }
                 }
