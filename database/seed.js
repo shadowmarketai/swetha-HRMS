@@ -8,6 +8,7 @@ const API_BASE = process.env.API_BASE || 'http://localhost:3000/api';
 const EMPLOYEES = [
   {code:'MD001',name:'Selvam',dept:'Admin',designation:'Managing Director',salary:0,bank:'',accNo:'',role:'MD',phone:'',doj:''},
   {code:'HR001',name:'HR Admin',dept:'Admin',designation:'HR Admin',salary:0,bank:'',accNo:'',role:'HR',phone:'',doj:''},
+  {code:'ACC001',name:'Accounts Admin',dept:'Accounts',designation:'Accounts Admin',salary:0,bank:'',accNo:'',role:'Accounts',phone:'',doj:''},
   {code:'SS001',name:'Sankar Guru P',dept:'Design',designation:'Designing',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:''},
   {code:'SS002',name:'Vishnukumar M',dept:'Marketing',designation:'Marketing',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:''},
   {code:'SS003',name:'Hariharan N',dept:'Execution',designation:'Execution',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:''},
@@ -53,7 +54,7 @@ const EMPLOYEES = [
 ];
 
 // Build credentials: MD001=admin123, HR001=hr123, all SS employees=emp123
-const CREDENTIALS = { 'MD001': {pass:'admin123', idx:0}, 'HR001': {pass:'hr123', idx:1} };
+const CREDENTIALS = { 'MD001': {pass:'admin123', idx:0}, 'HR001': {pass:'hr123', idx:1}, 'ACC001': {pass:'acc123', idx:2} };
 EMPLOYEES.forEach((e, i) => { if (!CREDENTIALS[e.code]) CREDENTIALS[e.code] = {pass:'emp123', idx:i}; });
 
 async function seed() {
@@ -408,6 +409,7 @@ async function seed() {
   console.log('Login credentials:');
   console.log('  MD:       MD001 / admin123');
   console.log('  HR:       HR001 / hr123');
+  console.log('  Accounts: ACC001 / acc123');
   console.log('  Employee: SS001 / emp123');
   console.log('  All others: [code] / emp123');
 }

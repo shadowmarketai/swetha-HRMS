@@ -75,6 +75,7 @@ const COMPANY_LOGO_B64 = 'iVBORw0KGgoAAAANSUhEUgAAAQUAAABgCAIAAAHsvcANAAAKQ2lDQ1
 const EMPLOYEES = [
   {code:'MD001',name:'Selvam',dept:'Admin',designation:'Managing Director',salary:0,bank:'',accNo:'',role:'MD',phone:'',doj:'',email:'selvam@swethastructures.com'},
   {code:'HR001',name:'HR Admin',dept:'Admin',designation:'HR Admin',salary:0,bank:'',accNo:'',role:'HR',phone:'',doj:'',email:''},
+  {code:'ACC001',name:'Accounts Admin',dept:'Accounts',designation:'Accounts Admin',salary:0,bank:'',accNo:'',role:'Accounts',phone:'',doj:'',email:''},
   {code:'SS001',name:'Sankar Guru P',dept:'Design',designation:'Designing',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'sankarguru182@gmail.com'},
   {code:'SS002',name:'Vishnukumar M',dept:'Marketing',designation:'Marketing',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'vishnum991@gmail.com'},
   {code:'SS003',name:'Hariharan N',dept:'Execution',designation:'Execution',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'hariharan0335@gmail.com'},
