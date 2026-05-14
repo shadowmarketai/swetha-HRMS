@@ -414,14 +414,6 @@ const NAV_CONFIG = {
       { id:'acc-sal-self', label:'Self Salary', action:{type:'tab',target:'salary'} },
       { id:'acc-sal-list', label:'Employee List', action:{type:'tab',target:'salary'} }
     ]},
-    { id:'acc-tax', label:'Tax & Compliance', icon:'tax', children:[
-      { id:'acc-tax-form16', label:'Form 16 & Tax', action:{type:'overlay',target:'hr-tax'} },
-      { id:'acc-compliance', label:'Compliance Filing', action:{type:'overlay',target:'hr-compliance'} }
-    ]},
-    { id:'acc-analytics', label:'Analytics', icon:'performance', children:[
-      { id:'acc-analytics-dash', label:'Analytics Dashboard', action:{type:'overlay',target:'hr-analytics'} },
-      { id:'acc-kpi', label:'Employee KPI', action:{type:'overlay',target:'hr-kpi'} }
-    ]},
     { id:'acc-progress', label:'Project Progress', icon:'progress', action:{type:'tab',target:'progress'} },
     { id:'acc-procurement', label:'Procurement', icon:'purchase', children:[
       { id:'acc-proc-grn', label:'GRN', action:{type:'overlay',target:'peb'} },
@@ -5699,7 +5691,7 @@ async function initAnalyticsCharts(m) {
     if (id === 'hr-recruit' && currentUser && !_isManagement) {
       showToast('Access restricted to Management'); return;
     }
-    if (id === 'hr-analytics' && currentUser && !_isManagement && currentUser.role !== 'Accounts') {
+    if (id === 'hr-analytics' && currentUser && !_isManagement) {
       showToast('Access restricted to Management'); return;
     }
 
@@ -5714,7 +5706,7 @@ async function initAnalyticsCharts(m) {
     if (id === 'hr-shifts' && currentUser && !_isManagement) {
       showToast('Access restricted to Management'); return;
     }
-    if (id === 'hr-compliance' && currentUser && !_isManagement && currentUser.role !== 'Accounts') {
+    if (id === 'hr-compliance' && currentUser && !_isManagement) {
       showToast('Access restricted to Management'); return;
     }
     if (id === 'hr-assets' && currentUser && !_isManagement) {
