@@ -13925,6 +13925,10 @@ function renderAccSettlementTracker(c) {
   if (employees.length === 0) {
     html += '<div class="card" style="padding:20px;text-align:center;color:var(--gray-400)">No settlements to track</div>';
   } else {
+    var dlSvg = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+    html += '<div style="display:flex;justify-content:flex-end;margin-bottom:10px">';
+    html += '<button class="nf-btn nf-btn-sm" onclick="downloadSettlementCSV()" style="display:inline-flex;align-items:center;gap:5px;font-size:.72rem">' + dlSvg + ' Download All (CSV)</button>';
+    html += '</div>';
     var th = function(t, align) { return '<th style="padding:8px 10px;text-align:' + (align||'left') + ';font-size:.7rem;font-weight:700;color:var(--gray-500);border-bottom:2px solid var(--gray-200);white-space:nowrap">' + t + '</th>'; };
     html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">';
     html += '<thead><tr style="background:var(--gray-50)">' + th('Employee') + th('Adv Approved','right') + th('Adv Paid','right') + th('Exp Approved','right') + th('Exp Reimbursed','right') + th('Net Balance','right') + '</tr></thead><tbody>';
@@ -13941,7 +13945,7 @@ function renderAccSettlementTracker(c) {
       html += '<tr>';
       var safeCode = code.replace(/'/g, "\\'");
       var safeName = (e.name || '').replace(/'/g, "\\'");
-      html += '<td style="padding:8px 10px;font-size:.78rem;border-bottom:1px solid var(--gray-100)"><button onclick="showEmpPaymentHistory(\'' + safeCode + '\',\'' + safeName + '\')" style="background:none;border:none;cursor:pointer;text-align:left;padding:0"><span style="font-weight:700;color:var(--primary);font-size:.78rem">' + escapeHTML(e.name) + '</span><br><span style="font-size:.65rem;color:var(--gray-400);font-weight:400">' + escapeHTML(code) + '</span></button></td>';
+      html += '<td style="padding:8px 10px;font-size:.78rem;border-bottom:1px solid var(--gray-100)"><div style="display:flex;align-items:center;gap:8px"><button onclick="showEmpPaymentHistory(\'' + safeCode + '\',\'' + safeName + '\')" style="background:none;border:none;cursor:pointer;text-align:left;padding:0"><span style="font-weight:700;color:var(--primary);font-size:.78rem">' + escapeHTML(e.name) + '</span><br><span style="font-size:.65rem;color:var(--gray-400);font-weight:400">' + escapeHTML(code) + '</span></button><button onclick="downloadEmpSettlementPDF(\'' + safeCode + '\',\'' + safeName + '\')" title="Download PDF" style="background:none;border:1px solid var(--gray-300);border-radius:4px;cursor:pointer;padding:3px 6px;color:var(--gray-500);font-size:.65rem;white-space:nowrap;display:inline-flex;align-items:center;gap:3px"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>PDF</button></div></td>';
       html += td(e.advApproved, e.advApproved ? '#b45309' : null);
       html += td(e.advPaid, e.advPaid ? '#16a34a' : null);
       html += td(e.expApproved, e.expApproved ? '#b45309' : null);
@@ -13963,6 +13967,157 @@ function renderAccSettlementTracker(c) {
     html += '</div>';
   }
   c.innerHTML = html;
+}
+
+// =====================================================
+// SETTLEMENT TRACKER DOWNLOADS
+// =====================================================
+
+// Build empMap from global advance/expense data (shared between render + download)
+function _buildSettlementMap() {
+  var empMap = {};
+  function ensureEmp(code, name) {
+    if (!empMap[code]) empMap[code] = { name: name || code, advApproved: 0, advPaid: 0, expApproved: 0, expPaid: 0 };
+  }
+  (typeof advanceRequests !== 'undefined' ? advanceRequests : []).forEach(function(r) {
+    var s = (r.status || '').toLowerCase();
+    if (s !== 'approved' && s !== 'paid') return;
+    ensureEmp(r.empCode, r.empName);
+    if (s === 'approved') empMap[r.empCode].advApproved += (r.amount || 0);
+    else                  empMap[r.empCode].advPaid    += (r.amount || 0);
+  });
+  (typeof expenseReimbursements !== 'undefined' ? expenseReimbursements : []).forEach(function(e) {
+    if (e.status !== 'Approved' && e.status !== 'Paid') return;
+    ensureEmp(e.empCode, e.empName);
+    if (e.status === 'Approved') empMap[e.empCode].expApproved += (e.amount || 0);
+    else                         empMap[e.empCode].expPaid     += (e.amount || 0);
+  });
+  return empMap;
+}
+
+// Download all employees as CSV
+function downloadSettlementCSV() {
+  var empMap = _buildSettlementMap();
+  var rows = ['﻿Employee,Code,Adv Approved (Rs.),Adv Paid (Rs.),Exp Approved (Rs.),Exp Reimbursed (Rs.),Net Balance (Rs.),Status'];
+  Object.keys(empMap).sort().forEach(function(code) {
+    var e = empMap[code];
+    var totalAdv = e.advApproved + e.advPaid;
+    var totalExp = e.expApproved + e.expPaid;
+    var balance  = totalAdv - totalExp;
+    var status   = balance > 0 ? 'To Return' : balance < 0 ? 'To Reimburse' : 'Settled';
+    rows.push(['"' + e.name + '"', code, e.advApproved, e.advPaid, e.expApproved, e.expPaid, Math.abs(balance), status].join(','));
+  });
+  downloadCSV(rows.join('\n'), 'Settlement_Tracker_' + new Date().toISOString().slice(0, 10) + '.csv');
+}
+
+// Download a single employee's settlement as a branded PDF
+async function downloadEmpSettlementPDF(empCode, empName) {
+  try {
+    await loadJsPdf();
+    var { jsPDF } = window.jspdf;
+    var doc = new jsPDF('p', 'mm', 'a4');
+    var pw = 210, lm = 14, rm = 196, cw = rm - lm;
+    var primary = [76, 81, 191], dark = [30, 30, 60], mid = [100, 100, 120], light = [245, 245, 252];
+    var fmt = function(v) { return 'Rs.' + (v || 0).toLocaleString('en-IN'); };
+    var today = new Date().toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' });
+
+    // Header
+    var y = 12;
+    try { doc.addImage('data:image/png;base64,' + COMPANY_LOGO_B64, 'PNG', lm, y, 22, 8); } catch(e) {
+      doc.setFillColor(...primary); doc.roundedRect(lm, y, 22, 8, 2, 2, 'F');
+      doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(255,255,255); doc.text('SS', lm+1.5, y+5.5);
+    }
+    doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(...primary);
+    doc.text('SWETHA STRUCTURES PRIVATE LIMITED', lm+26, y+4);
+    doc.setFont('helvetica','normal'); doc.setFontSize(6); doc.setTextColor(...mid);
+    doc.text('No.44, Alagu Nagar, Saravanampatti, Coimbatore, TN 641035', lm+26, y+8);
+    doc.setDrawColor(...primary); doc.setLineWidth(0.5); doc.line(lm, y+12, rm, y+12);
+    y += 18;
+
+    // Title
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor(...dark);
+    doc.text('SETTLEMENT TRACKER REPORT', pw/2, y, {align:'center'}); y += 6;
+    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(...mid);
+    doc.text('Employee: ' + empName + ' (' + empCode + ')   |   Generated: ' + today, pw/2, y, {align:'center'}); y += 8;
+
+    // Summary box
+    var empMap = _buildSettlementMap();
+    var emp = empMap[empCode] || { advApproved:0, advPaid:0, expApproved:0, expPaid:0 };
+    var totalAdv = emp.advApproved + emp.advPaid;
+    var totalExp = emp.expApproved + emp.expPaid;
+    var balance  = totalAdv - totalExp;
+    var balStatus = balance > 0 ? 'To Return' : balance < 0 ? 'To Reimburse' : 'Settled';
+    var balColor  = balance > 0 ? [220,38,38] : balance < 0 ? [22,163,74] : [107,114,128];
+
+    doc.setFillColor(...light); doc.roundedRect(lm, y, cw, 24, 3, 3, 'F');
+    doc.setDrawColor(200,200,220); doc.setLineWidth(0.3); doc.roundedRect(lm, y, cw, 24, 3, 3, 'S');
+    var colW = cw / 5;
+    var labels = ['Adv Approved','Adv Paid','Exp Approved','Exp Reimbursed','Net Balance'];
+    var values = [fmt(emp.advApproved), fmt(emp.advPaid), fmt(emp.expApproved), fmt(emp.expPaid), fmt(Math.abs(balance))];
+    labels.forEach(function(lbl, i) {
+      var cx = lm + colW * i + colW / 2;
+      doc.setFont('helvetica','normal'); doc.setFontSize(6); doc.setTextColor(...mid); doc.text(lbl, cx, y+7, {align:'center'});
+      doc.setFont('helvetica','bold'); doc.setFontSize(9);
+      doc.setTextColor(i === 4 ? balColor[0] : dark[0], i === 4 ? balColor[1] : dark[1], i === 4 ? balColor[2] : dark[2]);
+      doc.text(values[i], cx, y+15, {align:'center'});
+    });
+    doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...balColor);
+    doc.text(balStatus, lm + colW * 4 + colW / 2, y+21, {align:'center'});
+    y += 30;
+
+    // Advances table
+    var advRows = (typeof advanceRequests !== 'undefined' ? advanceRequests : []).filter(function(r){ return r.empCode === empCode; });
+    if (advRows.length > 0) {
+      doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...dark); doc.text('ADVANCES', lm, y); y += 4;
+      doc.setFillColor(...primary); doc.rect(lm, y, cw, 6, 'F');
+      doc.setFont('helvetica','bold'); doc.setFontSize(6); doc.setTextColor(255,255,255);
+      var aCols = ['Type','Amount','Reason','Date','Status'];
+      var aWidths = [30, 28, 72, 24, 28];
+      var ax = lm + 1;
+      aCols.forEach(function(col, i){ doc.text(col, ax, y+4); ax += aWidths[i]; });
+      y += 6;
+      var statusLabel = function(s){ var sl=(s||'').toLowerCase(); return sl==='paid'?'Paid':sl==='approved'?'MD Approved':sl==='accounts_accepted'?'Accts Accepted':sl==='rejected'?'Rejected':'Pending'; };
+      advRows.sort(function(a,b){ return b.id-a.id; }).forEach(function(r, idx) {
+        if (y > 265) { doc.addPage(); y = 14; }
+        if (idx%2===0){ doc.setFillColor(...light); doc.rect(lm, y, cw, 6, 'F'); }
+        doc.setFont('helvetica','normal'); doc.setFontSize(5.5); doc.setTextColor(...dark);
+        var typeLabel = r.type==='travel'?'Travel':r.type==='site'?'Site':'Salary';
+        var ax2 = lm + 1;
+        [typeLabel, fmt(r.amount||0), (r.reason||'').substring(0,40), r.date||r.createdAt||'', statusLabel(r.status)].forEach(function(v,i){ doc.text(String(v), ax2, y+4); ax2+=aWidths[i]; });
+        y += 6;
+      });
+      y += 4;
+    }
+
+    // Expenses table
+    var expRows = (typeof expenseReimbursements !== 'undefined' ? expenseReimbursements : []).filter(function(e){ return e.empCode === empCode; });
+    if (expRows.length > 0) {
+      if (y > 240) { doc.addPage(); y = 14; }
+      doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...dark); doc.text('EXPENSES', lm, y); y += 4;
+      doc.setFillColor(...primary); doc.rect(lm, y, cw, 6, 'F');
+      doc.setFont('helvetica','bold'); doc.setFontSize(6); doc.setTextColor(255,255,255);
+      var eCols = ['Type','Amount','Description','Date','Status'];
+      var eWidths = [30, 28, 72, 24, 28];
+      var ex = lm + 1;
+      eCols.forEach(function(col, i){ doc.text(col, ex, y+4); ex += eWidths[i]; });
+      y += 6;
+      expRows.sort(function(a,b){ return b.id-a.id; }).forEach(function(e, idx) {
+        if (y > 265) { doc.addPage(); y = 14; }
+        if (idx%2===0){ doc.setFillColor(...light); doc.rect(lm, y, cw, 6, 'F'); }
+        doc.setFont('helvetica','normal'); doc.setFontSize(5.5); doc.setTextColor(...dark);
+        var typeLabel = (e.expenseType||e.category||'Expense').replace(/_/g,' ');
+        var ex2 = lm + 1;
+        [typeLabel, fmt(e.amount||0), (e.description||'').substring(0,40), e.expenseDate||e.date||'', e.status||''].forEach(function(v,i){ doc.text(String(v), ex2, y+4); ex2+=eWidths[i]; });
+        y += 6;
+      });
+    }
+
+    // Footer
+    doc.setFont('helvetica','normal'); doc.setFontSize(6); doc.setTextColor(...mid);
+    doc.text('Generated by Swetha HRMS  |  ' + today, pw/2, 290, {align:'center'});
+
+    doc.save('Settlement_' + empCode + '_' + empName.replace(/\s+/g,'_') + '_' + new Date().toISOString().slice(0,10) + '.pdf');
+  } catch(e) { showToast('PDF generation failed: ' + (e.message || e)); }
 }
 
 // =====================================================
