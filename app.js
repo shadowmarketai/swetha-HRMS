@@ -395,12 +395,15 @@ const NAV_CONFIG = {
       { id:'acc-att-leave', label:'Apply Leave', action:{type:'tab',target:'leaves'} }
     ]},
     { id:'acc-advance', label:'Advance', icon:'advance', children:[
+      { id:'acc-adv-site', label:'Site Advance', action:{type:'tab',target:'site'} },
       { id:'acc-adv-salary', label:'Salary Advance', action:{type:'tab',target:'advance'} },
       { id:'acc-adv-travel', label:'Travel Advance', action:{type:'tab',target:'ta'} },
       { id:'acc-adv-requests', label:'Approve Requests', action:{type:'overlay',target:'advance-requests'} }
     ]},
     { id:'acc-expense', label:'Expense', icon:'expense', children:[
-      { id:'acc-exp-travel', label:'Travel Expense', action:{type:'tab',target:'travel-expense'} }
+      { id:'acc-exp-site', label:'Site Expense', action:{type:'tab',target:'site-expense'} },
+      { id:'acc-exp-travel', label:'Travel Expense', action:{type:'tab',target:'travel-expense'} },
+      { id:'acc-exp-all', label:'All Expense Requests', action:{type:'overlay',target:'hr-expenses'} }
     ]},
     { id:'acc-payments', label:'Payments', icon:'salary', children:[
       { id:'acc-approved-adv', label:'Approved Advances', action:{type:'overlay',target:'accounts-payments'} },
@@ -410,6 +413,14 @@ const NAV_CONFIG = {
     { id:'acc-salary', label:'Salary', icon:'salary', children:[
       { id:'acc-sal-self', label:'Self Salary', action:{type:'tab',target:'salary'} },
       { id:'acc-sal-list', label:'Employee List', action:{type:'tab',target:'salary'} }
+    ]},
+    { id:'acc-tax', label:'Tax & Compliance', icon:'tax', children:[
+      { id:'acc-tax-form16', label:'Form 16 & Tax', action:{type:'overlay',target:'hr-tax'} },
+      { id:'acc-compliance', label:'Compliance Filing', action:{type:'overlay',target:'hr-compliance'} }
+    ]},
+    { id:'acc-analytics', label:'Analytics', icon:'performance', children:[
+      { id:'acc-analytics-dash', label:'Analytics Dashboard', action:{type:'overlay',target:'hr-analytics'} },
+      { id:'acc-kpi', label:'Employee KPI', action:{type:'overlay',target:'hr-kpi'} }
     ]},
     { id:'acc-progress', label:'Project Progress', icon:'progress', action:{type:'tab',target:'progress'} },
     { id:'acc-procurement', label:'Procurement', icon:'purchase', children:[
@@ -5688,7 +5699,7 @@ async function initAnalyticsCharts(m) {
     if (id === 'hr-recruit' && currentUser && !_isManagement) {
       showToast('Access restricted to Management'); return;
     }
-    if (id === 'hr-analytics' && currentUser && !_isManagement) {
+    if (id === 'hr-analytics' && currentUser && !_isManagement && currentUser.role !== 'Accounts') {
       showToast('Access restricted to Management'); return;
     }
 
@@ -5703,7 +5714,7 @@ async function initAnalyticsCharts(m) {
     if (id === 'hr-shifts' && currentUser && !_isManagement) {
       showToast('Access restricted to Management'); return;
     }
-    if (id === 'hr-compliance' && currentUser && !_isManagement) {
+    if (id === 'hr-compliance' && currentUser && !_isManagement && currentUser.role !== 'Accounts') {
       showToast('Access restricted to Management'); return;
     }
     if (id === 'hr-assets' && currentUser && !_isManagement) {
