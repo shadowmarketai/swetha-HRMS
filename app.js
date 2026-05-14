@@ -396,7 +396,11 @@ const NAV_CONFIG = {
     ]},
     { id:'acc-advance', label:'Advance', icon:'advance', children:[
       { id:'acc-adv-salary', label:'Salary Advance', action:{type:'tab',target:'advance'} },
+      { id:'acc-adv-travel', label:'Travel Advance', action:{type:'tab',target:'ta'} },
       { id:'acc-adv-requests', label:'Approve Requests', action:{type:'overlay',target:'advance-requests'} }
+    ]},
+    { id:'acc-expense', label:'Expense', icon:'expense', children:[
+      { id:'acc-exp-travel', label:'Travel Expense', action:{type:'tab',target:'travel-expense'} }
     ]},
     { id:'acc-payments', label:'Payments', icon:'salary', children:[
       { id:'acc-approved-adv', label:'Approved Advances', action:{type:'overlay',target:'accounts-payments'} },
