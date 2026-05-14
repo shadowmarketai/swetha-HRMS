@@ -769,9 +769,10 @@
           <div class="form-row"><label>To *</label><input type="text" id="advTravelTo" placeholder="e.g. Tambaram"></div>
         </div>
         <div class="form-grid">
-          <div class="form-row"><label>Vehicle *</label><select id="advTravelVehicle"><option value="">Select</option><option>Bike</option><option>Car</option><option>Auto</option><option>Bus</option><option>Train</option><option>Other</option></select></div>
-          <div class="form-row"><label>Distance (km)</label><input type="number" id="advTravelKm" placeholder="e.g. 25"></div>
+          <div class="form-row"><label>Vehicle *</label><select id="advTravelVehicle" onchange="calcTravelAdvAmount()"><option value="">Select</option><option>Bike</option><option>Car</option><option>Auto</option><option>Bus</option><option>Train</option><option>Other</option></select></div>
+          <div class="form-row"><label>Distance (km)</label><input type="number" id="advTravelKm" placeholder="e.g. 25" oninput="calcTravelAdvAmount()"></div>
         </div>
+        <div id="advTravelCalcHint" style="display:none;background:#EEF2FF;border:1px solid #C7D2FE;border-radius:6px;padding:7px 11px;font-size:.76rem;color:#3730A3;margin-bottom:6px"></div>
         <div class="form-grid">
           <div class="form-row"><label>Fuel Type</label><select id="advFuelType"><option value="N/A">N/A</option><option>Petrol</option><option>Diesel</option><option>CNG</option><option>Electric</option></select></div>
           <div class="form-row"><label>Days of Project</label><input type="number" id="advProjectDays" placeholder="e.g. 5" min="1"></div>

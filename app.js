@@ -3459,6 +3459,64 @@ function renderMapDotsClickable(emps) {
 // =====================================================
 // UNIFIED ADVANCE APPLICATION & APPROVAL (Site / Salary / Travel)
 // =====================================================
+// Travel reimbursement rates (Rs. per km)
+const TRAVEL_RATES = { 'Bike': 3.25, 'Car': 6.00 };
+
+function _travelCalcHint(vehicle, km) {
+  var rate = TRAVEL_RATES[vehicle];
+  if (!rate || !km || km <= 0) return null;
+  var total = parseFloat((km * rate).toFixed(2));
+  return km + ' km × Rs.' + rate + '/km = <strong>Rs.' + total.toLocaleString('en-IN') + '</strong>';
+}
+
+// Travel Advance overlay form (index.html)
+function calcTravelAdvAmount() {
+  var vehicle = (document.getElementById('advTravelVehicle') || {}).value || '';
+  var km = parseFloat((document.getElementById('advTravelKm') || {}).value) || 0;
+  var hint = document.getElementById('advTravelCalcHint');
+  var msg = _travelCalcHint(vehicle, km);
+  if (msg) {
+    var total = parseFloat((km * TRAVEL_RATES[vehicle]).toFixed(2));
+    var amtEl = document.getElementById('advAmount');
+    if (amtEl) amtEl.value = total;
+    if (hint) { hint.innerHTML = msg; hint.style.display = ''; }
+  } else {
+    if (hint) hint.style.display = 'none';
+  }
+}
+
+// Inline advance form (app.js rendered)
+function calcInlineTravelAmount() {
+  var vehicle = (document.getElementById('inlineTravelVehicle') || {}).value || '';
+  var km = parseFloat((document.getElementById('inlineTravelKm') || {}).value) || 0;
+  var hint = document.getElementById('inlineTravelCalcHint');
+  var msg = _travelCalcHint(vehicle, km);
+  if (msg) {
+    var total = parseFloat((km * TRAVEL_RATES[vehicle]).toFixed(2));
+    var amtEl = document.getElementById('inlineExpAmount');
+    if (amtEl) amtEl.value = total;
+    if (hint) { hint.innerHTML = msg; hint.style.display = ''; }
+  } else {
+    if (hint) hint.style.display = 'none';
+  }
+}
+
+// Travel Expense bill form (app.js rendered)
+function calcTravelExpAmount() {
+  var vehicle = (document.getElementById('teBillVehicle') || {}).value || '';
+  var km = parseFloat((document.getElementById('teBillKm') || {}).value) || 0;
+  var hint = document.getElementById('teTravelCalcHint');
+  var msg = _travelCalcHint(vehicle, km);
+  if (msg) {
+    var total = parseFloat((km * TRAVEL_RATES[vehicle]).toFixed(2));
+    var amtEl = document.getElementById('teBillAmount');
+    if (amtEl) amtEl.value = total;
+    if (hint) { hint.innerHTML = msg; hint.style.display = ''; }
+  } else {
+    if (hint) hint.style.display = 'none';
+  }
+}
+
 const ADV_TYPE_LABELS = {site:'Site Advance', salary:'Salary Advance', travel:'Travel Advance', site_expense:'Site Expense', travel_expense:'Travel Expense'};
 const ADV_TYPE_ICONS = {site:'\u{1F3D7}', salary:'\u{1F4B0}', travel:'\u{1F699}', site_expense:'\u{1F9FE}', travel_expense:'\u{1F4CB}'};
 let advanceRequests = [];
@@ -3501,9 +3559,11 @@ function showInlineExpenseForm() {
   html += '<div class="form-row"><label>To *</label><input type="text" id="inlineTravelTo" placeholder="e.g. Tambaram"></div>';
   html += '</div>';
   html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
-  html += '<div class="form-row"><label>Vehicle *</label><select id="inlineTravelVehicle" class="nf-select"><option value="">Select</option><option>Bike</option><option>Car</option><option>Auto</option><option>Bus</option><option>Train</option><option>Other</option></select></div>';
-  html += '<div class="form-row"><label>Distance (km)</label><input type="number" id="inlineTravelKm" placeholder="e.g. 25"></div>';
-  html += '</div></div>';
+  html += '<div class="form-row"><label>Vehicle *</label><select id="inlineTravelVehicle" class="nf-select" onchange="calcInlineTravelAmount()"><option value="">Select</option><option>Bike</option><option>Car</option><option>Auto</option><option>Bus</option><option>Train</option><option>Other</option></select></div>';
+  html += '<div class="form-row"><label>Distance (km)</label><input type="number" id="inlineTravelKm" placeholder="e.g. 25" oninput="calcInlineTravelAmount()"></div>';
+  html += '</div>';
+  html += '<div id="inlineTravelCalcHint" style="display:none;background:#EEF2FF;border:1px solid #C7D2FE;border-radius:6px;padding:7px 11px;font-size:.76rem;color:#3730A3;margin-bottom:6px"></div>';
+  html += '</div>';
   // Common fields
   html += '<div class="form-row"><label>Details (optional)</label><textarea id="inlineExpDetails" rows="2" placeholder="Brief explanation..." style="width:100%;padding:8px;border:1.5px solid var(--gray-200);border-radius:var(--radius-xs);font-family:var(--font-body);font-size:.82rem"></textarea></div>';
   html += '<div class="section-title" style="font-size:.72rem;margin-bottom:6px">Attach Bill (optional)</div>';
@@ -4373,8 +4433,9 @@ function showTravelExpenseBillForm() {
   html += '<div class="form-row"><label>Travel Date *</label><input type="date" id="teBillDate" value="' + new Date().toISOString().split('T')[0] + '"></div>';
   html += '<div class="form-row"><label>Days</label><input type="number" id="teBillDays" placeholder="1" value="1"></div></div>';
   html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
-  html += '<div class="form-row"><label>Mode of Travel *</label><select id="teBillVehicle" class="nf-select"><option value="">Select</option><option>Bike</option><option>Car</option><option>Auto</option><option>Bus</option><option>Train</option><option>Flight</option><option>Other</option></select></div>';
-  html += '<div class="form-row"><label>Distance (km)</label><input type="number" id="teBillKm" placeholder="e.g. 500"></div></div>';
+  html += '<div class="form-row"><label>Mode of Travel *</label><select id="teBillVehicle" class="nf-select" onchange="calcTravelExpAmount()"><option value="">Select</option><option>Bike</option><option>Car</option><option>Auto</option><option>Bus</option><option>Train</option><option>Flight</option><option>Other</option></select></div>';
+  html += '<div class="form-row"><label>Distance (km)</label><input type="number" id="teBillKm" placeholder="e.g. 500" oninput="calcTravelExpAmount()"></div></div>';
+  html += '<div id="teTravelCalcHint" style="display:none;background:#EEF2FF;border:1px solid #C7D2FE;border-radius:6px;padding:7px 11px;font-size:.76rem;color:#3730A3;margin-bottom:6px"></div>';
   html += '<div class="form-row"><label>Bill Amount (Rs.) *</label><input type="number" id="teBillAmount" placeholder="e.g. 2500"></div>';
   html += '<div class="form-row"><label>Description</label><textarea id="teBillDesc" rows="2" placeholder="Trip details..." style="width:100%;padding:8px;border:1.5px solid var(--gray-200);border-radius:var(--radius-xs);font-family:var(--font-body);font-size:.82rem"></textarea></div>';
   html += '<div class="section-title" style="font-size:.72rem;margin-bottom:6px">Attach Receipt *</div>';
