@@ -8876,6 +8876,8 @@ function initDarkMode() {
   if (isDark) {
     document.documentElement.setAttribute('data-theme', 'dark');
     document.querySelector('meta[name="theme-color"]').content = '#0F1117';
+  } else {
+    document.querySelector('meta[name="theme-color"]').content = '#1C1710';
   }
   const toggle = document.getElementById('darkModeToggle');
   if (toggle && isDark) toggle.classList.add('on');
@@ -8886,7 +8888,7 @@ function toggleDarkMode() {
   const toggle = document.getElementById('darkModeToggle');
   if (isDark) {
     html.removeAttribute('data-theme');
-    document.querySelector('meta[name="theme-color"]').content = '#E85D04';
+    document.querySelector('meta[name="theme-color"]').content = '#1C1710';
     safeStorage.set(STORAGE_KEYS.darkMode, 'false');
     if (toggle) toggle.classList.remove('on');
   } else {
