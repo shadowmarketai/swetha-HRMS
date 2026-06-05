@@ -406,8 +406,8 @@ router.put('/:code', verifyToken, requireRole('MD', 'HR'), auditLog('update', 'e
 // DELETE /api/employees/:code — hard delete (permanently removes employee + auth + cascaded data)
 // Allowed for MD or SuperAdmin
 router.delete('/:code', verifyToken, auditLog('delete', 'employee'), async (req, res) => {
-  if (!req.user || (req.user.role !== 'MD' && !req.user.isSuperAdmin)) {
-    return res.status(403).json({ error: 'Insufficient permissions' });
+  if (!req.user || (req.user.role !== 'MD' && req.user.role !== 'HR' && !req.user.isSuperAdmin)) {
+    return res.status(403).json({ error: 'Only MD, HR, or SuperAdmin can delete employees' });
   }
   const code = req.params.code;
   if (code === 'MD001' || code === 'SADMIN') {

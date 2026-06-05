@@ -1874,17 +1874,18 @@ function _computeCalendarStatuses(logs, empCode, year, month, maxDay) {
   });
 
   // Build a set of dates that have an approved leave for this employee
+  // Value: 'half' for half-day leave, 'full' for full-day leave
   var leaveDates = {};
   if (typeof leaveApplications !== 'undefined' && empCode) {
     leaveApplications.forEach(function(la) {
       if (la.empCode !== empCode) return;
       if (la.status !== 'approved') return;
-      // Mark every day in the leave range that falls in this month
+      var isHalf = la.days === 0.5 || la.isHalfDay;
       var from = new Date(la.from + 'T00:00:00');
       var to = new Date(la.to + 'T00:00:00');
       for (var ld = new Date(from); ld <= to; ld.setDate(ld.getDate() + 1)) {
         if (ld.getFullYear() === year && ld.getMonth() === month) {
-          leaveDates[ld.getDate()] = true;
+          leaveDates[ld.getDate()] = isHalf ? 'half' : 'full';
         }
       }
     });
@@ -1925,7 +1926,7 @@ function _computeCalendarStatuses(logs, empCode, year, month, maxDay) {
       // ≥ 8 hours → Present, < 8 hours → Half day
       att[dd] = (totalMin >= 480) ? 'present' : 'half';
     } else if (leaveDates[dd]) {
-      att[dd] = 'leave';
+      att[dd] = leaveDates[dd] === 'half' ? 'half' : 'leave';
     } else {
       att[dd] = 'absent';
     }
@@ -1977,11 +1978,11 @@ async function buildCalendar() {
   ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(function(d) { html += '<div class="cal-day-label">'+d+'</div>'; });
   for (var e = 0; e < firstDayOfWeek; e++) { html += '<div class="cal-day"></div>'; }
   var badgeMap = {
-    present: {label:'P', cls:'cal-badge-present'},
-    absent:  {label:'A', cls:'cal-badge-absent'},
-    holiday: {label:'H', cls:'cal-badge-holiday'},
-    half:    {label:'H', cls:'cal-badge-half'},
-    leave:   {label:'L', cls:'cal-badge-leave'}
+    present: {label:'P',  cls:'cal-badge-present'},
+    absent:  {label:'A',  cls:'cal-badge-absent'},
+    holiday: {label:'H',  cls:'cal-badge-holiday'},
+    half:    {label:'½',  cls:'cal-badge-half'},
+    leave:   {label:'L',  cls:'cal-badge-leave'}
   };
   for (var d = 1; d <= daysInMonth; d++) {
     var isToday = isCurrentMonth && d === now.getDate();
@@ -2851,7 +2852,8 @@ function renderAllEmpList() {
   const container = document.getElementById('allEmpList');
   const colors = ['#E85D04','#D62828','#14B8A6','#22C55E','#EC4899'];
   const isMD = currentUser && currentUser.role === 'MD';
-  const canDelete = (isMD && !isTemporaryMD()) || _isSuperAdmin;
+  const isHR = currentUser && currentUser.role === 'HR';
+  const canDelete = (isMD && !isTemporaryMD()) || isHR || _isSuperAdmin;
   const isHRorMD = currentUser && (currentUser.role === 'MD' || currentUser.role === 'HR' || currentUser.role === 'Manager' || _isSuperAdmin);
   let html = '';
   departments.forEach((dept, di) => {
@@ -3058,8 +3060,8 @@ async function deactivateEmployee(code) {
 }
 
 async function deleteEmployeePermanently(code) {
-  var allowed = (currentUser && currentUser.role === 'MD' && !isTemporaryMD()) || _isSuperAdmin;
-  if (!allowed) { showToast('Only MD or SuperAdmin can delete employees'); return; }
+  var allowed = (currentUser && currentUser.role === 'MD' && !isTemporaryMD()) || (currentUser && currentUser.role === 'HR') || _isSuperAdmin;
+  if (!allowed) { showToast('Only MD, HR, or SuperAdmin can delete employees'); return; }
   if (code === 'MD001' || code === 'SADMIN') { showToast('Cannot delete protected account'); return; }
   var emp = EMPLOYEES.find(function(e) { return e.code === code; });
   if (!emp) return;
@@ -6165,7 +6167,17 @@ async function exportAttendanceReport() {
       if (row.check_in) {
         var start = new Date(row.check_in).getTime();
         var isToday = isCurrentMonth && dayNum === today.getDate();
-        var end = row.check_out ? new Date(row.check_out).getTime() : (isToday ? Date.now() : 0);
+        var end;
+        if (row.check_out) {
+          end = new Date(row.check_out).getTime();
+        } else if (isToday) {
+          end = Date.now();
+        } else {
+          // Past day with no checkout — auto-checkout at 9 PM, cap at 8 hrs
+          var autoOut = new Date(new Date(row.check_in).toDateString() + ' 21:00:00').getTime();
+          end = Math.min(autoOut, start + 480 * 60000);
+          empDayData[row.emp_code][dayNum].missedCheckout = true;
+        }
         if (end > start) empDayData[row.emp_code][dayNum].minutes += (end - start) / 60000;
       }
     });
@@ -6195,13 +6207,10 @@ async function exportAttendanceReport() {
           var dayData = empDayData[emp.code] && empDayData[emp.code][d];
           if (dayData) {
             presentCount++;
-            if (dayData.minutes > 0) {
-              var h = Math.floor(dayData.minutes / 60);
-              var m = Math.round(dayData.minutes % 60);
-              cols.push(h + 'h ' + m + 'm');
-            } else {
-              cols.push('Present');
-            }
+            var h = Math.floor(dayData.minutes / 60);
+            var m = Math.round(dayData.minutes % 60);
+            var hoursStr = h + 'h ' + (m < 10 ? '0' + m : m) + 'm';
+            cols.push(dayData.missedCheckout ? hoursStr + '*' : hoursStr);
           } else {
             cols.push('Absent');
           }
@@ -6212,6 +6221,8 @@ async function exportAttendanceReport() {
       cols.push(presentCount, absentDays, attPct);
       csvRows.push(cols.join(','));
     });
+    csvRows.push('');
+    csvRows.push('"* Hours estimated — check-out not recorded for this session"');
     var blob = new Blob(['﻿' + csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
     var link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -8875,24 +8886,8 @@ function initWebSocket() {
     var app = leaveApplications.find(function(a) { return a.id === id; });
     if (app) app.status = newStatus;
   }
-  // Helper: re-fetch leave balance after server-side change, so the displayed
-  // remaining count matches the DB (esp. for permission which is server-authoritative).
-  async function _refreshLeaveBalance() {
-    try {
-      if (!currentUser) return;
-      var role = currentUser.role;
-      if (role === 'MD' || role === 'HR') {
-        var all = await apiCall('GET', '/leaves/balance/all');
-        if (all && typeof all === 'object') {
-          Object.keys(leaveBalances).forEach(function(k) { delete leaveBalances[k]; });
-          Object.assign(leaveBalances, all);
-        }
-      } else {
-        var mine = await apiCall('GET', '/leaves/balance');
-        if (mine) leaveBalances[currentUser.code] = mine;
-      }
-    } catch (e) { /* non-fatal — UI will recover on next render */ }
-  }
+  // Alias the global refreshLeaveBalance for socket handlers
+  var _refreshLeaveBalance = refreshLeaveBalance;
 
   // ── Leave: approved ──
   _hrmsSocket.on('leave:approved', function(data) {
@@ -15029,7 +15024,23 @@ async function rejectMissedAtt(id) {
 // CHANGE 2: EMPLOYEE LEAVE REQUEST — HR→MD DUAL APPROVAL
 // =====================================================
 var _leavesOriginalHTML = '';
-function renderLeaveScreenForMode() {
+async function refreshLeaveBalance() {
+  try {
+    if (!currentUser) return;
+    if (currentUser.role === 'MD' || currentUser.role === 'HR') {
+      var all = await apiCall('GET', '/leaves/balance/all');
+      if (all && typeof all === 'object') {
+        Object.keys(leaveBalances).forEach(function(k) { delete leaveBalances[k]; });
+        Object.assign(leaveBalances, all);
+      }
+    } else {
+      var mine = await apiCall('GET', '/leaves/balance');
+      if (mine) leaveBalances[currentUser.code] = mine;
+    }
+  } catch (e) { /* non-fatal */ }
+}
+
+async function renderLeaveScreenForMode() {
   if (!currentUser) return;
   var container = document.getElementById('screen-leaves');
   if (!container) return;
@@ -15046,6 +15057,8 @@ function renderLeaveScreenForMode() {
   if (_leavesOriginalHTML && !container.querySelector('#leaveBalanceGrid')) {
     container.innerHTML = _leavesOriginalHTML;
   }
+  // Always fetch fresh balance before rendering so dashboard & apply-leave tab stay in sync
+  await refreshLeaveBalance();
   renderLeaveScreen();
 }
 
