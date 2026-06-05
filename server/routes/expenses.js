@@ -196,11 +196,27 @@ router.put('/:id/reject', verifyToken, requireRole('MD', 'Accounts', 'HR'), audi
   }
 });
 
+function _expStageLabel(status) {
+  switch (status) {
+    case 'Pending': return 'Awaiting Accounts Review';
+    case 'accounts_accepted': return 'Awaiting MD Approval';
+    case 'Approved': return 'Approved — Pending Disbursement';
+    case 'Paid': return 'Paid / Disbursed';
+    case 'Rejected': return 'Rejected';
+    default: return status || '';
+  }
+}
+
 // Build a parameterised WHERE for export queries — keeps Excel + PDF in sync.
+// status supports comma-separated values for multi-status IN queries.
 function buildFilters(query) {
   const where = [];
   const params = [];
-  if (query.status) { where.push('status = ?'); params.push(query.status); }
+  if (query.status) {
+    const statuses = query.status.split(',').map(s => s.trim()).filter(Boolean);
+    if (statuses.length === 1) { where.push('status = ?'); params.push(statuses[0]); }
+    else { where.push('status IN (' + statuses.map(() => '?').join(',') + ')'); params.push(...statuses); }
+  }
   if (query.empCode) { where.push('emp_code = ?'); params.push(query.empCode); }
   if (query.from) { where.push('DATE(submitted_at) >= ?'); params.push(query.from); }
   if (query.to) { where.push('DATE(submitted_at) <= ?'); params.push(query.to); }
@@ -235,6 +251,7 @@ router.get('/export', verifyToken, requireRole('MD', 'Accounts', 'HR'), async (r
       'Travel KM': r.travel_km || '',
       'Expense Date': r.expense_date ? new Date(r.expense_date).toISOString().slice(0, 10) : '',
       'Status': r.status,
+      'Approval Stage': _expStageLabel(r.status),
       'Reviewed By': r.reviewed_by || '',
       'Review Date': r.review_date ? new Date(r.review_date).toISOString().slice(0, 10) : '',
       'Paid By': r.paid_by || '',
@@ -243,11 +260,10 @@ router.get('/export', verifyToken, requireRole('MD', 'Accounts', 'HR'), async (r
       'Bill URL': r.bill_url || ''
     }));
     const ws = XLSX.utils.json_to_sheet(data);
-    // Reasonable column widths so Accounts can read it without resizing
     ws['!cols'] = [
       { wch: 6 }, { wch: 12 }, { wch: 22 }, { wch: 16 }, { wch: 14 }, { wch: 30 }, { wch: 14 }, { wch: 18 },
-      { wch: 18 }, { wch: 18 }, { wch: 12 }, { wch: 10 }, { wch: 12 }, { wch: 16 }, { wch: 14 }, { wch: 12 },
-      { wch: 14 }, { wch: 12 }, { wch: 18 }, { wch: 30 }
+      { wch: 18 }, { wch: 18 }, { wch: 12 }, { wch: 10 }, { wch: 12 }, { wch: 16 }, { wch: 34 }, { wch: 14 },
+      { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 18 }, { wch: 30 }
     ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Expenses');

@@ -5,7 +5,49 @@ const { body, validationResult } = require('express-validator');
 const { auditLog } = require('../middleware/audit');
 
 const VALID_LEAVE_TYPES = ['casual', 'comp', 'permission'];
-// Note: earned and sick leave types removed from UI. Only casual, comp off, and permission (1/month) are active.
+// Note: earned and sick leave types removed from UI. Only casual, comp off, and permission (4/month, 0.5 days each) are active.
+
+// Ensure monthly CL accrual is up-to-date for an employee.
+// CL year starts in April. Each month from April onwards adds +1 to the balance.
+// Accrual is lazy: runs when balance is read or a leave is applied.
+async function ensureCLAccrual(pool, empCode) {
+  const now = new Date();
+  const currentYM = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  // Only accrue from April onwards
+  if (now.getMonth() < 3) return; // Jan-Mar: no accrual yet for new FY
+
+  const [rows] = await pool.query('SELECT casual, cl_accrued_month FROM leave_balances WHERE emp_code = ?', [empCode]);
+  if (rows.length === 0) {
+    // Create balance row with 1 CL for current month
+    await pool.query(
+      'INSERT INTO leave_balances (emp_code, casual, permission, cl_accrued_month) VALUES (?, 1, 2, ?) ON DUPLICATE KEY UPDATE cl_accrued_month = VALUES(cl_accrued_month), casual = casual + 1',
+      [empCode, currentYM]
+    );
+    return;
+  }
+  const lastAccrued = rows[0].cl_accrued_month;
+  if (lastAccrued === currentYM) return; // already accrued this month
+
+  // Calculate how many months to add (may be > 1 if system was down)
+  const aprilThisYear = new Date(now.getFullYear(), 3, 1); // April 1
+  const startFrom = lastAccrued
+    ? new Date(lastAccrued + '-01T00:00:00')
+    : aprilThisYear;
+
+  let monthsToAdd = 0;
+  let cursor = new Date(startFrom.getFullYear(), startFrom.getMonth() + (lastAccrued ? 1 : 0), 1);
+  while (cursor <= now && cursor.getMonth() >= 3) {
+    monthsToAdd++;
+    cursor.setMonth(cursor.getMonth() + 1);
+    if (cursor.getFullYear() > now.getFullYear()) break;
+  }
+  if (monthsToAdd <= 0) return;
+
+  await pool.query(
+    'UPDATE leave_balances SET casual = casual + ?, cl_accrued_month = ? WHERE emp_code = ?',
+    [monthsToAdd, currentYM, empCode]
+  );
+}
 
 // Helper: create notifications for multiple users
 async function notifyUsers(pool, empCodes, title, message, type) {
@@ -56,23 +98,28 @@ router.post('/', verifyToken, [
   body('to').isISO8601().withMessage('Valid to date required'),
   body('reason').optional().trim().isLength({ max: 500 }),
   body('isLOP').optional().isBoolean(),
-  body('isHalfDay').optional().isBoolean()
+  body('isHalfDay').optional().isBoolean(),
+  body('halfDaySession').optional().isIn(['first', 'second'])
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
   try {
-    const { type, from, to, reason, isLOP, isHalfDay } = req.body;
+    const { type, from, to, reason, isLOP, isHalfDay, halfDaySession } = req.body;
     if (!type || !from || !to) return res.status(400).json({ error: 'Type, from and to dates required' });
-    if (!VALID_LEAVE_TYPES.includes(type)) return res.status(400).json({ error: 'Invalid leave type' });
 
     const fromDate = new Date(from + 'T00:00:00');
     const toDate = new Date(to + 'T00:00:00');
     if (toDate < fromDate) return res.status(400).json({ error: 'End date must be after start date' });
 
-    // Permission is 2-hour block (counts as 1 unit, same day only)
+    // Validate half-day session
+    if (isHalfDay && !halfDaySession) {
+      return res.status(400).json({ error: 'Please specify First Half or Second Half for half-day leave' });
+    }
+
+    // Permission: 2-hour block, same day only. Counts as 0.5 day for payroll; balance tracks count ×0.5.
     let days;
     if (type === 'permission') {
-      days = 1; // 1 permission unit = 2 hours
+      days = 0.5;
       if (from !== to) return res.status(400).json({ error: 'Permission is for 2 hours on a single day only' });
     } else if (isHalfDay) {
       days = 0.5;
@@ -80,18 +127,44 @@ router.post('/', verifyToken, [
       days = Math.round((toDate - fromDate) / 86400000) + 1;
     }
 
-    // Check balance — allow LOP if client confirmed
-    let lopFlag = !!isLOP;
-    const [bal] = await pool.query('SELECT * FROM leave_balances WHERE emp_code = ?', [req.user.empCode]);
-    if (bal.length > 0) {
-      const available = bal[0][type] || 0;
+    // Ensure monthly CL accrual is up-to-date before balance check
+    if (type === 'casual') await ensureCLAccrual(pool, req.user.empCode);
+
+    // Fetch balance
+    const [balRows] = await pool.query('SELECT * FROM leave_balances WHERE emp_code = ?', [req.user.empCode]);
+    let available = 0;
+    if (balRows.length > 0) {
+      available = parseFloat(balRows[0][type] || 0);
+    }
+
+    // Compute paid vs LOP split
+    let paidDays = 0, lopDays = 0, lopFlag = !!isLOP;
+    if (type === 'permission') {
+      if (available < 0.5 && !lopFlag) {
+        return res.status(400).json({ error: 'You have used all 4 permissions this month. Additional permission will be Loss of Pay (LOP). Confirm to proceed.' });
+      }
+      paidDays = available >= 0.5 ? 0.5 : 0;
+      lopDays = available >= 0.5 ? 0 : 0.5;
+    } else if (type === 'casual') {
+      // Paid days = min(available, requested); rest is LOP
+      paidDays = Math.min(available, days);
+      lopDays = Math.max(0, days - paidDays);
+      if (lopDays > 0 && !lopFlag) {
+        return res.status(400).json({
+          error: 'Insufficient leave balance',
+          lopDays, paidDays, available,
+          message: paidDays + ' day(s) will be paid leave and ' + lopDays + ' day(s) will be Loss of Pay (LOP). Confirm to proceed.'
+        });
+      }
+      lopFlag = lopDays > 0;
+    } else {
+      // comp leave
       if (available < days && !lopFlag) {
-        if (type === 'permission') {
-          return res.status(400).json({ error: 'You have used your 1 permission this month. Additional permission will be Loss of Pay (LOP). Confirm to proceed.' });
-        }
         return res.status(400).json({ error: 'Insufficient ' + type + ' leave balance (' + available + ' remaining). Apply as LOP if needed.' });
       }
-      if (available < days) lopFlag = true;
+      paidDays = Math.min(available, days);
+      lopDays = Math.max(0, days - paidDays);
+      lopFlag = lopDays > 0;
     }
 
     // Get employee info
@@ -100,22 +173,27 @@ router.post('/', verifyToken, [
     const dept = emp.length ? emp[0].dept : '';
 
     const [result] = await pool.query(
-      `INSERT INTO leave_applications (emp_code, emp_name, dept, leave_type, from_date, to_date, days, reason, is_lop)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [req.user.empCode, empName, dept, type, from, to, days, reason || '', lopFlag]
+      `INSERT INTO leave_applications
+         (emp_code, emp_name, dept, leave_type, from_date, to_date, days,
+          reason, is_lop, is_half_day, half_day_session, paid_days, lop_days)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [req.user.empCode, empName, dept, type, from, to, days,
+       reason || '', lopFlag ? 1 : 0,
+       isHalfDay ? 1 : 0, halfDaySession || null,
+       paidDays, lopDays]
     );
 
-    // Notify all HR and MD users about new leave request
+    // Notify HR and MD
     const managers = await getEmpCodesByRole(pool, ['HR', 'MD']);
     const targets = managers.filter(c => c !== req.user.empCode);
-    await notifyUsers(pool, targets, 'Leave Request', empName + ' applied for ' + days + ' day(s) ' + type + ' leave', 'leave');
+    const lopNote = lopDays > 0 ? ' (' + lopDays + ' day(s) LOP)' : ' (paid)';
+    await notifyUsers(pool, targets, 'Leave Request', empName + ' applied for ' + days + ' day(s) ' + type + ' leave' + lopNote, 'leave');
 
-    // Real-time: notify MD/HR instantly
     const io = req.app.get('io');
     if (io) {
-      io.to('role:MD').to('role:HR').emit('leave:new', { empCode: req.user.empCode, empName, type, days, from: fromDate, to: toDate });
+      io.to('role:MD').to('role:HR').emit('leave:new', { empCode: req.user.empCode, empName, type, days, from: fromDate, to: toDate, lopDays, paidDays });
     }
-    res.status(201).json({ message: 'Leave application submitted', id: result.insertId });
+    res.status(201).json({ message: 'Leave application submitted', id: result.insertId, paidDays, lopDays });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
@@ -136,15 +214,18 @@ router.patch('/:id/approve', verifyToken, requireRole('MD'), auditLog('approve',
       [req.user.empCode, req.params.id]
     );
 
-    // Deduct balance — validate leave_type against whitelist to prevent SQL injection
+    // Deduct only paid_days from balance (lop_days don't reduce the leave balance)
     if (!VALID_LEAVE_TYPES.includes(app.leave_type)) {
       return res.status(400).json({ error: 'Invalid leave type in application' });
     }
-    const col = app.leave_type; // safe: validated against whitelist
-    await pool.query(
-      `UPDATE leave_balances SET \`${col}\` = GREATEST(0, \`${col}\` - ?) WHERE emp_code = ?`,
-      [app.days, app.emp_code]
-    );
+    const col = app.leave_type;
+    const deductDays = parseFloat(app.paid_days || 0) || parseFloat(app.days || 0);
+    if (deductDays > 0) {
+      await pool.query(
+        `UPDATE leave_balances SET \`${col}\` = GREATEST(0, \`${col}\` - ?) WHERE emp_code = ?`,
+        [deductDays, app.emp_code]
+      );
+    }
 
     // Notify the employee that their leave was approved
     await notifyUsers(pool, [app.emp_code], 'Leave Approved', 'Your ' + app.leave_type + ' leave (' + app.days + ' days) has been approved', 'leave');
@@ -226,13 +307,14 @@ router.patch('/:id/reject', verifyToken, requireRole('MD', 'HR'), auditLog('reje
 // GET /api/leaves/balance — get leave balance for logged-in user
 router.get('/balance', verifyToken, async (req, res) => {
   try {
+    await ensureCLAccrual(pool, req.user.empCode);
     const [rows] = await pool.query('SELECT * FROM leave_balances WHERE emp_code = ?', [req.user.empCode]);
     if (rows.length === 0) {
-      await pool.query('INSERT INTO leave_balances (emp_code) VALUES (?)', [req.user.empCode]);
-      return res.json({ casual: 12, comp: 3, permission: 1 });
+      await pool.query('INSERT INTO leave_balances (emp_code, casual, permission) VALUES (?, 0, 2)', [req.user.empCode]);
+      return res.json({ casual: 0, comp: 3, permission: 2 });
     }
     const b = rows[0];
-    res.json({ casual: b.casual || 0, comp: b.comp || 0, permission: b.permission !== undefined ? b.permission : 1 });
+    res.json({ casual: parseFloat(b.casual) || 0, comp: b.comp || 0, permission: b.permission !== undefined ? parseFloat(b.permission) : 2 });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
@@ -245,7 +327,7 @@ router.get('/balance/all', verifyToken, requireRole('MD', 'HR'), async (req, res
     const [rows] = await pool.query('SELECT * FROM leave_balances');
     const result = {};
     rows.forEach(r => {
-      result[r.emp_code] = { casual: r.casual, comp: r.comp, permission: r.permission !== undefined ? r.permission : 1 };
+      result[r.emp_code] = { casual: r.casual, comp: r.comp, permission: r.permission !== undefined ? parseFloat(r.permission) : 2 };
     });
     res.json(result);
   } catch (err) {
@@ -258,9 +340,57 @@ router.get('/balance/all', verifyToken, requireRole('MD', 'HR'), async (req, res
 router.get('/balance/:code', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM leave_balances WHERE emp_code = ?', [req.params.code]);
-    if (rows.length === 0) return res.json({ casual: 12, comp: 3, permission: 1 });
+    if (rows.length === 0) return res.json({ casual: 12, comp: 3, permission: 2 });
     const b = rows[0];
-    res.json({ casual: b.casual || 0, comp: b.comp || 0, permission: b.permission !== undefined ? b.permission : 1 });
+    res.json({ casual: b.casual || 0, comp: b.comp || 0, permission: b.permission !== undefined ? parseFloat(b.permission) : 2 });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// PATCH /api/leaves/:id/cancel — employee cancels their own leave
+router.patch('/:id/cancel', verifyToken, async (req, res) => {
+  try {
+    const [apps] = await pool.query('SELECT * FROM leave_applications WHERE id = ?', [req.params.id]);
+    if (apps.length === 0) return res.status(404).json({ error: 'Leave application not found' });
+    const app = apps[0];
+
+    // Only the employee who applied can cancel
+    if (app.emp_code !== req.user.empCode && !['MD', 'HR'].includes(req.user.role)) {
+      return res.status(403).json({ error: 'You can only cancel your own leave' });
+    }
+    if (app.status === 'cancelled' || app.status === 'rejected') {
+      return res.status(400).json({ error: 'Leave is already ' + app.status });
+    }
+
+    await pool.query(
+      'UPDATE leave_applications SET status = "cancelled", cancelled_at = NOW(), cancelled_by = ? WHERE id = ?',
+      [req.user.empCode, req.params.id]
+    );
+
+    // Restore balance only if leave was already approved (balance was already deducted)
+    if (app.status === 'approved' && VALID_LEAVE_TYPES.includes(app.leave_type)) {
+      const restoreDays = parseFloat(app.paid_days || 0) || parseFloat(app.days || 0);
+      if (restoreDays > 0) {
+        await pool.query(
+          `UPDATE leave_balances SET \`${app.leave_type}\` = \`${app.leave_type}\` + ? WHERE emp_code = ?`,
+          [restoreDays, app.emp_code]
+        );
+      }
+    }
+
+    // Notify HR/MD about cancellation
+    const managers = await getEmpCodesByRole(pool, ['HR', 'MD']);
+    const targets = managers.filter(c => c !== app.emp_code);
+    await notifyUsers(pool, targets, 'Leave Cancelled', app.emp_name + ' cancelled their ' + app.leave_type + ' leave (' + app.from_date + ' to ' + app.to_date + ')', 'leave');
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to('role:MD').to('role:HR').emit('leave:updated', { id: app.id, empCode: app.emp_code, status: 'cancelled' });
+    }
+
+    res.json({ message: 'Leave cancelled successfully' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });

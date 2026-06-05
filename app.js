@@ -246,7 +246,7 @@ const NAV_CONFIG = {
   HR: [
     { id:'home', label:'Home', icon:'home', action:{type:'tab',target:'home'} },
     { id:'hr-attendance', label:'Attendance', icon:'attendance', children:[
-      { id:'hr-att-self', label:'Self Calendar', action:{type:'tab',target:'attendance'} },
+      { id:'hr-att-self', label:'Summary', action:{type:'tab',target:'attendance'} },
       { id:'hr-att-leave', label:'Apply Leave', action:{type:'tab',target:'leaves'} },
       { id:'hr-att-emp', label:'Employee Attendance', action:{type:'tab',target:'attendance'} },
       { id:'hr-att-leavereq', label:'Employee Leave Req', action:{type:'tab',target:'leaves'} }
@@ -294,7 +294,7 @@ const NAV_CONFIG = {
   Employee: [
     { id:'home', label:'Home', icon:'home', action:{type:'tab',target:'home'} },
     { id:'emp-attendance', label:'Attendance', icon:'attendance', children:[
-      { id:'emp-att-cal', label:'Calendar', action:{type:'tab',target:'attendance'} },
+      { id:'emp-att-cal', label:'Summary', action:{type:'tab',target:'attendance'} },
       { id:'emp-att-leave', label:'Apply Leave', action:{type:'tab',target:'leaves'} }
     ]},
     { id:'emp-advance', label:'Advance', icon:'advance', children:[
@@ -317,7 +317,10 @@ const NAV_CONFIG = {
     { id:'emp-acc-payments', label:'Payments', icon:'salary', deptOnly:['Accounts'], children:[
       { id:'emp-acc-approved-adv', label:'Approved Advances', action:{type:'overlay',target:'accounts-payments'} },
       { id:'emp-acc-approved-exp', label:'Approved Expenses', action:{type:'overlay',target:'accounts-payments'} },
-      { id:'emp-acc-settlement', label:'Settlement Tracker', action:{type:'overlay',target:'accounts-payments'} }
+      { id:'emp-acc-settlement', label:'Settlement Tracker', action:{type:'overlay',target:'accounts-payments'} },
+      { id:'emp-acc-adv-datewise', label:'Date-wise Advances', action:{type:'overlay',target:'accounts-payments'} },
+      { id:'emp-acc-exp-datewise', label:'Date-wise Expenses', action:{type:'overlay',target:'accounts-payments'} },
+      { id:'emp-acc-consolidated', label:'Consolidated Report', action:{type:'overlay',target:'accounts-payments'} }
     ]},
     { id:'emp-acc-salary', label:'All Salary', icon:'salary', deptOnly:['Accounts'], action:{type:'tab',target:'salary'} },
     { id:'emp-acc-procurement', label:'Procurement', icon:'store', deptOnly:['Accounts'], children:[
@@ -348,7 +351,7 @@ const NAV_CONFIG = {
   Manager: [
     { id:'home', label:'Home', icon:'home', action:{type:'tab',target:'home'} },
     { id:'mgr-attendance', label:'Attendance', icon:'attendance', children:[
-      { id:'mgr-att-self', label:'Self Calendar', action:{type:'tab',target:'attendance'} },
+      { id:'mgr-att-self', label:'Summary', action:{type:'tab',target:'attendance'} },
       { id:'mgr-att-leave', label:'Apply Leave', action:{type:'tab',target:'leaves'} },
       { id:'mgr-att-emp', label:'Employee Attendance', action:{type:'tab',target:'attendance'} },
       { id:'mgr-att-leavereq', label:'Employee Leave Req', action:{type:'tab',target:'leaves'} }
@@ -392,7 +395,7 @@ const NAV_CONFIG = {
   Accounts: [
     { id:'home', label:'Home', icon:'home', action:{type:'tab',target:'home'} },
     { id:'acc-attendance', label:'Attendance', icon:'attendance', children:[
-      { id:'acc-att-cal', label:'Calendar', action:{type:'tab',target:'attendance'} },
+      { id:'acc-att-cal', label:'Summary', action:{type:'tab',target:'attendance'} },
       { id:'acc-att-leave', label:'Apply Leave', action:{type:'tab',target:'leaves'} }
     ]},
     { id:'acc-advance', label:'Advance', icon:'advance', children:[
@@ -409,7 +412,10 @@ const NAV_CONFIG = {
     { id:'acc-payments', label:'Payments', icon:'salary', children:[
       { id:'acc-approved-adv', label:'Approved Advances', action:{type:'overlay',target:'accounts-payments'} },
       { id:'acc-approved-exp', label:'Approved Expenses', action:{type:'overlay',target:'accounts-payments'} },
-      { id:'acc-settlement', label:'Settlement Tracker', action:{type:'overlay',target:'accounts-payments'} }
+      { id:'acc-settlement', label:'Settlement Tracker', action:{type:'overlay',target:'accounts-payments'} },
+      { id:'acc-adv-datewise', label:'Date-wise Advances', action:{type:'overlay',target:'accounts-payments'} },
+      { id:'acc-exp-datewise', label:'Date-wise Expenses', action:{type:'overlay',target:'accounts-payments'} },
+      { id:'acc-consolidated', label:'Consolidated Report', action:{type:'overlay',target:'accounts-payments'} }
     ]},
     { id:'acc-salary', label:'Salary', icon:'salary', children:[
       { id:'acc-sal-self', label:'Self Salary', action:{type:'tab',target:'salary'} },
@@ -1874,17 +1880,32 @@ function _computeCalendarStatuses(logs, empCode, year, month, maxDay) {
   });
 
   // Build a set of dates that have an approved leave for this employee
+  // Value: 'half'|'full' for paid leave days, 'lop' for LOP (absent) days
   var leaveDates = {};
   if (typeof leaveApplications !== 'undefined' && empCode) {
     leaveApplications.forEach(function(la) {
       if (la.empCode !== empCode) return;
       if (la.status !== 'approved') return;
-      // Mark every day in the leave range that falls in this month
+      var isHalf = la.days === 0.5 || la.isHalfDay;
+      var paidDays = la.paidDays > 0 ? la.paidDays : la.days;
+      var lopDays = la.lopDays || 0;
       var from = new Date(la.from + 'T00:00:00');
       var to = new Date(la.to + 'T00:00:00');
+      var paidRemain = paidDays;
       for (var ld = new Date(from); ld <= to; ld.setDate(ld.getDate() + 1)) {
+        var ldDow = ld.getDay();
+        var ldYmd = ld.getFullYear() + '-' + String(ld.getMonth()+1).padStart(2,'0') + '-' + String(ld.getDate()).padStart(2,'0');
+        if (ldDow === 0 || (typeof publicHolidays !== 'undefined' && publicHolidays[ldYmd])) continue;
         if (ld.getFullYear() === year && ld.getMonth() === month) {
-          leaveDates[ld.getDate()] = true;
+          if (paidRemain > 0) {
+            leaveDates[ld.getDate()] = isHalf ? 'half' : 'full';
+            paidRemain -= isHalf ? 0.5 : 1;
+          } else if (lopDays > 0) {
+            leaveDates[ld.getDate()] = 'lop';
+          }
+        } else {
+          paidRemain -= isHalf ? 0.5 : 1;
+          if (paidRemain < 0) paidRemain = 0;
         }
       }
     });
@@ -1925,7 +1946,7 @@ function _computeCalendarStatuses(logs, empCode, year, month, maxDay) {
       // ≥ 8 hours → Present, < 8 hours → Half day
       att[dd] = (totalMin >= 480) ? 'present' : 'half';
     } else if (leaveDates[dd]) {
-      att[dd] = 'leave';
+      att[dd] = leaveDates[dd] === 'half' ? 'half' : leaveDates[dd] === 'lop' ? 'absent' : 'leave';
     } else {
       att[dd] = 'absent';
     }
@@ -1977,12 +1998,13 @@ async function buildCalendar() {
   ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(function(d) { html += '<div class="cal-day-label">'+d+'</div>'; });
   for (var e = 0; e < firstDayOfWeek; e++) { html += '<div class="cal-day"></div>'; }
   var badgeMap = {
-    present: {label:'P', cls:'cal-badge-present'},
-    absent:  {label:'A', cls:'cal-badge-absent'},
-    holiday: {label:'H', cls:'cal-badge-holiday'},
-    half:    {label:'H', cls:'cal-badge-half'},
-    leave:   {label:'L', cls:'cal-badge-leave'}
+    present: {label:'P',  cls:'cal-badge-present'},
+    absent:  {label:'A',  cls:'cal-badge-absent'},
+    holiday: {label:'H',  cls:'cal-badge-holiday'},
+    half:    {label:'½',  cls:'cal-badge-half'},
+    leave:   {label:'L',  cls:'cal-badge-leave'}
   };
+  var dayData = result.dayData;
   for (var d = 1; d <= daysInMonth; d++) {
     var isToday = isCurrentMonth && d === now.getDate();
     var st = d <= maxDay ? (att[d] || '') : '';
@@ -1990,7 +2012,18 @@ async function buildCalendar() {
     if (!st && publicHolidays[ymd]) st = 'holiday';
     var badge = st && badgeMap[st] ? '<span class="cal-status-badge '+badgeMap[st].cls+'">'+badgeMap[st].label+'</span>' : '';
     var holidayTitle = publicHolidays[ymd] ? ' title="' + escapeAttr(publicHolidays[ymd].name) + '"' : '';
-    html += '<div class="cal-day'+(isToday?' today':'')+'"'+holidayTitle+'>'+d+badge+'</div>';
+    // Show in/out times for present/half-day cells
+    var timesHtml = '';
+    if ((st === 'present' || st === 'half') && dayData[d] && dayData[d].length > 0) {
+      var firstSession = dayData[d][0];
+      var ciStr = firstSession.checkIn ? new Date(firstSession.checkIn).toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit', hour12:false}) : '';
+      var lastSession = dayData[d][dayData[d].length - 1];
+      var coStr = lastSession.checkOut ? new Date(lastSession.checkOut).toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit', hour12:false}) : '';
+      if (ciStr || coStr) {
+        timesHtml = '<div class="cal-times">' + (ciStr || '--') + '<br>' + (coStr || '--') + '</div>';
+      }
+    }
+    html += '<div class="cal-day'+(isToday?' today':'')+'"'+holidayTitle+'>'+d+badge+timesHtml+'</div>';
   }
   c.innerHTML = html; // single DOM write — no double-render possible
   // Update month title
@@ -2851,7 +2884,8 @@ function renderAllEmpList() {
   const container = document.getElementById('allEmpList');
   const colors = ['#E85D04','#D62828','#14B8A6','#22C55E','#EC4899'];
   const isMD = currentUser && currentUser.role === 'MD';
-  const canDelete = (isMD && !isTemporaryMD()) || _isSuperAdmin;
+  const isHR = currentUser && currentUser.role === 'HR';
+  const canDelete = (isMD && !isTemporaryMD()) || isHR || _isSuperAdmin;
   const isHRorMD = currentUser && (currentUser.role === 'MD' || currentUser.role === 'HR' || currentUser.role === 'Manager' || _isSuperAdmin);
   let html = '';
   departments.forEach((dept, di) => {
@@ -3058,8 +3092,8 @@ async function deactivateEmployee(code) {
 }
 
 async function deleteEmployeePermanently(code) {
-  var allowed = (currentUser && currentUser.role === 'MD' && !isTemporaryMD()) || _isSuperAdmin;
-  if (!allowed) { showToast('Only MD or SuperAdmin can delete employees'); return; }
+  var allowed = (currentUser && currentUser.role === 'MD' && !isTemporaryMD()) || (currentUser && currentUser.role === 'HR') || _isSuperAdmin;
+  if (!allowed) { showToast('Only MD, HR, or SuperAdmin can delete employees'); return; }
   if (code === 'MD001' || code === 'SADMIN') { showToast('Cannot delete protected account'); return; }
   var emp = EMPLOYEES.find(function(e) { return e.code === code; });
   if (!emp) return;
@@ -3927,16 +3961,31 @@ function renderAdvanceRequests(filter) {
   var isAccounts = currentUser && currentUser.role === 'Accounts';
   var isHR = currentUser && currentUser.role === 'HR';
   var isReviewerRole = isAccounts || isHR;
+
+  // Update tab count badges so the approver can see at a glance what's waiting.
+  // Pending = role-specific actionable items; Approved = items already approved (for rechecking).
+  var pendingCount = isMD
+    ? allItems.filter(r => r.status === 'accounts_accepted').length
+    : allItems.filter(r => r.status === 'pending').length;
+  var approvedCount = allItems.filter(r => r.status === 'approved').length;
+  var rejectedCount = allItems.filter(r => r.status === 'rejected').length;
+  var tabBtns = document.querySelectorAll('#advReqTabs .tab-pill');
+  var tabCounts = [pendingCount, approvedCount, rejectedCount, allItems.length];
+  var tabBaseLabels = isMD ? ['To Approve', 'Approved', 'Rejected', 'All'] : ['Pending', 'Approved', 'Rejected', 'All'];
+  tabBtns.forEach(function(btn, i) {
+    var cnt = tabCounts[i] !== undefined ? tabCounts[i] : '';
+    btn.textContent = tabBaseLabels[i] + (cnt > 0 ? ' (' + cnt + ')' : '');
+  });
+
   let reqs;
   if (filter === 'all') {
     reqs = [...allItems];
   } else if (filter === 'pending') {
-    // Accounts/HR sees Pending (to accept) + Approved (to mark Paid).
-    // MD sees pending + accounts_accepted (awaiting their confirm).
+    // Each role sees only items they need to act on — no cross-stage mixing.
+    // Accounts/HR use the Approved tab to see disbursement-ready items and for rechecking.
+    // MD uses the Approved tab to recheck what they approved.
     if (isMD) {
-      reqs = allItems.filter(r => r.status === 'pending' || r.status === 'accounts_accepted');
-    } else if (isReviewerRole) {
-      reqs = allItems.filter(r => r.status === 'pending' || r.status === 'approved');
+      reqs = allItems.filter(r => r.status === 'accounts_accepted');
     } else {
       reqs = allItems.filter(r => r.status === 'pending');
     }
@@ -3953,7 +4002,8 @@ function renderAdvanceRequests(filter) {
   }
   reqs.sort((a, b) => b.id - a.id);
   if (reqs.length === 0) {
-    var emptyMsg = advReqSearchQuery ? 'No results for "' + escapeHTML(advReqSearchQuery) + '"' : 'No ' + filter + ' requests';
+    var emptyLabel = filter === 'pending' && isMD ? 'to approve' : filter;
+    var emptyMsg = advReqSearchQuery ? 'No results for "' + escapeHTML(advReqSearchQuery) + '"' : 'No ' + emptyLabel + ' requests';
     container.innerHTML = '<div style="text-align:center;padding:40px 20px;color:var(--gray-400);font-size:.82rem">' + emptyMsg + '</div>';
     return;
   }
@@ -4105,14 +4155,6 @@ function _renderAdvExportBar(uiFilter) {
   if (!bar) return;
   var canExport = currentUser && (currentUser.role === 'MD' || currentUser.role === 'Accounts' || currentUser.role === 'HR');
   if (!canExport) { bar.style.display = 'none'; bar.innerHTML = ''; return; }
-  // Map UI filter → backend status query.
-  // For 'pending' we don't pin a single status because reviewers often want all unsettled
-  // items in one sheet — leaving status unset returns everything filtered, which Excel
-  // can re-filter. For approved/rejected we pin the single status.
-  var statusParam = '';
-  if (uiFilter === 'approved') statusParam = '&status=Approved';
-  else if (uiFilter === 'rejected') statusParam = '&status=Rejected';
-  // 'pending' and 'all' → no status filter, lets Accounts see everything
   var dlSvg = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
   bar.style.display = 'flex';
   bar.innerHTML =
@@ -4127,8 +4169,21 @@ function _renderAdvExportBar(uiFilter) {
 async function downloadAdvExport(kind, uiFilter) {
   try {
     var statusQ = '';
-    if (uiFilter === 'approved') statusQ = '?status=Approved';
-    else if (uiFilter === 'rejected') statusQ = '?status=Rejected';
+    var role = currentUser ? currentUser.role : '';
+    var isAdv = (kind === 'advances');
+    if (uiFilter === 'approved') {
+      statusQ = '?status=' + (isAdv ? 'approved' : 'Approved');
+    } else if (uiFilter === 'rejected') {
+      statusQ = '?status=' + (isAdv ? 'rejected' : 'Rejected');
+    } else if (uiFilter === 'pending') {
+      // MD acts on accounts_accepted items; Accounts/HR act on pending (review) + approved (disburse)
+      if (role === 'MD') {
+        statusQ = '?status=' + (isAdv ? 'pending,accounts_accepted' : 'Pending,accounts_accepted');
+      } else {
+        statusQ = '?status=' + (isAdv ? 'pending,approved' : 'Pending,Approved');
+      }
+    }
+    // 'all' → no filter
     var url = API_BASE + '/' + kind + '/export' + statusQ;
     var headers = (typeof apiHeaders === 'function') ? apiHeaders() : (JWT_TOKEN ? { 'Authorization': 'Bearer ' + JWT_TOKEN } : {});
     // Excel endpoint returns a binary buffer; don't send/expect JSON content-type on the response
@@ -6109,6 +6164,24 @@ function exportSalaryReport() {
   ]);
 }
 
+function switchAttExportTab(tab) {
+  var isTeam = tab === 'team';
+  document.getElementById('attExportTeamSection').style.display = isTeam ? '' : 'none';
+  document.getElementById('attExportIndvSection').style.display = isTeam ? 'none' : '';
+  var teamBtn = document.getElementById('attExportTeamTab');
+  var indvBtn = document.getElementById('attExportIndvTab');
+  if (teamBtn) {
+    teamBtn.style.background = isTeam ? 'var(--primary)' : 'white';
+    teamBtn.style.color = isTeam ? '#fff' : 'var(--gray-600)';
+    teamBtn.style.borderColor = isTeam ? 'var(--primary)' : 'var(--gray-200)';
+  }
+  if (indvBtn) {
+    indvBtn.style.background = isTeam ? 'white' : 'var(--primary)';
+    indvBtn.style.color = isTeam ? 'var(--gray-600)' : '#fff';
+    indvBtn.style.borderColor = isTeam ? 'var(--gray-200)' : 'var(--primary)';
+  }
+}
+
 function showAttendanceMonthPicker() {
   if (currentUser && currentUser.role === 'Employee') { showToast('Access denied. Management only.'); return; }
   var now = new Date();
@@ -6123,6 +6196,17 @@ function showAttendanceMonthPicker() {
     if (y === prevYear) opt.selected = true;
     yearSel.appendChild(opt);
   }
+  // Populate employee dropdown for individual report
+  var empSel = document.getElementById('attExportEmpCode');
+  if (empSel) {
+    empSel.innerHTML = '';
+    (EMPLOYEES || []).filter(function(e) { return e.status !== 'Inactive'; }).forEach(function(e) {
+      var o = document.createElement('option');
+      o.value = e.code; o.textContent = e.name + ' (' + e.code + ')';
+      empSel.appendChild(o);
+    });
+  }
+  switchAttExportTab('team');
   var overlay = document.getElementById('attendanceExportOverlay');
   overlay.style.setProperty('z-index', '100000', 'important');
   overlay.classList.add('active');
@@ -6133,93 +6217,410 @@ function closeAttendanceExportModal() {
 }
 
 async function exportAttendanceReport() {
+  var formatRadio = document.querySelector('input[name="attExportFormat"]:checked');
+  var fmt = formatRadio ? formatRadio.value : 'daily-hours';
+  if (fmt === 'punch-inout') { await _exportPunchInOutCSV(); return; }
+  if (fmt === 'weekly') { await _exportWeeklyHoursCSV(); return; }
+  if (fmt === 'total-hours') { await _exportTotalHoursCSV(); return; }
+  // default: daily-hours → Consolidated XLSX (color-coded, matches sample format)
   var selMonth = parseInt(document.getElementById('attExportMonth').value);
   var selYear = parseInt(document.getElementById('attExportYear').value);
   var monthStr = selYear + '-' + String(selMonth + 1).padStart(2, '0');
+  var monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var monthLabel = monthNames[selMonth] + ' ' + selYear;
+  closeAttendanceExportModal();
+  showToast('Generating consolidated report...');
+  try {
+    var url = API_BASE + '/attendance/export/consolidated?month=' + monthStr;
+    var headers = (typeof apiHeaders === 'function') ? apiHeaders() : (JWT_TOKEN ? { 'Authorization': 'Bearer ' + JWT_TOKEN } : {});
+    delete headers['Content-Type'];
+    var res = await fetch(url, { headers: headers });
+    if (!res.ok) { showToast('Export failed (' + res.status + ')'); return; }
+    var blob = await res.blob();
+    var dlUrl = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = dlUrl;
+    a.download = monthLabel + ' Consolidated.xlsx';
+    document.body.appendChild(a); a.click();
+    setTimeout(function() { URL.revokeObjectURL(dlUrl); a.remove(); }, 0);
+    showToast('Downloaded: ' + monthLabel + ' Consolidated.xlsx');
+  } catch (e) { showToast(e.message || 'Error exporting attendance'); }
+}
+
+// ---- Shared helper: fetch logs + build empDayData for a month ----
+async function _fetchAttMonthData(selYear, selMonth) {
+  var monthStr = selYear + '-' + String(selMonth + 1).padStart(2, '0');
+  var logs = await apiCall('GET', '/attendance?month=' + monthStr);
+  if (!Array.isArray(logs)) logs = [];
+  var today = new Date();
+  var isCurrentMonth = (today.getFullYear() === selYear && today.getMonth() === selMonth);
+  var daysInMonth = new Date(selYear, selMonth + 1, 0).getDate();
+  // Build empCode -> dayNum -> { present, minutes, sessions[] }
+  var empDayData = {};
+  logs.forEach(function(row) {
+    if (!row.emp_code || !row.log_date) return;
+    var dayNum = parseInt(String(row.log_date).substring(0, 10).split('-')[2], 10);
+    if (!empDayData[row.emp_code]) empDayData[row.emp_code] = {};
+    if (!empDayData[row.emp_code][dayNum]) empDayData[row.emp_code][dayNum] = { minutes: 0, sessions: [] };
+    var session = { checkIn: row.check_in || null, checkOut: row.check_out || null };
+    empDayData[row.emp_code][dayNum].sessions.push(session);
+    if (row.check_in) {
+      var start = new Date(row.check_in).getTime();
+      var end;
+      var isToday = isCurrentMonth && dayNum === today.getDate();
+      if (row.check_out) {
+        end = new Date(row.check_out).getTime();
+      } else if (isToday) {
+        end = Date.now();
+      } else {
+        var autoOut = new Date(new Date(row.check_in).toDateString() + ' 21:00:00').getTime();
+        end = Math.min(autoOut, start + 480 * 60000);
+        empDayData[row.emp_code][dayNum].missedCheckout = true;
+      }
+      if (end > start) empDayData[row.emp_code][dayNum].minutes += (end - start) / 60000;
+    }
+  });
+  return { logs, empDayData, daysInMonth, today, isCurrentMonth, monthStr };
+}
+
+function _csvEsc(v) {
+  v = String(v === null || v === undefined ? '' : v).replace(/"/g, '""');
+  return (v.indexOf(',') >= 0 || v.indexOf('"') >= 0 || v.indexOf('\n') >= 0) ? '"' + v + '"' : v;
+}
+
+function _minsToHHMM(mins) {
+  var h = Math.floor(mins / 60), m = Math.round(mins % 60);
+  return h + 'h ' + (m < 10 ? '0' + m : m) + 'm';
+}
+
+function _fmtTime(dtStr) {
+  if (!dtStr) return '';
+  var d = new Date(dtStr);
+  return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+}
+
+function _triggerCSVDownload(content, filename) {
+  var blob = new Blob(['﻿' + content], { type: 'text/csv;charset=utf-8;' });
+  var link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
+// ---- Format 2: Punch In / Punch Out ----
+async function _exportPunchInOutCSV() {
+  var selMonth = parseInt(document.getElementById('attExportMonth').value);
+  var selYear = parseInt(document.getElementById('attExportYear').value);
   var monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   var monthLabel = monthNames[selMonth] + '_' + selYear;
   closeAttendanceExportModal();
   showToast('Fetching attendance data...');
   try {
-    var logs = await apiCall('GET', '/attendance?month=' + monthStr);
-    if (!Array.isArray(logs)) logs = [];
-    var daysInMonth = new Date(selYear, selMonth + 1, 0).getDate();
-    var today = new Date();
-    var isCurrentMonth = (today.getFullYear() === selYear && today.getMonth() === selMonth);
-    var lastCountDay = isCurrentMonth ? today.getDate() : daysInMonth;
-    // Count working days (exclude Sundays and declared public holidays)
-    var workingDays = 0;
-    for (var d = 1; d <= lastCountDay; d++) {
-      var _dt = new Date(selYear, selMonth, d);
-      var _ymd = selYear + '-' + String(selMonth + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
-      if (_dt.getDay() !== 0 && !publicHolidays[_ymd]) workingDays++;
-    }
-    // Build empCode -> dayNum -> { present, minutes }
-    var empDayData = {};
-    logs.forEach(function(row) {
-      if (!row.emp_code || !row.log_date) return;
-      var dateStr = String(row.log_date).substring(0, 10);
-      var dayNum = parseInt(dateStr.split('-')[2], 10);
-      if (!empDayData[row.emp_code]) empDayData[row.emp_code] = {};
-      if (!empDayData[row.emp_code][dayNum]) empDayData[row.emp_code][dayNum] = { present: true, minutes: 0 };
-      if (row.check_in) {
-        var start = new Date(row.check_in).getTime();
-        var isToday = isCurrentMonth && dayNum === today.getDate();
-        var end = row.check_out ? new Date(row.check_out).getTime() : (isToday ? Date.now() : 0);
-        if (end > start) empDayData[row.emp_code][dayNum].minutes += (end - start) / 60000;
-      }
+    var { logs } = await _fetchAttMonthData(selYear, selMonth);
+    var empMap = {};
+    (EMPLOYEES || []).forEach(function(e) { empMap[e.code] = e; });
+    var headers = ['Date', 'Employee Name', 'Code', 'Department', 'Punch In', 'Punch Out', 'Hours'];
+    var rows = [headers.join(',')];
+    logs.sort(function(a, b) {
+      if (a.log_date < b.log_date) return -1;
+      if (a.log_date > b.log_date) return 1;
+      return (a.check_in || '') < (b.check_in || '') ? -1 : 1;
     });
-    // Build wide-format CSV
-    var _esc = function(v) {
-      v = String(v === null || v === undefined ? '' : v).replace(/"/g, '""');
-      return (v.indexOf(',') >= 0 || v.indexOf('"') >= 0 || v.indexOf('\n') >= 0) ? '"' + v + '"' : v;
-    };
-    var headers = ['Name', 'Employee Code'];
+    logs.forEach(function(row) {
+      var emp = empMap[row.emp_code] || {};
+      var dateStr = String(row.log_date).substring(0, 10);
+      var punchIn = _fmtTime(row.check_in);
+      var punchOut = _fmtTime(row.check_out);
+      var mins = 0;
+      if (row.check_in && row.check_out) {
+        mins = (new Date(row.check_out) - new Date(row.check_in)) / 60000;
+      }
+      var hoursStr = mins > 0 ? _minsToHHMM(mins) : '';
+      rows.push([_csvEsc(dateStr), _csvEsc(row.name || emp.name || ''), _csvEsc(row.emp_code),
+        _csvEsc(row.dept || emp.dept || ''), _csvEsc(punchIn), _csvEsc(punchOut), _csvEsc(hoursStr)].join(','));
+    });
+    _triggerCSVDownload(rows.join('\n'), 'punch_inout_' + monthLabel + '.csv');
+    showToast('Downloaded: punch_inout_' + monthLabel + '.csv');
+  } catch (e) { showToast(e.message || 'Error exporting'); }
+}
+
+// ---- Format 3: Total Hours Cumulation ----
+async function _exportTotalHoursCSV() {
+  var selMonth = parseInt(document.getElementById('attExportMonth').value);
+  var selYear = parseInt(document.getElementById('attExportYear').value);
+  var monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var monthLabel = monthNames[selMonth] + '_' + selYear;
+  closeAttendanceExportModal();
+  showToast('Fetching attendance data...');
+  try {
+    var { empDayData, daysInMonth, today, isCurrentMonth } = await _fetchAttMonthData(selYear, selMonth);
+    var headers = ['Name', 'Code', 'Dept'];
     for (var d = 1; d <= daysInMonth; d++) headers.push(String(d).padStart(2, '0'));
-    headers.push('Total Present Days', 'Absent Days', 'Attendance %');
-    var csvRows = [headers.join(',')];
-    EMPLOYEES.filter(function(e) { return e.status !== 'Inactive'; }).forEach(function(emp) {
-      var cols = [_esc(emp.name), _esc(emp.code)];
-      var presentCount = 0;
+    headers.push('Total Hours', 'Cumulative (decimal)');
+    var rows = [headers.join(',')];
+    (EMPLOYEES || []).filter(function(e) { return e.status !== 'Inactive'; }).forEach(function(emp) {
+      var cols = [_csvEsc(emp.name), _csvEsc(emp.code), _csvEsc(emp.dept || '')];
+      var totalMins = 0;
       for (var d = 1; d <= daysInMonth; d++) {
         var dow = new Date(selYear, selMonth, d).getDay();
         var ymd = selYear + '-' + String(selMonth + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
         var isFuture = isCurrentMonth && d > today.getDate();
-        if (dow === 0) {
-          cols.push('Sun');
-        } else if (publicHolidays[ymd]) {
-          cols.push('Holiday');
-        } else if (isFuture) {
-          cols.push('');
-        } else {
-          var dayData = empDayData[emp.code] && empDayData[emp.code][d];
-          if (dayData) {
-            presentCount++;
-            if (dayData.minutes > 0) {
-              var h = Math.floor(dayData.minutes / 60);
-              var m = Math.round(dayData.minutes % 60);
-              cols.push(h + 'h ' + m + 'm');
-            } else {
-              cols.push('Present');
-            }
-          } else {
-            cols.push('Absent');
-          }
+        if (dow === 0) { cols.push('Sun'); }
+        else if (publicHolidays[ymd]) { cols.push('Hol'); }
+        else if (isFuture) { cols.push(''); }
+        else {
+          var dd = empDayData[emp.code] && empDayData[emp.code][d];
+          if (dd && dd.minutes > 0) {
+            var capMin = Math.min(dd.minutes, 480);
+            totalMins += capMin;
+            cols.push((capMin / 60).toFixed(2));
+          } else { cols.push('0.00'); }
         }
       }
-      var absentDays = Math.max(0, workingDays - presentCount);
-      var attPct = workingDays > 0 ? ((presentCount / workingDays) * 100).toFixed(1) + '%' : '0.0%';
-      cols.push(presentCount, absentDays, attPct);
-      csvRows.push(cols.join(','));
+      cols.push(_minsToHHMM(totalMins));
+      cols.push((totalMins / 60).toFixed(2));
+      rows.push(cols.join(','));
     });
-    var blob = new Blob(['﻿' + csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
-    var link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = 'attendance_' + monthLabel + '.csv';
-    link.click();
-    URL.revokeObjectURL(link.href);
-    showToast('Downloaded: attendance_' + monthLabel + '.csv');
-  } catch (e) { showToast(e.message || 'Error exporting attendance'); }
+    rows.push('');
+    rows.push('"Hours capped at 8h per day. Decimal format for payroll calculations."');
+    _triggerCSVDownload(rows.join('\n'), 'total_hours_' + monthLabel + '.csv');
+    showToast('Downloaded: total_hours_' + monthLabel + '.csv');
+  } catch (e) { showToast(e.message || 'Error exporting'); }
+}
+
+// ---- Format 4: Weekly Hours Cumulation ----
+async function _exportWeeklyHoursCSV() {
+  var selMonth = parseInt(document.getElementById('attExportMonth').value);
+  var selYear = parseInt(document.getElementById('attExportYear').value);
+  var monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var monthLabel = monthNames[selMonth] + '_' + selYear;
+  closeAttendanceExportModal();
+  showToast('Fetching attendance data...');
+  try {
+    var { empDayData, daysInMonth, today, isCurrentMonth } = await _fetchAttMonthData(selYear, selMonth);
+    // Determine week ranges within the month
+    var weeks = [];
+    var weekStart = 1;
+    for (var d = 1; d <= daysInMonth; d++) {
+      var dow = new Date(selYear, selMonth, d).getDay();
+      if (dow === 6 || d === daysInMonth) {
+        weeks.push({ start: weekStart, end: d });
+        weekStart = d + 1;
+      }
+    }
+    var headers = ['Name', 'Code', 'Dept'];
+    weeks.forEach(function(w, i) {
+      headers.push('Week ' + (i + 1) + ' (' + String(w.start).padStart(2,'0') + '-' + String(w.end).padStart(2,'0') + ')');
+    });
+    headers.push('Total Hours');
+    var rows = [headers.join(',')];
+    (EMPLOYEES || []).filter(function(e) { return e.status !== 'Inactive'; }).forEach(function(emp) {
+      var cols = [_csvEsc(emp.name), _csvEsc(emp.code), _csvEsc(emp.dept || '')];
+      var totalMins = 0;
+      weeks.forEach(function(w) {
+        var weekMins = 0;
+        for (var d = w.start; d <= w.end; d++) {
+          var dow = new Date(selYear, selMonth, d).getDay();
+          var ymd = selYear + '-' + String(selMonth + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+          if (dow === 0 || publicHolidays[ymd]) continue;
+          if (isCurrentMonth && d > today.getDate()) continue;
+          var dd = empDayData[emp.code] && empDayData[emp.code][d];
+          if (dd && dd.minutes > 0) weekMins += Math.min(dd.minutes, 480);
+        }
+        totalMins += weekMins;
+        cols.push((weekMins / 60).toFixed(2));
+      });
+      cols.push((totalMins / 60).toFixed(2));
+      rows.push(cols.join(','));
+    });
+    _triggerCSVDownload(rows.join('\n'), 'weekly_hours_' + monthLabel + '.csv');
+    showToast('Downloaded: weekly_hours_' + monthLabel + '.csv');
+  } catch (e) { showToast(e.message || 'Error exporting'); }
+}
+
+// ---- Individual Staff PDF ----
+async function exportIndividualStaffPDF() {
+  var selMonth = parseInt(document.getElementById('attExportMonth').value);
+  var selYear = parseInt(document.getElementById('attExportYear').value);
+  var empCode = document.getElementById('attExportEmpCode').value;
+  if (!empCode) { showToast('Select an employee'); return; }
+  closeAttendanceExportModal();
+  showToast('Generating PDF...');
+  try {
+    await loadJsPdf();
+    var { jsPDF } = window.jspdf;
+    var monthStr = selYear + '-' + String(selMonth + 1).padStart(2, '0');
+    var logs = await apiCall('GET', '/attendance?empCode=' + encodeURIComponent(empCode) + '&month=' + monthStr);
+    if (!Array.isArray(logs)) logs = [];
+    var emp = (EMPLOYEES || []).find(function(e) { return e.code === empCode; }) || { name: empCode, code: empCode, dept: '', designation: '' };
+    var monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    var dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    var daysInMonth = new Date(selYear, selMonth + 1, 0).getDate();
+    var today = new Date();
+    var isCurrentMonth = (today.getFullYear() === selYear && today.getMonth() === selMonth);
+    // Build day -> log map
+    var dayLogs = {};
+    logs.forEach(function(row) {
+      var dayNum = parseInt(String(row.log_date).substring(0, 10).split('-')[2], 10);
+      if (!dayLogs[dayNum]) dayLogs[dayNum] = [];
+      dayLogs[dayNum].push(row);
+    });
+    // Build approved leaves for this employee/month
+    var leaveDaysMap = {};
+    if (typeof leaveApplications !== 'undefined') {
+      leaveApplications.forEach(function(la) {
+        if (la.empCode !== empCode || la.status !== 'approved') return;
+        var from = new Date(la.from + 'T00:00:00');
+        var to = new Date(la.to + 'T00:00:00');
+        for (var ld = new Date(from); ld <= to; ld.setDate(ld.getDate() + 1)) {
+          if (ld.getFullYear() === selYear && ld.getMonth() === selMonth) {
+            leaveDaysMap[ld.getDate()] = la.type;
+          }
+        }
+      });
+    }
+    var doc = new jsPDF('p', 'mm', 'a4');
+    var pw = 210, lm = 14, rm = 196, cw = rm - lm;
+    var primary = [76,81,191], dark = [30,30,60], mid = [100,100,120], light = [245,245,252];
+    var y = 14;
+    // Company header
+    try { doc.addImage('data:image/png;base64,' + COMPANY_LOGO_B64, 'PNG', lm, y, 28, 10); } catch(e) {
+      doc.setFillColor(...primary); doc.roundedRect(lm, y, 28, 10, 2, 2, 'F');
+      doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(255,255,255); doc.text('SS', lm+2, y+6.5);
+    }
+    doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(...primary);
+    doc.text('SWETHA STRUCTURES PRIVATE LIMITED', lm+31, y+4.5);
+    doc.setFont('helvetica','normal'); doc.setFontSize(6.5); doc.setTextColor(...mid);
+    doc.text('No.44, Alagu Nagar, Saravanampatti, Coimbatore, TN 641035 | GSTIN: 33AAWCS9286M1Z6', lm+31, y+9.5);
+    y += 16; doc.setDrawColor(...primary); doc.setLineWidth(0.5); doc.line(lm, y, rm, y);
+    // Report title
+    y += 7; doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...dark);
+    doc.text('INDIVIDUAL ATTENDANCE REPORT — ' + monthNames[selMonth].toUpperCase() + ' ' + selYear, pw/2, y, {align:'center'});
+    // Employee info box
+    y += 7; doc.setFillColor(...light); doc.roundedRect(lm, y, cw, 18, 2, 2, 'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(...primary);
+    doc.text(emp.name, lm+4, y+6);
+    doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(...mid);
+    doc.text('Code: ' + emp.code + '   Dept: ' + (emp.dept||'—') + '   Designation: ' + (emp.designation||'—'), lm+4, y+12);
+    // Stats — computed below
+    var presentDays = 0, absentDays = 0, leaveDays = 0, halfDays = 0, totalMins = 0, holidayDays = 0;
+    for (var d = 1; d <= daysInMonth; d++) {
+      var dow2 = new Date(selYear, selMonth, d).getDay();
+      var ymd2 = selYear + '-' + String(selMonth+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+      if (dow2 === 0 || publicHolidays[ymd2]) { holidayDays++; continue; }
+      if (isCurrentMonth && d > today.getDate()) continue;
+      if (dayLogs[d] && dayLogs[d].length > 0) {
+        var dayMin = 0;
+        dayLogs[d].forEach(function(row) {
+          if (!row.check_in) return;
+          var s = new Date(row.check_in).getTime();
+          var en;
+          if (row.check_out) en = new Date(row.check_out).getTime();
+          else if (isCurrentMonth && d === today.getDate()) en = Date.now();
+          else { var ao = new Date(new Date(row.check_in).toDateString() + ' 21:00:00').getTime(); en = Math.min(ao, s + 480*60000); }
+          if (en > s) dayMin += (en - s) / 60000;
+        });
+        dayMin = Math.min(dayMin, 480);
+        totalMins += dayMin;
+        if (dayMin >= 480) presentDays++; else halfDays++;
+      } else if (leaveDaysMap[d]) {
+        leaveDays++;
+      } else {
+        absentDays++;
+      }
+    }
+    var workingDays = presentDays + halfDays + absentDays + leaveDays;
+    var attPct = workingDays > 0 ? Math.round((presentDays + halfDays * 0.5) / workingDays * 100) : 0;
+    doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...dark);
+    doc.text('Present: ' + presentDays + '  Half: ' + halfDays + '  Absent: ' + absentDays + '  Leave: ' + leaveDays + '  Holiday/Sun: ' + holidayDays, lm+4, y+17);
+    // Table
+    y += 24;
+    var colW = [12, 16, 28, 28, 22, 24, 22];
+    var colX = [lm];
+    colW.forEach(function(w, i) { if (i > 0) colX.push(colX[i-1] + colW[i-1]); });
+    var colHdr = ['Day','Date','Punch In','Punch Out','Hours','Status','Note'];
+    doc.setFillColor(...primary); doc.rect(lm, y, cw, 6, 'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(255,255,255);
+    colHdr.forEach(function(h, i) { doc.text(h, colX[i]+1, y+4.5); });
+    y += 6;
+    var rowIdx = 0;
+    for (var d = 1; d <= daysInMonth; d++) {
+      if (y > 272) { doc.addPage(); y = 14; }
+      var dow3 = new Date(selYear, selMonth, d).getDay();
+      var ymd3 = selYear + '-' + String(selMonth+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+      var isFuture = isCurrentMonth && d > today.getDate();
+      var rowH = 5.5;
+      if (rowIdx % 2 === 0) { doc.setFillColor(248,248,255); doc.rect(lm, y, cw, rowH, 'F'); }
+      doc.setFont('helvetica','normal'); doc.setFontSize(6.2); doc.setTextColor(...dark);
+      var dayName2 = dayNames[dow3];
+      var dateLabel = String(d).padStart(2,'0') + '/' + String(selMonth+1).padStart(2,'0');
+      if (dow3 === 0 || publicHolidays[ymd3]) {
+        doc.setTextColor(160,160,180);
+        var hlabel = dow3 === 0 ? 'Sunday' : ((publicHolidays[ymd3] && publicHolidays[ymd3].name) || 'Holiday');
+        var hNote = '';
+        doc.text(dayName2, colX[0]+1, y+3.8);
+        doc.text(dateLabel, colX[1]+1, y+3.8);
+        doc.text('', colX[2]+1, y+3.8);
+        doc.text('', colX[3]+1, y+3.8);
+        doc.text('', colX[4]+1, y+3.8);
+        doc.text(hlabel, colX[5]+1, y+3.8);
+        doc.text(hNote, colX[6]+1, y+3.8);
+        // Check holiday presence
+        if (dayLogs[d] && dayLogs[d].length > 0) {
+          doc.setTextColor(220,38,38);
+          var hPunchIn = _fmtTime(dayLogs[d][0].check_in);
+          doc.text(hPunchIn, colX[2]+1, y+3.8);
+          doc.text('Present on Holiday', colX[6]+1, y+3.8);
+        }
+      } else if (isFuture) {
+        doc.setTextColor(180,180,190);
+        doc.text(dayName2, colX[0]+1, y+3.8); doc.text(dateLabel, colX[1]+1, y+3.8);
+        doc.text('—', colX[5]+1, y+3.8);
+      } else if (dayLogs[d] && dayLogs[d].length > 0) {
+        var sess = dayLogs[d][0];
+        var pIn = _fmtTime(sess.check_in);
+        var pOut = sess.check_out ? _fmtTime(sess.check_out) : (isCurrentMonth && d === today.getDate() ? 'Active' : '—*');
+        var sessMin = 0;
+        dayLogs[d].forEach(function(row) {
+          if (!row.check_in) return;
+          var s = new Date(row.check_in).getTime();
+          var en;
+          if (row.check_out) en = new Date(row.check_out).getTime();
+          else if (isCurrentMonth && d === today.getDate()) en = Date.now();
+          else { var ao = new Date(new Date(row.check_in).toDateString() + ' 21:00:00').getTime(); en = Math.min(ao, s + 480*60000); }
+          if (en > s) sessMin += (en - s) / 60000;
+        });
+        sessMin = Math.min(sessMin, 480);
+        var statusTxt = sessMin >= 480 ? 'Present' : 'Half Day';
+        var missNote = !dayLogs[d][0].check_out && !(isCurrentMonth && d === today.getDate()) ? 'Missed checkout*' : '';
+        doc.text(dayName2, colX[0]+1, y+3.8);
+        doc.text(dateLabel, colX[1]+1, y+3.8);
+        doc.text(pIn, colX[2]+1, y+3.8);
+        doc.text(pOut, colX[3]+1, y+3.8);
+        doc.text(_minsToHHMM(sessMin), colX[4]+1, y+3.8);
+        doc.text(statusTxt, colX[5]+1, y+3.8);
+        if (missNote) { doc.setTextColor(200,100,0); doc.text(missNote, colX[6]+1, y+3.8); doc.setTextColor(...dark); }
+      } else if (leaveDaysMap[d]) {
+        doc.setTextColor(8,145,178);
+        doc.text(dayName2, colX[0]+1, y+3.8); doc.text(dateLabel, colX[1]+1, y+3.8);
+        doc.text('Leave (' + leaveDaysMap[d] + ')', colX[5]+1, y+3.8);
+      } else {
+        doc.setTextColor(220,38,38);
+        doc.text(dayName2, colX[0]+1, y+3.8); doc.text(dateLabel, colX[1]+1, y+3.8);
+        doc.text('Absent', colX[5]+1, y+3.8);
+      }
+      y += rowH; rowIdx++;
+    }
+    // Footer
+    y += 6; doc.setDrawColor(...primary); doc.line(lm, y, rm, y);
+    y += 5; doc.setFont('helvetica','normal'); doc.setFontSize(6.5); doc.setTextColor(...mid);
+    doc.text('* Checkout not recorded — hours estimated. Attendance %: ' + attPct + '%  |  Total Hours: ' + _minsToHHMM(totalMins), lm, y);
+    doc.text('Generated: ' + new Date().toLocaleDateString('en-IN') + ' | Swetha HRMS', rm, y, { align: 'right' });
+    var fname = 'attendance_' + emp.code + '_' + monthNames[selMonth] + '_' + selYear + '.pdf';
+    savePdfSafe(doc, fname);
+    showToast('PDF downloaded for ' + emp.name);
+  } catch (e) { showToast(e.message || 'Error generating PDF'); }
 }
 
 function exportTaskReport() {
@@ -7330,8 +7731,13 @@ function mapLeave(row) {
     dept: row.dept || '', type: row.leave_type || row.type || 'casual',
     from: row.from_date ? String(row.from_date).substring(0, 10) : (row.from || ''),
     to: row.to_date ? String(row.to_date).substring(0, 10) : (row.to || ''),
-    days: parseInt(row.days, 10) || 1, reason: row.reason || '',
+    days: parseFloat(row.days) || 1, reason: row.reason || '',
     status: row.status || 'pending',
+    isHalfDay: !!(row.is_half_day || row.isHalfDay),
+    halfDaySession: row.half_day_session || row.halfDaySession || null,
+    paidDays: parseFloat(row.paid_days || row.paidDays) || 0,
+    lopDays: parseFloat(row.lop_days || row.lopDays) || 0,
+    isLOP: !!(row.is_lop || row.isLOP),
     reviewedBy: row.reviewed_by || row.reviewedBy || null,
     reviewDate: row.review_date ? String(row.review_date).substring(0, 10) : (row.reviewDate || null)
   };
@@ -8681,6 +9087,39 @@ async function downloadAttendanceReport() {
     });
   }
 
+  // Holiday presence notes
+  const holidayPresence = [];
+  for (const [ymd, hobj] of Object.entries(publicHolidays)) {
+    const [hy, hm] = ymd.split('-').map(Number);
+    if (hy !== yr || hm !== now.getMonth() + 1) continue;
+    EMPLOYEES.filter(e => e.status !== 'Inactive').forEach(emp => {
+      const dl = attendanceLogs.filter(function(l) {
+        var ec = l.emp_code || l.empCode;
+        var ld = l.log_date || (l.check_in ? String(l.check_in).substring(0,10) : '');
+        return ec === emp.code && ld === ymd;
+      });
+      if (dl.length > 0) holidayPresence.push({ emp: emp.name, code: emp.code, date: ymd, holiday: (hobj && hobj.name) || 'Holiday', time: _fmtTime(dl[0].check_in) });
+    });
+  }
+  if (holidayPresence.length > 0) {
+    if (y > 250) { doc.addPage(); y = 15; }
+    y += 8;
+    doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...primary);
+    doc.text('HOLIDAY PRESENCE', lm, y);
+    y += 5;
+    doc.setFillColor(254,242,242); doc.roundedRect(lm, y, cw, holidayPresence.length * 6 + 6, 2, 2, 'F');
+    y += 5;
+    holidayPresence.forEach(hp => {
+      doc.setFont('helvetica','normal'); doc.setFontSize(6.5); doc.setTextColor(220,38,38);
+      doc.text(hp.emp + ' (' + hp.code + ')  —  ' + hp.holiday + ' (' + hp.date + ')  Checked in: ' + hp.time, lm+3, y);
+      y += 6;
+    });
+  }
+
+  y += 8; doc.setDrawColor(...primary); doc.line(lm, y, rm, y);
+  y += 5; doc.setFont('helvetica','normal'); doc.setFontSize(6); doc.setTextColor(...mid);
+  doc.text('Generated: ' + new Date().toLocaleDateString('en-IN') + ' | Swetha HRMS', rm, y, { align: 'right' });
+
   doc.save('Attendance_Report_' + mName + '_' + yr + '.pdf');
   showToast('Attendance report downloaded');
 }
@@ -8875,24 +9314,8 @@ function initWebSocket() {
     var app = leaveApplications.find(function(a) { return a.id === id; });
     if (app) app.status = newStatus;
   }
-  // Helper: re-fetch leave balance after server-side change, so the displayed
-  // remaining count matches the DB (esp. for permission which is server-authoritative).
-  async function _refreshLeaveBalance() {
-    try {
-      if (!currentUser) return;
-      var role = currentUser.role;
-      if (role === 'MD' || role === 'HR') {
-        var all = await apiCall('GET', '/leaves/balance/all');
-        if (all && typeof all === 'object') {
-          Object.keys(leaveBalances).forEach(function(k) { delete leaveBalances[k]; });
-          Object.assign(leaveBalances, all);
-        }
-      } else {
-        var mine = await apiCall('GET', '/leaves/balance');
-        if (mine) leaveBalances[currentUser.code] = mine;
-      }
-    } catch (e) { /* non-fatal — UI will recover on next render */ }
-  }
+  // Alias the global refreshLeaveBalance for socket handlers
+  var _refreshLeaveBalance = refreshLeaveBalance;
 
   // ── Leave: approved ──
   _hrmsSocket.on('leave:approved', function(data) {
@@ -9720,7 +10143,9 @@ function restoreNotifPrefToggles() {
 // =====================================================
 function getLeaveBalance(empCode) {
   if (!leaveBalances[empCode]) {
-    leaveBalances[empCode] = { casual: 12, comp: 3, permission: 1 };
+    var now = new Date();
+    var accruedCL = now.getMonth() >= 3 ? Math.min(now.getMonth() - 2, 12) : 0;
+    leaveBalances[empCode] = { casual: accruedCL, comp: 3, permission: 2 };
   }
   return leaveBalances[empCode];
 }
@@ -9781,7 +10206,16 @@ function toggleHalfDay() {
     var toDate = document.getElementById('leaveToDate');
     var fromDate = document.getElementById('leaveFromDate');
     if (fromDate.value) toDate.value = fromDate.value;
+    // Clear any previous selection
+    document.querySelectorAll('input[name="halfDaySession"]').forEach(function(r) { r.checked = false; });
+    document.getElementById('firstHalfLabel').style.borderColor = 'var(--gray-200)';
+    document.getElementById('secondHalfLabel').style.borderColor = 'var(--gray-200)';
   }
+}
+
+function selectHalfSession(radio) {
+  document.getElementById('firstHalfLabel').style.borderColor = radio.value === 'first' ? 'var(--primary)' : 'var(--gray-200)';
+  document.getElementById('secondHalfLabel').style.borderColor = radio.value === 'second' ? 'var(--primary)' : 'var(--gray-200)';
 }
 
 function closeLeaveForm() {
@@ -9797,10 +10231,11 @@ function selectLeaveType(type, el) {
   if (balText && currentUser) {
     var bal = getLeaveBalance(currentUser.code);
     if (type === 'permission') {
-      var permLeft = bal.permission !== undefined ? bal.permission : 1;
-      balText.innerHTML = 'Permission (2hr): <strong>' + permLeft + '</strong> of 1 remaining this month' +
+      var permDays = bal.permission !== undefined ? parseFloat(bal.permission) : 2;
+      var permLeft = Math.round(permDays * 2); // convert days → count (0–4)
+      balText.innerHTML = 'Permission (2hr): <strong>' + permLeft + '</strong> of 4 remaining this month' +
         '<br><span style="font-size:.7rem;color:' + (permLeft > 0 ? 'var(--success)' : 'var(--danger)') + '">' +
-        (permLeft > 0 ? '1 free permission available — no salary deduction' : 'Permission used this month — additional will be LOP') + '</span>';
+        (permLeft > 0 ? permLeft + ' permission' + (permLeft !== 1 ? 's' : '') + ' available — no salary deduction' : 'All 4 permissions used this month — additional will be LOP') + '</span>';
       // Auto-set same-day dates for permission
       var today = new Date().toISOString().split('T')[0];
       var fromEl = document.getElementById('leaveFromDate');
@@ -9845,62 +10280,64 @@ async function submitLeave() {
 
   var halfDayToggle = document.getElementById('halfDayToggle');
   var isHalfDay = halfDayToggle && halfDayToggle.classList.contains('on');
-  const days = isHalfDay ? 0.5 : Math.ceil((new Date(to) - new Date(from)) / 86400000) + 1;
-  const bal = getLeaveBalance(currentUser.code);
-
-  // Leave policy: 1 casual leave per month (paid), extra = LOP (salary deducted)
-  var casualUsedThisMonth = getCasualLeavesUsedThisMonth(currentUser.code);
-  var paidAvailable = Math.max(0, 1 - casualUsedThisMonth); // 1 per month
+  var halfDaySession = null;
+  if (isHalfDay) {
+    var sessionRadio = document.querySelector('input[name="halfDaySession"]:checked');
+    if (!sessionRadio) { showToast('Please select First Half or Second Half'); return; }
+    halfDaySession = sessionRadio.value;
+  }
   var leaveType = selectedLeaveType;
+  // Permission = 2 hours = 0.5 day for payroll; override the generic day count
+  const days = leaveType === 'permission' ? 0.5 : (isHalfDay ? 0.5 : Math.ceil((new Date(to) - new Date(from)) / 86400000) + 1);
+  const bal = getLeaveBalance(currentUser.code);
   var isLOP = false;
 
   if (leaveType === 'permission') {
-    // Permission: 2 per month, same day only
     if (from !== to) { showToast('Permission is for 2 hours on a single day only'); return; }
-    var permLeft = bal.permission !== undefined ? bal.permission : 1;
+    var permDays = bal.permission !== undefined ? parseFloat(bal.permission) : 2;
+    var permLeft = Math.round(permDays * 2);
     if (permLeft <= 0) {
       isLOP = true;
-      if (!confirm('You have already used your 1 permission this month.\n\nThis permission will be Loss of Pay (LOP) — 2 hours salary will be deducted.\n\nDo you want to proceed?')) return;
+      if (!confirm('You have used all 4 permissions this month.\n\nThis permission will be Loss of Pay (LOP) — 2 hours salary will be deducted.\n\nDo you want to proceed?')) return;
     }
   } else if (leaveType === 'casual') {
-    if (bal.casual <= 0) {
-      // No casual balance left — entire request is LOP
+    var clBalance = parseFloat(bal.casual) || 0;
+    if (clBalance <= 0) {
       isLOP = true;
-      if (!confirm('You have exhausted all 12 casual leaves for this year.\n\nThis leave will be Loss of Pay (LOP) — salary for ' + days + ' day(s) will be deducted.\n\nDo you want to proceed?')) return;
-    } else if (days > paidAvailable) {
-      // Partially paid, partially LOP
-      var lopDays = days - paidAvailable;
-      if (!confirm('You have used your 1 paid casual leave for this month.\n\n' + (paidAvailable > 0 ? paidAvailable + ' day(s) will be paid leave.\n' : '') + lopDays + ' day(s) will be Loss of Pay (LOP) — salary will be deducted for those days.\n\nDo you want to proceed?')) return;
-      isLOP = lopDays > 0;
-    }
-    // Check yearly balance
-    if (bal.casual < days && !isLOP) {
-      if (!confirm('You only have ' + bal.casual + ' casual leave(s) remaining this year.\n\n' + (days - bal.casual) + ' day(s) will be Loss of Pay (LOP) — salary will be deducted.\n\nDo you want to proceed?')) return;
+      if (!confirm('No casual leave balance available.\n\nThis leave will be fully Loss of Pay (LOP) — salary for ' + days + ' day(s) will be deducted.\n\nProceed?')) return;
+    } else if (days > clBalance) {
+      var lopPortion = days - clBalance;
+      if (!confirm('You have ' + clBalance + ' CL day(s) available.\n\n' + clBalance + ' day(s) → Paid leave\n' + lopPortion + ' day(s) → Loss of Pay (LOP)\n\nSalary will be deducted for the LOP days.\n\nProceed?')) return;
       isLOP = true;
     }
   }
 
   try {
-    var lopFlag = isLOP || (leaveType === 'casual' && days > paidAvailable);
-    var apiRes = await apiCall('POST', '/leaves', { type: leaveType, from: from, to: to, reason: reason, isLOP: lopFlag, isHalfDay: isHalfDay });
+    var apiRes = await apiCall('POST', '/leaves', {
+      type: leaveType, from: from, to: to, reason: reason,
+      isLOP: isLOP, isHalfDay: isHalfDay, halfDaySession: halfDaySession
+    });
+    // Server returns actual paidDays/lopDays in response
+    var serverPaidDays = apiRes && apiRes.paidDays !== undefined ? apiRes.paidDays : days;
+    var serverLopDays  = apiRes && apiRes.lopDays  !== undefined ? apiRes.lopDays  : 0;
+    var lopFlag = serverLopDays > 0;
+
     var app = {
       id: (apiRes && apiRes.id) || leaveNextId++,
-      empCode: currentUser.code,
-      empName: currentUser.name,
-      dept: currentUser.dept,
-      type: leaveType,
-      from: from, to: to, days: days, reason: reason,
-      status: 'pending',
-      isLOP: lopFlag,
+      empCode: currentUser.code, empName: currentUser.name, dept: currentUser.dept,
+      type: leaveType, from: from, to: to, days: days, reason: reason,
+      status: 'pending', isLOP: lopFlag,
+      paidDays: serverPaidDays, lopDays: serverLopDays,
+      isHalfDay: isHalfDay, halfDaySession: halfDaySession,
       date: new Date().toISOString()
     };
     leaveApplications.push(app);
     var leaveBtn = document.querySelector('.leave-form-overlay .btn-primary, .leave-form-overlay .nf-btn-primary');
     _submitSuccess(leaveBtn);
     if (lopFlag) {
-      showToast('Leave submitted — salary deduction will apply for LOP days');
+      showToast('Leave submitted — ' + serverPaidDays + ' day(s) paid + ' + serverLopDays + ' day(s) LOP');
     } else {
-      showToast('Leave application submitted (paid leave)');
+      showToast('Leave submitted — ' + days + ' day(s) paid leave');
     }
     setTimeout(function() { closeLeaveForm(); renderLeaveScreen(); }, 1500);
     refreshNotifications();
@@ -9909,6 +10346,30 @@ async function submitLeave() {
     _submitError(leaveBtnE, 'Failed');
     showToast(e.message || 'Error submitting leave');
   }
+}
+
+async function cancelLeave(id) {
+  if (!confirm('Cancel this leave application?')) return;
+  try {
+    const res = await apiCall('PATCH', '/leaves/' + id + '/cancel');
+    const app = leaveApplications.find(a => a.id === id);
+    if (app) {
+      const wasApproved = app.status === 'approved';
+      app.status = 'cancelled';
+      if (wasApproved) {
+        const bal = getLeaveBalance(app.empCode);
+        if (app.type !== 'permission') {
+          bal[app.type] = (bal[app.type] || 0) + (app.paidDays || app.days);
+        } else {
+          bal.permission = Math.min(2, (bal.permission || 0) + 0.5);
+        }
+      }
+    }
+    renderLeaveScreen();
+    await refreshLeaveBalance();
+    renderLeaveScreen();
+    showToast('Leave cancelled');
+  } catch (err) { showToast(err.message || 'Error cancelling leave'); }
 }
 
 async function approveLeave(id) {
@@ -9929,7 +10390,8 @@ async function approveLeave(id) {
     await apiCall('PATCH', '/leaves/' + id + '/approve');
     app.status = 'approved';
     const bal = getLeaveBalance(app.empCode);
-    bal[app.type] = Math.max(0, bal[app.type] - app.days);
+    const deduct = app.paidDays > 0 ? app.paidDays : app.days;
+    bal[app.type] = Math.max(0, bal[app.type] - deduct);
     renderLeaveScreen();
     showToast('Leave approved');
     refreshNotifications();
@@ -9973,14 +10435,18 @@ function renderLeaveScreen() {
     if (isMD) {
       balGrid.innerHTML = '';
     } else {
+      const _now = new Date();
+      const _clMax = _now.getMonth() >= 3 ? Math.min(_now.getMonth() - 2, 12) : 1;
       const leaveTypes = [
-        {key:'casual',label:'Casual Leave',total:12,color:'#E85D04',cls:'casual'},
+        {key:'casual',label:'Casual Leave',total:_clMax,color:'#E85D04',cls:'casual'},
         {key:'comp',label:'Comp Off',total:3,color:'#0891b2',cls:'comp'},
-        {key:'permission',label:'Permission (2hr)',total:1,color:'#d97706',cls:'permission'}
+        {key:'permission',label:'Permission (2hr)',total:4,color:'#d97706',cls:'permission'}
       ];
       balGrid.innerHTML = '<div class="section-title" style="margin-top:4px">Leave Balance</div><div class="leave-balance-grid fade-in">' +
         leaveTypes.map(lt => {
-          const rem = bal[lt.key] || 0;
+          // Permission balance is stored in days (0–2.0); display as count (0–4) by multiplying by 2
+          const rawRem = bal[lt.key] || 0;
+          const rem = lt.key === 'permission' ? Math.round(rawRem * 2) : rawRem;
           const used = lt.total - rem;
           const offset = circumference * (used / lt.total);
           return `<div class="leave-balance-card ${lt.cls}"><div class="donut-chart"><svg viewBox="0 0 65 65"><circle class="donut-bg" cx="32.5" cy="32.5" r="26"/><circle class="donut-fill" cx="32.5" cy="32.5" r="26" stroke="${lt.color}" stroke-dasharray="${circumference}" stroke-dashoffset="${offset}"/></svg><div class="donut-center">${rem}</div></div><div class="leave-type-name">${lt.label}</div><div class="leave-detail">${rem} of ${lt.total} remaining</div></div>`;
@@ -10006,13 +10472,17 @@ function renderLeaveScreen() {
       myTab.innerHTML = '<div style="padding:16px;text-align:center;font-size:.78rem;color:var(--gray-400)">No leave applications yet</div>';
     } else {
       myTab.innerHTML = myApps.map(a => {
-        const badgeCls = a.status === 'approved' ? 'badge-approved' : a.status === 'rejected' ? 'badge-rejected' : a.status === 'hr_accepted' ? '' : 'badge-pending';
-        const badgeStyle = a.status === 'hr_accepted' ? ' style="background:#DBEAFE;color:#1D4ED8"' : '';
-        const statusLabel = a.status === 'hr_accepted' ? 'HR Accepted' : a.status.charAt(0).toUpperCase()+a.status.slice(1);
+        const isCancelled = a.status === 'cancelled';
+        const badgeCls = a.status === 'approved' ? 'badge-approved' : a.status === 'rejected' ? 'badge-rejected' : isCancelled ? 'badge-rejected' : a.status === 'hr_accepted' ? '' : 'badge-pending';
+        const badgeStyle = a.status === 'hr_accepted' ? ' style="background:#DBEAFE;color:#1D4ED8"' : isCancelled ? ' style="background:#F3F4F6;color:#6B7280"' : '';
+        const statusLabel = a.status === 'hr_accepted' ? 'HR Accepted' : isCancelled ? 'Cancelled' : a.status.charAt(0).toUpperCase()+a.status.slice(1);
         const fromD = new Date(a.from).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
         const toD = new Date(a.to).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
+        var halfLabel = a.isHalfDay ? (' <span style="font-size:.6rem;background:#FEF9C3;color:#92400E;padding:1px 5px;border-radius:4px;font-weight:600">' + (a.halfDaySession === 'second' ? '2nd Half' : '1st Half') + '</span>') : '';
         var lopBadge = a.isLOP ? '<span style="display:inline-block;font-size:.55rem;padding:1px 5px;border-radius:4px;background:#FEE2E2;color:#DC2626;margin-left:4px;font-weight:600">LOP</span>' : '<span style="display:inline-block;font-size:.55rem;padding:1px 5px;border-radius:4px;background:#DCFCE7;color:#16A34A;margin-left:4px;font-weight:600">PAID</span>';
-        return `<div class="request-item"><div class="req-icon" style="background:#FFF7ED;color:#E85D04"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/></svg></div><div class="req-info"><h4>${a.type.charAt(0).toUpperCase()+a.type.slice(1)} Leave${lopBadge}</h4><p>${fromD} — ${toD} &middot; ${a.days} day(s)</p></div><div class="req-meta"><span class="badge-status ${badgeCls}"${badgeStyle}>${statusLabel}</span></div></div>`;
+        const canCancel = !isCancelled && a.status !== 'rejected';
+        const cancelBtn = canCancel ? `<button onclick="cancelLeave(${a.id})" style="margin-top:6px;padding:3px 10px;font-size:.65rem;background:#FEE2E2;color:#DC2626;border:none;border-radius:6px;cursor:pointer;font-weight:600">Cancel</button>` : '';
+        return `<div class="request-item" style="flex-wrap:wrap"><div class="req-icon" style="background:#FFF7ED;color:#E85D04"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/></svg></div><div class="req-info"><h4>${a.type.charAt(0).toUpperCase()+a.type.slice(1)} Leave${halfLabel}${lopBadge}</h4><p>${fromD} — ${toD} &middot; ${a.days} day(s)</p>${cancelBtn}</div><div class="req-meta"><span class="badge-status ${badgeCls}"${badgeStyle}>${statusLabel}</span></div></div>`;
       }).join('');
     }
   }
@@ -10854,10 +11324,53 @@ function renderAttendanceLogOverlay() {
 // =====================================================
 // ATTENDANCE LOG LIST (below calendar)
 // =====================================================
-function renderAttendanceLogList() {
+var _attLogMonth = null; // null = current month
+
+function changeAttLogMonth(dir) {
+  if (!_attLogMonth) {
+    var n = new Date();
+    _attLogMonth = { year: n.getFullYear(), month: n.getMonth() };
+  }
+  _attLogMonth.month += dir;
+  if (_attLogMonth.month < 0) { _attLogMonth.month = 11; _attLogMonth.year--; }
+  if (_attLogMonth.month > 11) { _attLogMonth.month = 0; _attLogMonth.year++; }
+  renderAttendanceLogList();
+}
+
+async function renderAttendanceLogList() {
   var c = document.getElementById('attendanceLogList');
   if (!c || !currentUser) return;
-  var myLogs = (typeof attendanceLogs !== 'undefined' ? attendanceLogs : []).filter(function(l) { return l.empCode === currentUser.code; });
+
+  var now = new Date();
+  if (!_attLogMonth) _attLogMonth = { year: now.getFullYear(), month: now.getMonth() };
+  var isCurrentMonth = (_attLogMonth.year === now.getFullYear() && _attLogMonth.month === now.getMonth());
+
+  // Update month label in header
+  var monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var labelEl = document.getElementById('attLogMonthLabel');
+  if (labelEl) labelEl.textContent = monthNames[_attLogMonth.month] + ' ' + _attLogMonth.year;
+
+  // Disable Next button if we're already at current month
+  var btns = document.querySelectorAll('[onclick="changeAttLogMonth(1)"]');
+  btns.forEach(function(b) { b.disabled = isCurrentMonth; b.style.opacity = isCurrentMonth ? '0.4' : '1'; });
+
+  var monthStr = _attLogMonth.year + '-' + String(_attLogMonth.month + 1).padStart(2, '0');
+  var myLogs;
+  if (isCurrentMonth && typeof attendanceLogs !== 'undefined') {
+    myLogs = attendanceLogs.filter(function(l) { return l.empCode === currentUser.code; });
+  } else {
+    try {
+      c.innerHTML = '<div style="padding:12px;text-align:center;color:var(--gray-400);font-size:.78rem">Loading...</div>';
+      var rawLogs = await apiCall('GET', '/attendance?month=' + monthStr);
+      myLogs = (Array.isArray(rawLogs) ? rawLogs : [])
+        .filter(function(l) { return (l.emp_code || l.empCode) === currentUser.code; })
+        .map(function(l) { return { empCode: l.emp_code || l.empCode, logDate: l.log_date || l.logDate, checkIn: l.check_in || l.checkIn, checkOut: l.check_out || l.checkOut, location: l.location_name || l.location }; });
+    } catch(e) {
+      c.innerHTML = '<div style="padding:12px;text-align:center;color:var(--danger);font-size:.78rem">Failed to load logs</div>';
+      return;
+    }
+  }
+  if (myLogs.length === 0) {
   if (myLogs.length === 0) {
     c.innerHTML = '<div style="padding:16px;text-align:center;color:var(--gray-400);font-size:.8rem">No attendance records yet. Use GPS Check-In to start logging.</div>';
     return;
@@ -11113,7 +11626,7 @@ function renderHomeQuickStats() {
 
   // Leave balance
   var compLeft = bal.comp !== undefined ? bal.comp : 3;
-  var permLeft = bal.permission !== undefined ? bal.permission : 1;
+  var permLeft = Math.round((bal.permission !== undefined ? parseFloat(bal.permission) : 2) * 2);
 
   var html = '<div class="section-title" style="margin-top:4px">Quick Stats</div>';
   html += '<div class="home-quick-stats">';
@@ -13826,6 +14339,9 @@ function editProject(id) {
 // =====================================================
 // ACCOUNTS DEPARTMENT — PAYMENTS & SETTLEMENTS
 // =====================================================
+var _accAdvFilter = { from: '', to: '', status: 'all' };
+var _accExpFilter = { from: '', to: '', status: 'all' };
+
 function renderAccountsPayments() {
   var c = document.getElementById('accPaymentsContent');
   if (!c) return;
@@ -13834,15 +14350,25 @@ function renderAccountsPayments() {
   var section = 'approved-advances';
   if (_activeNavId === 'emp-acc-approved-exp' || _activeNavId === 'acc-approved-exp') section = 'approved-expenses';
   if (_activeNavId === 'emp-acc-settlement' || _activeNavId === 'acc-settlement') section = 'settlement';
+  if (_activeNavId === 'emp-acc-adv-datewise' || _activeNavId === 'acc-adv-datewise') section = 'adv-datewise';
+  if (_activeNavId === 'emp-acc-exp-datewise' || _activeNavId === 'acc-exp-datewise') section = 'exp-datewise';
+  if (_activeNavId === 'emp-acc-consolidated' || _activeNavId === 'acc-consolidated') section = 'consolidated';
 
   if (titleEl) {
-    var titles = {'approved-advances':'Approved Advances','approved-expenses':'Approved Expenses','settlement':'Settlement Tracker'};
+    var titles = {
+      'approved-advances':'Approved Advances','approved-expenses':'Approved Expenses',
+      'settlement':'Settlement Tracker','adv-datewise':'Date-wise Advances',
+      'exp-datewise':'Date-wise Expenses','consolidated':'Consolidated Report'
+    };
     titleEl.textContent = titles[section] || 'Payments';
   }
 
   if (section === 'approved-advances') renderAccApprovedAdvances(c);
   else if (section === 'approved-expenses') renderAccApprovedExpenses(c);
   else if (section === 'settlement') renderAccSettlementTracker(c);
+  else if (section === 'adv-datewise') renderAccDatewiseAdvances(c);
+  else if (section === 'exp-datewise') renderAccDatewiseExpenses(c);
+  else if (section === 'consolidated') renderAccConsolidatedReport(c);
 }
 
 function renderAccApprovedAdvances(c) {
@@ -14069,6 +14595,273 @@ function downloadSettlementCSV() {
     rows.push(['"' + e.name + '"', code, e.advApproved, e.advPaid, e.expApproved, e.expPaid, Math.abs(balance), status].join(','));
   });
   downloadCSV(rows.join('\n'), 'Settlement_Tracker_' + new Date().toISOString().slice(0, 10) + '.csv');
+}
+
+// =====================================================
+// ACCOUNTS REPORTS: DATE-WISE + CONSOLIDATED
+// =====================================================
+
+function _accDateFilterBar(filterObj, applyFn, sectionId) {
+  var dlSvg = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+  return '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px;background:var(--gray-50);padding:10px;border-radius:var(--radius-sm)">' +
+    '<span style="font-size:.7rem;font-weight:600;color:var(--gray-500)">Date Range:</span>' +
+    '<input type="date" id="' + sectionId + 'From" value="' + escapeAttr(filterObj.from) + '" style="padding:5px 8px;border:1px solid var(--gray-200);border-radius:4px;font-size:.75rem">' +
+    '<span style="font-size:.7rem;color:var(--gray-400)">to</span>' +
+    '<input type="date" id="' + sectionId + 'To" value="' + escapeAttr(filterObj.to) + '" style="padding:5px 8px;border:1px solid var(--gray-200);border-radius:4px;font-size:.75rem">' +
+    '<button onclick="' + applyFn + '" style="padding:5px 12px;font-size:.7rem;font-weight:600;background:var(--primary);color:#fff;border:none;border-radius:4px;cursor:pointer">Apply</button>' +
+    '<button onclick="' + sectionId + 'ClearFilter()" style="padding:5px 10px;font-size:.7rem;background:white;border:1px solid var(--gray-200);border-radius:4px;cursor:pointer">Clear</button>' +
+    dlSvg.replace(dlSvg, '') +
+    '</div>';
+}
+
+function _applyAccAdvFilter() {
+  _accAdvFilter.from = (document.getElementById('accAdvDateFrom') || {}).value || '';
+  _accAdvFilter.to   = (document.getElementById('accAdvDateTo')   || {}).value || '';
+  renderAccDatewiseAdvances(document.getElementById('accPaymentsContent'));
+}
+function accAdvDateFromClearFilter() {
+  _accAdvFilter.from = ''; _accAdvFilter.to = '';
+  renderAccDatewiseAdvances(document.getElementById('accPaymentsContent'));
+}
+
+function _applyAccExpFilter() {
+  _accExpFilter.from = (document.getElementById('accExpDateFrom') || {}).value || '';
+  _accExpFilter.to   = (document.getElementById('accExpDateTo')   || {}).value || '';
+  renderAccDatewiseExpenses(document.getElementById('accPaymentsContent'));
+}
+function accExpDateFromClearFilter() {
+  _accExpFilter.from = ''; _accExpFilter.to = '';
+  renderAccDatewiseExpenses(document.getElementById('accPaymentsContent'));
+}
+
+function _accInDateRange(dateStr, from, to) {
+  if (!dateStr) return true;
+  var d = dateStr.substring(0, 10);
+  if (from && d < from) return false;
+  if (to   && d > to)   return false;
+  return true;
+}
+
+// Date-wise Advances
+function renderAccDatewiseAdvances(c) {
+  var from = _accAdvFilter.from, to = _accAdvFilter.to;
+  var all = (typeof advanceRequests !== 'undefined' ? advanceRequests : [])
+    .filter(function(r) { var s = (r.status||'').toLowerCase(); return (s==='approved'||s==='paid') && _accInDateRange(r.appliedDate, from, to); })
+    .sort(function(a, b) { return (a.appliedDate||'') < (b.appliedDate||'') ? -1 : 1; });
+  var total = all.reduce(function(s, r) { return s + (r.amount||0); }, 0);
+  var html = '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px;background:var(--gray-50);padding:10px;border-radius:var(--radius-sm)">' +
+    '<span style="font-size:.7rem;font-weight:600;color:var(--gray-500)">Date Range:</span>' +
+    '<input type="date" id="accAdvDateFrom" value="' + escapeAttr(from) + '" style="padding:5px 8px;border:1px solid var(--gray-200);border-radius:4px;font-size:.75rem">' +
+    '<span style="font-size:.7rem;color:var(--gray-400)">to</span>' +
+    '<input type="date" id="accAdvDateTo" value="' + escapeAttr(to) + '" style="padding:5px 8px;border:1px solid var(--gray-200);border-radius:4px;font-size:.75rem">' +
+    '<button onclick="_applyAccAdvFilter()" style="padding:5px 12px;font-size:.7rem;font-weight:600;background:var(--primary);color:#fff;border:none;border-radius:4px;cursor:pointer">Apply</button>' +
+    '<button onclick="_accAdvFilter.from=\'\';_accAdvFilter.to=\'\';renderAccDatewiseAdvances(document.getElementById(\'accPaymentsContent\'))" style="padding:5px 10px;font-size:.7rem;background:white;border:1px solid var(--gray-200);border-radius:4px;cursor:pointer">Clear</button>' +
+    '<button onclick="downloadDatewiseAdvancesCSV()" style="padding:5px 10px;font-size:.7rem;font-weight:600;background:#10B981;color:#fff;border:none;border-radius:4px;cursor:pointer;margin-left:auto">⬇ CSV</button>' +
+    '</div>';
+  if (all.length === 0) {
+    html += '<div class="card" style="padding:16px;text-align:center;color:var(--gray-400);font-size:.78rem">No advances in this date range</div>';
+  } else {
+    html += '<div class="card" style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.72rem">';
+    html += '<thead><tr style="background:var(--gray-50)"><th style="padding:7px 8px;text-align:left">Date</th><th style="padding:7px 8px;text-align:left">Employee</th><th style="padding:7px 8px;text-align:left">Type</th><th style="padding:7px 8px;text-align:left">Reason</th><th style="padding:7px 8px;text-align:right">Amount</th><th style="padding:7px 8px;text-align:center">Status</th><th style="padding:7px 8px;text-align:left">Approved By</th></tr></thead><tbody>';
+    var ADV_TYPE = {site:'Site',salary:'Salary',travel:'Travel',site_expense:'Site Expense',travel_expense:'Travel Expense'};
+    all.forEach(function(r) {
+      var s = (r.status||'').toLowerCase();
+      var badge = s === 'paid' ? '<span style="background:#dcfce7;color:#16a34a;padding:1px 7px;border-radius:4px;font-size:.65rem;font-weight:700">PAID</span>' : '<span style="background:#fef9c3;color:#b45309;padding:1px 7px;border-radius:4px;font-size:.65rem;font-weight:700">APPROVED</span>';
+      html += '<tr style="border-bottom:1px solid var(--gray-100)"><td style="padding:7px 8px">' + escapeHTML(r.appliedDate||'') + '</td><td style="padding:7px 8px;font-weight:600">' + escapeHTML(r.empName||r.empCode) + '<br><span style="font-size:.65rem;color:var(--gray-400)">' + escapeHTML(r.empCode) + '</span></td><td style="padding:7px 8px">' + escapeHTML(ADV_TYPE[r.type]||r.type||'') + '</td><td style="padding:7px 8px;font-size:.68rem;color:var(--gray-500);max-width:120px">' + escapeHTML((r.reason||r.details||'').substring(0,50)) + '</td><td style="padding:7px 8px;text-align:right;font-weight:700;color:var(--primary)">Rs.' + (r.amount||0).toLocaleString('en-IN') + '</td><td style="padding:7px 8px;text-align:center">' + badge + '</td><td style="padding:7px 8px;font-size:.68rem;color:var(--gray-500)">' + escapeHTML(r.reviewedBy||'—') + '</td></tr>';
+    });
+    html += '</tbody><tfoot><tr style="background:var(--gray-50);font-weight:700"><td colspan="4" style="padding:8px">Total (' + all.length + ' records)</td><td style="padding:8px;text-align:right;color:var(--primary)">Rs.' + total.toLocaleString('en-IN') + '</td><td colspan="2"></td></tr></tfoot></table></div>';
+  }
+  c.innerHTML = html;
+}
+
+function downloadDatewiseAdvancesCSV() {
+  var from = _accAdvFilter.from, to = _accAdvFilter.to;
+  var all = (typeof advanceRequests !== 'undefined' ? advanceRequests : [])
+    .filter(function(r) { var s = (r.status||'').toLowerCase(); return (s==='approved'||s==='paid') && _accInDateRange(r.appliedDate, from, to); })
+    .sort(function(a, b) { return (a.appliedDate||'') < (b.appliedDate||'') ? -1 : 1; });
+  var rows = ['Date,Employee,Code,Dept,Type,Reason,Amount,Status,Approved By'];
+  var ADV_TYPE = {site:'Site',salary:'Salary',travel:'Travel',site_expense:'Site Expense',travel_expense:'Travel Expense'};
+  all.forEach(function(r) {
+    rows.push([r.appliedDate||'', '"'+(r.empName||r.empCode)+'"', r.empCode, r.dept||'', ADV_TYPE[r.type]||r.type||'', '"'+(r.reason||r.details||'')+'"', r.amount||0, r.status||'', r.reviewedBy||''].join(','));
+  });
+  rows.push('');
+  rows.push('"Total Rs.'+(all.reduce(function(s,r){return s+(r.amount||0);},0)).toLocaleString('en-IN')+'"');
+  _triggerCSVDownload(rows.join('\n'), 'advance_datewise_' + (from||'all') + '_to_' + (to||'today') + '.csv');
+  showToast('Downloaded advance report');
+}
+
+// Date-wise Expenses
+function renderAccDatewiseExpenses(c) {
+  var from = _accExpFilter.from, to = _accExpFilter.to;
+  var all = (typeof expenseReimbursements !== 'undefined' ? expenseReimbursements : [])
+    .filter(function(e) { return (e.status==='Approved'||e.status==='Paid') && _accInDateRange(e.date||e.submittedOn, from, to); })
+    .sort(function(a, b) { return (a.date||a.submittedOn||'') < (b.date||b.submittedOn||'') ? -1 : 1; });
+  var total = all.reduce(function(s, e) { return s + (e.amount||0); }, 0);
+  var html = '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px;background:var(--gray-50);padding:10px;border-radius:var(--radius-sm)">' +
+    '<span style="font-size:.7rem;font-weight:600;color:var(--gray-500)">Date Range:</span>' +
+    '<input type="date" id="accExpDateFrom" value="' + escapeAttr(from) + '" style="padding:5px 8px;border:1px solid var(--gray-200);border-radius:4px;font-size:.75rem">' +
+    '<span style="font-size:.7rem;color:var(--gray-400)">to</span>' +
+    '<input type="date" id="accExpDateTo" value="' + escapeAttr(to) + '" style="padding:5px 8px;border:1px solid var(--gray-200);border-radius:4px;font-size:.75rem">' +
+    '<button onclick="_applyAccExpFilter()" style="padding:5px 12px;font-size:.7rem;font-weight:600;background:var(--primary);color:#fff;border:none;border-radius:4px;cursor:pointer">Apply</button>' +
+    '<button onclick="_accExpFilter.from=\'\';_accExpFilter.to=\'\';renderAccDatewiseExpenses(document.getElementById(\'accPaymentsContent\'))" style="padding:5px 10px;font-size:.7rem;background:white;border:1px solid var(--gray-200);border-radius:4px;cursor:pointer">Clear</button>' +
+    '<button onclick="downloadDatewiseExpensesCSV()" style="padding:5px 10px;font-size:.7rem;font-weight:600;background:#10B981;color:#fff;border:none;border-radius:4px;cursor:pointer;margin-left:auto">⬇ CSV</button>' +
+    '</div>';
+  if (all.length === 0) {
+    html += '<div class="card" style="padding:16px;text-align:center;color:var(--gray-400);font-size:.78rem">No expenses in this date range</div>';
+  } else {
+    html += '<div class="card" style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.72rem">';
+    html += '<thead><tr style="background:var(--gray-50)"><th style="padding:7px 8px;text-align:left">Date</th><th style="padding:7px 8px;text-align:left">Employee</th><th style="padding:7px 8px;text-align:left">Category</th><th style="padding:7px 8px;text-align:left">Description</th><th style="padding:7px 8px;text-align:right">Amount</th><th style="padding:7px 8px;text-align:center">Status</th><th style="padding:7px 8px;text-align:left">Approved By</th></tr></thead><tbody>';
+    all.forEach(function(e) {
+      var badge = e.status === 'Paid' ? '<span style="background:#dcfce7;color:#16a34a;padding:1px 7px;border-radius:4px;font-size:.65rem;font-weight:700">PAID</span>' : '<span style="background:#fef9c3;color:#b45309;padding:1px 7px;border-radius:4px;font-size:.65rem;font-weight:700">APPROVED</span>';
+      var dateLabel = e.date || e.submittedOn || '';
+      html += '<tr style="border-bottom:1px solid var(--gray-100)"><td style="padding:7px 8px">' + escapeHTML(dateLabel) + '</td><td style="padding:7px 8px;font-weight:600">' + escapeHTML(e.empName||e.empCode) + '<br><span style="font-size:.65rem;color:var(--gray-400)">' + escapeHTML(e.empCode) + '</span></td><td style="padding:7px 8px">' + escapeHTML(e.category||e.expenseType||'') + '</td><td style="padding:7px 8px;font-size:.68rem;color:var(--gray-500);max-width:120px">' + escapeHTML((e.description||'').substring(0,50)) + '</td><td style="padding:7px 8px;text-align:right;font-weight:700;color:var(--primary)">Rs.' + (e.amount||0).toLocaleString('en-IN') + '</td><td style="padding:7px 8px;text-align:center">' + badge + '</td><td style="padding:7px 8px;font-size:.68rem;color:var(--gray-500)">' + escapeHTML(e.reviewedBy||'—') + '</td></tr>';
+    });
+    html += '</tbody><tfoot><tr style="background:var(--gray-50);font-weight:700"><td colspan="4" style="padding:8px">Total (' + all.length + ' records)</td><td style="padding:8px;text-align:right;color:var(--primary)">Rs.' + total.toLocaleString('en-IN') + '</td><td colspan="2"></td></tr></tfoot></table></div>';
+  }
+  c.innerHTML = html;
+}
+
+function downloadDatewiseExpensesCSV() {
+  var from = _accExpFilter.from, to = _accExpFilter.to;
+  var all = (typeof expenseReimbursements !== 'undefined' ? expenseReimbursements : [])
+    .filter(function(e) { return (e.status==='Approved'||e.status==='Paid') && _accInDateRange(e.date||e.submittedOn, from, to); })
+    .sort(function(a, b) { return (a.date||a.submittedOn||'') < (b.date||b.submittedOn||'') ? -1 : 1; });
+  var rows = ['Date,Employee,Code,Dept,Category,Description,Project,Amount,Status,Approved By'];
+  all.forEach(function(e) {
+    rows.push([(e.date||e.submittedOn||''), '"'+(e.empName||e.empCode)+'"', e.empCode, e.dept||'', e.category||e.expenseType||'', '"'+(e.description||'')+'"', e.project||'', e.amount||0, e.status||'', e.reviewedBy||''].join(','));
+  });
+  rows.push('');
+  rows.push('"Total Rs.'+(all.reduce(function(s,e){return s+(e.amount||0);},0)).toLocaleString('en-IN')+'"');
+  _triggerCSVDownload(rows.join('\n'), 'expense_datewise_' + (from||'all') + '_to_' + (to||'today') + '.csv');
+  showToast('Downloaded expense report');
+}
+
+// Consolidated Payments Report
+var _accConsFilter = { from: '', to: '' };
+
+function renderAccConsolidatedReport(c) {
+  var from = _accConsFilter.from, to = _accConsFilter.to;
+  var advances = (typeof advanceRequests !== 'undefined' ? advanceRequests : [])
+    .filter(function(r) { var s=(r.status||'').toLowerCase(); return (s==='approved'||s==='paid') && _accInDateRange(r.appliedDate, from, to); });
+  var expenses = (typeof expenseReimbursements !== 'undefined' ? expenseReimbursements : [])
+    .filter(function(e) { return (e.status==='Approved'||e.status==='Paid') && _accInDateRange(e.date||e.submittedOn, from, to); });
+  var advTotal = advances.reduce(function(s, r) { return s + (r.amount||0); }, 0);
+  var expTotal = expenses.reduce(function(s, e) { return s + (e.amount||0); }, 0);
+  var grandTotal = advTotal + expTotal;
+  var html = '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px;background:var(--gray-50);padding:10px;border-radius:var(--radius-sm)">' +
+    '<span style="font-size:.7rem;font-weight:600;color:var(--gray-500)">Date Range:</span>' +
+    '<input type="date" id="accConsDateFrom" value="' + escapeAttr(from) + '" style="padding:5px 8px;border:1px solid var(--gray-200);border-radius:4px;font-size:.75rem">' +
+    '<span style="font-size:.7rem;color:var(--gray-400)">to</span>' +
+    '<input type="date" id="accConsDateTo" value="' + escapeAttr(to) + '" style="padding:5px 8px;border:1px solid var(--gray-200);border-radius:4px;font-size:.75rem">' +
+    '<button onclick="_accConsFilter.from=(document.getElementById(\'accConsDateFrom\')||{}).value||\'\';_accConsFilter.to=(document.getElementById(\'accConsDateTo\')||{}).value||\'\';renderAccConsolidatedReport(document.getElementById(\'accPaymentsContent\'))" style="padding:5px 12px;font-size:.7rem;font-weight:600;background:var(--primary);color:#fff;border:none;border-radius:4px;cursor:pointer">Apply</button>' +
+    '<button onclick="_accConsFilter.from=\'\';_accConsFilter.to=\'\';renderAccConsolidatedReport(document.getElementById(\'accPaymentsContent\'))" style="padding:5px 10px;font-size:.7rem;background:white;border:1px solid var(--gray-200);border-radius:4px;cursor:pointer">Clear</button>' +
+    '<button onclick="downloadConsolidatedCSV()" style="padding:5px 10px;font-size:.7rem;font-weight:600;background:#10B981;color:#fff;border:none;border-radius:4px;cursor:pointer">⬇ CSV</button>' +
+    '<button onclick="downloadConsolidatedPDF()" style="padding:5px 10px;font-size:.7rem;font-weight:600;background:var(--primary);color:#fff;border:none;border-radius:4px;cursor:pointer">⬇ PDF</button>' +
+    '</div>';
+  // Summary cards
+  html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">';
+  html += '<div class="card" style="padding:10px;text-align:center"><div style="font-size:.68rem;color:var(--gray-500);margin-bottom:2px">Total Advances</div><div style="font-size:.92rem;font-weight:700;color:#d97706">Rs.' + advTotal.toLocaleString('en-IN') + '</div><div style="font-size:.62rem;color:var(--gray-400)">' + advances.length + ' records</div></div>';
+  html += '<div class="card" style="padding:10px;text-align:center"><div style="font-size:.68rem;color:var(--gray-500);margin-bottom:2px">Total Expenses</div><div style="font-size:.92rem;font-weight:700;color:#7c3aed">Rs.' + expTotal.toLocaleString('en-IN') + '</div><div style="font-size:.62rem;color:var(--gray-400)">' + expenses.length + ' records</div></div>';
+  html += '<div class="card" style="padding:10px;text-align:center;border:2px solid var(--primary)"><div style="font-size:.68rem;color:var(--gray-500);margin-bottom:2px">Grand Total</div><div style="font-size:.92rem;font-weight:700;color:var(--primary)">Rs.' + grandTotal.toLocaleString('en-IN') + '</div><div style="font-size:.62rem;color:var(--gray-400)">' + (advances.length + expenses.length) + ' records</div></div>';
+  html += '</div>';
+  // Combined table
+  var combined = [];
+  advances.forEach(function(r) { combined.push({ date: r.appliedDate||'', emp: r.empName||r.empCode, code: r.empCode, type: 'Advance', category: r.type||'', desc: r.reason||r.details||'', amount: r.amount||0, status: r.status, by: r.reviewedBy||'' }); });
+  expenses.forEach(function(e) { combined.push({ date: e.date||e.submittedOn||'', emp: e.empName||e.empCode, code: e.empCode, type: 'Expense', category: e.category||e.expenseType||'', desc: e.description||'', amount: e.amount||0, status: e.status, by: e.reviewedBy||'' }); });
+  combined.sort(function(a, b) { return a.date < b.date ? -1 : 1; });
+  html += '<div class="card" style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.7rem">';
+  html += '<thead><tr style="background:var(--gray-50)"><th style="padding:7px 8px;text-align:left">Date</th><th style="padding:7px 8px;text-align:left">Employee</th><th style="padding:7px 8px;text-align:center">Type</th><th style="padding:7px 8px;text-align:left">Category</th><th style="padding:7px 8px;text-align:left">Description</th><th style="padding:7px 8px;text-align:right">Amount</th><th style="padding:7px 8px;text-align:center">Status</th></tr></thead><tbody>';
+  combined.forEach(function(row) {
+    var typeBadge = row.type === 'Advance' ? '<span style="background:#FEF9C3;color:#B45309;padding:1px 6px;border-radius:4px;font-size:.6rem;font-weight:600">ADV</span>' : '<span style="background:#EDE9FE;color:#6D28D9;padding:1px 6px;border-radius:4px;font-size:.6rem;font-weight:600">EXP</span>';
+    var s = (row.status||'').toLowerCase();
+    var stBadge = (s==='paid'||s==='reimbursed') ? '<span style="background:#dcfce7;color:#16a34a;padding:1px 6px;border-radius:4px;font-size:.6rem;font-weight:700">PAID</span>' : '<span style="background:#fef9c3;color:#b45309;padding:1px 6px;border-radius:4px;font-size:.6rem;font-weight:700">APPROVED</span>';
+    html += '<tr style="border-bottom:1px solid var(--gray-100)"><td style="padding:7px 8px">' + escapeHTML(row.date) + '</td><td style="padding:7px 8px"><span style="font-weight:600">' + escapeHTML(row.emp) + '</span><br><span style="font-size:.62rem;color:var(--gray-400)">' + escapeHTML(row.code) + '</span></td><td style="padding:7px 8px;text-align:center">' + typeBadge + '</td><td style="padding:7px 8px">' + escapeHTML(row.category) + '</td><td style="padding:7px 8px;font-size:.65rem;color:var(--gray-500);max-width:100px">' + escapeHTML(row.desc.substring(0,40)) + '</td><td style="padding:7px 8px;text-align:right;font-weight:700;color:var(--primary)">Rs.' + row.amount.toLocaleString('en-IN') + '</td><td style="padding:7px 8px;text-align:center">' + stBadge + '</td></tr>';
+  });
+  html += '</tbody><tfoot><tr style="background:var(--gray-50);font-weight:700"><td colspan="5" style="padding:8px">Grand Total (' + combined.length + ' records)</td><td style="padding:8px;text-align:right;color:var(--primary)">Rs.' + grandTotal.toLocaleString('en-IN') + '</td><td></td></tr></tfoot></table></div>';
+  c.innerHTML = html;
+}
+
+function downloadConsolidatedCSV() {
+  var from = _accConsFilter.from, to = _accConsFilter.to;
+  var advances = (typeof advanceRequests !== 'undefined' ? advanceRequests : [])
+    .filter(function(r) { var s=(r.status||'').toLowerCase(); return (s==='approved'||s==='paid') && _accInDateRange(r.appliedDate, from, to); });
+  var expenses = (typeof expenseReimbursements !== 'undefined' ? expenseReimbursements : [])
+    .filter(function(e) { return (e.status==='Approved'||e.status==='Paid') && _accInDateRange(e.date||e.submittedOn, from, to); });
+  var combined = [];
+  advances.forEach(function(r) { combined.push({ date: r.appliedDate||'', emp: r.empName||r.empCode, code: r.empCode, dept: r.dept||'', type: 'Advance', category: r.type||'', desc: r.reason||r.details||'', amount: r.amount||0, status: r.status, by: r.reviewedBy||'' }); });
+  expenses.forEach(function(e) { combined.push({ date: e.date||e.submittedOn||'', emp: e.empName||e.empCode, code: e.empCode, dept: e.dept||'', type: 'Expense', category: e.category||e.expenseType||'', desc: e.description||'', amount: e.amount||0, status: e.status, by: e.reviewedBy||'' }); });
+  combined.sort(function(a, b) { return a.date < b.date ? -1 : 1; });
+  var rows = ['Date,Employee,Code,Dept,Type,Category,Description,Amount,Status,Approved By'];
+  combined.forEach(function(row) {
+    rows.push([row.date, '"'+row.emp+'"', row.code, row.dept, row.type, row.category, '"'+row.desc+'"', row.amount, row.status, row.by].join(','));
+  });
+  rows.push('');
+  rows.push('"Total Advances: Rs.'+(advances.reduce(function(s,r){return s+(r.amount||0);},0)).toLocaleString('en-IN')+'",,,,,,,');
+  rows.push('"Total Expenses: Rs.'+(expenses.reduce(function(s,e){return s+(e.amount||0);},0)).toLocaleString('en-IN')+'",,,,,,,');
+  rows.push('"Grand Total: Rs.'+(combined.reduce(function(s,r){return s+(r.amount||0);},0)).toLocaleString('en-IN')+'",,,,,,,');
+  _triggerCSVDownload(rows.join('\n'), 'consolidated_payments_' + (from||'all') + '_to_' + (to||'today') + '.csv');
+  showToast('Downloaded consolidated report');
+}
+
+async function downloadConsolidatedPDF() {
+  await loadJsPdf();
+  var { jsPDF } = window.jspdf;
+  var from = _accConsFilter.from, to = _accConsFilter.to;
+  var advances = (typeof advanceRequests !== 'undefined' ? advanceRequests : [])
+    .filter(function(r) { var s=(r.status||'').toLowerCase(); return (s==='approved'||s==='paid') && _accInDateRange(r.appliedDate, from, to); });
+  var expenses = (typeof expenseReimbursements !== 'undefined' ? expenseReimbursements : [])
+    .filter(function(e) { return (e.status==='Approved'||e.status==='Paid') && _accInDateRange(e.date||e.submittedOn, from, to); });
+  var combined = [];
+  advances.forEach(function(r) { combined.push({ date: r.appliedDate||'', emp: (r.empName||r.empCode).substring(0,20), code: r.empCode, type: 'ADV', category: (r.type||'').substring(0,12), amount: r.amount||0, status: r.status }); });
+  expenses.forEach(function(e) { combined.push({ date: e.date||e.submittedOn||'', emp: (e.empName||e.empCode).substring(0,20), code: e.empCode, type: 'EXP', category: (e.category||e.expenseType||'').substring(0,12), amount: e.amount||0, status: e.status }); });
+  combined.sort(function(a, b) { return a.date < b.date ? -1 : 1; });
+  var advTotal = advances.reduce(function(s,r){return s+(r.amount||0);},0);
+  var expTotal = expenses.reduce(function(s,e){return s+(e.amount||0);},0);
+  var doc = new jsPDF('p', 'mm', 'a4');
+  var pw=210, lm=14, rm=196, cw=rm-lm;
+  var primary=[76,81,191], dark=[30,30,60], mid=[100,100,120], light=[245,245,252];
+  var y=14;
+  try { doc.addImage('data:image/png;base64,'+COMPANY_LOGO_B64,'PNG',lm,y,28,10); } catch(e) {
+    doc.setFillColor(...primary); doc.roundedRect(lm,y,28,10,2,2,'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(255,255,255); doc.text('SS',lm+2,y+6.5);
+  }
+  doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(...primary);
+  doc.text('SWETHA STRUCTURES PRIVATE LIMITED', lm+31, y+4.5);
+  doc.setFont('helvetica','normal'); doc.setFontSize(6.5); doc.setTextColor(...mid);
+  doc.text('No.44, Alagu Nagar, Saravanampatti, Coimbatore, TN 641035 | GSTIN: 33AAWCS9286M1Z6', lm+31, y+9.5);
+  y+=16; doc.setDrawColor(...primary); doc.setLineWidth(0.5); doc.line(lm,y,rm,y);
+  y+=7; doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...dark);
+  var periodLabel = (from && to) ? (from + ' to ' + to) : (from ? 'From '+from : (to ? 'Up to '+to : 'All Records'));
+  doc.text('CONSOLIDATED PAYMENTS REPORT — ' + periodLabel.toUpperCase(), pw/2, y, {align:'center'});
+  // Summary
+  y+=8; doc.setFillColor(...light); doc.roundedRect(lm,y,cw,14,2,2,'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...primary);
+  doc.text('Advances: Rs.'+advTotal.toLocaleString('en-IN')+' ('+advances.length+' records)', lm+4, y+6);
+  doc.text('Expenses: Rs.'+expTotal.toLocaleString('en-IN')+' ('+expenses.length+' records)', lm+70, y+6);
+  doc.text('Grand Total: Rs.'+(advTotal+expTotal).toLocaleString('en-IN'), lm+140, y+6);
+  y+=18;
+  // Table
+  var colW=[20,36,8,16,16,22,14]; var colX=[lm]; colW.forEach(function(w,i){if(i>0)colX.push(colX[i-1]+colW[i-1]);});
+  var hdrs=['Date','Employee','T','Category','Amount (Rs.)','Status','By'];
+  doc.setFillColor(...primary); doc.rect(lm,y,cw,6,'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(255,255,255);
+  hdrs.forEach(function(h,i){doc.text(h,colX[i]+1,y+4.5);});
+  y+=6;
+  var rowIdx=0;
+  combined.forEach(function(row) {
+    if(y>272){doc.addPage();y=14;}
+    if(rowIdx%2===0){doc.setFillColor(248,248,255);doc.rect(lm,y,cw,5.5,'F');}
+    doc.setFont('helvetica','normal'); doc.setFontSize(6); doc.setTextColor(...dark);
+    var s=(row.status||'').toLowerCase();
+    var stLabel=s==='paid'?'PAID':s==='reimbursed'?'PAID':'APPROVED';
+    [row.date,row.emp,row.type,row.category,'Rs.'+row.amount.toLocaleString('en-IN'),stLabel,row.code].forEach(function(v,i){doc.text(String(v),colX[i]+1,y+4);});
+    y+=5.5; rowIdx++;
+  });
+  y+=6; doc.setDrawColor(...primary); doc.line(lm,y,rm,y);
+  y+=5; doc.setFont('helvetica','normal'); doc.setFontSize(6); doc.setTextColor(...mid);
+  doc.text('Generated: '+new Date().toLocaleDateString('en-IN')+' | Swetha HRMS', rm, y, {align:'right'});
+  savePdfSafe(doc, 'consolidated_payments_'+new Date().toISOString().slice(0,10)+'.pdf');
+  showToast('PDF downloaded');
 }
 
 // Download a single employee's settlement as a branded PDF
@@ -14804,6 +15597,61 @@ function showAttDayDetail(dayNum) {
 // MISSED ATTENDANCE REQUESTS
 // =====================================================
 
+// Opens permission (2hr) request directly from the Approval/Leaves tab
+function openPermissionForm() {
+  selectedLeaveType = 'permission';
+  openLeaveForm();
+  // After form opens, activate the permission pill
+  setTimeout(function() {
+    document.querySelectorAll('#leaveTypePills .lt-pill').forEach(function(p) {
+      if (p.textContent.includes('Permission')) {
+        selectLeaveType('permission', p);
+        p.classList.add('active');
+      } else {
+        p.classList.remove('active');
+      }
+    });
+  }, 50);
+}
+
+// Shows missed punch report form inside the Leaves/Approval tab
+function showMissedPunchInLeaves() {
+  var area = document.getElementById('missedPunchLeavesArea');
+  if (!area) return;
+  if (area.innerHTML.trim()) { area.innerHTML = ''; return; }
+  var today = new Date().toISOString().split('T')[0];
+  var html = '<div class="card fade-in" style="padding:14px;margin:8px 0;border-left:4px solid var(--warning,#f59e0b)">';
+  html += '<h4 style="font-size:.85rem;font-weight:600;margin:0 0 10px 0">Report Missed Punch</h4>';
+  html += '<div class="form-row"><label>Date *</label><input type="date" id="missedPunchDate" max="' + today + '" style="width:100%"></div>';
+  html += '<div class="form-row"><label>Missed</label><select id="missedPunchType" style="width:100%;padding:8px;border:1.5px solid var(--gray-200);border-radius:var(--radius-xs);font-size:.82rem"><option value="in">Check-In (forgot to punch in)</option><option value="out">Check-Out (forgot to punch out)</option><option value="both">Both In & Out</option></select></div>';
+  html += '<div class="form-row"><label>Reason *</label><textarea id="missedPunchReason" rows="2" placeholder="Reason for missing punch..." style="width:100%;padding:8px;border:1.5px solid var(--gray-200);border-radius:var(--radius-xs);font-size:.82rem"></textarea></div>';
+  html += '<div style="display:flex;gap:8px"><button class="nf-btn nf-btn-primary" onclick="submitMissedPunchFromLeaves()">Submit</button>';
+  html += '<button class="nf-btn nf-btn-outline" onclick="document.getElementById(\'missedPunchLeavesArea\').innerHTML=\'\'">Cancel</button></div>';
+  html += '</div>';
+  area.innerHTML = html;
+}
+
+async function submitMissedPunchFromLeaves() {
+  var date = (document.getElementById('missedPunchDate') || {}).value;
+  var type = (document.getElementById('missedPunchType') || {}).value;
+  var reason = (document.getElementById('missedPunchReason') || {}).value.trim();
+  if (!date) { showToast('Please select the date'); return; }
+  if (!reason) { showToast('Please enter a reason'); return; }
+  var btn = document.querySelector('#missedPunchLeavesArea .nf-btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Submitting...'; }
+  try {
+    var fd = new FormData();
+    fd.append('date', date);
+    fd.append('reason', '(' + type + ' punch missed) ' + reason);
+    await apiUpload('/attendance/missed', fd);
+    showToast('Missed punch report submitted. HR will review.');
+    document.getElementById('missedPunchLeavesArea').innerHTML = '';
+  } catch (e) {
+    showToast(e.message || 'Error submitting request');
+    if (btn) { btn.disabled = false; btn.textContent = 'Submit'; }
+  }
+}
+
 function showMissedAttendanceForm() {
   var area = document.getElementById('missedAttFormArea');
   if (!area) return;
@@ -15029,7 +15877,23 @@ async function rejectMissedAtt(id) {
 // CHANGE 2: EMPLOYEE LEAVE REQUEST — HR→MD DUAL APPROVAL
 // =====================================================
 var _leavesOriginalHTML = '';
-function renderLeaveScreenForMode() {
+async function refreshLeaveBalance() {
+  try {
+    if (!currentUser) return;
+    if (currentUser.role === 'MD' || currentUser.role === 'HR') {
+      var all = await apiCall('GET', '/leaves/balance/all');
+      if (all && typeof all === 'object') {
+        Object.keys(leaveBalances).forEach(function(k) { delete leaveBalances[k]; });
+        Object.assign(leaveBalances, all);
+      }
+    } else {
+      var mine = await apiCall('GET', '/leaves/balance');
+      if (mine) leaveBalances[currentUser.code] = mine;
+    }
+  } catch (e) { /* non-fatal */ }
+}
+
+async function renderLeaveScreenForMode() {
   if (!currentUser) return;
   var container = document.getElementById('screen-leaves');
   if (!container) return;
@@ -15046,6 +15910,8 @@ function renderLeaveScreenForMode() {
   if (_leavesOriginalHTML && !container.querySelector('#leaveBalanceGrid')) {
     container.innerHTML = _leavesOriginalHTML;
   }
+  // Always fetch fresh balance before rendering so dashboard & apply-leave tab stay in sync
+  await refreshLeaveBalance();
   renderLeaveScreen();
 }
 
@@ -15208,12 +16074,15 @@ function renderEmpSalaryTable() {
     var hra = Math.round(e.salary * 0.2);
     var da = Math.round(e.salary * 0.15);
     var other = e.salary - basic - hra - da;
-    html += '<tr style="border-bottom:1px solid var(--gray-100);cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'table-row\':\'none\'">';
-    html += '<td style="padding:8px 6px;font-weight:600">' + escapeHTML(e.name) + '</td>';
+    var editInfo = _salaryEditsThisSession[e.code];
+    var rowBg = editInfo ? 'background:#FFFBEB;' : '';
+    var editBadge = editInfo ? '<span style="display:inline-block;font-size:.55rem;padding:1px 5px;border-radius:4px;background:#FEF3C7;color:#D97706;margin-left:5px;font-weight:700;border:1px solid #FCD34D" title="Updated from Rs.' + editInfo.oldSalary.toLocaleString('en-IN') + ' by ' + editInfo.editedBy + ' at ' + editInfo.editedAt + '">✎ Edited</span>' : '';
+    html += '<tr style="border-bottom:1px solid var(--gray-100);cursor:pointer;' + rowBg + '" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'table-row\':\'none\'">';
+    html += '<td style="padding:8px 6px;font-weight:600">' + escapeHTML(e.name) + editBadge + '</td>';
     html += '<td style="padding:8px 6px;color:var(--gray-500)">' + escapeHTML(e.code) + '</td>';
     html += '<td style="padding:8px 6px">' + escapeHTML(e.dept) + '</td>';
     html += '<td style="padding:8px 6px">' + escapeHTML(e.designation) + '</td>';
-    html += '<td style="padding:8px 6px;text-align:right;font-weight:600">Rs.' + e.salary.toLocaleString('en-IN') + '</td>';
+    html += '<td style="padding:8px 6px;text-align:right;font-weight:600' + (editInfo ? ';color:#D97706' : '') + '">Rs.' + e.salary.toLocaleString('en-IN') + '</td>';
     html += '<td style="padding:8px 6px;font-size:.65rem">' + escapeHTML(e.bank || '') + '</td>';
     if (canEditSalary) html += '<td style="padding:8px 6px;text-align:center"><button class="btn btn-sm" style="font-size:.6rem;padding:2px 8px;background:var(--primary);color:#fff;border-radius:4px" onclick="event.stopPropagation();openSalaryEditForm(\'' + escapeAttr(e.code) + '\',' + e.salary + ')">Edit</button></td>';
     html += '</tr>';
@@ -15233,6 +16102,9 @@ function renderEmpSalaryTable() {
   html += '<div class="card" style="margin-top:8px;padding:10px;display:flex;justify-content:space-between;font-size:.78rem"><span>Total Employees: <strong>' + filtered.length + '</strong></span><span>Total Monthly Payroll: <strong>Rs.' + totalSalary.toLocaleString('en-IN') + '</strong></span></div>';
   area.innerHTML = html;
 }
+
+// Tracks salary edits made this session: empCode -> { oldSalary, newSalary, editedBy, editedAt }
+var _salaryEditsThisSession = {};
 
 // Salary edit form (Accounts dept / MD / HR)
 function openSalaryEditForm(empCode, currentSalary) {
@@ -15256,10 +16128,15 @@ async function saveSalaryUpdate(empCode) {
   var newSalary = parseFloat((document.getElementById('newSalaryAmt') || {}).value);
   if (isNaN(newSalary) || newSalary < 0) { showToast('Please enter a valid salary amount'); return; }
   try {
-    await apiCall('PUT', '/salary/' + empCode, { salary: newSalary });
-    // Update local data
     var emp = EMPLOYEES.find(function(e) { return e.code === empCode; });
+    var oldSalary = emp ? emp.salary : 0;
+    await apiCall('PUT', '/salary/' + empCode, { salary: newSalary });
     if (emp) emp.salary = newSalary;
+    _salaryEditsThisSession[empCode] = {
+      oldSalary: oldSalary, newSalary: newSalary,
+      editedBy: currentUser ? currentUser.name : 'Accounts',
+      editedAt: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
+    };
     showToast('Salary updated for ' + empCode);
     renderEmpSalaryTable();
   } catch (e) {

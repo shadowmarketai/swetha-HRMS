@@ -310,4 +310,272 @@ router.put('/missed/:id/reject', verifyToken, requireRole('MD', 'HR'), async (re
   }
 });
 
+// ─────────────────────────────────────────────────────────────────
+// GET /api/attendance/export/consolidated  — ExcelJS styled workbook
+// Matches the "May 2026 Consolidated" sample format exactly:
+//   Serial | Name | Code | Days 1-17 | 10 summary cols | Days 18-end
+// Color scheme:  Sunday/Holiday #FFFF00 · Absent #A6CAEC
+//                Leave #92D050  · Short hours (<8h) #FFC000
+// ─────────────────────────────────────────────────────────────────
+router.get('/export/consolidated', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
+  try {
+    const ExcelJS = require('exceljs');
+    const month = (req.query.month || new Date().toISOString().slice(0, 7)).slice(0, 7); // YYYY-MM
+    const [yr, mo] = month.split('-').map(Number);
+    const daysInMonth = new Date(yr, mo, 0).getDate();
+    const today = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    const isCurrentMonth = (today.getFullYear() === yr && today.getMonth() + 1 === mo);
+    const lastDay = isCurrentMonth ? today.getDate() : daysInMonth;
+
+    // Fetch data from DB in parallel
+    const [attRows, leaveRows, holidayRows, empRows] = await Promise.all([
+      pool.query(
+        `SELECT a.emp_code, a.log_date, a.check_in, a.check_out
+         FROM attendance_logs a WHERE a.log_date LIKE ? ORDER BY a.emp_code, a.log_date`,
+        [month + '%']
+      ),
+      pool.query(
+        `SELECT emp_code, from_date, to_date, days, paid_days, lop_days, is_half_day, half_day_session, leave_type, status
+         FROM leave_applications WHERE status = 'approved'
+         AND ((from_date LIKE ? OR to_date LIKE ?) OR (from_date < ? AND to_date > ?))`,
+        [month + '%', month + '%', month + '-01', month + '-' + String(daysInMonth).padStart(2,'0')]
+      ),
+      pool.query(`SELECT holiday_date, name FROM public_holidays WHERE holiday_date LIKE ?`, [month + '%']),
+      pool.query(`SELECT code, name, dept FROM employees WHERE status != 'Inactive' ORDER BY name`)
+    ]);
+
+    // Build holiday lookup  { 'YYYY-MM-DD': name }
+    const holidays = {};
+    (holidayRows[0] || []).forEach(h => { holidays[String(h.holiday_date).slice(0,10)] = h.name || 'Holiday'; });
+
+    // Build attendance: empCode -> dayNum -> totalMinutes
+    const attMap = {};
+    (attRows[0] || []).forEach(row => {
+      const dateStr = String(row.log_date).slice(0, 10);
+      const d = parseInt(dateStr.slice(8), 10);
+      if (!attMap[row.emp_code]) attMap[row.emp_code] = {};
+      if (!attMap[row.emp_code][d]) attMap[row.emp_code][d] = { mins: 0 };
+      if (row.check_in) {
+        const start = new Date(row.check_in).getTime();
+        let end;
+        if (row.check_out) {
+          end = new Date(row.check_out).getTime();
+        } else if (isCurrentMonth && d === today.getDate()) {
+          end = Date.now();
+        } else {
+          const autoOut = new Date(new Date(row.check_in).toDateString() + ' 21:00:00').getTime();
+          end = Math.min(autoOut, start + 480 * 60000);
+        }
+        if (end > start) attMap[row.emp_code][d].mins += (end - start) / 60000;
+      }
+    });
+
+    // Build approved-leave lookup: empCode -> { 'YYYY-MM-DD': 'Leave'|'Half Day'|'LOP' }
+    const leaveMap = {};
+    (leaveRows[0] || []).forEach(la => {
+      const code = la.emp_code;
+      if (!leaveMap[code]) leaveMap[code] = {};
+      const from = new Date(String(la.from_date).slice(0,10) + 'T00:00:00');
+      const to   = new Date(String(la.to_date).slice(0,10) + 'T00:00:00');
+      let paidRemain = parseFloat(la.paid_days) > 0 ? parseFloat(la.paid_days) : parseFloat(la.days);
+      for (let ld = new Date(from); ld <= to; ld.setDate(ld.getDate() + 1)) {
+        if (ld.getDay() === 0) continue;
+        const ymd = ld.toISOString().slice(0,10);
+        if (holidays[ymd]) continue;
+        if (paidRemain > 0) {
+          leaveMap[code][ymd] = la.is_half_day ? 'Half Day' : 'Leave';
+          paidRemain -= la.is_half_day ? 0.5 : 1;
+        } else {
+          leaveMap[code][ymd] = 'LOP';
+        }
+      }
+    });
+
+    // Count total working days in month (Mon–Sat, non-holiday, up to lastDay)
+    let totalWorkingDays = 0;
+    for (let d = 1; d <= lastDay; d++) {
+      const dow = new Date(yr, mo - 1, d).getDay();
+      const ymd = `${yr}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      if (dow !== 0 && !holidays[ymd]) totalWorkingDays++;
+    }
+
+    // ── Build ExcelJS workbook ────────────────────────────────────
+    const wb = new ExcelJS.Workbook();
+    wb.creator = 'SweRMS';
+    wb.created = new Date();
+    const ws = wb.addWorksheet('Consolidated');
+
+    // Fill shortcuts (ARGB = alpha + RGB)
+    const FILL_YELLOW = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFF00' } };
+    const FILL_BLUE   = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFA6CAEC' } };
+    const FILL_GREEN  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF92D050' } };
+    const FILL_AMBER  = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFC000' } };
+    const FILL_HEADER = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD9E1F2' } }; // soft blue-gray
+    const FILL_SUMMARY= { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFBDD7EE' } }; // summary header
+    const BORDER_THIN = { style: 'thin', color: { argb: 'FFBFBFBF' } };
+    const BORDER_ALL  = { top: BORDER_THIN, left: BORDER_THIN, bottom: BORDER_THIN, right: BORDER_THIN };
+    const FONT_DATA   = { name: 'Calibri', size: 10 };
+    const FONT_HEADER = { name: 'Calibri', size: 10, bold: true };
+    const ALIGN_CENTER = { horizontal: 'center', vertical: 'middle', wrapText: false };
+    const ALIGN_WRAP   = { horizontal: 'center', vertical: 'middle', wrapText: true };
+    const ALIGN_LEFT   = { horizontal: 'left', vertical: 'middle', wrapText: false };
+
+    // Column layout: A-C fixed, then days 1-17, then 10 summary, then days 18-end
+    const DAYS_PART1 = 17;
+    const SUMMARY_COLS = [
+      'Total No. of Working Days Except Sunday',
+      'Full Day Worked', 'Half Day', 'Leave', 'Absent',
+      'WORKED HOURS', 'WORKED MINUTES', 'MINUTES In Decimal',
+      'Total Hours', 'Average Hours per Day'
+    ];
+    const totalCols = 3 + daysInMonth + SUMMARY_COLS.length;
+
+    // Helper: get 1-based Excel column index for a given day (1-indexed day)
+    function colForDay(d) {
+      return d <= DAYS_PART1
+        ? 3 + d                                       // D(4)..T(20) for days 1-17
+        : 3 + DAYS_PART1 + SUMMARY_COLS.length + (d - DAYS_PART1); // after summary
+    }
+    function summaryCol(idx) { return 3 + DAYS_PART1 + 1 + idx; } // 0-indexed idx
+
+    // ── Row 1: Header ────────────────────────────────────────────
+    const headerRow = ws.getRow(1);
+    function setHdr(colIdx, val, fill) {
+      const cell = ws.getCell(1, colIdx);
+      cell.value = val;
+      cell.font = FONT_HEADER;
+      cell.alignment = ALIGN_WRAP;
+      cell.border = BORDER_ALL;
+      cell.fill = fill || FILL_HEADER;
+    }
+    setHdr(1, 'Serial No.'); setHdr(2, 'Name'); setHdr(3, 'Employee Code');
+    for (let d = 1; d <= daysInMonth; d++) {
+      const ymd = `${yr}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const dow = new Date(yr, mo - 1, d).getDay();
+      const isWeekend = dow === 0;
+      const isHol     = !!holidays[ymd];
+      const hdrFill   = (isWeekend || isHol) ? FILL_YELLOW : FILL_HEADER;
+      setHdr(colForDay(d), d, hdrFill);
+    }
+    for (let i = 0; i < SUMMARY_COLS.length; i++) setHdr(summaryCol(i), SUMMARY_COLS[i], FILL_SUMMARY);
+    headerRow.height = 30;
+
+    // ── Data rows ────────────────────────────────────────────────
+    const monthStr = `${yr}-${String(mo).padStart(2,'0')}`;
+    const employees = empRows[0] || [];
+    employees.forEach((emp, idx) => {
+      const rowIdx = idx + 2;
+      const dataRow = ws.getRow(rowIdx);
+      dataRow.height = 16;
+
+      function setCell(colIdx, val, fill, numFmt) {
+        const cell = ws.getCell(rowIdx, colIdx);
+        cell.value = val;
+        cell.font = FONT_DATA;
+        cell.alignment = ALIGN_CENTER;
+        cell.border = BORDER_ALL;
+        if (fill) cell.fill = fill;
+        if (numFmt) cell.numFmt = numFmt;
+      }
+
+      // Fixed columns
+      setCell(1, idx + 1);
+      const nameCell = ws.getCell(rowIdx, 2);
+      nameCell.value = emp.name; nameCell.font = FONT_DATA;
+      nameCell.alignment = ALIGN_LEFT; nameCell.border = BORDER_ALL;
+      const codeCell = ws.getCell(rowIdx, 3);
+      codeCell.value = emp.code; codeCell.font = FONT_DATA;
+      codeCell.alignment = ALIGN_CENTER; codeCell.border = BORDER_ALL;
+
+      let totalMins = 0, fullDays = 0, halfDays = 0, leaveDays = 0, absentDays = 0;
+
+      for (let d = 1; d <= daysInMonth; d++) {
+        const ymd = `${monthStr}-${String(d).padStart(2,'0')}`;
+        const dow = new Date(yr, mo - 1, d).getDay();
+        const isFuture = isCurrentMonth && d > lastDay;
+        const colIdx = colForDay(d);
+
+        if (dow === 0) {
+          setCell(colIdx, 'Sun', FILL_YELLOW);
+        } else if (holidays[ymd]) {
+          setCell(colIdx, 'Holiday', FILL_YELLOW);
+        } else if (isFuture) {
+          setCell(colIdx, '');
+        } else {
+          const att = attMap[emp.code] && attMap[emp.code][d];
+          const leaveStatus = leaveMap[emp.code] && leaveMap[emp.code][ymd];
+          if (att && att.mins > 0) {
+            const h = Math.floor(att.mins / 60);
+            const m = Math.round(att.mins % 60);
+            const label = `${h}h ${m < 10 ? '0' + m : m}m`;
+            const isShort = att.mins < 480; // < 8 hours
+            setCell(colIdx, label, isShort ? FILL_AMBER : null);
+            if (att.mins >= 480) fullDays++;
+            else if (att.mins >= 240) halfDays++;
+            totalMins += att.mins;
+          } else if (leaveStatus === 'Leave' || leaveStatus === 'Half Day') {
+            setCell(colIdx, leaveStatus, FILL_GREEN);
+            if (leaveStatus === 'Leave') leaveDays++;
+            else halfDays++;
+          } else if (leaveStatus === 'LOP') {
+            setCell(colIdx, 'LOP', FILL_BLUE);
+            absentDays++;
+          } else {
+            setCell(colIdx, 'Absent', FILL_BLUE);
+            absentDays++;
+          }
+        }
+      }
+
+      // Summary columns
+      const workedH   = Math.floor(totalMins / 60);
+      const workedM   = Math.round(totalMins % 60);
+      const minsDecimal = +(workedM / 60).toFixed(3);
+      const totalHours = +(totalMins / 60).toFixed(2);
+      const avgHours   = fullDays > 0 ? +(totalHours / fullDays).toFixed(2) : 0;
+
+      setCell(summaryCol(0), totalWorkingDays);
+      setCell(summaryCol(1), fullDays);
+      setCell(summaryCol(2), halfDays || '');
+      setCell(summaryCol(3), leaveDays || '');
+      setCell(summaryCol(4), absentDays || '');
+      setCell(summaryCol(5), workedH);
+      setCell(summaryCol(6), workedM);
+      setCell(summaryCol(7), minsDecimal);
+      setCell(summaryCol(8), totalHours);
+      setCell(summaryCol(9), avgHours);
+    });
+
+    // ── Column widths ─────────────────────────────────────────────
+    ws.getColumn(1).width = 7;   // Serial
+    ws.getColumn(2).width = 22;  // Name
+    ws.getColumn(3).width = 12;  // Code
+    for (let d = 1; d <= daysInMonth; d++) ws.getColumn(colForDay(d)).width = 9;
+    ws.getColumn(summaryCol(0)).width = 14;
+    ws.getColumn(summaryCol(1)).width = 12;
+    ws.getColumn(summaryCol(2)).width = 9;
+    ws.getColumn(summaryCol(3)).width = 9;
+    ws.getColumn(summaryCol(4)).width = 9;
+    ws.getColumn(summaryCol(5)).width = 12;
+    ws.getColumn(summaryCol(6)).width = 12;
+    ws.getColumn(summaryCol(7)).width = 14;
+    ws.getColumn(summaryCol(8)).width = 12;
+    ws.getColumn(summaryCol(9)).width = 16;
+
+    // ── Freeze panes at D2 so serial/name/code + header stay fixed ─
+    ws.views = [{ state: 'frozen', xSplit: 3, ySplit: 1, topLeftCell: 'D2' }];
+
+    // ── Send response ─────────────────────────────────────────────
+    const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const filename = `${monthNames[mo-1]}_${yr}_Consolidated.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    await wb.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    console.error('[attendance/export/consolidated]', err);
+    res.status(500).json({ error: 'Failed to generate consolidated report' });
+  }
+});
+
 module.exports = router;
