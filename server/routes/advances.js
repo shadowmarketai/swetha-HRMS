@@ -221,11 +221,27 @@ router.patch('/:id/reject', verifyToken, requireRole('MD', 'Accounts', 'HR'), au
   }
 });
 
+function _advStageLabel(status) {
+  switch (status) {
+    case 'pending': return 'Awaiting Accounts Review';
+    case 'accounts_accepted': return 'Awaiting MD Approval';
+    case 'approved': return 'Approved — Pending Disbursement';
+    case 'paid': return 'Paid / Disbursed';
+    case 'rejected': return 'Rejected';
+    default: return status || '';
+  }
+}
+
 // Build a parameterised WHERE for export queries — keeps Excel + PDF in sync.
+// status supports comma-separated values for multi-status IN queries.
 function buildFilters(query) {
   const where = [];
   const params = [];
-  if (query.status) { where.push('status = ?'); params.push(query.status); }
+  if (query.status) {
+    const statuses = query.status.split(',').map(s => s.trim()).filter(Boolean);
+    if (statuses.length === 1) { where.push('status = ?'); params.push(statuses[0]); }
+    else { where.push('status IN (' + statuses.map(() => '?').join(',') + ')'); params.push(...statuses); }
+  }
   if (query.empCode) { where.push('emp_code = ?'); params.push(query.empCode); }
   if (query.type) { where.push('type = ?'); params.push(query.type); }
   if (query.from) { where.push('applied_date >= ?'); params.push(query.from); }
@@ -263,6 +279,7 @@ router.get('/export', verifyToken, requireRole('MD', 'Accounts', 'HR'), async (r
       'EMI Months': r.emi_months || '',
       'Urgency': r.urgency,
       'Status': r.status,
+      'Approval Stage': _advStageLabel(r.status),
       'Applied Date': r.applied_date ? new Date(r.applied_date).toISOString().slice(0, 10) : '',
       'Reviewed By': r.reviewed_by || '',
       'Review Date': r.review_date ? new Date(r.review_date).toISOString().slice(0, 10) : '',
@@ -274,7 +291,7 @@ router.get('/export', verifyToken, requireRole('MD', 'Accounts', 'HR'), async (r
     ws['!cols'] = [
       { wch: 6 }, { wch: 10 }, { wch: 12 }, { wch: 22 }, { wch: 14 }, { wch: 14 }, { wch: 30 }, { wch: 30 },
       { wch: 18 }, { wch: 14 }, { wch: 18 }, { wch: 18 }, { wch: 12 }, { wch: 10 }, { wch: 12 }, { wch: 10 },
-      { wch: 10 }, { wch: 18 }, { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 30 }, { wch: 14 }, { wch: 12 }
+      { wch: 10 }, { wch: 16 }, { wch: 34 }, { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 30 }, { wch: 14 }, { wch: 12 }
     ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Advances');

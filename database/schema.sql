@@ -795,5 +795,9 @@ ALTER TABLE leave_applications
 -- leave_balances: add monthly CL accrual tracking, permission column, decimal casual
 ALTER TABLE leave_balances
   MODIFY COLUMN casual DECIMAL(4,2) DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS permission INT DEFAULT 1,
+  ADD COLUMN IF NOT EXISTS permission DECIMAL(4,2) DEFAULT 2,
   ADD COLUMN IF NOT EXISTS cl_accrued_month VARCHAR(7) DEFAULT NULL;
+
+-- Permission now stores days (0–2.0) representing up to 4 × 0.5-day permissions.
+-- Reset existing employees who still have the old integer value (1 = full month unused).
+UPDATE leave_balances SET permission = 2.0 WHERE permission = 1;

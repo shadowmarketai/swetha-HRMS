@@ -3961,16 +3961,31 @@ function renderAdvanceRequests(filter) {
   var isAccounts = currentUser && currentUser.role === 'Accounts';
   var isHR = currentUser && currentUser.role === 'HR';
   var isReviewerRole = isAccounts || isHR;
+
+  // Update tab count badges so the approver can see at a glance what's waiting.
+  // Pending = role-specific actionable items; Approved = items already approved (for rechecking).
+  var pendingCount = isMD
+    ? allItems.filter(r => r.status === 'accounts_accepted').length
+    : allItems.filter(r => r.status === 'pending').length;
+  var approvedCount = allItems.filter(r => r.status === 'approved').length;
+  var rejectedCount = allItems.filter(r => r.status === 'rejected').length;
+  var tabBtns = document.querySelectorAll('#advReqTabs .tab-pill');
+  var tabCounts = [pendingCount, approvedCount, rejectedCount, allItems.length];
+  var tabBaseLabels = isMD ? ['To Approve', 'Approved', 'Rejected', 'All'] : ['Pending', 'Approved', 'Rejected', 'All'];
+  tabBtns.forEach(function(btn, i) {
+    var cnt = tabCounts[i] !== undefined ? tabCounts[i] : '';
+    btn.textContent = tabBaseLabels[i] + (cnt > 0 ? ' (' + cnt + ')' : '');
+  });
+
   let reqs;
   if (filter === 'all') {
     reqs = [...allItems];
   } else if (filter === 'pending') {
-    // Accounts/HR sees Pending (to accept) + Approved (to mark Paid).
-    // MD sees pending + accounts_accepted (awaiting their confirm).
+    // Each role sees only items they need to act on — no cross-stage mixing.
+    // Accounts/HR use the Approved tab to see disbursement-ready items and for rechecking.
+    // MD uses the Approved tab to recheck what they approved.
     if (isMD) {
-      reqs = allItems.filter(r => r.status === 'pending' || r.status === 'accounts_accepted');
-    } else if (isReviewerRole) {
-      reqs = allItems.filter(r => r.status === 'pending' || r.status === 'approved');
+      reqs = allItems.filter(r => r.status === 'accounts_accepted');
     } else {
       reqs = allItems.filter(r => r.status === 'pending');
     }
@@ -3987,7 +4002,8 @@ function renderAdvanceRequests(filter) {
   }
   reqs.sort((a, b) => b.id - a.id);
   if (reqs.length === 0) {
-    var emptyMsg = advReqSearchQuery ? 'No results for "' + escapeHTML(advReqSearchQuery) + '"' : 'No ' + filter + ' requests';
+    var emptyLabel = filter === 'pending' && isMD ? 'to approve' : filter;
+    var emptyMsg = advReqSearchQuery ? 'No results for "' + escapeHTML(advReqSearchQuery) + '"' : 'No ' + emptyLabel + ' requests';
     container.innerHTML = '<div style="text-align:center;padding:40px 20px;color:var(--gray-400);font-size:.82rem">' + emptyMsg + '</div>';
     return;
   }
@@ -4139,14 +4155,6 @@ function _renderAdvExportBar(uiFilter) {
   if (!bar) return;
   var canExport = currentUser && (currentUser.role === 'MD' || currentUser.role === 'Accounts' || currentUser.role === 'HR');
   if (!canExport) { bar.style.display = 'none'; bar.innerHTML = ''; return; }
-  // Map UI filter → backend status query.
-  // For 'pending' we don't pin a single status because reviewers often want all unsettled
-  // items in one sheet — leaving status unset returns everything filtered, which Excel
-  // can re-filter. For approved/rejected we pin the single status.
-  var statusParam = '';
-  if (uiFilter === 'approved') statusParam = '&status=Approved';
-  else if (uiFilter === 'rejected') statusParam = '&status=Rejected';
-  // 'pending' and 'all' → no status filter, lets Accounts see everything
   var dlSvg = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
   bar.style.display = 'flex';
   bar.innerHTML =
@@ -4161,8 +4169,21 @@ function _renderAdvExportBar(uiFilter) {
 async function downloadAdvExport(kind, uiFilter) {
   try {
     var statusQ = '';
-    if (uiFilter === 'approved') statusQ = '?status=Approved';
-    else if (uiFilter === 'rejected') statusQ = '?status=Rejected';
+    var role = currentUser ? currentUser.role : '';
+    var isAdv = (kind === 'advances');
+    if (uiFilter === 'approved') {
+      statusQ = '?status=' + (isAdv ? 'approved' : 'Approved');
+    } else if (uiFilter === 'rejected') {
+      statusQ = '?status=' + (isAdv ? 'rejected' : 'Rejected');
+    } else if (uiFilter === 'pending') {
+      // MD acts on accounts_accepted items; Accounts/HR act on pending (review) + approved (disburse)
+      if (role === 'MD') {
+        statusQ = '?status=' + (isAdv ? 'pending,accounts_accepted' : 'Pending,accounts_accepted');
+      } else {
+        statusQ = '?status=' + (isAdv ? 'pending,approved' : 'Pending,Approved');
+      }
+    }
+    // 'all' → no filter
     var url = API_BASE + '/' + kind + '/export' + statusQ;
     var headers = (typeof apiHeaders === 'function') ? apiHeaders() : (JWT_TOKEN ? { 'Authorization': 'Bearer ' + JWT_TOKEN } : {});
     // Excel endpoint returns a binary buffer; don't send/expect JSON content-type on the response
@@ -6201,127 +6222,28 @@ async function exportAttendanceReport() {
   if (fmt === 'punch-inout') { await _exportPunchInOutCSV(); return; }
   if (fmt === 'weekly') { await _exportWeeklyHoursCSV(); return; }
   if (fmt === 'total-hours') { await _exportTotalHoursCSV(); return; }
-  // default: daily-hours (existing logic)
+  // default: daily-hours → Consolidated XLSX (color-coded, matches sample format)
   var selMonth = parseInt(document.getElementById('attExportMonth').value);
   var selYear = parseInt(document.getElementById('attExportYear').value);
   var monthStr = selYear + '-' + String(selMonth + 1).padStart(2, '0');
   var monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-  var monthLabel = monthNames[selMonth] + '_' + selYear;
+  var monthLabel = monthNames[selMonth] + ' ' + selYear;
   closeAttendanceExportModal();
-  showToast('Fetching attendance data...');
+  showToast('Generating consolidated report...');
   try {
-    var logs = await apiCall('GET', '/attendance?month=' + monthStr);
-    if (!Array.isArray(logs)) logs = [];
-    var daysInMonth = new Date(selYear, selMonth + 1, 0).getDate();
-    var today = new Date();
-    var isCurrentMonth = (today.getFullYear() === selYear && today.getMonth() === selMonth);
-    var lastCountDay = isCurrentMonth ? today.getDate() : daysInMonth;
-    // Count working days (exclude Sundays and declared public holidays)
-    var workingDays = 0;
-    for (var d = 1; d <= lastCountDay; d++) {
-      var _dt = new Date(selYear, selMonth, d);
-      var _ymd = selYear + '-' + String(selMonth + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
-      if (_dt.getDay() !== 0 && !publicHolidays[_ymd]) workingDays++;
-    }
-    // Build empCode -> dayNum -> { present, minutes }
-    var empDayData = {};
-    logs.forEach(function(row) {
-      if (!row.emp_code || !row.log_date) return;
-      var dateStr = String(row.log_date).substring(0, 10);
-      var dayNum = parseInt(dateStr.split('-')[2], 10);
-      if (!empDayData[row.emp_code]) empDayData[row.emp_code] = {};
-      if (!empDayData[row.emp_code][dayNum]) empDayData[row.emp_code][dayNum] = { present: true, minutes: 0 };
-      if (row.check_in) {
-        var start = new Date(row.check_in).getTime();
-        var isToday = isCurrentMonth && dayNum === today.getDate();
-        var end;
-        if (row.check_out) {
-          end = new Date(row.check_out).getTime();
-        } else if (isToday) {
-          end = Date.now();
-        } else {
-          // Past day with no checkout — auto-checkout at 9 PM, cap at 8 hrs
-          var autoOut = new Date(new Date(row.check_in).toDateString() + ' 21:00:00').getTime();
-          end = Math.min(autoOut, start + 480 * 60000);
-          empDayData[row.emp_code][dayNum].missedCheckout = true;
-        }
-        if (end > start) empDayData[row.emp_code][dayNum].minutes += (end - start) / 60000;
-      }
-    });
-    // Build approved-leave lookup: empCode -> Set of 'YYYY-MM-DD'
-    var approvedLeaveDates = {};
-    if (typeof leaveApplications !== 'undefined') {
-      leaveApplications.forEach(function(la) {
-        if (la.status !== 'approved') return;
-        var code = la.empCode;
-        if (!approvedLeaveDates[code]) approvedLeaveDates[code] = {};
-        var from = new Date(la.from + 'T00:00:00');
-        var to = new Date(la.to + 'T00:00:00');
-        var paidRemain = la.paidDays > 0 ? la.paidDays : la.days;
-        for (var ld = new Date(from); ld <= to; ld.setDate(ld.getDate() + 1)) {
-          var ldDow = ld.getDay();
-          if (ldDow === 0) continue;
-          var ldYmd = ld.getFullYear() + '-' + String(ld.getMonth()+1).padStart(2,'0') + '-' + String(ld.getDate()).padStart(2,'0');
-          if (publicHolidays && publicHolidays[ldYmd]) continue;
-          if (paidRemain > 0) {
-            approvedLeaveDates[code][ldYmd] = 'Leave';
-            paidRemain -= la.isHalfDay ? 0.5 : 1;
-          } else {
-            approvedLeaveDates[code][ldYmd] = 'LOP';
-          }
-        }
-      });
-    }
-    // Build wide-format CSV
-    var _esc = function(v) {
-      v = String(v === null || v === undefined ? '' : v).replace(/"/g, '""');
-      return (v.indexOf(',') >= 0 || v.indexOf('"') >= 0 || v.indexOf('\n') >= 0) ? '"' + v + '"' : v;
-    };
-    var headers = ['Name', 'Employee Code'];
-    for (var d = 1; d <= daysInMonth; d++) headers.push(String(d).padStart(2, '0'));
-    headers.push('Total Present Days', 'Absent Days', 'Attendance %');
-    var csvRows = [headers.join(',')];
-    EMPLOYEES.filter(function(e) { return e.status !== 'Inactive'; }).forEach(function(emp) {
-      var cols = [_esc(emp.name), _esc(emp.code)];
-      var presentCount = 0;
-      for (var d = 1; d <= daysInMonth; d++) {
-        var dow = new Date(selYear, selMonth, d).getDay();
-        var ymd = selYear + '-' + String(selMonth + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
-        var isFuture = isCurrentMonth && d > today.getDate();
-        if (dow === 0) {
-          cols.push('Sun');
-        } else if (publicHolidays[ymd]) {
-          cols.push('Holiday');
-        } else if (isFuture) {
-          cols.push('');
-        } else {
-          var dayData = empDayData[emp.code] && empDayData[emp.code][d];
-          if (dayData) {
-            presentCount++;
-            var h = Math.floor(dayData.minutes / 60);
-            var m = Math.round(dayData.minutes % 60);
-            var hoursStr = h + 'h ' + (m < 10 ? '0' + m : m) + 'm';
-            cols.push(dayData.missedCheckout ? hoursStr + '*' : hoursStr);
-          } else {
-            var leaveStatus = approvedLeaveDates[emp.code] && approvedLeaveDates[emp.code][ymd];
-            cols.push(leaveStatus || 'Absent');
-          }
-        }
-      }
-      var absentDays = Math.max(0, workingDays - presentCount);
-      var attPct = workingDays > 0 ? ((presentCount / workingDays) * 100).toFixed(1) + '%' : '0.0%';
-      cols.push(presentCount, absentDays, attPct);
-      csvRows.push(cols.join(','));
-    });
-    csvRows.push('');
-    csvRows.push('"* Hours estimated — check-out not recorded for this session"');
-    var blob = new Blob(['﻿' + csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
-    var link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = 'attendance_' + monthLabel + '.csv';
-    link.click();
-    URL.revokeObjectURL(link.href);
-    showToast('Downloaded: attendance_' + monthLabel + '.csv');
+    var url = API_BASE + '/attendance/export/consolidated?month=' + monthStr;
+    var headers = (typeof apiHeaders === 'function') ? apiHeaders() : (JWT_TOKEN ? { 'Authorization': 'Bearer ' + JWT_TOKEN } : {});
+    delete headers['Content-Type'];
+    var res = await fetch(url, { headers: headers });
+    if (!res.ok) { showToast('Export failed (' + res.status + ')'); return; }
+    var blob = await res.blob();
+    var dlUrl = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = dlUrl;
+    a.download = monthLabel + ' Consolidated.xlsx';
+    document.body.appendChild(a); a.click();
+    setTimeout(function() { URL.revokeObjectURL(dlUrl); a.remove(); }, 0);
+    showToast('Downloaded: ' + monthLabel + ' Consolidated.xlsx');
   } catch (e) { showToast(e.message || 'Error exporting attendance'); }
 }
 
@@ -10223,7 +10145,7 @@ function getLeaveBalance(empCode) {
   if (!leaveBalances[empCode]) {
     var now = new Date();
     var accruedCL = now.getMonth() >= 3 ? Math.min(now.getMonth() - 2, 12) : 0;
-    leaveBalances[empCode] = { casual: accruedCL, comp: 3, permission: 1 };
+    leaveBalances[empCode] = { casual: accruedCL, comp: 3, permission: 2 };
   }
   return leaveBalances[empCode];
 }
@@ -10309,10 +10231,11 @@ function selectLeaveType(type, el) {
   if (balText && currentUser) {
     var bal = getLeaveBalance(currentUser.code);
     if (type === 'permission') {
-      var permLeft = bal.permission !== undefined ? bal.permission : 1;
-      balText.innerHTML = 'Permission (2hr): <strong>' + permLeft + '</strong> of 1 remaining this month' +
+      var permDays = bal.permission !== undefined ? parseFloat(bal.permission) : 2;
+      var permLeft = Math.round(permDays * 2); // convert days → count (0–4)
+      balText.innerHTML = 'Permission (2hr): <strong>' + permLeft + '</strong> of 4 remaining this month' +
         '<br><span style="font-size:.7rem;color:' + (permLeft > 0 ? 'var(--success)' : 'var(--danger)') + '">' +
-        (permLeft > 0 ? '1 free permission available — no salary deduction' : 'Permission used this month — additional will be LOP') + '</span>';
+        (permLeft > 0 ? permLeft + ' permission' + (permLeft !== 1 ? 's' : '') + ' available — no salary deduction' : 'All 4 permissions used this month — additional will be LOP') + '</span>';
       // Auto-set same-day dates for permission
       var today = new Date().toISOString().split('T')[0];
       var fromEl = document.getElementById('leaveFromDate');
@@ -10363,17 +10286,19 @@ async function submitLeave() {
     if (!sessionRadio) { showToast('Please select First Half or Second Half'); return; }
     halfDaySession = sessionRadio.value;
   }
-  const days = isHalfDay ? 0.5 : Math.ceil((new Date(to) - new Date(from)) / 86400000) + 1;
-  const bal = getLeaveBalance(currentUser.code);
   var leaveType = selectedLeaveType;
+  // Permission = 2 hours = 0.5 day for payroll; override the generic day count
+  const days = leaveType === 'permission' ? 0.5 : (isHalfDay ? 0.5 : Math.ceil((new Date(to) - new Date(from)) / 86400000) + 1);
+  const bal = getLeaveBalance(currentUser.code);
   var isLOP = false;
 
   if (leaveType === 'permission') {
     if (from !== to) { showToast('Permission is for 2 hours on a single day only'); return; }
-    var permLeft = bal.permission !== undefined ? bal.permission : 1;
+    var permDays = bal.permission !== undefined ? parseFloat(bal.permission) : 2;
+    var permLeft = Math.round(permDays * 2);
     if (permLeft <= 0) {
       isLOP = true;
-      if (!confirm('You have already used your 1 permission this month.\n\nThis permission will be Loss of Pay (LOP) — 2 hours salary will be deducted.\n\nDo you want to proceed?')) return;
+      if (!confirm('You have used all 4 permissions this month.\n\nThis permission will be Loss of Pay (LOP) — 2 hours salary will be deducted.\n\nDo you want to proceed?')) return;
     }
   } else if (leaveType === 'casual') {
     var clBalance = parseFloat(bal.casual) || 0;
@@ -10436,7 +10361,7 @@ async function cancelLeave(id) {
         if (app.type !== 'permission') {
           bal[app.type] = (bal[app.type] || 0) + (app.paidDays || app.days);
         } else {
-          bal.permission = Math.min(1, (bal.permission || 0) + 1);
+          bal.permission = Math.min(2, (bal.permission || 0) + 0.5);
         }
       }
     }
@@ -10515,11 +10440,13 @@ function renderLeaveScreen() {
       const leaveTypes = [
         {key:'casual',label:'Casual Leave',total:_clMax,color:'#E85D04',cls:'casual'},
         {key:'comp',label:'Comp Off',total:3,color:'#0891b2',cls:'comp'},
-        {key:'permission',label:'Permission (2hr)',total:1,color:'#d97706',cls:'permission'}
+        {key:'permission',label:'Permission (2hr)',total:4,color:'#d97706',cls:'permission'}
       ];
       balGrid.innerHTML = '<div class="section-title" style="margin-top:4px">Leave Balance</div><div class="leave-balance-grid fade-in">' +
         leaveTypes.map(lt => {
-          const rem = bal[lt.key] || 0;
+          // Permission balance is stored in days (0–2.0); display as count (0–4) by multiplying by 2
+          const rawRem = bal[lt.key] || 0;
+          const rem = lt.key === 'permission' ? Math.round(rawRem * 2) : rawRem;
           const used = lt.total - rem;
           const offset = circumference * (used / lt.total);
           return `<div class="leave-balance-card ${lt.cls}"><div class="donut-chart"><svg viewBox="0 0 65 65"><circle class="donut-bg" cx="32.5" cy="32.5" r="26"/><circle class="donut-fill" cx="32.5" cy="32.5" r="26" stroke="${lt.color}" stroke-dasharray="${circumference}" stroke-dashoffset="${offset}"/></svg><div class="donut-center">${rem}</div></div><div class="leave-type-name">${lt.label}</div><div class="leave-detail">${rem} of ${lt.total} remaining</div></div>`;
@@ -11699,7 +11626,7 @@ function renderHomeQuickStats() {
 
   // Leave balance
   var compLeft = bal.comp !== undefined ? bal.comp : 3;
-  var permLeft = bal.permission !== undefined ? bal.permission : 1;
+  var permLeft = Math.round((bal.permission !== undefined ? parseFloat(bal.permission) : 2) * 2);
 
   var html = '<div class="section-title" style="margin-top:4px">Quick Stats</div>';
   html += '<div class="home-quick-stats">';

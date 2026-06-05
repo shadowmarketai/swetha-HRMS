@@ -5,7 +5,7 @@ const { body, validationResult } = require('express-validator');
 const { auditLog } = require('../middleware/audit');
 
 const VALID_LEAVE_TYPES = ['casual', 'comp', 'permission'];
-// Note: earned and sick leave types removed from UI. Only casual, comp off, and permission (1/month) are active.
+// Note: earned and sick leave types removed from UI. Only casual, comp off, and permission (4/month, 0.5 days each) are active.
 
 // Ensure monthly CL accrual is up-to-date for an employee.
 // CL year starts in April. Each month from April onwards adds +1 to the balance.
@@ -20,7 +20,7 @@ async function ensureCLAccrual(pool, empCode) {
   if (rows.length === 0) {
     // Create balance row with 1 CL for current month
     await pool.query(
-      'INSERT INTO leave_balances (emp_code, casual, permission, cl_accrued_month) VALUES (?, 1, 1, ?) ON DUPLICATE KEY UPDATE cl_accrued_month = VALUES(cl_accrued_month), casual = casual + 1',
+      'INSERT INTO leave_balances (emp_code, casual, permission, cl_accrued_month) VALUES (?, 1, 2, ?) ON DUPLICATE KEY UPDATE cl_accrued_month = VALUES(cl_accrued_month), casual = casual + 1',
       [empCode, currentYM]
     );
     return;
@@ -116,10 +116,10 @@ router.post('/', verifyToken, [
       return res.status(400).json({ error: 'Please specify First Half or Second Half for half-day leave' });
     }
 
-    // Permission: 2-hour block, same day only
+    // Permission: 2-hour block, same day only. Counts as 0.5 day for payroll; balance tracks count ×0.5.
     let days;
     if (type === 'permission') {
-      days = 1;
+      days = 0.5;
       if (from !== to) return res.status(400).json({ error: 'Permission is for 2 hours on a single day only' });
     } else if (isHalfDay) {
       days = 0.5;
@@ -140,11 +140,11 @@ router.post('/', verifyToken, [
     // Compute paid vs LOP split
     let paidDays = 0, lopDays = 0, lopFlag = !!isLOP;
     if (type === 'permission') {
-      if (available < 1 && !lopFlag) {
-        return res.status(400).json({ error: 'You have used your 1 permission this month. Additional permission will be Loss of Pay (LOP). Confirm to proceed.' });
+      if (available < 0.5 && !lopFlag) {
+        return res.status(400).json({ error: 'You have used all 4 permissions this month. Additional permission will be Loss of Pay (LOP). Confirm to proceed.' });
       }
-      paidDays = available >= 1 ? 1 : 0;
-      lopDays = available >= 1 ? 0 : 1;
+      paidDays = available >= 0.5 ? 0.5 : 0;
+      lopDays = available >= 0.5 ? 0 : 0.5;
     } else if (type === 'casual') {
       // Paid days = min(available, requested); rest is LOP
       paidDays = Math.min(available, days);
@@ -310,11 +310,11 @@ router.get('/balance', verifyToken, async (req, res) => {
     await ensureCLAccrual(pool, req.user.empCode);
     const [rows] = await pool.query('SELECT * FROM leave_balances WHERE emp_code = ?', [req.user.empCode]);
     if (rows.length === 0) {
-      await pool.query('INSERT INTO leave_balances (emp_code, casual, permission) VALUES (?, 0, 1)', [req.user.empCode]);
-      return res.json({ casual: 0, comp: 3, permission: 1 });
+      await pool.query('INSERT INTO leave_balances (emp_code, casual, permission) VALUES (?, 0, 2)', [req.user.empCode]);
+      return res.json({ casual: 0, comp: 3, permission: 2 });
     }
     const b = rows[0];
-    res.json({ casual: parseFloat(b.casual) || 0, comp: b.comp || 0, permission: b.permission !== undefined ? b.permission : 1 });
+    res.json({ casual: parseFloat(b.casual) || 0, comp: b.comp || 0, permission: b.permission !== undefined ? parseFloat(b.permission) : 2 });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
@@ -327,7 +327,7 @@ router.get('/balance/all', verifyToken, requireRole('MD', 'HR'), async (req, res
     const [rows] = await pool.query('SELECT * FROM leave_balances');
     const result = {};
     rows.forEach(r => {
-      result[r.emp_code] = { casual: r.casual, comp: r.comp, permission: r.permission !== undefined ? r.permission : 1 };
+      result[r.emp_code] = { casual: r.casual, comp: r.comp, permission: r.permission !== undefined ? parseFloat(r.permission) : 2 };
     });
     res.json(result);
   } catch (err) {
@@ -340,9 +340,9 @@ router.get('/balance/all', verifyToken, requireRole('MD', 'HR'), async (req, res
 router.get('/balance/:code', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM leave_balances WHERE emp_code = ?', [req.params.code]);
-    if (rows.length === 0) return res.json({ casual: 12, comp: 3, permission: 1 });
+    if (rows.length === 0) return res.json({ casual: 12, comp: 3, permission: 2 });
     const b = rows[0];
-    res.json({ casual: b.casual || 0, comp: b.comp || 0, permission: b.permission !== undefined ? b.permission : 1 });
+    res.json({ casual: b.casual || 0, comp: b.comp || 0, permission: b.permission !== undefined ? parseFloat(b.permission) : 2 });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
