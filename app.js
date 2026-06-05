@@ -317,7 +317,10 @@ const NAV_CONFIG = {
     { id:'emp-acc-payments', label:'Payments', icon:'salary', deptOnly:['Accounts'], children:[
       { id:'emp-acc-approved-adv', label:'Approved Advances', action:{type:'overlay',target:'accounts-payments'} },
       { id:'emp-acc-approved-exp', label:'Approved Expenses', action:{type:'overlay',target:'accounts-payments'} },
-      { id:'emp-acc-settlement', label:'Settlement Tracker', action:{type:'overlay',target:'accounts-payments'} }
+      { id:'emp-acc-settlement', label:'Settlement Tracker', action:{type:'overlay',target:'accounts-payments'} },
+      { id:'emp-acc-adv-datewise', label:'Date-wise Advances', action:{type:'overlay',target:'accounts-payments'} },
+      { id:'emp-acc-exp-datewise', label:'Date-wise Expenses', action:{type:'overlay',target:'accounts-payments'} },
+      { id:'emp-acc-consolidated', label:'Consolidated Report', action:{type:'overlay',target:'accounts-payments'} }
     ]},
     { id:'emp-acc-salary', label:'All Salary', icon:'salary', deptOnly:['Accounts'], action:{type:'tab',target:'salary'} },
     { id:'emp-acc-procurement', label:'Procurement', icon:'store', deptOnly:['Accounts'], children:[
@@ -409,7 +412,10 @@ const NAV_CONFIG = {
     { id:'acc-payments', label:'Payments', icon:'salary', children:[
       { id:'acc-approved-adv', label:'Approved Advances', action:{type:'overlay',target:'accounts-payments'} },
       { id:'acc-approved-exp', label:'Approved Expenses', action:{type:'overlay',target:'accounts-payments'} },
-      { id:'acc-settlement', label:'Settlement Tracker', action:{type:'overlay',target:'accounts-payments'} }
+      { id:'acc-settlement', label:'Settlement Tracker', action:{type:'overlay',target:'accounts-payments'} },
+      { id:'acc-adv-datewise', label:'Date-wise Advances', action:{type:'overlay',target:'accounts-payments'} },
+      { id:'acc-exp-datewise', label:'Date-wise Expenses', action:{type:'overlay',target:'accounts-payments'} },
+      { id:'acc-consolidated', label:'Consolidated Report', action:{type:'overlay',target:'accounts-payments'} }
     ]},
     { id:'acc-salary', label:'Salary', icon:'salary', children:[
       { id:'acc-sal-self', label:'Self Salary', action:{type:'tab',target:'salary'} },
@@ -14406,6 +14412,9 @@ function editProject(id) {
 // =====================================================
 // ACCOUNTS DEPARTMENT — PAYMENTS & SETTLEMENTS
 // =====================================================
+var _accAdvFilter = { from: '', to: '', status: 'all' };
+var _accExpFilter = { from: '', to: '', status: 'all' };
+
 function renderAccountsPayments() {
   var c = document.getElementById('accPaymentsContent');
   if (!c) return;
@@ -14414,15 +14423,25 @@ function renderAccountsPayments() {
   var section = 'approved-advances';
   if (_activeNavId === 'emp-acc-approved-exp' || _activeNavId === 'acc-approved-exp') section = 'approved-expenses';
   if (_activeNavId === 'emp-acc-settlement' || _activeNavId === 'acc-settlement') section = 'settlement';
+  if (_activeNavId === 'emp-acc-adv-datewise' || _activeNavId === 'acc-adv-datewise') section = 'adv-datewise';
+  if (_activeNavId === 'emp-acc-exp-datewise' || _activeNavId === 'acc-exp-datewise') section = 'exp-datewise';
+  if (_activeNavId === 'emp-acc-consolidated' || _activeNavId === 'acc-consolidated') section = 'consolidated';
 
   if (titleEl) {
-    var titles = {'approved-advances':'Approved Advances','approved-expenses':'Approved Expenses','settlement':'Settlement Tracker'};
+    var titles = {
+      'approved-advances':'Approved Advances','approved-expenses':'Approved Expenses',
+      'settlement':'Settlement Tracker','adv-datewise':'Date-wise Advances',
+      'exp-datewise':'Date-wise Expenses','consolidated':'Consolidated Report'
+    };
     titleEl.textContent = titles[section] || 'Payments';
   }
 
   if (section === 'approved-advances') renderAccApprovedAdvances(c);
   else if (section === 'approved-expenses') renderAccApprovedExpenses(c);
   else if (section === 'settlement') renderAccSettlementTracker(c);
+  else if (section === 'adv-datewise') renderAccDatewiseAdvances(c);
+  else if (section === 'exp-datewise') renderAccDatewiseExpenses(c);
+  else if (section === 'consolidated') renderAccConsolidatedReport(c);
 }
 
 function renderAccApprovedAdvances(c) {
@@ -14649,6 +14668,273 @@ function downloadSettlementCSV() {
     rows.push(['"' + e.name + '"', code, e.advApproved, e.advPaid, e.expApproved, e.expPaid, Math.abs(balance), status].join(','));
   });
   downloadCSV(rows.join('\n'), 'Settlement_Tracker_' + new Date().toISOString().slice(0, 10) + '.csv');
+}
+
+// =====================================================
+// ACCOUNTS REPORTS: DATE-WISE + CONSOLIDATED
+// =====================================================
+
+function _accDateFilterBar(filterObj, applyFn, sectionId) {
+  var dlSvg = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+  return '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px;background:var(--gray-50);padding:10px;border-radius:var(--radius-sm)">' +
+    '<span style="font-size:.7rem;font-weight:600;color:var(--gray-500)">Date Range:</span>' +
+    '<input type="date" id="' + sectionId + 'From" value="' + escapeAttr(filterObj.from) + '" style="padding:5px 8px;border:1px solid var(--gray-200);border-radius:4px;font-size:.75rem">' +
+    '<span style="font-size:.7rem;color:var(--gray-400)">to</span>' +
+    '<input type="date" id="' + sectionId + 'To" value="' + escapeAttr(filterObj.to) + '" style="padding:5px 8px;border:1px solid var(--gray-200);border-radius:4px;font-size:.75rem">' +
+    '<button onclick="' + applyFn + '" style="padding:5px 12px;font-size:.7rem;font-weight:600;background:var(--primary);color:#fff;border:none;border-radius:4px;cursor:pointer">Apply</button>' +
+    '<button onclick="' + sectionId + 'ClearFilter()" style="padding:5px 10px;font-size:.7rem;background:white;border:1px solid var(--gray-200);border-radius:4px;cursor:pointer">Clear</button>' +
+    dlSvg.replace(dlSvg, '') +
+    '</div>';
+}
+
+function _applyAccAdvFilter() {
+  _accAdvFilter.from = (document.getElementById('accAdvDateFrom') || {}).value || '';
+  _accAdvFilter.to   = (document.getElementById('accAdvDateTo')   || {}).value || '';
+  renderAccDatewiseAdvances(document.getElementById('accPaymentsContent'));
+}
+function accAdvDateFromClearFilter() {
+  _accAdvFilter.from = ''; _accAdvFilter.to = '';
+  renderAccDatewiseAdvances(document.getElementById('accPaymentsContent'));
+}
+
+function _applyAccExpFilter() {
+  _accExpFilter.from = (document.getElementById('accExpDateFrom') || {}).value || '';
+  _accExpFilter.to   = (document.getElementById('accExpDateTo')   || {}).value || '';
+  renderAccDatewiseExpenses(document.getElementById('accPaymentsContent'));
+}
+function accExpDateFromClearFilter() {
+  _accExpFilter.from = ''; _accExpFilter.to = '';
+  renderAccDatewiseExpenses(document.getElementById('accPaymentsContent'));
+}
+
+function _accInDateRange(dateStr, from, to) {
+  if (!dateStr) return true;
+  var d = dateStr.substring(0, 10);
+  if (from && d < from) return false;
+  if (to   && d > to)   return false;
+  return true;
+}
+
+// Date-wise Advances
+function renderAccDatewiseAdvances(c) {
+  var from = _accAdvFilter.from, to = _accAdvFilter.to;
+  var all = (typeof advanceRequests !== 'undefined' ? advanceRequests : [])
+    .filter(function(r) { var s = (r.status||'').toLowerCase(); return (s==='approved'||s==='paid') && _accInDateRange(r.appliedDate, from, to); })
+    .sort(function(a, b) { return (a.appliedDate||'') < (b.appliedDate||'') ? -1 : 1; });
+  var total = all.reduce(function(s, r) { return s + (r.amount||0); }, 0);
+  var html = '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px;background:var(--gray-50);padding:10px;border-radius:var(--radius-sm)">' +
+    '<span style="font-size:.7rem;font-weight:600;color:var(--gray-500)">Date Range:</span>' +
+    '<input type="date" id="accAdvDateFrom" value="' + escapeAttr(from) + '" style="padding:5px 8px;border:1px solid var(--gray-200);border-radius:4px;font-size:.75rem">' +
+    '<span style="font-size:.7rem;color:var(--gray-400)">to</span>' +
+    '<input type="date" id="accAdvDateTo" value="' + escapeAttr(to) + '" style="padding:5px 8px;border:1px solid var(--gray-200);border-radius:4px;font-size:.75rem">' +
+    '<button onclick="_applyAccAdvFilter()" style="padding:5px 12px;font-size:.7rem;font-weight:600;background:var(--primary);color:#fff;border:none;border-radius:4px;cursor:pointer">Apply</button>' +
+    '<button onclick="_accAdvFilter.from=\'\';_accAdvFilter.to=\'\';renderAccDatewiseAdvances(document.getElementById(\'accPaymentsContent\'))" style="padding:5px 10px;font-size:.7rem;background:white;border:1px solid var(--gray-200);border-radius:4px;cursor:pointer">Clear</button>' +
+    '<button onclick="downloadDatewiseAdvancesCSV()" style="padding:5px 10px;font-size:.7rem;font-weight:600;background:#10B981;color:#fff;border:none;border-radius:4px;cursor:pointer;margin-left:auto">⬇ CSV</button>' +
+    '</div>';
+  if (all.length === 0) {
+    html += '<div class="card" style="padding:16px;text-align:center;color:var(--gray-400);font-size:.78rem">No advances in this date range</div>';
+  } else {
+    html += '<div class="card" style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.72rem">';
+    html += '<thead><tr style="background:var(--gray-50)"><th style="padding:7px 8px;text-align:left">Date</th><th style="padding:7px 8px;text-align:left">Employee</th><th style="padding:7px 8px;text-align:left">Type</th><th style="padding:7px 8px;text-align:left">Reason</th><th style="padding:7px 8px;text-align:right">Amount</th><th style="padding:7px 8px;text-align:center">Status</th><th style="padding:7px 8px;text-align:left">Approved By</th></tr></thead><tbody>';
+    var ADV_TYPE = {site:'Site',salary:'Salary',travel:'Travel',site_expense:'Site Expense',travel_expense:'Travel Expense'};
+    all.forEach(function(r) {
+      var s = (r.status||'').toLowerCase();
+      var badge = s === 'paid' ? '<span style="background:#dcfce7;color:#16a34a;padding:1px 7px;border-radius:4px;font-size:.65rem;font-weight:700">PAID</span>' : '<span style="background:#fef9c3;color:#b45309;padding:1px 7px;border-radius:4px;font-size:.65rem;font-weight:700">APPROVED</span>';
+      html += '<tr style="border-bottom:1px solid var(--gray-100)"><td style="padding:7px 8px">' + escapeHTML(r.appliedDate||'') + '</td><td style="padding:7px 8px;font-weight:600">' + escapeHTML(r.empName||r.empCode) + '<br><span style="font-size:.65rem;color:var(--gray-400)">' + escapeHTML(r.empCode) + '</span></td><td style="padding:7px 8px">' + escapeHTML(ADV_TYPE[r.type]||r.type||'') + '</td><td style="padding:7px 8px;font-size:.68rem;color:var(--gray-500);max-width:120px">' + escapeHTML((r.reason||r.details||'').substring(0,50)) + '</td><td style="padding:7px 8px;text-align:right;font-weight:700;color:var(--primary)">Rs.' + (r.amount||0).toLocaleString('en-IN') + '</td><td style="padding:7px 8px;text-align:center">' + badge + '</td><td style="padding:7px 8px;font-size:.68rem;color:var(--gray-500)">' + escapeHTML(r.reviewedBy||'—') + '</td></tr>';
+    });
+    html += '</tbody><tfoot><tr style="background:var(--gray-50);font-weight:700"><td colspan="4" style="padding:8px">Total (' + all.length + ' records)</td><td style="padding:8px;text-align:right;color:var(--primary)">Rs.' + total.toLocaleString('en-IN') + '</td><td colspan="2"></td></tr></tfoot></table></div>';
+  }
+  c.innerHTML = html;
+}
+
+function downloadDatewiseAdvancesCSV() {
+  var from = _accAdvFilter.from, to = _accAdvFilter.to;
+  var all = (typeof advanceRequests !== 'undefined' ? advanceRequests : [])
+    .filter(function(r) { var s = (r.status||'').toLowerCase(); return (s==='approved'||s==='paid') && _accInDateRange(r.appliedDate, from, to); })
+    .sort(function(a, b) { return (a.appliedDate||'') < (b.appliedDate||'') ? -1 : 1; });
+  var rows = ['Date,Employee,Code,Dept,Type,Reason,Amount,Status,Approved By'];
+  var ADV_TYPE = {site:'Site',salary:'Salary',travel:'Travel',site_expense:'Site Expense',travel_expense:'Travel Expense'};
+  all.forEach(function(r) {
+    rows.push([r.appliedDate||'', '"'+(r.empName||r.empCode)+'"', r.empCode, r.dept||'', ADV_TYPE[r.type]||r.type||'', '"'+(r.reason||r.details||'')+'"', r.amount||0, r.status||'', r.reviewedBy||''].join(','));
+  });
+  rows.push('');
+  rows.push('"Total Rs.'+(all.reduce(function(s,r){return s+(r.amount||0);},0)).toLocaleString('en-IN')+'"');
+  _triggerCSVDownload(rows.join('\n'), 'advance_datewise_' + (from||'all') + '_to_' + (to||'today') + '.csv');
+  showToast('Downloaded advance report');
+}
+
+// Date-wise Expenses
+function renderAccDatewiseExpenses(c) {
+  var from = _accExpFilter.from, to = _accExpFilter.to;
+  var all = (typeof expenseReimbursements !== 'undefined' ? expenseReimbursements : [])
+    .filter(function(e) { return (e.status==='Approved'||e.status==='Paid') && _accInDateRange(e.date||e.submittedOn, from, to); })
+    .sort(function(a, b) { return (a.date||a.submittedOn||'') < (b.date||b.submittedOn||'') ? -1 : 1; });
+  var total = all.reduce(function(s, e) { return s + (e.amount||0); }, 0);
+  var html = '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px;background:var(--gray-50);padding:10px;border-radius:var(--radius-sm)">' +
+    '<span style="font-size:.7rem;font-weight:600;color:var(--gray-500)">Date Range:</span>' +
+    '<input type="date" id="accExpDateFrom" value="' + escapeAttr(from) + '" style="padding:5px 8px;border:1px solid var(--gray-200);border-radius:4px;font-size:.75rem">' +
+    '<span style="font-size:.7rem;color:var(--gray-400)">to</span>' +
+    '<input type="date" id="accExpDateTo" value="' + escapeAttr(to) + '" style="padding:5px 8px;border:1px solid var(--gray-200);border-radius:4px;font-size:.75rem">' +
+    '<button onclick="_applyAccExpFilter()" style="padding:5px 12px;font-size:.7rem;font-weight:600;background:var(--primary);color:#fff;border:none;border-radius:4px;cursor:pointer">Apply</button>' +
+    '<button onclick="_accExpFilter.from=\'\';_accExpFilter.to=\'\';renderAccDatewiseExpenses(document.getElementById(\'accPaymentsContent\'))" style="padding:5px 10px;font-size:.7rem;background:white;border:1px solid var(--gray-200);border-radius:4px;cursor:pointer">Clear</button>' +
+    '<button onclick="downloadDatewiseExpensesCSV()" style="padding:5px 10px;font-size:.7rem;font-weight:600;background:#10B981;color:#fff;border:none;border-radius:4px;cursor:pointer;margin-left:auto">⬇ CSV</button>' +
+    '</div>';
+  if (all.length === 0) {
+    html += '<div class="card" style="padding:16px;text-align:center;color:var(--gray-400);font-size:.78rem">No expenses in this date range</div>';
+  } else {
+    html += '<div class="card" style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.72rem">';
+    html += '<thead><tr style="background:var(--gray-50)"><th style="padding:7px 8px;text-align:left">Date</th><th style="padding:7px 8px;text-align:left">Employee</th><th style="padding:7px 8px;text-align:left">Category</th><th style="padding:7px 8px;text-align:left">Description</th><th style="padding:7px 8px;text-align:right">Amount</th><th style="padding:7px 8px;text-align:center">Status</th><th style="padding:7px 8px;text-align:left">Approved By</th></tr></thead><tbody>';
+    all.forEach(function(e) {
+      var badge = e.status === 'Paid' ? '<span style="background:#dcfce7;color:#16a34a;padding:1px 7px;border-radius:4px;font-size:.65rem;font-weight:700">PAID</span>' : '<span style="background:#fef9c3;color:#b45309;padding:1px 7px;border-radius:4px;font-size:.65rem;font-weight:700">APPROVED</span>';
+      var dateLabel = e.date || e.submittedOn || '';
+      html += '<tr style="border-bottom:1px solid var(--gray-100)"><td style="padding:7px 8px">' + escapeHTML(dateLabel) + '</td><td style="padding:7px 8px;font-weight:600">' + escapeHTML(e.empName||e.empCode) + '<br><span style="font-size:.65rem;color:var(--gray-400)">' + escapeHTML(e.empCode) + '</span></td><td style="padding:7px 8px">' + escapeHTML(e.category||e.expenseType||'') + '</td><td style="padding:7px 8px;font-size:.68rem;color:var(--gray-500);max-width:120px">' + escapeHTML((e.description||'').substring(0,50)) + '</td><td style="padding:7px 8px;text-align:right;font-weight:700;color:var(--primary)">Rs.' + (e.amount||0).toLocaleString('en-IN') + '</td><td style="padding:7px 8px;text-align:center">' + badge + '</td><td style="padding:7px 8px;font-size:.68rem;color:var(--gray-500)">' + escapeHTML(e.reviewedBy||'—') + '</td></tr>';
+    });
+    html += '</tbody><tfoot><tr style="background:var(--gray-50);font-weight:700"><td colspan="4" style="padding:8px">Total (' + all.length + ' records)</td><td style="padding:8px;text-align:right;color:var(--primary)">Rs.' + total.toLocaleString('en-IN') + '</td><td colspan="2"></td></tr></tfoot></table></div>';
+  }
+  c.innerHTML = html;
+}
+
+function downloadDatewiseExpensesCSV() {
+  var from = _accExpFilter.from, to = _accExpFilter.to;
+  var all = (typeof expenseReimbursements !== 'undefined' ? expenseReimbursements : [])
+    .filter(function(e) { return (e.status==='Approved'||e.status==='Paid') && _accInDateRange(e.date||e.submittedOn, from, to); })
+    .sort(function(a, b) { return (a.date||a.submittedOn||'') < (b.date||b.submittedOn||'') ? -1 : 1; });
+  var rows = ['Date,Employee,Code,Dept,Category,Description,Project,Amount,Status,Approved By'];
+  all.forEach(function(e) {
+    rows.push([(e.date||e.submittedOn||''), '"'+(e.empName||e.empCode)+'"', e.empCode, e.dept||'', e.category||e.expenseType||'', '"'+(e.description||'')+'"', e.project||'', e.amount||0, e.status||'', e.reviewedBy||''].join(','));
+  });
+  rows.push('');
+  rows.push('"Total Rs.'+(all.reduce(function(s,e){return s+(e.amount||0);},0)).toLocaleString('en-IN')+'"');
+  _triggerCSVDownload(rows.join('\n'), 'expense_datewise_' + (from||'all') + '_to_' + (to||'today') + '.csv');
+  showToast('Downloaded expense report');
+}
+
+// Consolidated Payments Report
+var _accConsFilter = { from: '', to: '' };
+
+function renderAccConsolidatedReport(c) {
+  var from = _accConsFilter.from, to = _accConsFilter.to;
+  var advances = (typeof advanceRequests !== 'undefined' ? advanceRequests : [])
+    .filter(function(r) { var s=(r.status||'').toLowerCase(); return (s==='approved'||s==='paid') && _accInDateRange(r.appliedDate, from, to); });
+  var expenses = (typeof expenseReimbursements !== 'undefined' ? expenseReimbursements : [])
+    .filter(function(e) { return (e.status==='Approved'||e.status==='Paid') && _accInDateRange(e.date||e.submittedOn, from, to); });
+  var advTotal = advances.reduce(function(s, r) { return s + (r.amount||0); }, 0);
+  var expTotal = expenses.reduce(function(s, e) { return s + (e.amount||0); }, 0);
+  var grandTotal = advTotal + expTotal;
+  var html = '<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px;background:var(--gray-50);padding:10px;border-radius:var(--radius-sm)">' +
+    '<span style="font-size:.7rem;font-weight:600;color:var(--gray-500)">Date Range:</span>' +
+    '<input type="date" id="accConsDateFrom" value="' + escapeAttr(from) + '" style="padding:5px 8px;border:1px solid var(--gray-200);border-radius:4px;font-size:.75rem">' +
+    '<span style="font-size:.7rem;color:var(--gray-400)">to</span>' +
+    '<input type="date" id="accConsDateTo" value="' + escapeAttr(to) + '" style="padding:5px 8px;border:1px solid var(--gray-200);border-radius:4px;font-size:.75rem">' +
+    '<button onclick="_accConsFilter.from=(document.getElementById(\'accConsDateFrom\')||{}).value||\'\';_accConsFilter.to=(document.getElementById(\'accConsDateTo\')||{}).value||\'\';renderAccConsolidatedReport(document.getElementById(\'accPaymentsContent\'))" style="padding:5px 12px;font-size:.7rem;font-weight:600;background:var(--primary);color:#fff;border:none;border-radius:4px;cursor:pointer">Apply</button>' +
+    '<button onclick="_accConsFilter.from=\'\';_accConsFilter.to=\'\';renderAccConsolidatedReport(document.getElementById(\'accPaymentsContent\'))" style="padding:5px 10px;font-size:.7rem;background:white;border:1px solid var(--gray-200);border-radius:4px;cursor:pointer">Clear</button>' +
+    '<button onclick="downloadConsolidatedCSV()" style="padding:5px 10px;font-size:.7rem;font-weight:600;background:#10B981;color:#fff;border:none;border-radius:4px;cursor:pointer">⬇ CSV</button>' +
+    '<button onclick="downloadConsolidatedPDF()" style="padding:5px 10px;font-size:.7rem;font-weight:600;background:var(--primary);color:#fff;border:none;border-radius:4px;cursor:pointer">⬇ PDF</button>' +
+    '</div>';
+  // Summary cards
+  html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px">';
+  html += '<div class="card" style="padding:10px;text-align:center"><div style="font-size:.68rem;color:var(--gray-500);margin-bottom:2px">Total Advances</div><div style="font-size:.92rem;font-weight:700;color:#d97706">Rs.' + advTotal.toLocaleString('en-IN') + '</div><div style="font-size:.62rem;color:var(--gray-400)">' + advances.length + ' records</div></div>';
+  html += '<div class="card" style="padding:10px;text-align:center"><div style="font-size:.68rem;color:var(--gray-500);margin-bottom:2px">Total Expenses</div><div style="font-size:.92rem;font-weight:700;color:#7c3aed">Rs.' + expTotal.toLocaleString('en-IN') + '</div><div style="font-size:.62rem;color:var(--gray-400)">' + expenses.length + ' records</div></div>';
+  html += '<div class="card" style="padding:10px;text-align:center;border:2px solid var(--primary)"><div style="font-size:.68rem;color:var(--gray-500);margin-bottom:2px">Grand Total</div><div style="font-size:.92rem;font-weight:700;color:var(--primary)">Rs.' + grandTotal.toLocaleString('en-IN') + '</div><div style="font-size:.62rem;color:var(--gray-400)">' + (advances.length + expenses.length) + ' records</div></div>';
+  html += '</div>';
+  // Combined table
+  var combined = [];
+  advances.forEach(function(r) { combined.push({ date: r.appliedDate||'', emp: r.empName||r.empCode, code: r.empCode, type: 'Advance', category: r.type||'', desc: r.reason||r.details||'', amount: r.amount||0, status: r.status, by: r.reviewedBy||'' }); });
+  expenses.forEach(function(e) { combined.push({ date: e.date||e.submittedOn||'', emp: e.empName||e.empCode, code: e.empCode, type: 'Expense', category: e.category||e.expenseType||'', desc: e.description||'', amount: e.amount||0, status: e.status, by: e.reviewedBy||'' }); });
+  combined.sort(function(a, b) { return a.date < b.date ? -1 : 1; });
+  html += '<div class="card" style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.7rem">';
+  html += '<thead><tr style="background:var(--gray-50)"><th style="padding:7px 8px;text-align:left">Date</th><th style="padding:7px 8px;text-align:left">Employee</th><th style="padding:7px 8px;text-align:center">Type</th><th style="padding:7px 8px;text-align:left">Category</th><th style="padding:7px 8px;text-align:left">Description</th><th style="padding:7px 8px;text-align:right">Amount</th><th style="padding:7px 8px;text-align:center">Status</th></tr></thead><tbody>';
+  combined.forEach(function(row) {
+    var typeBadge = row.type === 'Advance' ? '<span style="background:#FEF9C3;color:#B45309;padding:1px 6px;border-radius:4px;font-size:.6rem;font-weight:600">ADV</span>' : '<span style="background:#EDE9FE;color:#6D28D9;padding:1px 6px;border-radius:4px;font-size:.6rem;font-weight:600">EXP</span>';
+    var s = (row.status||'').toLowerCase();
+    var stBadge = (s==='paid'||s==='reimbursed') ? '<span style="background:#dcfce7;color:#16a34a;padding:1px 6px;border-radius:4px;font-size:.6rem;font-weight:700">PAID</span>' : '<span style="background:#fef9c3;color:#b45309;padding:1px 6px;border-radius:4px;font-size:.6rem;font-weight:700">APPROVED</span>';
+    html += '<tr style="border-bottom:1px solid var(--gray-100)"><td style="padding:7px 8px">' + escapeHTML(row.date) + '</td><td style="padding:7px 8px"><span style="font-weight:600">' + escapeHTML(row.emp) + '</span><br><span style="font-size:.62rem;color:var(--gray-400)">' + escapeHTML(row.code) + '</span></td><td style="padding:7px 8px;text-align:center">' + typeBadge + '</td><td style="padding:7px 8px">' + escapeHTML(row.category) + '</td><td style="padding:7px 8px;font-size:.65rem;color:var(--gray-500);max-width:100px">' + escapeHTML(row.desc.substring(0,40)) + '</td><td style="padding:7px 8px;text-align:right;font-weight:700;color:var(--primary)">Rs.' + row.amount.toLocaleString('en-IN') + '</td><td style="padding:7px 8px;text-align:center">' + stBadge + '</td></tr>';
+  });
+  html += '</tbody><tfoot><tr style="background:var(--gray-50);font-weight:700"><td colspan="5" style="padding:8px">Grand Total (' + combined.length + ' records)</td><td style="padding:8px;text-align:right;color:var(--primary)">Rs.' + grandTotal.toLocaleString('en-IN') + '</td><td></td></tr></tfoot></table></div>';
+  c.innerHTML = html;
+}
+
+function downloadConsolidatedCSV() {
+  var from = _accConsFilter.from, to = _accConsFilter.to;
+  var advances = (typeof advanceRequests !== 'undefined' ? advanceRequests : [])
+    .filter(function(r) { var s=(r.status||'').toLowerCase(); return (s==='approved'||s==='paid') && _accInDateRange(r.appliedDate, from, to); });
+  var expenses = (typeof expenseReimbursements !== 'undefined' ? expenseReimbursements : [])
+    .filter(function(e) { return (e.status==='Approved'||e.status==='Paid') && _accInDateRange(e.date||e.submittedOn, from, to); });
+  var combined = [];
+  advances.forEach(function(r) { combined.push({ date: r.appliedDate||'', emp: r.empName||r.empCode, code: r.empCode, dept: r.dept||'', type: 'Advance', category: r.type||'', desc: r.reason||r.details||'', amount: r.amount||0, status: r.status, by: r.reviewedBy||'' }); });
+  expenses.forEach(function(e) { combined.push({ date: e.date||e.submittedOn||'', emp: e.empName||e.empCode, code: e.empCode, dept: e.dept||'', type: 'Expense', category: e.category||e.expenseType||'', desc: e.description||'', amount: e.amount||0, status: e.status, by: e.reviewedBy||'' }); });
+  combined.sort(function(a, b) { return a.date < b.date ? -1 : 1; });
+  var rows = ['Date,Employee,Code,Dept,Type,Category,Description,Amount,Status,Approved By'];
+  combined.forEach(function(row) {
+    rows.push([row.date, '"'+row.emp+'"', row.code, row.dept, row.type, row.category, '"'+row.desc+'"', row.amount, row.status, row.by].join(','));
+  });
+  rows.push('');
+  rows.push('"Total Advances: Rs.'+(advances.reduce(function(s,r){return s+(r.amount||0);},0)).toLocaleString('en-IN')+'",,,,,,,');
+  rows.push('"Total Expenses: Rs.'+(expenses.reduce(function(s,e){return s+(e.amount||0);},0)).toLocaleString('en-IN')+'",,,,,,,');
+  rows.push('"Grand Total: Rs.'+(combined.reduce(function(s,r){return s+(r.amount||0);},0)).toLocaleString('en-IN')+'",,,,,,,');
+  _triggerCSVDownload(rows.join('\n'), 'consolidated_payments_' + (from||'all') + '_to_' + (to||'today') + '.csv');
+  showToast('Downloaded consolidated report');
+}
+
+async function downloadConsolidatedPDF() {
+  await loadJsPdf();
+  var { jsPDF } = window.jspdf;
+  var from = _accConsFilter.from, to = _accConsFilter.to;
+  var advances = (typeof advanceRequests !== 'undefined' ? advanceRequests : [])
+    .filter(function(r) { var s=(r.status||'').toLowerCase(); return (s==='approved'||s==='paid') && _accInDateRange(r.appliedDate, from, to); });
+  var expenses = (typeof expenseReimbursements !== 'undefined' ? expenseReimbursements : [])
+    .filter(function(e) { return (e.status==='Approved'||e.status==='Paid') && _accInDateRange(e.date||e.submittedOn, from, to); });
+  var combined = [];
+  advances.forEach(function(r) { combined.push({ date: r.appliedDate||'', emp: (r.empName||r.empCode).substring(0,20), code: r.empCode, type: 'ADV', category: (r.type||'').substring(0,12), amount: r.amount||0, status: r.status }); });
+  expenses.forEach(function(e) { combined.push({ date: e.date||e.submittedOn||'', emp: (e.empName||e.empCode).substring(0,20), code: e.empCode, type: 'EXP', category: (e.category||e.expenseType||'').substring(0,12), amount: e.amount||0, status: e.status }); });
+  combined.sort(function(a, b) { return a.date < b.date ? -1 : 1; });
+  var advTotal = advances.reduce(function(s,r){return s+(r.amount||0);},0);
+  var expTotal = expenses.reduce(function(s,e){return s+(e.amount||0);},0);
+  var doc = new jsPDF('p', 'mm', 'a4');
+  var pw=210, lm=14, rm=196, cw=rm-lm;
+  var primary=[76,81,191], dark=[30,30,60], mid=[100,100,120], light=[245,245,252];
+  var y=14;
+  try { doc.addImage('data:image/png;base64,'+COMPANY_LOGO_B64,'PNG',lm,y,28,10); } catch(e) {
+    doc.setFillColor(...primary); doc.roundedRect(lm,y,28,10,2,2,'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(255,255,255); doc.text('SS',lm+2,y+6.5);
+  }
+  doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(...primary);
+  doc.text('SWETHA STRUCTURES PRIVATE LIMITED', lm+31, y+4.5);
+  doc.setFont('helvetica','normal'); doc.setFontSize(6.5); doc.setTextColor(...mid);
+  doc.text('No.44, Alagu Nagar, Saravanampatti, Coimbatore, TN 641035 | GSTIN: 33AAWCS9286M1Z6', lm+31, y+9.5);
+  y+=16; doc.setDrawColor(...primary); doc.setLineWidth(0.5); doc.line(lm,y,rm,y);
+  y+=7; doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...dark);
+  var periodLabel = (from && to) ? (from + ' to ' + to) : (from ? 'From '+from : (to ? 'Up to '+to : 'All Records'));
+  doc.text('CONSOLIDATED PAYMENTS REPORT — ' + periodLabel.toUpperCase(), pw/2, y, {align:'center'});
+  // Summary
+  y+=8; doc.setFillColor(...light); doc.roundedRect(lm,y,cw,14,2,2,'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...primary);
+  doc.text('Advances: Rs.'+advTotal.toLocaleString('en-IN')+' ('+advances.length+' records)', lm+4, y+6);
+  doc.text('Expenses: Rs.'+expTotal.toLocaleString('en-IN')+' ('+expenses.length+' records)', lm+70, y+6);
+  doc.text('Grand Total: Rs.'+(advTotal+expTotal).toLocaleString('en-IN'), lm+140, y+6);
+  y+=18;
+  // Table
+  var colW=[20,36,8,16,16,22,14]; var colX=[lm]; colW.forEach(function(w,i){if(i>0)colX.push(colX[i-1]+colW[i-1]);});
+  var hdrs=['Date','Employee','T','Category','Amount (Rs.)','Status','By'];
+  doc.setFillColor(...primary); doc.rect(lm,y,cw,6,'F');
+  doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(255,255,255);
+  hdrs.forEach(function(h,i){doc.text(h,colX[i]+1,y+4.5);});
+  y+=6;
+  var rowIdx=0;
+  combined.forEach(function(row) {
+    if(y>272){doc.addPage();y=14;}
+    if(rowIdx%2===0){doc.setFillColor(248,248,255);doc.rect(lm,y,cw,5.5,'F');}
+    doc.setFont('helvetica','normal'); doc.setFontSize(6); doc.setTextColor(...dark);
+    var s=(row.status||'').toLowerCase();
+    var stLabel=s==='paid'?'PAID':s==='reimbursed'?'PAID':'APPROVED';
+    [row.date,row.emp,row.type,row.category,'Rs.'+row.amount.toLocaleString('en-IN'),stLabel,row.code].forEach(function(v,i){doc.text(String(v),colX[i]+1,y+4);});
+    y+=5.5; rowIdx++;
+  });
+  y+=6; doc.setDrawColor(...primary); doc.line(lm,y,rm,y);
+  y+=5; doc.setFont('helvetica','normal'); doc.setFontSize(6); doc.setTextColor(...mid);
+  doc.text('Generated: '+new Date().toLocaleDateString('en-IN')+' | Swetha HRMS', rm, y, {align:'right'});
+  savePdfSafe(doc, 'consolidated_payments_'+new Date().toISOString().slice(0,10)+'.pdf');
+  showToast('PDF downloaded');
 }
 
 // Download a single employee's settlement as a branded PDF
@@ -15861,12 +16147,15 @@ function renderEmpSalaryTable() {
     var hra = Math.round(e.salary * 0.2);
     var da = Math.round(e.salary * 0.15);
     var other = e.salary - basic - hra - da;
-    html += '<tr style="border-bottom:1px solid var(--gray-100);cursor:pointer" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'table-row\':\'none\'">';
-    html += '<td style="padding:8px 6px;font-weight:600">' + escapeHTML(e.name) + '</td>';
+    var editInfo = _salaryEditsThisSession[e.code];
+    var rowBg = editInfo ? 'background:#FFFBEB;' : '';
+    var editBadge = editInfo ? '<span style="display:inline-block;font-size:.55rem;padding:1px 5px;border-radius:4px;background:#FEF3C7;color:#D97706;margin-left:5px;font-weight:700;border:1px solid #FCD34D" title="Updated from Rs.' + editInfo.oldSalary.toLocaleString('en-IN') + ' by ' + editInfo.editedBy + ' at ' + editInfo.editedAt + '">✎ Edited</span>' : '';
+    html += '<tr style="border-bottom:1px solid var(--gray-100);cursor:pointer;' + rowBg + '" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display===\'none\'?\'table-row\':\'none\'">';
+    html += '<td style="padding:8px 6px;font-weight:600">' + escapeHTML(e.name) + editBadge + '</td>';
     html += '<td style="padding:8px 6px;color:var(--gray-500)">' + escapeHTML(e.code) + '</td>';
     html += '<td style="padding:8px 6px">' + escapeHTML(e.dept) + '</td>';
     html += '<td style="padding:8px 6px">' + escapeHTML(e.designation) + '</td>';
-    html += '<td style="padding:8px 6px;text-align:right;font-weight:600">Rs.' + e.salary.toLocaleString('en-IN') + '</td>';
+    html += '<td style="padding:8px 6px;text-align:right;font-weight:600' + (editInfo ? ';color:#D97706' : '') + '">Rs.' + e.salary.toLocaleString('en-IN') + '</td>';
     html += '<td style="padding:8px 6px;font-size:.65rem">' + escapeHTML(e.bank || '') + '</td>';
     if (canEditSalary) html += '<td style="padding:8px 6px;text-align:center"><button class="btn btn-sm" style="font-size:.6rem;padding:2px 8px;background:var(--primary);color:#fff;border-radius:4px" onclick="event.stopPropagation();openSalaryEditForm(\'' + escapeAttr(e.code) + '\',' + e.salary + ')">Edit</button></td>';
     html += '</tr>';
@@ -15886,6 +16175,9 @@ function renderEmpSalaryTable() {
   html += '<div class="card" style="margin-top:8px;padding:10px;display:flex;justify-content:space-between;font-size:.78rem"><span>Total Employees: <strong>' + filtered.length + '</strong></span><span>Total Monthly Payroll: <strong>Rs.' + totalSalary.toLocaleString('en-IN') + '</strong></span></div>';
   area.innerHTML = html;
 }
+
+// Tracks salary edits made this session: empCode -> { oldSalary, newSalary, editedBy, editedAt }
+var _salaryEditsThisSession = {};
 
 // Salary edit form (Accounts dept / MD / HR)
 function openSalaryEditForm(empCode, currentSalary) {
@@ -15909,10 +16201,15 @@ async function saveSalaryUpdate(empCode) {
   var newSalary = parseFloat((document.getElementById('newSalaryAmt') || {}).value);
   if (isNaN(newSalary) || newSalary < 0) { showToast('Please enter a valid salary amount'); return; }
   try {
-    await apiCall('PUT', '/salary/' + empCode, { salary: newSalary });
-    // Update local data
     var emp = EMPLOYEES.find(function(e) { return e.code === empCode; });
+    var oldSalary = emp ? emp.salary : 0;
+    await apiCall('PUT', '/salary/' + empCode, { salary: newSalary });
     if (emp) emp.salary = newSalary;
+    _salaryEditsThisSession[empCode] = {
+      oldSalary: oldSalary, newSalary: newSalary,
+      editedBy: currentUser ? currentUser.name : 'Accounts',
+      editedAt: new Date().toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
+    };
     showToast('Salary updated for ' + empCode);
     renderEmpSalaryTable();
   } catch (e) {
