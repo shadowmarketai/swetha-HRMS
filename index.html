@@ -516,15 +516,17 @@
 
   <div class="leave-form-overlay" id="attendanceExportOverlay" onclick="if(event.target===this)closeAttendanceExportModal()">
     <div class="leave-form-sheet">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
         <h3 style="font-family:var(--font-display);font-size:1rem;font-weight:700">Download Attendance Report</h3>
         <button style="background:none;border:none;cursor:pointer;font-size:1.2rem;color:var(--gray-400)" onclick="closeAttendanceExportModal()">&times;</button>
       </div>
-      <div style="display:flex;align-items:flex-start;gap:10px;background:var(--primary-50);border:1px solid var(--primary-100);border-radius:var(--radius-sm);padding:10px 14px;margin-bottom:16px">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" style="flex-shrink:0;margin-top:1px"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-        <div style="font-size:.72rem;color:var(--gray-600);line-height:1.5">CSV with daily worked hours per employee — one column per day, plus total present/absent days &amp; attendance %.</div>
+      <!-- Report type tabs -->
+      <div style="display:flex;gap:6px;margin-bottom:14px">
+        <button id="attExportTeamTab" onclick="switchAttExportTab('team')" style="flex:1;padding:7px;font-size:.75rem;font-weight:600;border-radius:var(--radius-sm);border:1.5px solid var(--primary);background:var(--primary);color:#fff;cursor:pointer">Team Report</button>
+        <button id="attExportIndvTab" onclick="switchAttExportTab('individual')" style="flex:1;padding:7px;font-size:.75rem;font-weight:600;border-radius:var(--radius-sm);border:1.5px solid var(--gray-200);background:white;color:var(--gray-600);cursor:pointer">Individual Staff</button>
       </div>
-      <div style="display:flex;gap:8px;margin-bottom:16px">
+      <!-- Month / Year row (shared) -->
+      <div style="display:flex;gap:8px;margin-bottom:14px">
         <div style="flex:1">
           <div style="font-size:.72rem;font-weight:600;color:var(--gray-600);margin-bottom:4px">Month</div>
           <select id="attExportMonth" style="width:100%;padding:8px 10px;border-radius:var(--radius-sm);border:1.5px solid var(--gray-200);font-size:.82rem;background:white">
@@ -539,7 +541,31 @@
           <select id="attExportYear" style="width:100%;padding:8px 10px;border-radius:var(--radius-sm);border:1.5px solid var(--gray-200);font-size:.82rem;background:white"></select>
         </div>
       </div>
-      <button class="btn btn-primary w-full" style="border-radius:var(--radius-sm)" onclick="exportAttendanceReport()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;vertical-align:middle"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download Attendance CSV</button>
+      <!-- Team report section -->
+      <div id="attExportTeamSection">
+        <div style="font-size:.72rem;font-weight:600;color:var(--gray-600);margin-bottom:6px">Download Format</div>
+        <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px">
+          <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--radius-sm);border:1.5px solid var(--gray-200);cursor:pointer;font-size:.78rem">
+            <input type="radio" name="attExportFormat" value="daily-hours" checked style="accent-color:var(--primary)"> Daily Hours <span style="font-size:.65rem;color:var(--gray-400);margin-left:4px">— hours worked per day per employee</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--radius-sm);border:1.5px solid var(--gray-200);cursor:pointer;font-size:.78rem">
+            <input type="radio" name="attExportFormat" value="punch-inout" style="accent-color:var(--primary)"> Punch In / Punch Out <span style="font-size:.65rem;color:var(--gray-400);margin-left:4px">— each check-in/out as a row</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--radius-sm);border:1.5px solid var(--gray-200);cursor:pointer;font-size:.78rem">
+            <input type="radio" name="attExportFormat" value="total-hours" style="accent-color:var(--primary)"> Total Hours Cumulation <span style="font-size:.65rem;color:var(--gray-400);margin-left:4px">— decimal hours + running total</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--radius-sm);border:1.5px solid var(--gray-200);cursor:pointer;font-size:.78rem">
+            <input type="radio" name="attExportFormat" value="weekly" style="accent-color:var(--primary)"> Weekly Hours <span style="font-size:.65rem;color:var(--gray-400);margin-left:4px">— hours grouped by week</span>
+          </label>
+        </div>
+        <button class="btn btn-primary w-full" style="border-radius:var(--radius-sm)" onclick="exportAttendanceReport()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;vertical-align:middle"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Download</button>
+      </div>
+      <!-- Individual staff section -->
+      <div id="attExportIndvSection" style="display:none">
+        <div style="font-size:.72rem;font-weight:600;color:var(--gray-600);margin-bottom:4px">Employee</div>
+        <select id="attExportEmpCode" style="width:100%;padding:8px 10px;border-radius:var(--radius-sm);border:1.5px solid var(--gray-200);font-size:.82rem;background:white;margin-bottom:14px"></select>
+        <button class="btn btn-primary w-full" style="border-radius:var(--radius-sm)" onclick="exportIndividualStaffPDF()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:6px;vertical-align:middle"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Download PDF</button>
+      </div>
     </div>
   </div>
 

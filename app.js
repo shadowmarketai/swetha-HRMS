@@ -6137,6 +6137,24 @@ function exportSalaryReport() {
   ]);
 }
 
+function switchAttExportTab(tab) {
+  var isTeam = tab === 'team';
+  document.getElementById('attExportTeamSection').style.display = isTeam ? '' : 'none';
+  document.getElementById('attExportIndvSection').style.display = isTeam ? 'none' : '';
+  var teamBtn = document.getElementById('attExportTeamTab');
+  var indvBtn = document.getElementById('attExportIndvTab');
+  if (teamBtn) {
+    teamBtn.style.background = isTeam ? 'var(--primary)' : 'white';
+    teamBtn.style.color = isTeam ? '#fff' : 'var(--gray-600)';
+    teamBtn.style.borderColor = isTeam ? 'var(--primary)' : 'var(--gray-200)';
+  }
+  if (indvBtn) {
+    indvBtn.style.background = isTeam ? 'white' : 'var(--primary)';
+    indvBtn.style.color = isTeam ? 'var(--gray-600)' : '#fff';
+    indvBtn.style.borderColor = isTeam ? 'var(--gray-200)' : 'var(--primary)';
+  }
+}
+
 function showAttendanceMonthPicker() {
   if (currentUser && currentUser.role === 'Employee') { showToast('Access denied. Management only.'); return; }
   var now = new Date();
@@ -6151,6 +6169,17 @@ function showAttendanceMonthPicker() {
     if (y === prevYear) opt.selected = true;
     yearSel.appendChild(opt);
   }
+  // Populate employee dropdown for individual report
+  var empSel = document.getElementById('attExportEmpCode');
+  if (empSel) {
+    empSel.innerHTML = '';
+    (EMPLOYEES || []).filter(function(e) { return e.status !== 'Inactive'; }).forEach(function(e) {
+      var o = document.createElement('option');
+      o.value = e.code; o.textContent = e.name + ' (' + e.code + ')';
+      empSel.appendChild(o);
+    });
+  }
+  switchAttExportTab('team');
   var overlay = document.getElementById('attendanceExportOverlay');
   overlay.style.setProperty('z-index', '100000', 'important');
   overlay.classList.add('active');
@@ -6161,6 +6190,12 @@ function closeAttendanceExportModal() {
 }
 
 async function exportAttendanceReport() {
+  var formatRadio = document.querySelector('input[name="attExportFormat"]:checked');
+  var fmt = formatRadio ? formatRadio.value : 'daily-hours';
+  if (fmt === 'punch-inout') { await _exportPunchInOutCSV(); return; }
+  if (fmt === 'weekly') { await _exportWeeklyHoursCSV(); return; }
+  if (fmt === 'total-hours') { await _exportTotalHoursCSV(); return; }
+  // default: daily-hours (existing logic)
   var selMonth = parseInt(document.getElementById('attExportMonth').value);
   var selYear = parseInt(document.getElementById('attExportYear').value);
   var monthStr = selYear + '-' + String(selMonth + 1).padStart(2, '0');
@@ -6282,6 +6317,382 @@ async function exportAttendanceReport() {
     URL.revokeObjectURL(link.href);
     showToast('Downloaded: attendance_' + monthLabel + '.csv');
   } catch (e) { showToast(e.message || 'Error exporting attendance'); }
+}
+
+// ---- Shared helper: fetch logs + build empDayData for a month ----
+async function _fetchAttMonthData(selYear, selMonth) {
+  var monthStr = selYear + '-' + String(selMonth + 1).padStart(2, '0');
+  var logs = await apiCall('GET', '/attendance?month=' + monthStr);
+  if (!Array.isArray(logs)) logs = [];
+  var today = new Date();
+  var isCurrentMonth = (today.getFullYear() === selYear && today.getMonth() === selMonth);
+  var daysInMonth = new Date(selYear, selMonth + 1, 0).getDate();
+  // Build empCode -> dayNum -> { present, minutes, sessions[] }
+  var empDayData = {};
+  logs.forEach(function(row) {
+    if (!row.emp_code || !row.log_date) return;
+    var dayNum = parseInt(String(row.log_date).substring(0, 10).split('-')[2], 10);
+    if (!empDayData[row.emp_code]) empDayData[row.emp_code] = {};
+    if (!empDayData[row.emp_code][dayNum]) empDayData[row.emp_code][dayNum] = { minutes: 0, sessions: [] };
+    var session = { checkIn: row.check_in || null, checkOut: row.check_out || null };
+    empDayData[row.emp_code][dayNum].sessions.push(session);
+    if (row.check_in) {
+      var start = new Date(row.check_in).getTime();
+      var end;
+      var isToday = isCurrentMonth && dayNum === today.getDate();
+      if (row.check_out) {
+        end = new Date(row.check_out).getTime();
+      } else if (isToday) {
+        end = Date.now();
+      } else {
+        var autoOut = new Date(new Date(row.check_in).toDateString() + ' 21:00:00').getTime();
+        end = Math.min(autoOut, start + 480 * 60000);
+        empDayData[row.emp_code][dayNum].missedCheckout = true;
+      }
+      if (end > start) empDayData[row.emp_code][dayNum].minutes += (end - start) / 60000;
+    }
+  });
+  return { logs, empDayData, daysInMonth, today, isCurrentMonth, monthStr };
+}
+
+function _csvEsc(v) {
+  v = String(v === null || v === undefined ? '' : v).replace(/"/g, '""');
+  return (v.indexOf(',') >= 0 || v.indexOf('"') >= 0 || v.indexOf('\n') >= 0) ? '"' + v + '"' : v;
+}
+
+function _minsToHHMM(mins) {
+  var h = Math.floor(mins / 60), m = Math.round(mins % 60);
+  return h + 'h ' + (m < 10 ? '0' + m : m) + 'm';
+}
+
+function _fmtTime(dtStr) {
+  if (!dtStr) return '';
+  var d = new Date(dtStr);
+  return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+}
+
+function _triggerCSVDownload(content, filename) {
+  var blob = new Blob(['﻿' + content], { type: 'text/csv;charset=utf-8;' });
+  var link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
+// ---- Format 2: Punch In / Punch Out ----
+async function _exportPunchInOutCSV() {
+  var selMonth = parseInt(document.getElementById('attExportMonth').value);
+  var selYear = parseInt(document.getElementById('attExportYear').value);
+  var monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var monthLabel = monthNames[selMonth] + '_' + selYear;
+  closeAttendanceExportModal();
+  showToast('Fetching attendance data...');
+  try {
+    var { logs } = await _fetchAttMonthData(selYear, selMonth);
+    var empMap = {};
+    (EMPLOYEES || []).forEach(function(e) { empMap[e.code] = e; });
+    var headers = ['Date', 'Employee Name', 'Code', 'Department', 'Punch In', 'Punch Out', 'Hours'];
+    var rows = [headers.join(',')];
+    logs.sort(function(a, b) {
+      if (a.log_date < b.log_date) return -1;
+      if (a.log_date > b.log_date) return 1;
+      return (a.check_in || '') < (b.check_in || '') ? -1 : 1;
+    });
+    logs.forEach(function(row) {
+      var emp = empMap[row.emp_code] || {};
+      var dateStr = String(row.log_date).substring(0, 10);
+      var punchIn = _fmtTime(row.check_in);
+      var punchOut = _fmtTime(row.check_out);
+      var mins = 0;
+      if (row.check_in && row.check_out) {
+        mins = (new Date(row.check_out) - new Date(row.check_in)) / 60000;
+      }
+      var hoursStr = mins > 0 ? _minsToHHMM(mins) : '';
+      rows.push([_csvEsc(dateStr), _csvEsc(row.name || emp.name || ''), _csvEsc(row.emp_code),
+        _csvEsc(row.dept || emp.dept || ''), _csvEsc(punchIn), _csvEsc(punchOut), _csvEsc(hoursStr)].join(','));
+    });
+    _triggerCSVDownload(rows.join('\n'), 'punch_inout_' + monthLabel + '.csv');
+    showToast('Downloaded: punch_inout_' + monthLabel + '.csv');
+  } catch (e) { showToast(e.message || 'Error exporting'); }
+}
+
+// ---- Format 3: Total Hours Cumulation ----
+async function _exportTotalHoursCSV() {
+  var selMonth = parseInt(document.getElementById('attExportMonth').value);
+  var selYear = parseInt(document.getElementById('attExportYear').value);
+  var monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var monthLabel = monthNames[selMonth] + '_' + selYear;
+  closeAttendanceExportModal();
+  showToast('Fetching attendance data...');
+  try {
+    var { empDayData, daysInMonth, today, isCurrentMonth } = await _fetchAttMonthData(selYear, selMonth);
+    var headers = ['Name', 'Code', 'Dept'];
+    for (var d = 1; d <= daysInMonth; d++) headers.push(String(d).padStart(2, '0'));
+    headers.push('Total Hours', 'Cumulative (decimal)');
+    var rows = [headers.join(',')];
+    (EMPLOYEES || []).filter(function(e) { return e.status !== 'Inactive'; }).forEach(function(emp) {
+      var cols = [_csvEsc(emp.name), _csvEsc(emp.code), _csvEsc(emp.dept || '')];
+      var totalMins = 0;
+      for (var d = 1; d <= daysInMonth; d++) {
+        var dow = new Date(selYear, selMonth, d).getDay();
+        var ymd = selYear + '-' + String(selMonth + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+        var isFuture = isCurrentMonth && d > today.getDate();
+        if (dow === 0) { cols.push('Sun'); }
+        else if (publicHolidays[ymd]) { cols.push('Hol'); }
+        else if (isFuture) { cols.push(''); }
+        else {
+          var dd = empDayData[emp.code] && empDayData[emp.code][d];
+          if (dd && dd.minutes > 0) {
+            var capMin = Math.min(dd.minutes, 480);
+            totalMins += capMin;
+            cols.push((capMin / 60).toFixed(2));
+          } else { cols.push('0.00'); }
+        }
+      }
+      cols.push(_minsToHHMM(totalMins));
+      cols.push((totalMins / 60).toFixed(2));
+      rows.push(cols.join(','));
+    });
+    rows.push('');
+    rows.push('"Hours capped at 8h per day. Decimal format for payroll calculations."');
+    _triggerCSVDownload(rows.join('\n'), 'total_hours_' + monthLabel + '.csv');
+    showToast('Downloaded: total_hours_' + monthLabel + '.csv');
+  } catch (e) { showToast(e.message || 'Error exporting'); }
+}
+
+// ---- Format 4: Weekly Hours Cumulation ----
+async function _exportWeeklyHoursCSV() {
+  var selMonth = parseInt(document.getElementById('attExportMonth').value);
+  var selYear = parseInt(document.getElementById('attExportYear').value);
+  var monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var monthLabel = monthNames[selMonth] + '_' + selYear;
+  closeAttendanceExportModal();
+  showToast('Fetching attendance data...');
+  try {
+    var { empDayData, daysInMonth, today, isCurrentMonth } = await _fetchAttMonthData(selYear, selMonth);
+    // Determine week ranges within the month
+    var weeks = [];
+    var weekStart = 1;
+    for (var d = 1; d <= daysInMonth; d++) {
+      var dow = new Date(selYear, selMonth, d).getDay();
+      if (dow === 6 || d === daysInMonth) {
+        weeks.push({ start: weekStart, end: d });
+        weekStart = d + 1;
+      }
+    }
+    var headers = ['Name', 'Code', 'Dept'];
+    weeks.forEach(function(w, i) {
+      headers.push('Week ' + (i + 1) + ' (' + String(w.start).padStart(2,'0') + '-' + String(w.end).padStart(2,'0') + ')');
+    });
+    headers.push('Total Hours');
+    var rows = [headers.join(',')];
+    (EMPLOYEES || []).filter(function(e) { return e.status !== 'Inactive'; }).forEach(function(emp) {
+      var cols = [_csvEsc(emp.name), _csvEsc(emp.code), _csvEsc(emp.dept || '')];
+      var totalMins = 0;
+      weeks.forEach(function(w) {
+        var weekMins = 0;
+        for (var d = w.start; d <= w.end; d++) {
+          var dow = new Date(selYear, selMonth, d).getDay();
+          var ymd = selYear + '-' + String(selMonth + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+          if (dow === 0 || publicHolidays[ymd]) continue;
+          if (isCurrentMonth && d > today.getDate()) continue;
+          var dd = empDayData[emp.code] && empDayData[emp.code][d];
+          if (dd && dd.minutes > 0) weekMins += Math.min(dd.minutes, 480);
+        }
+        totalMins += weekMins;
+        cols.push((weekMins / 60).toFixed(2));
+      });
+      cols.push((totalMins / 60).toFixed(2));
+      rows.push(cols.join(','));
+    });
+    _triggerCSVDownload(rows.join('\n'), 'weekly_hours_' + monthLabel + '.csv');
+    showToast('Downloaded: weekly_hours_' + monthLabel + '.csv');
+  } catch (e) { showToast(e.message || 'Error exporting'); }
+}
+
+// ---- Individual Staff PDF ----
+async function exportIndividualStaffPDF() {
+  var selMonth = parseInt(document.getElementById('attExportMonth').value);
+  var selYear = parseInt(document.getElementById('attExportYear').value);
+  var empCode = document.getElementById('attExportEmpCode').value;
+  if (!empCode) { showToast('Select an employee'); return; }
+  closeAttendanceExportModal();
+  showToast('Generating PDF...');
+  try {
+    await loadJsPdf();
+    var { jsPDF } = window.jspdf;
+    var monthStr = selYear + '-' + String(selMonth + 1).padStart(2, '0');
+    var logs = await apiCall('GET', '/attendance?empCode=' + encodeURIComponent(empCode) + '&month=' + monthStr);
+    if (!Array.isArray(logs)) logs = [];
+    var emp = (EMPLOYEES || []).find(function(e) { return e.code === empCode; }) || { name: empCode, code: empCode, dept: '', designation: '' };
+    var monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    var dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+    var daysInMonth = new Date(selYear, selMonth + 1, 0).getDate();
+    var today = new Date();
+    var isCurrentMonth = (today.getFullYear() === selYear && today.getMonth() === selMonth);
+    // Build day -> log map
+    var dayLogs = {};
+    logs.forEach(function(row) {
+      var dayNum = parseInt(String(row.log_date).substring(0, 10).split('-')[2], 10);
+      if (!dayLogs[dayNum]) dayLogs[dayNum] = [];
+      dayLogs[dayNum].push(row);
+    });
+    // Build approved leaves for this employee/month
+    var leaveDaysMap = {};
+    if (typeof leaveApplications !== 'undefined') {
+      leaveApplications.forEach(function(la) {
+        if (la.empCode !== empCode || la.status !== 'approved') return;
+        var from = new Date(la.from + 'T00:00:00');
+        var to = new Date(la.to + 'T00:00:00');
+        for (var ld = new Date(from); ld <= to; ld.setDate(ld.getDate() + 1)) {
+          if (ld.getFullYear() === selYear && ld.getMonth() === selMonth) {
+            leaveDaysMap[ld.getDate()] = la.type;
+          }
+        }
+      });
+    }
+    var doc = new jsPDF('p', 'mm', 'a4');
+    var pw = 210, lm = 14, rm = 196, cw = rm - lm;
+    var primary = [76,81,191], dark = [30,30,60], mid = [100,100,120], light = [245,245,252];
+    var y = 14;
+    // Company header
+    try { doc.addImage('data:image/png;base64,' + COMPANY_LOGO_B64, 'PNG', lm, y, 28, 10); } catch(e) {
+      doc.setFillColor(...primary); doc.roundedRect(lm, y, 28, 10, 2, 2, 'F');
+      doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor(255,255,255); doc.text('SS', lm+2, y+6.5);
+    }
+    doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(...primary);
+    doc.text('SWETHA STRUCTURES PRIVATE LIMITED', lm+31, y+4.5);
+    doc.setFont('helvetica','normal'); doc.setFontSize(6.5); doc.setTextColor(...mid);
+    doc.text('No.44, Alagu Nagar, Saravanampatti, Coimbatore, TN 641035 | GSTIN: 33AAWCS9286M1Z6', lm+31, y+9.5);
+    y += 16; doc.setDrawColor(...primary); doc.setLineWidth(0.5); doc.line(lm, y, rm, y);
+    // Report title
+    y += 7; doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...dark);
+    doc.text('INDIVIDUAL ATTENDANCE REPORT — ' + monthNames[selMonth].toUpperCase() + ' ' + selYear, pw/2, y, {align:'center'});
+    // Employee info box
+    y += 7; doc.setFillColor(...light); doc.roundedRect(lm, y, cw, 18, 2, 2, 'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor(...primary);
+    doc.text(emp.name, lm+4, y+6);
+    doc.setFont('helvetica','normal'); doc.setFontSize(7); doc.setTextColor(...mid);
+    doc.text('Code: ' + emp.code + '   Dept: ' + (emp.dept||'—') + '   Designation: ' + (emp.designation||'—'), lm+4, y+12);
+    // Stats — computed below
+    var presentDays = 0, absentDays = 0, leaveDays = 0, halfDays = 0, totalMins = 0, holidayDays = 0;
+    for (var d = 1; d <= daysInMonth; d++) {
+      var dow2 = new Date(selYear, selMonth, d).getDay();
+      var ymd2 = selYear + '-' + String(selMonth+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+      if (dow2 === 0 || publicHolidays[ymd2]) { holidayDays++; continue; }
+      if (isCurrentMonth && d > today.getDate()) continue;
+      if (dayLogs[d] && dayLogs[d].length > 0) {
+        var dayMin = 0;
+        dayLogs[d].forEach(function(row) {
+          if (!row.check_in) return;
+          var s = new Date(row.check_in).getTime();
+          var en;
+          if (row.check_out) en = new Date(row.check_out).getTime();
+          else if (isCurrentMonth && d === today.getDate()) en = Date.now();
+          else { var ao = new Date(new Date(row.check_in).toDateString() + ' 21:00:00').getTime(); en = Math.min(ao, s + 480*60000); }
+          if (en > s) dayMin += (en - s) / 60000;
+        });
+        dayMin = Math.min(dayMin, 480);
+        totalMins += dayMin;
+        if (dayMin >= 480) presentDays++; else halfDays++;
+      } else if (leaveDaysMap[d]) {
+        leaveDays++;
+      } else {
+        absentDays++;
+      }
+    }
+    var workingDays = presentDays + halfDays + absentDays + leaveDays;
+    var attPct = workingDays > 0 ? Math.round((presentDays + halfDays * 0.5) / workingDays * 100) : 0;
+    doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(...dark);
+    doc.text('Present: ' + presentDays + '  Half: ' + halfDays + '  Absent: ' + absentDays + '  Leave: ' + leaveDays + '  Holiday/Sun: ' + holidayDays, lm+4, y+17);
+    // Table
+    y += 24;
+    var colW = [12, 16, 28, 28, 22, 24, 22];
+    var colX = [lm];
+    colW.forEach(function(w, i) { if (i > 0) colX.push(colX[i-1] + colW[i-1]); });
+    var colHdr = ['Day','Date','Punch In','Punch Out','Hours','Status','Note'];
+    doc.setFillColor(...primary); doc.rect(lm, y, cw, 6, 'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(255,255,255);
+    colHdr.forEach(function(h, i) { doc.text(h, colX[i]+1, y+4.5); });
+    y += 6;
+    var rowIdx = 0;
+    for (var d = 1; d <= daysInMonth; d++) {
+      if (y > 272) { doc.addPage(); y = 14; }
+      var dow3 = new Date(selYear, selMonth, d).getDay();
+      var ymd3 = selYear + '-' + String(selMonth+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+      var isFuture = isCurrentMonth && d > today.getDate();
+      var rowH = 5.5;
+      if (rowIdx % 2 === 0) { doc.setFillColor(248,248,255); doc.rect(lm, y, cw, rowH, 'F'); }
+      doc.setFont('helvetica','normal'); doc.setFontSize(6.2); doc.setTextColor(...dark);
+      var dayName2 = dayNames[dow3];
+      var dateLabel = String(d).padStart(2,'0') + '/' + String(selMonth+1).padStart(2,'0');
+      if (dow3 === 0 || publicHolidays[ymd3]) {
+        doc.setTextColor(160,160,180);
+        var hlabel = dow3 === 0 ? 'Sunday' : ((publicHolidays[ymd3] && publicHolidays[ymd3].name) || 'Holiday');
+        var hNote = '';
+        doc.text(dayName2, colX[0]+1, y+3.8);
+        doc.text(dateLabel, colX[1]+1, y+3.8);
+        doc.text('', colX[2]+1, y+3.8);
+        doc.text('', colX[3]+1, y+3.8);
+        doc.text('', colX[4]+1, y+3.8);
+        doc.text(hlabel, colX[5]+1, y+3.8);
+        doc.text(hNote, colX[6]+1, y+3.8);
+        // Check holiday presence
+        if (dayLogs[d] && dayLogs[d].length > 0) {
+          doc.setTextColor(220,38,38);
+          var hPunchIn = _fmtTime(dayLogs[d][0].check_in);
+          doc.text(hPunchIn, colX[2]+1, y+3.8);
+          doc.text('Present on Holiday', colX[6]+1, y+3.8);
+        }
+      } else if (isFuture) {
+        doc.setTextColor(180,180,190);
+        doc.text(dayName2, colX[0]+1, y+3.8); doc.text(dateLabel, colX[1]+1, y+3.8);
+        doc.text('—', colX[5]+1, y+3.8);
+      } else if (dayLogs[d] && dayLogs[d].length > 0) {
+        var sess = dayLogs[d][0];
+        var pIn = _fmtTime(sess.check_in);
+        var pOut = sess.check_out ? _fmtTime(sess.check_out) : (isCurrentMonth && d === today.getDate() ? 'Active' : '—*');
+        var sessMin = 0;
+        dayLogs[d].forEach(function(row) {
+          if (!row.check_in) return;
+          var s = new Date(row.check_in).getTime();
+          var en;
+          if (row.check_out) en = new Date(row.check_out).getTime();
+          else if (isCurrentMonth && d === today.getDate()) en = Date.now();
+          else { var ao = new Date(new Date(row.check_in).toDateString() + ' 21:00:00').getTime(); en = Math.min(ao, s + 480*60000); }
+          if (en > s) sessMin += (en - s) / 60000;
+        });
+        sessMin = Math.min(sessMin, 480);
+        var statusTxt = sessMin >= 480 ? 'Present' : 'Half Day';
+        var missNote = !dayLogs[d][0].check_out && !(isCurrentMonth && d === today.getDate()) ? 'Missed checkout*' : '';
+        doc.text(dayName2, colX[0]+1, y+3.8);
+        doc.text(dateLabel, colX[1]+1, y+3.8);
+        doc.text(pIn, colX[2]+1, y+3.8);
+        doc.text(pOut, colX[3]+1, y+3.8);
+        doc.text(_minsToHHMM(sessMin), colX[4]+1, y+3.8);
+        doc.text(statusTxt, colX[5]+1, y+3.8);
+        if (missNote) { doc.setTextColor(200,100,0); doc.text(missNote, colX[6]+1, y+3.8); doc.setTextColor(...dark); }
+      } else if (leaveDaysMap[d]) {
+        doc.setTextColor(8,145,178);
+        doc.text(dayName2, colX[0]+1, y+3.8); doc.text(dateLabel, colX[1]+1, y+3.8);
+        doc.text('Leave (' + leaveDaysMap[d] + ')', colX[5]+1, y+3.8);
+      } else {
+        doc.setTextColor(220,38,38);
+        doc.text(dayName2, colX[0]+1, y+3.8); doc.text(dateLabel, colX[1]+1, y+3.8);
+        doc.text('Absent', colX[5]+1, y+3.8);
+      }
+      y += rowH; rowIdx++;
+    }
+    // Footer
+    y += 6; doc.setDrawColor(...primary); doc.line(lm, y, rm, y);
+    y += 5; doc.setFont('helvetica','normal'); doc.setFontSize(6.5); doc.setTextColor(...mid);
+    doc.text('* Checkout not recorded — hours estimated. Attendance %: ' + attPct + '%  |  Total Hours: ' + _minsToHHMM(totalMins), lm, y);
+    doc.text('Generated: ' + new Date().toLocaleDateString('en-IN') + ' | Swetha HRMS', rm, y, { align: 'right' });
+    var fname = 'attendance_' + emp.code + '_' + monthNames[selMonth] + '_' + selYear + '.pdf';
+    savePdfSafe(doc, fname);
+    showToast('PDF downloaded for ' + emp.name);
+  } catch (e) { showToast(e.message || 'Error generating PDF'); }
 }
 
 function exportTaskReport() {
@@ -8747,6 +9158,39 @@ async function downloadAttendanceReport() {
       y += 6; rowIdx++;
     });
   }
+
+  // Holiday presence notes
+  const holidayPresence = [];
+  for (const [ymd, hobj] of Object.entries(publicHolidays)) {
+    const [hy, hm] = ymd.split('-').map(Number);
+    if (hy !== yr || hm !== now.getMonth() + 1) continue;
+    EMPLOYEES.filter(e => e.status !== 'Inactive').forEach(emp => {
+      const dl = attendanceLogs.filter(function(l) {
+        var ec = l.emp_code || l.empCode;
+        var ld = l.log_date || (l.check_in ? String(l.check_in).substring(0,10) : '');
+        return ec === emp.code && ld === ymd;
+      });
+      if (dl.length > 0) holidayPresence.push({ emp: emp.name, code: emp.code, date: ymd, holiday: (hobj && hobj.name) || 'Holiday', time: _fmtTime(dl[0].check_in) });
+    });
+  }
+  if (holidayPresence.length > 0) {
+    if (y > 250) { doc.addPage(); y = 15; }
+    y += 8;
+    doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...primary);
+    doc.text('HOLIDAY PRESENCE', lm, y);
+    y += 5;
+    doc.setFillColor(254,242,242); doc.roundedRect(lm, y, cw, holidayPresence.length * 6 + 6, 2, 2, 'F');
+    y += 5;
+    holidayPresence.forEach(hp => {
+      doc.setFont('helvetica','normal'); doc.setFontSize(6.5); doc.setTextColor(220,38,38);
+      doc.text(hp.emp + ' (' + hp.code + ')  —  ' + hp.holiday + ' (' + hp.date + ')  Checked in: ' + hp.time, lm+3, y);
+      y += 6;
+    });
+  }
+
+  y += 8; doc.setDrawColor(...primary); doc.line(lm, y, rm, y);
+  y += 5; doc.setFont('helvetica','normal'); doc.setFontSize(6); doc.setTextColor(...mid);
+  doc.text('Generated: ' + new Date().toLocaleDateString('en-IN') + ' | Swetha HRMS', rm, y, { align: 'right' });
 
   doc.save('Attendance_Report_' + mName + '_' + yr + '.pdf');
   showToast('Attendance report downloaded');
