@@ -246,7 +246,7 @@ const NAV_CONFIG = {
   HR: [
     { id:'home', label:'Home', icon:'home', action:{type:'tab',target:'home'} },
     { id:'hr-attendance', label:'Attendance', icon:'attendance', children:[
-      { id:'hr-att-self', label:'Self Calendar', action:{type:'tab',target:'attendance'} },
+      { id:'hr-att-self', label:'Summary', action:{type:'tab',target:'attendance'} },
       { id:'hr-att-leave', label:'Apply Leave', action:{type:'tab',target:'leaves'} },
       { id:'hr-att-emp', label:'Employee Attendance', action:{type:'tab',target:'attendance'} },
       { id:'hr-att-leavereq', label:'Employee Leave Req', action:{type:'tab',target:'leaves'} }
@@ -294,7 +294,7 @@ const NAV_CONFIG = {
   Employee: [
     { id:'home', label:'Home', icon:'home', action:{type:'tab',target:'home'} },
     { id:'emp-attendance', label:'Attendance', icon:'attendance', children:[
-      { id:'emp-att-cal', label:'Calendar', action:{type:'tab',target:'attendance'} },
+      { id:'emp-att-cal', label:'Summary', action:{type:'tab',target:'attendance'} },
       { id:'emp-att-leave', label:'Apply Leave', action:{type:'tab',target:'leaves'} }
     ]},
     { id:'emp-advance', label:'Advance', icon:'advance', children:[
@@ -348,7 +348,7 @@ const NAV_CONFIG = {
   Manager: [
     { id:'home', label:'Home', icon:'home', action:{type:'tab',target:'home'} },
     { id:'mgr-attendance', label:'Attendance', icon:'attendance', children:[
-      { id:'mgr-att-self', label:'Self Calendar', action:{type:'tab',target:'attendance'} },
+      { id:'mgr-att-self', label:'Summary', action:{type:'tab',target:'attendance'} },
       { id:'mgr-att-leave', label:'Apply Leave', action:{type:'tab',target:'leaves'} },
       { id:'mgr-att-emp', label:'Employee Attendance', action:{type:'tab',target:'attendance'} },
       { id:'mgr-att-leavereq', label:'Employee Leave Req', action:{type:'tab',target:'leaves'} }
@@ -392,7 +392,7 @@ const NAV_CONFIG = {
   Accounts: [
     { id:'home', label:'Home', icon:'home', action:{type:'tab',target:'home'} },
     { id:'acc-attendance', label:'Attendance', icon:'attendance', children:[
-      { id:'acc-att-cal', label:'Calendar', action:{type:'tab',target:'attendance'} },
+      { id:'acc-att-cal', label:'Summary', action:{type:'tab',target:'attendance'} },
       { id:'acc-att-leave', label:'Apply Leave', action:{type:'tab',target:'leaves'} }
     ]},
     { id:'acc-advance', label:'Advance', icon:'advance', children:[
@@ -1984,6 +1984,7 @@ async function buildCalendar() {
     half:    {label:'½',  cls:'cal-badge-half'},
     leave:   {label:'L',  cls:'cal-badge-leave'}
   };
+  var dayData = result.dayData;
   for (var d = 1; d <= daysInMonth; d++) {
     var isToday = isCurrentMonth && d === now.getDate();
     var st = d <= maxDay ? (att[d] || '') : '';
@@ -1991,7 +1992,18 @@ async function buildCalendar() {
     if (!st && publicHolidays[ymd]) st = 'holiday';
     var badge = st && badgeMap[st] ? '<span class="cal-status-badge '+badgeMap[st].cls+'">'+badgeMap[st].label+'</span>' : '';
     var holidayTitle = publicHolidays[ymd] ? ' title="' + escapeAttr(publicHolidays[ymd].name) + '"' : '';
-    html += '<div class="cal-day'+(isToday?' today':'')+'"'+holidayTitle+'>'+d+badge+'</div>';
+    // Show in/out times for present/half-day cells
+    var timesHtml = '';
+    if ((st === 'present' || st === 'half') && dayData[d] && dayData[d].length > 0) {
+      var firstSession = dayData[d][0];
+      var ciStr = firstSession.checkIn ? new Date(firstSession.checkIn).toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit', hour12:false}) : '';
+      var lastSession = dayData[d][dayData[d].length - 1];
+      var coStr = lastSession.checkOut ? new Date(lastSession.checkOut).toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit', hour12:false}) : '';
+      if (ciStr || coStr) {
+        timesHtml = '<div class="cal-times">' + (ciStr || '--') + '<br>' + (coStr || '--') + '</div>';
+      }
+    }
+    html += '<div class="cal-day'+(isToday?' today':'')+'"'+holidayTitle+'>'+d+badge+timesHtml+'</div>';
   }
   c.innerHTML = html; // single DOM write — no double-render possible
   // Update month title
@@ -10849,10 +10861,53 @@ function renderAttendanceLogOverlay() {
 // =====================================================
 // ATTENDANCE LOG LIST (below calendar)
 // =====================================================
-function renderAttendanceLogList() {
+var _attLogMonth = null; // null = current month
+
+function changeAttLogMonth(dir) {
+  if (!_attLogMonth) {
+    var n = new Date();
+    _attLogMonth = { year: n.getFullYear(), month: n.getMonth() };
+  }
+  _attLogMonth.month += dir;
+  if (_attLogMonth.month < 0) { _attLogMonth.month = 11; _attLogMonth.year--; }
+  if (_attLogMonth.month > 11) { _attLogMonth.month = 0; _attLogMonth.year++; }
+  renderAttendanceLogList();
+}
+
+async function renderAttendanceLogList() {
   var c = document.getElementById('attendanceLogList');
   if (!c || !currentUser) return;
-  var myLogs = (typeof attendanceLogs !== 'undefined' ? attendanceLogs : []).filter(function(l) { return l.empCode === currentUser.code; });
+
+  var now = new Date();
+  if (!_attLogMonth) _attLogMonth = { year: now.getFullYear(), month: now.getMonth() };
+  var isCurrentMonth = (_attLogMonth.year === now.getFullYear() && _attLogMonth.month === now.getMonth());
+
+  // Update month label in header
+  var monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var labelEl = document.getElementById('attLogMonthLabel');
+  if (labelEl) labelEl.textContent = monthNames[_attLogMonth.month] + ' ' + _attLogMonth.year;
+
+  // Disable Next button if we're already at current month
+  var btns = document.querySelectorAll('[onclick="changeAttLogMonth(1)"]');
+  btns.forEach(function(b) { b.disabled = isCurrentMonth; b.style.opacity = isCurrentMonth ? '0.4' : '1'; });
+
+  var monthStr = _attLogMonth.year + '-' + String(_attLogMonth.month + 1).padStart(2, '0');
+  var myLogs;
+  if (isCurrentMonth && typeof attendanceLogs !== 'undefined') {
+    myLogs = attendanceLogs.filter(function(l) { return l.empCode === currentUser.code; });
+  } else {
+    try {
+      c.innerHTML = '<div style="padding:12px;text-align:center;color:var(--gray-400);font-size:.78rem">Loading...</div>';
+      var rawLogs = await apiCall('GET', '/attendance?month=' + monthStr);
+      myLogs = (Array.isArray(rawLogs) ? rawLogs : [])
+        .filter(function(l) { return (l.emp_code || l.empCode) === currentUser.code; })
+        .map(function(l) { return { empCode: l.emp_code || l.empCode, logDate: l.log_date || l.logDate, checkIn: l.check_in || l.checkIn, checkOut: l.check_out || l.checkOut, location: l.location_name || l.location }; });
+    } catch(e) {
+      c.innerHTML = '<div style="padding:12px;text-align:center;color:var(--danger);font-size:.78rem">Failed to load logs</div>';
+      return;
+    }
+  }
+  if (myLogs.length === 0) {
   if (myLogs.length === 0) {
     c.innerHTML = '<div style="padding:16px;text-align:center;color:var(--gray-400);font-size:.8rem">No attendance records yet. Use GPS Check-In to start logging.</div>';
     return;
@@ -14798,6 +14853,61 @@ function showAttDayDetail(dayNum) {
 // =====================================================
 // MISSED ATTENDANCE REQUESTS
 // =====================================================
+
+// Opens permission (2hr) request directly from the Approval/Leaves tab
+function openPermissionForm() {
+  selectedLeaveType = 'permission';
+  openLeaveForm();
+  // After form opens, activate the permission pill
+  setTimeout(function() {
+    document.querySelectorAll('#leaveTypePills .lt-pill').forEach(function(p) {
+      if (p.textContent.includes('Permission')) {
+        selectLeaveType('permission', p);
+        p.classList.add('active');
+      } else {
+        p.classList.remove('active');
+      }
+    });
+  }, 50);
+}
+
+// Shows missed punch report form inside the Leaves/Approval tab
+function showMissedPunchInLeaves() {
+  var area = document.getElementById('missedPunchLeavesArea');
+  if (!area) return;
+  if (area.innerHTML.trim()) { area.innerHTML = ''; return; }
+  var today = new Date().toISOString().split('T')[0];
+  var html = '<div class="card fade-in" style="padding:14px;margin:8px 0;border-left:4px solid var(--warning,#f59e0b)">';
+  html += '<h4 style="font-size:.85rem;font-weight:600;margin:0 0 10px 0">Report Missed Punch</h4>';
+  html += '<div class="form-row"><label>Date *</label><input type="date" id="missedPunchDate" max="' + today + '" style="width:100%"></div>';
+  html += '<div class="form-row"><label>Missed</label><select id="missedPunchType" style="width:100%;padding:8px;border:1.5px solid var(--gray-200);border-radius:var(--radius-xs);font-size:.82rem"><option value="in">Check-In (forgot to punch in)</option><option value="out">Check-Out (forgot to punch out)</option><option value="both">Both In & Out</option></select></div>';
+  html += '<div class="form-row"><label>Reason *</label><textarea id="missedPunchReason" rows="2" placeholder="Reason for missing punch..." style="width:100%;padding:8px;border:1.5px solid var(--gray-200);border-radius:var(--radius-xs);font-size:.82rem"></textarea></div>';
+  html += '<div style="display:flex;gap:8px"><button class="nf-btn nf-btn-primary" onclick="submitMissedPunchFromLeaves()">Submit</button>';
+  html += '<button class="nf-btn nf-btn-outline" onclick="document.getElementById(\'missedPunchLeavesArea\').innerHTML=\'\'">Cancel</button></div>';
+  html += '</div>';
+  area.innerHTML = html;
+}
+
+async function submitMissedPunchFromLeaves() {
+  var date = (document.getElementById('missedPunchDate') || {}).value;
+  var type = (document.getElementById('missedPunchType') || {}).value;
+  var reason = (document.getElementById('missedPunchReason') || {}).value.trim();
+  if (!date) { showToast('Please select the date'); return; }
+  if (!reason) { showToast('Please enter a reason'); return; }
+  var btn = document.querySelector('#missedPunchLeavesArea .nf-btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Submitting...'; }
+  try {
+    var fd = new FormData();
+    fd.append('date', date);
+    fd.append('reason', '(' + type + ' punch missed) ' + reason);
+    await apiUpload('/attendance/missed', fd);
+    showToast('Missed punch report submitted. HR will review.');
+    document.getElementById('missedPunchLeavesArea').innerHTML = '';
+  } catch (e) {
+    showToast(e.message || 'Error submitting request');
+    if (btn) { btn.disabled = false; btn.textContent = 'Submit'; }
+  }
+}
 
 function showMissedAttendanceForm() {
   var area = document.getElementById('missedAttFormArea');
