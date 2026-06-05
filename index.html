@@ -497,9 +497,16 @@
         <button class="toggle" id="halfDayToggle" onclick="toggleHalfDay()"></button>
       </div>
       <div id="halfDayTimeFields" style="display:none">
-        <div style="display:flex;gap:8px">
-          <div class="form-row" style="flex:1"><label>From Time</label><select id="leaveFromTime"></select></div>
-          <div class="form-row" style="flex:1"><label>To Time</label><select id="leaveToTime"></select></div>
+        <div class="form-row" style="margin-bottom:8px">
+          <label style="font-size:.78rem;font-weight:600;margin-bottom:6px;display:block">Which Half? *</label>
+          <div style="display:flex;gap:8px">
+            <label style="display:flex;align-items:center;gap:6px;font-size:.8rem;cursor:pointer;flex:1;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:var(--radius-xs)" id="firstHalfLabel">
+              <input type="radio" name="halfDaySession" id="halfDayFirst" value="first" onchange="selectHalfSession(this)"> First Half (AM)
+            </label>
+            <label style="display:flex;align-items:center;gap:6px;font-size:.8rem;cursor:pointer;flex:1;padding:8px 10px;border:1.5px solid var(--gray-200);border-radius:var(--radius-xs)" id="secondHalfLabel">
+              <input type="radio" name="halfDaySession" id="halfDaySecond" value="second" onchange="selectHalfSession(this)"> Second Half (PM)
+            </label>
+          </div>
         </div>
       </div>
       <div class="form-row"><label>Reason</label><textarea id="leaveReason" placeholder="Enter reason for leave..." rows="3"></textarea></div>

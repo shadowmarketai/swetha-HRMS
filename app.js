@@ -1874,18 +1874,32 @@ function _computeCalendarStatuses(logs, empCode, year, month, maxDay) {
   });
 
   // Build a set of dates that have an approved leave for this employee
-  // Value: 'half' for half-day leave, 'full' for full-day leave
+  // Value: 'half'|'full' for paid leave days, 'lop' for LOP (absent) days
   var leaveDates = {};
   if (typeof leaveApplications !== 'undefined' && empCode) {
     leaveApplications.forEach(function(la) {
       if (la.empCode !== empCode) return;
       if (la.status !== 'approved') return;
       var isHalf = la.days === 0.5 || la.isHalfDay;
+      var paidDays = la.paidDays > 0 ? la.paidDays : la.days;
+      var lopDays = la.lopDays || 0;
       var from = new Date(la.from + 'T00:00:00');
       var to = new Date(la.to + 'T00:00:00');
+      var paidRemain = paidDays;
       for (var ld = new Date(from); ld <= to; ld.setDate(ld.getDate() + 1)) {
+        var ldDow = ld.getDay();
+        var ldYmd = ld.getFullYear() + '-' + String(ld.getMonth()+1).padStart(2,'0') + '-' + String(ld.getDate()).padStart(2,'0');
+        if (ldDow === 0 || (typeof publicHolidays !== 'undefined' && publicHolidays[ldYmd])) continue;
         if (ld.getFullYear() === year && ld.getMonth() === month) {
-          leaveDates[ld.getDate()] = isHalf ? 'half' : 'full';
+          if (paidRemain > 0) {
+            leaveDates[ld.getDate()] = isHalf ? 'half' : 'full';
+            paidRemain -= isHalf ? 0.5 : 1;
+          } else if (lopDays > 0) {
+            leaveDates[ld.getDate()] = 'lop';
+          }
+        } else {
+          paidRemain -= isHalf ? 0.5 : 1;
+          if (paidRemain < 0) paidRemain = 0;
         }
       }
     });
@@ -1926,7 +1940,7 @@ function _computeCalendarStatuses(logs, empCode, year, month, maxDay) {
       // ≥ 8 hours → Present, < 8 hours → Half day
       att[dd] = (totalMin >= 480) ? 'present' : 'half';
     } else if (leaveDates[dd]) {
-      att[dd] = leaveDates[dd] === 'half' ? 'half' : 'leave';
+      att[dd] = leaveDates[dd] === 'half' ? 'half' : leaveDates[dd] === 'lop' ? 'absent' : 'leave';
     } else {
       att[dd] = 'absent';
     }
@@ -6193,6 +6207,30 @@ async function exportAttendanceReport() {
         if (end > start) empDayData[row.emp_code][dayNum].minutes += (end - start) / 60000;
       }
     });
+    // Build approved-leave lookup: empCode -> Set of 'YYYY-MM-DD'
+    var approvedLeaveDates = {};
+    if (typeof leaveApplications !== 'undefined') {
+      leaveApplications.forEach(function(la) {
+        if (la.status !== 'approved') return;
+        var code = la.empCode;
+        if (!approvedLeaveDates[code]) approvedLeaveDates[code] = {};
+        var from = new Date(la.from + 'T00:00:00');
+        var to = new Date(la.to + 'T00:00:00');
+        var paidRemain = la.paidDays > 0 ? la.paidDays : la.days;
+        for (var ld = new Date(from); ld <= to; ld.setDate(ld.getDate() + 1)) {
+          var ldDow = ld.getDay();
+          if (ldDow === 0) continue;
+          var ldYmd = ld.getFullYear() + '-' + String(ld.getMonth()+1).padStart(2,'0') + '-' + String(ld.getDate()).padStart(2,'0');
+          if (publicHolidays && publicHolidays[ldYmd]) continue;
+          if (paidRemain > 0) {
+            approvedLeaveDates[code][ldYmd] = 'Leave';
+            paidRemain -= la.isHalfDay ? 0.5 : 1;
+          } else {
+            approvedLeaveDates[code][ldYmd] = 'LOP';
+          }
+        }
+      });
+    }
     // Build wide-format CSV
     var _esc = function(v) {
       v = String(v === null || v === undefined ? '' : v).replace(/"/g, '""');
@@ -6224,7 +6262,8 @@ async function exportAttendanceReport() {
             var hoursStr = h + 'h ' + (m < 10 ? '0' + m : m) + 'm';
             cols.push(dayData.missedCheckout ? hoursStr + '*' : hoursStr);
           } else {
-            cols.push('Absent');
+            var leaveStatus = approvedLeaveDates[emp.code] && approvedLeaveDates[emp.code][ymd];
+            cols.push(leaveStatus || 'Absent');
           }
         }
       }
@@ -7353,8 +7392,13 @@ function mapLeave(row) {
     dept: row.dept || '', type: row.leave_type || row.type || 'casual',
     from: row.from_date ? String(row.from_date).substring(0, 10) : (row.from || ''),
     to: row.to_date ? String(row.to_date).substring(0, 10) : (row.to || ''),
-    days: parseInt(row.days, 10) || 1, reason: row.reason || '',
+    days: parseFloat(row.days) || 1, reason: row.reason || '',
     status: row.status || 'pending',
+    isHalfDay: !!(row.is_half_day || row.isHalfDay),
+    halfDaySession: row.half_day_session || row.halfDaySession || null,
+    paidDays: parseFloat(row.paid_days || row.paidDays) || 0,
+    lopDays: parseFloat(row.lop_days || row.lopDays) || 0,
+    isLOP: !!(row.is_lop || row.isLOP),
     reviewedBy: row.reviewed_by || row.reviewedBy || null,
     reviewDate: row.review_date ? String(row.review_date).substring(0, 10) : (row.reviewDate || null)
   };
@@ -9727,7 +9771,9 @@ function restoreNotifPrefToggles() {
 // =====================================================
 function getLeaveBalance(empCode) {
   if (!leaveBalances[empCode]) {
-    leaveBalances[empCode] = { casual: 12, comp: 3, permission: 1 };
+    var now = new Date();
+    var accruedCL = now.getMonth() >= 3 ? Math.min(now.getMonth() - 2, 12) : 0;
+    leaveBalances[empCode] = { casual: accruedCL, comp: 3, permission: 1 };
   }
   return leaveBalances[empCode];
 }
@@ -9788,7 +9834,16 @@ function toggleHalfDay() {
     var toDate = document.getElementById('leaveToDate');
     var fromDate = document.getElementById('leaveFromDate');
     if (fromDate.value) toDate.value = fromDate.value;
+    // Clear any previous selection
+    document.querySelectorAll('input[name="halfDaySession"]').forEach(function(r) { r.checked = false; });
+    document.getElementById('firstHalfLabel').style.borderColor = 'var(--gray-200)';
+    document.getElementById('secondHalfLabel').style.borderColor = 'var(--gray-200)';
   }
+}
+
+function selectHalfSession(radio) {
+  document.getElementById('firstHalfLabel').style.borderColor = radio.value === 'first' ? 'var(--primary)' : 'var(--gray-200)';
+  document.getElementById('secondHalfLabel').style.borderColor = radio.value === 'second' ? 'var(--primary)' : 'var(--gray-200)';
 }
 
 function closeLeaveForm() {
@@ -9852,17 +9907,18 @@ async function submitLeave() {
 
   var halfDayToggle = document.getElementById('halfDayToggle');
   var isHalfDay = halfDayToggle && halfDayToggle.classList.contains('on');
+  var halfDaySession = null;
+  if (isHalfDay) {
+    var sessionRadio = document.querySelector('input[name="halfDaySession"]:checked');
+    if (!sessionRadio) { showToast('Please select First Half or Second Half'); return; }
+    halfDaySession = sessionRadio.value;
+  }
   const days = isHalfDay ? 0.5 : Math.ceil((new Date(to) - new Date(from)) / 86400000) + 1;
   const bal = getLeaveBalance(currentUser.code);
-
-  // Leave policy: 1 casual leave per month (paid), extra = LOP (salary deducted)
-  var casualUsedThisMonth = getCasualLeavesUsedThisMonth(currentUser.code);
-  var paidAvailable = Math.max(0, 1 - casualUsedThisMonth); // 1 per month
   var leaveType = selectedLeaveType;
   var isLOP = false;
 
   if (leaveType === 'permission') {
-    // Permission: 2 per month, same day only
     if (from !== to) { showToast('Permission is for 2 hours on a single day only'); return; }
     var permLeft = bal.permission !== undefined ? bal.permission : 1;
     if (permLeft <= 0) {
@@ -9870,44 +9926,43 @@ async function submitLeave() {
       if (!confirm('You have already used your 1 permission this month.\n\nThis permission will be Loss of Pay (LOP) — 2 hours salary will be deducted.\n\nDo you want to proceed?')) return;
     }
   } else if (leaveType === 'casual') {
-    if (bal.casual <= 0) {
-      // No casual balance left — entire request is LOP
+    var clBalance = parseFloat(bal.casual) || 0;
+    if (clBalance <= 0) {
       isLOP = true;
-      if (!confirm('You have exhausted all 12 casual leaves for this year.\n\nThis leave will be Loss of Pay (LOP) — salary for ' + days + ' day(s) will be deducted.\n\nDo you want to proceed?')) return;
-    } else if (days > paidAvailable) {
-      // Partially paid, partially LOP
-      var lopDays = days - paidAvailable;
-      if (!confirm('You have used your 1 paid casual leave for this month.\n\n' + (paidAvailable > 0 ? paidAvailable + ' day(s) will be paid leave.\n' : '') + lopDays + ' day(s) will be Loss of Pay (LOP) — salary will be deducted for those days.\n\nDo you want to proceed?')) return;
-      isLOP = lopDays > 0;
-    }
-    // Check yearly balance
-    if (bal.casual < days && !isLOP) {
-      if (!confirm('You only have ' + bal.casual + ' casual leave(s) remaining this year.\n\n' + (days - bal.casual) + ' day(s) will be Loss of Pay (LOP) — salary will be deducted.\n\nDo you want to proceed?')) return;
+      if (!confirm('No casual leave balance available.\n\nThis leave will be fully Loss of Pay (LOP) — salary for ' + days + ' day(s) will be deducted.\n\nProceed?')) return;
+    } else if (days > clBalance) {
+      var lopPortion = days - clBalance;
+      if (!confirm('You have ' + clBalance + ' CL day(s) available.\n\n' + clBalance + ' day(s) → Paid leave\n' + lopPortion + ' day(s) → Loss of Pay (LOP)\n\nSalary will be deducted for the LOP days.\n\nProceed?')) return;
       isLOP = true;
     }
   }
 
   try {
-    var lopFlag = isLOP || (leaveType === 'casual' && days > paidAvailable);
-    var apiRes = await apiCall('POST', '/leaves', { type: leaveType, from: from, to: to, reason: reason, isLOP: lopFlag, isHalfDay: isHalfDay });
+    var apiRes = await apiCall('POST', '/leaves', {
+      type: leaveType, from: from, to: to, reason: reason,
+      isLOP: isLOP, isHalfDay: isHalfDay, halfDaySession: halfDaySession
+    });
+    // Server returns actual paidDays/lopDays in response
+    var serverPaidDays = apiRes && apiRes.paidDays !== undefined ? apiRes.paidDays : days;
+    var serverLopDays  = apiRes && apiRes.lopDays  !== undefined ? apiRes.lopDays  : 0;
+    var lopFlag = serverLopDays > 0;
+
     var app = {
       id: (apiRes && apiRes.id) || leaveNextId++,
-      empCode: currentUser.code,
-      empName: currentUser.name,
-      dept: currentUser.dept,
-      type: leaveType,
-      from: from, to: to, days: days, reason: reason,
-      status: 'pending',
-      isLOP: lopFlag,
+      empCode: currentUser.code, empName: currentUser.name, dept: currentUser.dept,
+      type: leaveType, from: from, to: to, days: days, reason: reason,
+      status: 'pending', isLOP: lopFlag,
+      paidDays: serverPaidDays, lopDays: serverLopDays,
+      isHalfDay: isHalfDay, halfDaySession: halfDaySession,
       date: new Date().toISOString()
     };
     leaveApplications.push(app);
     var leaveBtn = document.querySelector('.leave-form-overlay .btn-primary, .leave-form-overlay .nf-btn-primary');
     _submitSuccess(leaveBtn);
     if (lopFlag) {
-      showToast('Leave submitted — salary deduction will apply for LOP days');
+      showToast('Leave submitted — ' + serverPaidDays + ' day(s) paid + ' + serverLopDays + ' day(s) LOP');
     } else {
-      showToast('Leave application submitted (paid leave)');
+      showToast('Leave submitted — ' + days + ' day(s) paid leave');
     }
     setTimeout(function() { closeLeaveForm(); renderLeaveScreen(); }, 1500);
     refreshNotifications();
@@ -9916,6 +9971,30 @@ async function submitLeave() {
     _submitError(leaveBtnE, 'Failed');
     showToast(e.message || 'Error submitting leave');
   }
+}
+
+async function cancelLeave(id) {
+  if (!confirm('Cancel this leave application?')) return;
+  try {
+    const res = await apiCall('PATCH', '/leaves/' + id + '/cancel');
+    const app = leaveApplications.find(a => a.id === id);
+    if (app) {
+      const wasApproved = app.status === 'approved';
+      app.status = 'cancelled';
+      if (wasApproved) {
+        const bal = getLeaveBalance(app.empCode);
+        if (app.type !== 'permission') {
+          bal[app.type] = (bal[app.type] || 0) + (app.paidDays || app.days);
+        } else {
+          bal.permission = Math.min(1, (bal.permission || 0) + 1);
+        }
+      }
+    }
+    renderLeaveScreen();
+    await refreshLeaveBalance();
+    renderLeaveScreen();
+    showToast('Leave cancelled');
+  } catch (err) { showToast(err.message || 'Error cancelling leave'); }
 }
 
 async function approveLeave(id) {
@@ -9936,7 +10015,8 @@ async function approveLeave(id) {
     await apiCall('PATCH', '/leaves/' + id + '/approve');
     app.status = 'approved';
     const bal = getLeaveBalance(app.empCode);
-    bal[app.type] = Math.max(0, bal[app.type] - app.days);
+    const deduct = app.paidDays > 0 ? app.paidDays : app.days;
+    bal[app.type] = Math.max(0, bal[app.type] - deduct);
     renderLeaveScreen();
     showToast('Leave approved');
     refreshNotifications();
@@ -9980,8 +10060,10 @@ function renderLeaveScreen() {
     if (isMD) {
       balGrid.innerHTML = '';
     } else {
+      const _now = new Date();
+      const _clMax = _now.getMonth() >= 3 ? Math.min(_now.getMonth() - 2, 12) : 1;
       const leaveTypes = [
-        {key:'casual',label:'Casual Leave',total:12,color:'#E85D04',cls:'casual'},
+        {key:'casual',label:'Casual Leave',total:_clMax,color:'#E85D04',cls:'casual'},
         {key:'comp',label:'Comp Off',total:3,color:'#0891b2',cls:'comp'},
         {key:'permission',label:'Permission (2hr)',total:1,color:'#d97706',cls:'permission'}
       ];
@@ -10013,13 +10095,17 @@ function renderLeaveScreen() {
       myTab.innerHTML = '<div style="padding:16px;text-align:center;font-size:.78rem;color:var(--gray-400)">No leave applications yet</div>';
     } else {
       myTab.innerHTML = myApps.map(a => {
-        const badgeCls = a.status === 'approved' ? 'badge-approved' : a.status === 'rejected' ? 'badge-rejected' : a.status === 'hr_accepted' ? '' : 'badge-pending';
-        const badgeStyle = a.status === 'hr_accepted' ? ' style="background:#DBEAFE;color:#1D4ED8"' : '';
-        const statusLabel = a.status === 'hr_accepted' ? 'HR Accepted' : a.status.charAt(0).toUpperCase()+a.status.slice(1);
+        const isCancelled = a.status === 'cancelled';
+        const badgeCls = a.status === 'approved' ? 'badge-approved' : a.status === 'rejected' ? 'badge-rejected' : isCancelled ? 'badge-rejected' : a.status === 'hr_accepted' ? '' : 'badge-pending';
+        const badgeStyle = a.status === 'hr_accepted' ? ' style="background:#DBEAFE;color:#1D4ED8"' : isCancelled ? ' style="background:#F3F4F6;color:#6B7280"' : '';
+        const statusLabel = a.status === 'hr_accepted' ? 'HR Accepted' : isCancelled ? 'Cancelled' : a.status.charAt(0).toUpperCase()+a.status.slice(1);
         const fromD = new Date(a.from).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
         const toD = new Date(a.to).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
+        var halfLabel = a.isHalfDay ? (' <span style="font-size:.6rem;background:#FEF9C3;color:#92400E;padding:1px 5px;border-radius:4px;font-weight:600">' + (a.halfDaySession === 'second' ? '2nd Half' : '1st Half') + '</span>') : '';
         var lopBadge = a.isLOP ? '<span style="display:inline-block;font-size:.55rem;padding:1px 5px;border-radius:4px;background:#FEE2E2;color:#DC2626;margin-left:4px;font-weight:600">LOP</span>' : '<span style="display:inline-block;font-size:.55rem;padding:1px 5px;border-radius:4px;background:#DCFCE7;color:#16A34A;margin-left:4px;font-weight:600">PAID</span>';
-        return `<div class="request-item"><div class="req-icon" style="background:#FFF7ED;color:#E85D04"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/></svg></div><div class="req-info"><h4>${a.type.charAt(0).toUpperCase()+a.type.slice(1)} Leave${lopBadge}</h4><p>${fromD} — ${toD} &middot; ${a.days} day(s)</p></div><div class="req-meta"><span class="badge-status ${badgeCls}"${badgeStyle}>${statusLabel}</span></div></div>`;
+        const canCancel = !isCancelled && a.status !== 'rejected';
+        const cancelBtn = canCancel ? `<button onclick="cancelLeave(${a.id})" style="margin-top:6px;padding:3px 10px;font-size:.65rem;background:#FEE2E2;color:#DC2626;border:none;border-radius:6px;cursor:pointer;font-weight:600">Cancel</button>` : '';
+        return `<div class="request-item" style="flex-wrap:wrap"><div class="req-icon" style="background:#FFF7ED;color:#E85D04"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/></svg></div><div class="req-info"><h4>${a.type.charAt(0).toUpperCase()+a.type.slice(1)} Leave${halfLabel}${lopBadge}</h4><p>${fromD} — ${toD} &middot; ${a.days} day(s)</p>${cancelBtn}</div><div class="req-meta"><span class="badge-status ${badgeCls}"${badgeStyle}>${statusLabel}</span></div></div>`;
       }).join('');
     }
   }

@@ -773,3 +773,27 @@ CREATE TABLE IF NOT EXISTS feature_access (
   UNIQUE KEY unique_emp_feature (emp_code, feature_key),
   INDEX idx_fa_emp (emp_code)
 );
+
+-- =====================================================
+-- Phase 3 migrations: CL accrual, half-day session,
+-- LOP split, cancel leave
+-- =====================================================
+
+-- leave_applications: support half-day session, LOP split, cancel status, permission type, decimal days
+ALTER TABLE leave_applications
+  MODIFY COLUMN leave_type ENUM('casual','earned','sick','comp','permission') NOT NULL,
+  MODIFY COLUMN days DECIMAL(4,2) NOT NULL DEFAULT 0,
+  MODIFY COLUMN status ENUM('pending','hr_accepted','approved','rejected','cancelled') DEFAULT 'pending',
+  ADD COLUMN IF NOT EXISTS is_half_day TINYINT(1) DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS half_day_session ENUM('first','second') NULL,
+  ADD COLUMN IF NOT EXISTS paid_days DECIMAL(4,2) DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS lop_days DECIMAL(4,2) DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS is_lop TINYINT(1) DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS cancelled_at DATETIME NULL,
+  ADD COLUMN IF NOT EXISTS cancelled_by VARCHAR(20) NULL;
+
+-- leave_balances: add monthly CL accrual tracking, permission column, decimal casual
+ALTER TABLE leave_balances
+  MODIFY COLUMN casual DECIMAL(4,2) DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS permission INT DEFAULT 1,
+  ADD COLUMN IF NOT EXISTS cl_accrued_month VARCHAR(7) DEFAULT NULL;
