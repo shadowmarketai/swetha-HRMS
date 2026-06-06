@@ -9010,6 +9010,7 @@ async function downloadPayrollReport() {
 // FEATURE 2: ATTENDANCE REPORT PDF
 // =====================================================
 async function downloadAttendanceReport() {
+  showToast('Generating report…');
   await loadJsPdf();
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF('p', 'mm', 'a4');
@@ -9020,6 +9021,11 @@ async function downloadAttendanceReport() {
   const yr = now.getFullYear();
   const daysInMonth = new Date(yr, now.getMonth()+1, 0).getDate();
   const workingDays = daysInMonth - 4; // ~4 holidays
+
+  // Fetch fresh attendance data from API for current month
+  const monthStr = yr + '-' + String(now.getMonth()+1).padStart(2,'0');
+  let freshLogs = [];
+  try { freshLogs = await apiCall('GET', '/attendance?month=' + monthStr); if (!Array.isArray(freshLogs)) freshLogs = []; } catch(e) { freshLogs = []; }
 
   // Header
   let y = 15;
@@ -9034,13 +9040,11 @@ async function downloadAttendanceReport() {
   doc.text('ATTENDANCE REPORT — ' + mName + ' ' + yr, pw/2, y, {align:'center'});
   y += 8;
 
-  // Summary — build from attendanceLogs DB data
+  // Summary — build from fresh API data
   let totalPresent = 0, totalCount = EMPLOYEES.length;
-  const curMonth = now.getMonth(), curYear = yr;
   const empData = EMPLOYEES.map(emp => {
-    const empLogs = attendanceLogs.filter(function(l) {
-      var d = new Date(l.date || l.check_in);
-      return (l.empCode || l.emp_code) === emp.code && d.getMonth() === curMonth && d.getFullYear() === curYear;
+    const empLogs = freshLogs.filter(function(l) {
+      return (l.emp_code || l.empCode) === emp.code;
     });
     const present = empLogs.filter(function(l) { return l.status === 'present' || l.status === 'Present' || l.check_in; }).length;
     const half = empLogs.filter(function(l) { return l.status === 'half' || l.status === 'Half Day'; }).length;
