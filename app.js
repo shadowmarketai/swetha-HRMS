@@ -10235,7 +10235,7 @@ function selectLeaveType(type, el) {
     if (type === 'permission') {
       var permDays = bal.permission !== undefined ? parseFloat(bal.permission) : 2;
       var permLeft = Math.round(permDays * 2); // convert days → count (0–4)
-      balText.innerHTML = 'Permission (2hr): <strong>' + permLeft + '</strong> of 4 remaining this month' +
+      balText.innerHTML = '<strong>2hr</strong> (0.5 × ' + permLeft + ')' +
         '<br><span style="font-size:.7rem;color:' + (permLeft > 0 ? 'var(--success)' : 'var(--danger)') + '">' +
         (permLeft > 0 ? permLeft + ' permission' + (permLeft !== 1 ? 's' : '') + ' available — no salary deduction' : 'All 4 permissions used this month — additional will be LOP') + '</span>';
       // Auto-set same-day dates for permission
@@ -10451,7 +10451,8 @@ function renderLeaveScreen() {
           const rem = lt.key === 'permission' ? Math.round(rawRem * 2) : rawRem;
           const used = lt.total - rem;
           const offset = circumference * (used / lt.total);
-          return `<div class="leave-balance-card ${lt.cls}"><div class="donut-chart"><svg viewBox="0 0 65 65"><circle class="donut-bg" cx="32.5" cy="32.5" r="26"/><circle class="donut-fill" cx="32.5" cy="32.5" r="26" stroke="${lt.color}" stroke-dasharray="${circumference}" stroke-dashoffset="${offset}"/></svg><div class="donut-center">${rem}</div></div><div class="leave-type-name">${lt.label}</div><div class="leave-detail">${rem} of ${lt.total} remaining</div></div>`;
+          const detail = lt.key === 'permission' ? `2hr (0.5 × ${rem})` : `${rem} of ${lt.total} remaining`;
+          return `<div class="leave-balance-card ${lt.cls}"><div class="donut-chart"><svg viewBox="0 0 65 65"><circle class="donut-bg" cx="32.5" cy="32.5" r="26"/><circle class="donut-fill" cx="32.5" cy="32.5" r="26" stroke="${lt.color}" stroke-dasharray="${circumference}" stroke-dashoffset="${offset}"/></svg><div class="donut-center">${rem}</div></div><div class="leave-type-name">${lt.label}</div><div class="leave-detail">${detail}</div></div>`;
         }).join('') + '</div>';
     }
   }
