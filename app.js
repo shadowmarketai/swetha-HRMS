@@ -7750,7 +7750,9 @@ function mapLeave(row) {
     lopDays: parseFloat(row.lop_days || row.lopDays) || 0,
     isLOP: !!(row.is_lop || row.isLOP),
     reviewedBy: row.reviewed_by || row.reviewedBy || null,
-    reviewDate: row.review_date ? String(row.review_date).substring(0, 10) : (row.reviewDate || null)
+    reviewDate: row.review_date ? String(row.review_date).substring(0, 10) : (row.reviewDate || null),
+    fromTime: row.from_time || row.fromTime || null,
+    toTime: row.to_time || row.toTime || null
   };
 }
 function mapAdvance(row) {
@@ -10624,6 +10626,7 @@ async function submitLeave() {
       status: 'pending', isLOP: lopFlag,
       paidDays: serverPaidDays, lopDays: serverLopDays,
       isHalfDay: isHalfDay, halfDaySession: halfDaySession,
+      fromTime: fromTime, toTime: toTime,
       date: new Date().toISOString()
     };
     leaveApplications.push(app);
@@ -10713,6 +10716,18 @@ function switchLeaveTab(tab, el) {
   document.getElementById('holidaysTab').style.display = tab === 'holidays' ? '' : 'none';
 }
 
+function _fmtLeaveDate(a) {
+  var fromD = new Date(a.from).toLocaleDateString('en-IN', {day:'2-digit', month:'short'});
+  if (a.type === 'permission') {
+    return fromD + ' · ' + (a.fromTime || '09:00') + ' - ' + (a.toTime || '11:00');
+  }
+  if (a.from === a.to) {
+    return fromD + ' · ' + (a.days === 0.5 ? 'Half Day' : '1 day');
+  }
+  var toD = new Date(a.to).toLocaleDateString('en-IN', {day:'2-digit', month:'short'});
+  return fromD + ' — ' + toD + ' · ' + a.days + ' day(s)';
+}
+
 function renderLeaveScreen() {
   if (!currentUser) return;
   const isMDorHR = currentUser.role === 'MD' || currentUser.role === 'HR';
@@ -10778,7 +10793,7 @@ function renderLeaveScreen() {
         var lopBadge = a.isLOP ? '<span style="display:inline-block;font-size:.55rem;padding:1px 5px;border-radius:4px;background:#FEE2E2;color:#DC2626;margin-left:4px;font-weight:600">LOP</span>' : '<span style="display:inline-block;font-size:.55rem;padding:1px 5px;border-radius:4px;background:#DCFCE7;color:#16A34A;margin-left:4px;font-weight:600">PAID</span>';
         const canCancel = !isCancelled && a.status !== 'rejected';
         const cancelBtn = canCancel ? `<button onclick="cancelLeave(${a.id})" style="margin-top:6px;padding:3px 10px;font-size:.65rem;background:#FEE2E2;color:#DC2626;border:none;border-radius:6px;cursor:pointer;font-weight:600">Cancel</button>` : '';
-        return `<div class="request-item" style="flex-wrap:wrap"><div class="req-icon" style="background:#FFF7ED;color:#E85D04"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/></svg></div><div class="req-info"><h4>${a.type.charAt(0).toUpperCase()+a.type.slice(1)} Leave${halfLabel}${lopBadge}</h4><p>${fromD} — ${toD} &middot; ${a.days} day(s)</p>${cancelBtn}</div><div class="req-meta"><span class="badge-status ${badgeCls}"${badgeStyle}>${statusLabel}</span></div></div>`;
+        return `<div class="request-item" style="flex-wrap:wrap"><div class="req-icon" style="background:#FFF7ED;color:#E85D04"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/></svg></div><div class="req-info"><h4>${a.type.charAt(0).toUpperCase()+a.type.slice(1)} Leave${halfLabel}${lopBadge}</h4><p>${_fmtLeaveDate(a)}</p>${cancelBtn}</div><div class="req-meta"><span class="badge-status ${badgeCls}"${badgeStyle}>${statusLabel}</span></div></div>`;
       }).join('');
     }
   }
@@ -10805,7 +10820,7 @@ function renderLeaveScreen() {
           } else if (isMD) {
             actionsHtml = `<div style="margin-top:6px"><span class="badge-status badge-pending">Awaiting HR</span></div>`;
           }
-          return `<div class="request-item" style="flex-wrap:wrap"><div class="req-icon" style="background:#FCE7F3;color:#DB2777"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><div class="req-info"><h4>${escapeHTML(a.empName)} — ${escapeHTML(a.type)} Leave</h4><p>${escapeHTML(a.dept)} &middot; ${fromD} — ${toD} &middot; ${a.days} day(s)</p><p style="font-size:.65rem;color:var(--gray-500);margin-top:2px">${escapeHTML(a.reason)}</p></div>${actionsHtml}</div>`;
+          return `<div class="request-item" style="flex-wrap:wrap"><div class="req-icon" style="background:#FCE7F3;color:#DB2777"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><div class="req-info"><h4>${escapeHTML(a.empName)} — ${escapeHTML(a.type)} Leave</h4><p>${escapeHTML(a.dept)} &middot; ${_fmtLeaveDate(a)}</p><p style="font-size:.65rem;color:var(--gray-500);margin-top:2px">${escapeHTML(a.reason)}</p></div>${actionsHtml}</div>`;
         }).join('');
       }
       if (hrAccepted.length > 0 && isMD) {
@@ -10813,14 +10828,14 @@ function renderLeaveScreen() {
         html += hrAccepted.map(a => {
           const fromD = new Date(a.from).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
           const toD = new Date(a.to).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
-          return `<div class="request-item" style="flex-wrap:wrap"><div class="req-icon" style="background:#DBEAFE;color:#1D4ED8"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/></svg></div><div class="req-info"><h4>${escapeHTML(a.empName)} — ${escapeHTML(a.type)} Leave</h4><p>${escapeHTML(a.dept)} &middot; ${fromD} — ${toD} &middot; ${a.days} day(s)</p></div><div class="leave-action-btns" style="width:100%;margin-top:8px"><button style="background:var(--success-light);color:var(--success-dark)" onclick="approveLeave(${a.id})">Confirm</button><button style="background:var(--danger-light);color:var(--danger-dark)" onclick="rejectLeave(${a.id})">Reject</button></div></div>`;
+          return `<div class="request-item" style="flex-wrap:wrap"><div class="req-icon" style="background:#DBEAFE;color:#1D4ED8"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/></svg></div><div class="req-info"><h4>${escapeHTML(a.empName)} — ${escapeHTML(a.type)} Leave</h4><p>${escapeHTML(a.dept)} &middot; ${_fmtLeaveDate(a)}</p></div><div class="leave-action-btns" style="width:100%;margin-top:8px"><button style="background:var(--success-light);color:var(--success-dark)" onclick="approveLeave(${a.id})">Confirm</button><button style="background:var(--danger-light);color:var(--danger-dark)" onclick="rejectLeave(${a.id})">Reject</button></div></div>`;
         }).join('');
       } else if (hrAccepted.length > 0 && isHR) {
         html += '<div style="font-size:.72rem;font-weight:600;color:#1D4ED8;margin:8px 0 4px">Awaiting MD Confirmation</div>';
         html += hrAccepted.map(a => {
           const fromD = new Date(a.from).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
           const toD = new Date(a.to).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
-          return `<div class="request-item"><div class="req-icon" style="background:#DBEAFE;color:#1D4ED8"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/></svg></div><div class="req-info"><h4>${escapeHTML(a.empName)} — ${escapeHTML(a.type)}</h4><p>${escapeHTML(a.dept)} &middot; ${fromD} — ${toD}</p></div><span class="badge-status" style="background:#DBEAFE;color:#1D4ED8">HR Accepted</span></div>`;
+          return `<div class="request-item"><div class="req-icon" style="background:#DBEAFE;color:#1D4ED8"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/></svg></div><div class="req-info"><h4>${escapeHTML(a.empName)} — ${escapeHTML(a.type)}</h4><p>${escapeHTML(a.dept)} &middot; ${_fmtLeaveDate(a)}</p></div><span class="badge-status" style="background:#DBEAFE;color:#1D4ED8">HR Accepted</span></div>`;
         }).join('');
       }
       if (others.length > 0) {
@@ -10828,7 +10843,7 @@ function renderLeaveScreen() {
           const badgeCls = a.status === 'approved' ? 'badge-approved' : 'badge-rejected';
           const fromD = new Date(a.from).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
           const toD = new Date(a.to).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
-          return `<div class="request-item"><div class="req-icon" style="background:#D1FAE5;color:#059669"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><div class="req-info"><h4>${escapeHTML(a.empName)} — ${escapeHTML(a.type)}</h4><p>${escapeHTML(a.dept)} &middot; ${fromD} — ${toD}</p></div><div class="req-meta"><span class="badge-status ${badgeCls}">${escapeHTML(a.status)}</span></div></div>`;
+          return `<div class="request-item"><div class="req-icon" style="background:#D1FAE5;color:#059669"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><div class="req-info"><h4>${escapeHTML(a.empName)} — ${escapeHTML(a.type)}</h4><p>${escapeHTML(a.dept)} &middot; ${_fmtLeaveDate(a)}</p></div><div class="req-meta"><span class="badge-status ${badgeCls}">${escapeHTML(a.status)}</span></div></div>`;
         }).join('');
       }
       if (!html) html = '<div style="padding:16px;text-align:center;font-size:.78rem;color:var(--gray-400)">No leave applications</div>';
@@ -16230,7 +16245,7 @@ function renderHRLeaveRequests() {
     pending.forEach(function(a) {
       var fromD = new Date(a.from).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
       var toD = new Date(a.to).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
-      html += '<div class="request-item" style="flex-wrap:wrap"><div class="req-icon" style="background:#FCE7F3;color:#DB2777"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><div class="req-info"><h4>' + escapeHTML(a.empName) + ' — ' + escapeHTML(a.type) + ' Leave</h4><p>' + escapeHTML(a.dept) + ' &middot; ' + fromD + ' — ' + toD + ' &middot; ' + a.days + ' day(s)</p><p style="font-size:.65rem;color:var(--gray-500);margin-top:2px">' + escapeHTML(a.reason) + '</p></div><div class="leave-action-btns" style="width:100%;margin-top:8px"><button style="background:#DBEAFE;color:#1D4ED8" onclick="hrAcceptLeave(' + a.id + ')">Accept</button><button style="background:var(--danger-light);color:var(--danger-dark)" onclick="rejectLeave(' + a.id + ')">Reject</button></div></div>';
+      html += '<div class="request-item" style="flex-wrap:wrap"><div class="req-icon" style="background:#FCE7F3;color:#DB2777"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><div class="req-info"><h4>' + escapeHTML(a.empName) + ' — ' + escapeHTML(a.type) + ' Leave</h4><p>' + escapeHTML(a.dept) + ' &middot; ' + _fmtLeaveDate(a) + '</p><p style="font-size:.65rem;color:var(--gray-500);margin-top:2px">' + escapeHTML(a.reason) + '</p></div><div class="leave-action-btns" style="width:100%;margin-top:8px"><button style="background:#DBEAFE;color:#1D4ED8" onclick="hrAcceptLeave(' + a.id + ')">Accept</button><button style="background:var(--danger-light);color:var(--danger-dark)" onclick="rejectLeave(' + a.id + ')">Reject</button></div></div>';
     });
   }
   if (hrAccepted.length > 0) {
@@ -16238,7 +16253,7 @@ function renderHRLeaveRequests() {
     hrAccepted.forEach(function(a) {
       var fromD = new Date(a.from).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
       var toD = new Date(a.to).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
-      html += '<div class="request-item"><div class="req-icon" style="background:#DBEAFE;color:#1D4ED8"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/></svg></div><div class="req-info"><h4>' + escapeHTML(a.empName) + ' — ' + escapeHTML(a.type) + '</h4><p>' + escapeHTML(a.dept) + ' &middot; ' + fromD + ' — ' + toD + ' &middot; ' + a.days + ' day(s)</p></div><span class="badge-status" style="background:#DBEAFE;color:#1D4ED8">HR Accepted</span></div>';
+      html += '<div class="request-item"><div class="req-icon" style="background:#DBEAFE;color:#1D4ED8"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/></svg></div><div class="req-info"><h4>' + escapeHTML(a.empName) + ' — ' + escapeHTML(a.type) + '</h4><p>' + escapeHTML(a.dept) + ' &middot; ' + _fmtLeaveDate(a) + '</p></div><span class="badge-status" style="background:#DBEAFE;color:#1D4ED8">HR Accepted</span></div>';
     });
   }
   if (others.length > 0) {
@@ -16247,7 +16262,7 @@ function renderHRLeaveRequests() {
       var badgeCls = a.status === 'approved' ? 'badge-approved' : 'badge-rejected';
       var fromD = new Date(a.from).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
       var toD = new Date(a.to).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
-      html += '<div class="request-item"><div class="req-icon" style="background:#D1FAE5;color:#059669"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><div class="req-info"><h4>' + escapeHTML(a.empName) + ' — ' + escapeHTML(a.type) + '</h4><p>' + escapeHTML(a.dept) + ' &middot; ' + fromD + ' — ' + toD + '</p></div><div class="req-meta"><span class="badge-status ' + badgeCls + '">' + escapeHTML(a.status) + '</span></div></div>';
+      html += '<div class="request-item"><div class="req-icon" style="background:#D1FAE5;color:#059669"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><div class="req-info"><h4>' + escapeHTML(a.empName) + ' — ' + escapeHTML(a.type) + '</h4><p>' + escapeHTML(a.dept) + ' &middot; ' + _fmtLeaveDate(a) + '</p></div><div class="req-meta"><span class="badge-status ' + badgeCls + '">' + escapeHTML(a.status) + '</span></div></div>';
     });
   }
   if (!pending.length && !hrAccepted.length && !others.length) {
