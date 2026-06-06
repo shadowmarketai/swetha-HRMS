@@ -11373,7 +11373,6 @@ async function renderAttendanceLogList() {
     }
   }
   if (myLogs.length === 0) {
-  if (myLogs.length === 0) {
     c.innerHTML = '<div style="padding:16px;text-align:center;color:var(--gray-400);font-size:.8rem">No attendance records yet. Use GPS Check-In to start logging.</div>';
     return;
   }
