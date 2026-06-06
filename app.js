@@ -38,7 +38,7 @@ function authUrl(path) {
 // =====================================================
 let _jsPdfLoaded = false, _chartJsLoaded = false, _xlsxLoaded = false;
 function loadXlsx() {
-  if (_xlsxLoaded || window.XLSXStyle) { _xlsxLoaded = true; return Promise.resolve(); }
+  if (_xlsxLoaded || window.XLSX) { _xlsxLoaded = true; return Promise.resolve(); }
   return new Promise((resolve, reject) => {
     const s = document.createElement('script');
     s.src = 'https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js';
@@ -9128,7 +9128,7 @@ async function downloadConsolidatedXLSX() {
   const { rows, daysInMonth, holidays, selYear: yr, selMonth: mo } = await _buildConsolidatedData(selMonth, selYear);
   const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
-  const XS = window.XLSXStyle;
+  const XS = window.XLSX;
   const mk = (v, rgb, bold, align) => ({
     v: v === null || v === undefined ? '' : v,
     t: typeof v === 'number' ? 'n' : 's',
