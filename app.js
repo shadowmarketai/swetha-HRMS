@@ -9029,6 +9029,7 @@ function openConsolidatedAttModal() {
   document.getElementById('conAttMonth').value = now.getMonth();
   document.getElementById('conAttYear').value = now.getFullYear();
   el.classList.add('active');
+  el.style.setProperty('z-index', '200000', 'important');
 }
 function closeConsolidatedAttModal() {
   var el = document.getElementById('consolidatedAttModal');
