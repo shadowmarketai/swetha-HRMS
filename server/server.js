@@ -459,6 +459,10 @@ app.get('*', (req, res) => {
     // Phase F3: Leave is_lop column
     await pool.query("ALTER TABLE leave_applications ADD COLUMN is_lop BOOLEAN DEFAULT FALSE").catch(() => {});
 
+    // Phase F4: CL accrual tracking + permission as decimal
+    await pool.query("ALTER TABLE leave_balances ADD COLUMN cl_accrued_month VARCHAR(7) DEFAULT NULL").catch(() => {});
+    await pool.query("ALTER TABLE leave_balances MODIFY COLUMN permission DECIMAL(4,2) DEFAULT 2").catch(() => {});
+
     // Phase G1: Missed attendance requests table
     await pool.query(`CREATE TABLE IF NOT EXISTS missed_attendance_requests (
       id INT AUTO_INCREMENT PRIMARY KEY,
@@ -601,7 +605,7 @@ async function resetMonthlyPermissions() {
     const pool = require('./config/db');
     const today = new Date();
     if (today.getDate() === 1) {
-      const [result] = await pool.query('UPDATE leave_balances SET permission = 1 WHERE permission < 1');
+      const [result] = await pool.query('UPDATE leave_balances SET permission = 2 WHERE permission < 2');
       if (result.affectedRows > 0) console.log('[PERM-RESET] Reset permission balance for ' + result.affectedRows + ' employees');
     }
   } catch (e) { console.error('[PERM-RESET] Error:', e.message); }
