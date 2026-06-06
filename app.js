@@ -36,7 +36,18 @@ function authUrl(path) {
 // =====================================================
 // LAZY CDN LOADERS
 // =====================================================
-let _jsPdfLoaded = false, _chartJsLoaded = false;
+let _jsPdfLoaded = false, _chartJsLoaded = false, _xlsxLoaded = false;
+function loadXlsx() {
+  if (_xlsxLoaded || window.XLSXStyle) { _xlsxLoaded = true; return Promise.resolve(); }
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js';
+    s.crossOrigin = 'anonymous';
+    s.onload = () => { _xlsxLoaded = true; resolve(); };
+    s.onerror = reject;
+    document.head.appendChild(s);
+  });
+}
 function loadJsPdf() {
   if (_jsPdfLoaded || (typeof jspdf !== 'undefined' && jspdf.jsPDF)) return Promise.resolve();
   return new Promise((resolve, reject) => {
@@ -9007,7 +9018,278 @@ async function downloadPayrollReport() {
 }
 
 // =====================================================
-// FEATURE 2: ATTENDANCE REPORT PDF
+// FEATURE 2: CONSOLIDATED ATTENDANCE REPORT (XLSX + PDF grid)
+// =====================================================
+
+// ── Modal open/close ──
+function openConsolidatedAttModal() {
+  var el = document.getElementById('consolidatedAttModal');
+  if (!el) return;
+  var now = new Date();
+  document.getElementById('conAttMonth').value = now.getMonth();
+  document.getElementById('conAttYear').value = now.getFullYear();
+  el.classList.add('active');
+}
+function closeConsolidatedAttModal() {
+  var el = document.getElementById('consolidatedAttModal');
+  if (el) el.classList.remove('active');
+}
+
+// ── Shared: fetch and pivot attendance data for the month ──
+async function _buildConsolidatedData(selMonth, selYear) {
+  const monthStr = selYear + '-' + String(selMonth + 1).padStart(2, '0');
+  const daysInMonth = new Date(selYear, selMonth + 1, 0).getDate();
+
+  const [logs, allLeaves] = await Promise.all([
+    apiCall('GET', '/attendance?month=' + monthStr).catch(() => []),
+    apiCall('GET', '/leaves').catch(() => [])
+  ]);
+
+  let holidays = {};
+  try {
+    const hols = await apiCall('GET', '/holidays');
+    if (Array.isArray(hols)) hols.forEach(h => { if (h.date) holidays[h.date.substring(0, 10)] = h.name || 'Holiday'; });
+  } catch(e) {}
+
+  // Attendance map: empCode → { day → { hours, mins } }
+  const attMap = {};
+  (Array.isArray(logs) ? logs : []).forEach(l => {
+    const code = l.emp_code || l.empCode;
+    const d = new Date(l.log_date || l.check_in);
+    const day = d.getDate();
+    if (!attMap[code]) attMap[code] = {};
+    let hrs = 0, mn = 0;
+    if (l.check_in && l.check_out) {
+      const diff = (new Date(l.check_out) - new Date(l.check_in)) / 60000;
+      hrs = Math.floor(diff / 60); mn = Math.round(diff % 60);
+    } else {
+      hrs = 8; mn = 0; // no checkout — assume 8h
+    }
+    attMap[code][day] = { hrs, mn };
+  });
+
+  // Leave map: empCode → { day → 'Leave' }
+  const leaveMap = {};
+  (Array.isArray(allLeaves) ? allLeaves : []).filter(lv => lv.status === 'approved' && lv.type !== 'permission').forEach(lv => {
+    const code = lv.emp_code || lv.empCode;
+    if (!leaveMap[code]) leaveMap[code] = {};
+    const from = new Date(lv.from_date || lv.from);
+    const to   = new Date(lv.to_date   || lv.to);
+    for (var dd = new Date(from); dd <= to; dd.setDate(dd.getDate() + 1)) {
+      if (dd.getMonth() === selMonth && dd.getFullYear() === selYear)
+        leaveMap[code][dd.getDate()] = 'Leave';
+    }
+  });
+
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+
+  // Build per-employee rows
+  const activeEmps = EMPLOYEES.filter(e => e.status !== 'Inactive' && e.role === 'Employee' || e.role === 'HR' || e.role === 'MD').filter(e => e.code !== 'SADMIN');
+  const rows = activeEmps.map(emp => {
+    const days = [];
+    let fullDays = 0, halfDays = 0, leaveDays = 0, absentDays = 0, workingDays = 0, totalMins = 0;
+    for (let d = 1; d <= daysInMonth; d++) {
+      const date = new Date(selYear, selMonth, d);
+      const isSun = date.getDay() === 0;
+      const ymd = selYear + '-' + String(selMonth+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+      const isHol = !!holidays[ymd];
+      if (isSun) { days.push({ label:'Sun', type:'sun' }); continue; }
+      if (isHol) { days.push({ label:'Holiday', type:'holiday' }); workingDays++; continue; }
+      workingDays++;
+      const lv = leaveMap[emp.code]?.[d];
+      const att = attMap[emp.code]?.[d];
+      if (lv) {
+        days.push({ label:'Leave', type:'leave' }); leaveDays++;
+      } else if (att) {
+        const h = att.hrs, m = att.mn;
+        totalMins += h * 60 + m;
+        const label = h + 'h ' + m + 'm';
+        if (h < 5) { days.push({ label, type:'half' }); halfDays++; }
+        else       { days.push({ label, type:'present' }); fullDays++; }
+      } else {
+        if (date < today) { days.push({ label:'Absent', type:'absent' }); absentDays++; }
+        else              { days.push({ label:'', type:'future' }); }
+      }
+    }
+    const tH = Math.floor(totalMins / 60), tM = totalMins % 60;
+    return { emp, days, fullDays, halfDays, leaveDays, absentDays, workingDays, totalHours: tH + 'h ' + tM + 'm' };
+  });
+
+  return { rows, daysInMonth, holidays, selMonth, selYear };
+}
+
+// ── XLSX Download ──
+async function downloadConsolidatedXLSX() {
+  closeConsolidatedAttModal();
+  showToast('Generating Excel report…');
+  await loadXlsx();
+  const selMonth = parseInt(document.getElementById('conAttMonth').value);
+  const selYear  = parseInt(document.getElementById('conAttYear').value);
+  const { rows, daysInMonth, holidays, selYear: yr, selMonth: mo } = await _buildConsolidatedData(selMonth, selYear);
+  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+  const XS = window.XLSXStyle;
+  const mk = (v, rgb, bold, align) => ({
+    v: v === null || v === undefined ? '' : v,
+    t: typeof v === 'number' ? 'n' : 's',
+    s: {
+      fill: { patternType: 'solid', fgColor: { rgb: rgb || 'FFFFFF' } },
+      font: { sz: 8, bold: !!bold, color: { rgb: (rgb === '4472C4' || rgb === '1F497D') ? 'FFFFFF' : '000000' } },
+      alignment: { horizontal: align || 'center', vertical: 'center', wrapText: false },
+      border: { top:{style:'thin',color:{rgb:'CCCCCC'}}, bottom:{style:'thin',color:{rgb:'CCCCCC'}}, left:{style:'thin',color:{rgb:'CCCCCC'}}, right:{style:'thin',color:{rgb:'CCCCCC'}} }
+    }
+  });
+
+  const TYPE_COLOR = { sun:'FFFF00', holiday:'FFFF00', leave:'92D050', absent:'FF9999', half:'FFC000', present:'FFFFFF', future:'FFFFFF' };
+
+  const wsData = [];
+
+  // Title row
+  const titleRow = [mk(monthNames[mo] + ' ' + yr + ' — Attendance Report', '1F497D', true, 'left')];
+  for (let i = 1; i < 3 + daysInMonth + 6; i++) titleRow.push(mk('', '1F497D'));
+  wsData.push(titleRow);
+
+  // Header row
+  const hdr = [mk('S.No','4472C4',true), mk('Name','4472C4',true,'left'), mk('Code','4472C4',true)];
+  for (let d = 1; d <= daysInMonth; d++) {
+    const date = new Date(yr, mo, d);
+    const isSun = date.getDay() === 0;
+    const ymd = yr + '-' + String(mo+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+    const isHol = !!holidays[ymd];
+    const dayLetters = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+    hdr.push(mk(d + '\n' + dayLetters[date.getDay()], (isSun || isHol) ? 'FFFF00' : '4472C4', true));
+  }
+  ['Working\nDays','Full\nDay','Half\nDay','Leave','Absent','Total\nHours'].forEach(h => hdr.push(mk(h,'4472C4',true)));
+  wsData.push(hdr);
+
+  // Data rows
+  rows.forEach((r, idx) => {
+    const row = [mk(idx+1), mk(r.emp.name,'FFFFFF',false,'left'), mk(r.emp.code)];
+    r.days.forEach(d => row.push(mk(d.label, TYPE_COLOR[d.type] || 'FFFFFF')));
+    row.push(mk(r.workingDays), mk(r.fullDays), mk(r.halfDays||''), mk(r.leaveDays||''), mk(r.absentDays||''), mk(r.totalHours));
+    wsData.push(row);
+  });
+
+  const ws = XS.utils.aoa_to_sheet(wsData.map(row => row.map(c => c.v)));
+  // Apply styles cell by cell
+  wsData.forEach((row, R) => {
+    row.forEach((cell, C) => {
+      const addr = XS.utils.encode_cell({r:R, c:C});
+      if (ws[addr]) ws[addr].s = cell.s;
+    });
+  });
+
+  // Column widths
+  ws['!cols'] = [{wch:5},{wch:24},{wch:10},...Array(daysInMonth).fill({wch:6}),...[{wch:9},{wch:7},{wch:7},{wch:7},{wch:7},{wch:10}]];
+  ws['!rows'] = [{hpt:18},...wsData.slice(1).map(() => ({hpt:16}))];
+  ws['!merges'] = [{ s:{r:0,c:0}, e:{r:0,c:2+daysInMonth+5} }]; // merge title
+
+  const wb = XS.utils.book_new();
+  XS.utils.book_append_sheet(wb, ws, monthNames[mo].substring(0,7) + ' ' + yr);
+  XS.writeFile(wb, 'Attendance_' + monthNames[mo] + '_' + yr + '.xlsx');
+  showToast('Excel report downloaded!');
+}
+
+// ── PDF Download (grid format) ──
+async function downloadConsolidatedPDFReport() {
+  closeConsolidatedAttModal();
+  showToast('Generating PDF report…');
+  await loadJsPdf();
+  const selMonth = parseInt(document.getElementById('conAttMonth').value);
+  const selYear  = parseInt(document.getElementById('conAttYear').value);
+  const { rows, daysInMonth, holidays, selYear: yr, selMonth: mo } = await _buildConsolidatedData(selMonth, selYear);
+  const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const { jsPDF } = window.jspdf;
+
+  const doc = new jsPDF('l', 'mm', 'a4'); // landscape
+  const pw = 297, ph = 210, lm = 6, rm = 291, cw = rm - lm;
+  const primary = [68,114,196], dark = [30,30,60], mid = [100,100,120];
+  const COLORS = { sun:[255,255,0], holiday:[255,255,0], leave:[146,208,80], absent:[255,153,153], half:[255,192,0], present:[255,255,255], future:[255,255,255] };
+
+  let y = 8;
+  // Title
+  try { doc.addImage('data:image/png;base64,' + COMPANY_LOGO_B64, 'PNG', lm, y-2, 22, 8); } catch(e) {}
+  doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(...primary);
+  doc.text('SWETHA STRUCTURES — ' + monthNames[mo].toUpperCase() + ' ' + yr + ' ATTENDANCE REPORT', lm+25, y+4);
+  doc.setFont('helvetica','normal'); doc.setFontSize(6); doc.setTextColor(...mid);
+  doc.text('Generated: ' + new Date().toLocaleDateString('en-IN'), rm, y+4, {align:'right'});
+  y += 10; doc.setDrawColor(...primary); doc.setLineWidth(0.4); doc.line(lm, y, rm, y); y += 2;
+
+  // Column layout
+  const fixedW = [5, 28, 10]; // S.No, Name, Code
+  const summaryW = [9, 7, 7, 7, 7, 11]; // Working, Full, Half, Leave, Absent, TotalHrs
+  const dayCols = daysInMonth;
+  const dayW = Math.max(3.5, (cw - fixedW.reduce((a,b)=>a+b,0) - summaryW.reduce((a,b)=>a+b,0)) / dayCols);
+  const rowH = 5, hdrH = 7;
+
+  function drawCell(x, yy, w, h, text, bgRgb, bold, fontSize, textColor) {
+    if (bgRgb) { doc.setFillColor(...bgRgb); doc.rect(x, yy, w, h, 'F'); }
+    doc.setDrawColor(200,200,200); doc.setLineWidth(0.1); doc.rect(x, yy, w, h);
+    if (text) {
+      doc.setFont('helvetica', bold ? 'bold' : 'normal');
+      doc.setFontSize(fontSize || 5.5);
+      doc.setTextColor(...(textColor || dark));
+      doc.text(String(text), x + w/2, yy + h/2 + 1.5, {align:'center', maxWidth: w-0.5});
+    }
+  }
+
+  // Draw header
+  let x = lm;
+  ['#','Name','Code'].forEach((h,i) => { doc.setFillColor(...primary); doc.rect(x, y, fixedW[i], hdrH, 'F'); doc.setFont('helvetica','bold'); doc.setFontSize(5.5); doc.setTextColor(255,255,255); doc.setDrawColor(200,200,200); doc.setLineWidth(0.1); doc.rect(x, y, fixedW[i], hdrH); doc.text(h, x+fixedW[i]/2, y+hdrH/2+1.5, {align:'center'}); x += fixedW[i]; });
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const date = new Date(yr, mo, d);
+    const isSun = date.getDay() === 0;
+    const ymd = yr + '-' + String(mo+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+    const isHol = !!holidays[ymd];
+    const bg = (isSun || isHol) ? [255,255,0] : primary;
+    const tc = (isSun || isHol) ? [0,0,0] : [255,255,255];
+    doc.setFillColor(...bg); doc.rect(x, y, dayW, hdrH, 'F'); doc.setDrawColor(200,200,200); doc.setLineWidth(0.1); doc.rect(x, y, dayW, hdrH);
+    doc.setFont('helvetica','bold'); doc.setFontSize(5); doc.setTextColor(...tc);
+    doc.text(String(d), x+dayW/2, y+hdrH/2+1, {align:'center'});
+    x += dayW;
+  }
+  ['WD','Full','Half','Lv','Ab','Hours'].forEach((h,i) => { doc.setFillColor(...primary); doc.rect(x, y, summaryW[i], hdrH, 'F'); doc.setFont('helvetica','bold'); doc.setFontSize(5); doc.setTextColor(255,255,255); doc.setDrawColor(200,200,200); doc.setLineWidth(0.1); doc.rect(x, y, summaryW[i], hdrH); doc.text(h, x+summaryW[i]/2, y+hdrH/2+1.5, {align:'center'}); x += summaryW[i]; });
+  y += hdrH;
+
+  // Data rows
+  rows.forEach((r, idx) => {
+    if (y + rowH > ph - 8) { doc.addPage(); y = 10; }
+    x = lm;
+    const rowBg = idx % 2 === 0 ? [245,245,252] : [255,255,255];
+    drawCell(x, y, fixedW[0], rowH, idx+1, rowBg); x += fixedW[0];
+    doc.setFillColor(...rowBg); doc.rect(x, y, fixedW[1], rowH, 'F'); doc.setDrawColor(200,200,200); doc.setLineWidth(0.1); doc.rect(x, y, fixedW[1], rowH); doc.setFont('helvetica','bold'); doc.setFontSize(5.5); doc.setTextColor(...dark); doc.text(r.emp.name.substring(0,20), x+1, y+rowH/2+1.5); x += fixedW[1];
+    drawCell(x, y, fixedW[2], rowH, r.emp.code, rowBg); x += fixedW[2];
+    r.days.forEach(d => {
+      const bg = COLORS[d.type] || [255,255,255];
+      drawCell(x, y, dayW, rowH, d.label, bg, false, 4.5); x += dayW;
+    });
+    drawCell(x, y, summaryW[0], rowH, r.workingDays, rowBg); x += summaryW[0];
+    drawCell(x, y, summaryW[1], rowH, r.fullDays, rowBg); x += summaryW[1];
+    drawCell(x, y, summaryW[2], rowH, r.halfDays||'', rowBg); x += summaryW[2];
+    drawCell(x, y, summaryW[3], rowH, r.leaveDays||'', [146,208,80]); x += summaryW[3];
+    drawCell(x, y, summaryW[4], rowH, r.absentDays||'', r.absentDays ? [255,153,153] : rowBg); x += summaryW[4];
+    drawCell(x, y, summaryW[5], rowH, r.totalHours, rowBg);
+    y += rowH;
+  });
+
+  // Legend
+  y += 3;
+  const legend = [{label:'Present (hours)', rgb:[255,255,255]},{label:'Sunday/Holiday', rgb:[255,255,0]},{label:'Leave', rgb:[146,208,80]},{label:'Half Day', rgb:[255,192,0]},{label:'Absent', rgb:[255,153,153]}];
+  doc.setFont('helvetica','bold'); doc.setFontSize(5.5); doc.setTextColor(...dark); doc.text('Legend:', lm, y+3);
+  let lx = lm + 12;
+  legend.forEach(lg => {
+    doc.setFillColor(...lg.rgb); doc.rect(lx, y, 8, 4, 'F'); doc.setDrawColor(180,180,180); doc.rect(lx, y, 8, 4);
+    doc.setFont('helvetica','normal'); doc.setFontSize(5); doc.setTextColor(...dark); doc.text(lg.label, lx+9, y+3);
+    lx += 35;
+  });
+
+  savePdfSafe(doc, 'Attendance_' + monthNames[mo] + '_' + yr + '.pdf');
+  showToast('PDF report downloaded!');
+}
+
+// =====================================================
+// FEATURE 2: ATTENDANCE REPORT PDF (legacy — simple summary)
 // =====================================================
 async function downloadAttendanceReport() {
   showToast('Generating report…');
