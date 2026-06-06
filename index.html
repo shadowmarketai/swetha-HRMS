@@ -288,9 +288,6 @@
     <!-- ATTENDANCE -->
     <div class="screen" id="screen-attendance">
       <div class="section-title" style="margin-top:4px">Attendance Summary — <span id="calMonthTitle">March 2026</span></div>
-      <!-- Punch Miss icon always visible above calendar -->
-      <div style="margin-bottom:8px"><button class="btn btn-outline w-full" style="border-radius:var(--radius);font-size:.78rem;color:var(--warning-dark,#92400e);border-color:var(--warning,#f59e0b);background:var(--warning-light,#fef3c7)" onclick="showMissedAttendanceForm()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> Missed Punch? Report Here</button></div>
-      <div id="missedAttFormArea"></div>
       <div class="card calendar-card fade-in" id="calendarCard">
         <div class="cal-header"><h3>Attendance Summary</h3><div class="cal-nav"><button onclick="changeCalendarMonth(-1)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button><button onclick="changeCalendarMonth(1)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"/></svg></button></div></div>
         <div class="cal-days" id="calDays"></div>
@@ -333,6 +330,9 @@
         <button class="btn btn-outline" style="border-radius:var(--radius);flex:1;font-size:.78rem" onclick="openPermissionForm()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Permission (2hr)</button>
       </div>
       <div id="applyLeaveBtn" style="display:none"></div>
+      <!-- Missed punch report in Leaves tab -->
+      <div style="margin-top:8px"><button class="btn btn-outline w-full" style="border-radius:var(--radius);font-size:.78rem;color:var(--warning-dark,#92400e);border-color:var(--warning,#f59e0b);background:var(--warning-light,#fef3c7)" onclick="showMissedPunchInLeaves()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg> Missed Punch? Report Here</button></div>
+      <div id="missedPunchLeavesArea"></div>
     </div>
 
     <!-- EXPENSES -->
