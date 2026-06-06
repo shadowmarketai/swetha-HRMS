@@ -489,7 +489,13 @@
       </div>
       <div class="form-row"><label>From Date</label><input type="date" id="leaveFromDate" onclick="this.showPicker&&this.showPicker()"></div>
       <div class="form-row"><label>To Date</label><input type="date" id="leaveToDate" onclick="this.showPicker&&this.showPicker()"></div>
-      <div class="form-row" style="display:flex;align-items:center;gap:10px;margin:8px 0">
+      <div id="permissionTimeRow" style="display:none">
+        <div style="display:flex;gap:10px;margin-bottom:8px">
+          <div class="form-row" style="flex:1;margin:0"><label>From Time</label><input type="time" id="leaveFromTime" style="width:100%"></div>
+          <div class="form-row" style="flex:1;margin:0"><label>To Time</label><input type="time" id="leaveToTime" style="width:100%"></div>
+        </div>
+      </div>
+      <div id="halfDayRow" class="form-row" style="display:flex;align-items:center;gap:10px;margin:8px 0">
         <label style="margin:0;font-size:.78rem;font-weight:600">Half Day Leave</label>
         <button class="toggle" id="halfDayToggle" onclick="toggleHalfDay()"></button>
       </div>

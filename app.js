@@ -10181,21 +10181,15 @@ function openLeaveForm() {
   if (halfToggle) halfToggle.classList.remove('on');
   var timeFields = document.getElementById('halfDayTimeFields');
   if (timeFields) timeFields.style.display = 'none';
-  // Populate time dropdowns
+  // Reset permission time row (hidden by default — only shown for permission type)
+  var permTimeRow = document.getElementById('permissionTimeRow');
+  if (permTimeRow) permTimeRow.style.display = 'none';
+  var halfDayRow = document.getElementById('halfDayRow');
+  if (halfDayRow) halfDayRow.style.display = '';
   var fromTime = document.getElementById('leaveFromTime');
   var toTime = document.getElementById('leaveToTime');
-  if (fromTime && toTime) {
-    var opts = '';
-    for (var h = 9; h <= 18; h++) {
-      var hh = h < 10 ? '0' + h : '' + h;
-      opts += '<option value="' + hh + ':00">' + hh + ':00</option>';
-      if (h < 18) opts += '<option value="' + hh + ':30">' + hh + ':30</option>';
-    }
-    fromTime.innerHTML = opts;
-    toTime.innerHTML = opts;
-    fromTime.value = '09:00';
-    toTime.value = '13:00';
-  }
+  if (fromTime) fromTime.value = '09:00';
+  if (toTime) toTime.value = '11:00';
 }
 
 function toggleHalfDay() {
@@ -10238,12 +10232,18 @@ function selectLeaveType(type, el) {
       balText.innerHTML = '<strong>2hr</strong> (0.5 × ' + permLeft + ')' +
         '<br><span style="font-size:.7rem;color:' + (permLeft > 0 ? 'var(--success)' : 'var(--danger)') + '">' +
         (permLeft > 0 ? permLeft + ' permission' + (permLeft !== 1 ? 's' : '') + ' available — no salary deduction' : 'All 4 permissions used this month — additional will be LOP') + '</span>';
-      // Auto-set same-day dates for permission
+      // Auto-set same-day dates and show time pickers for permission
       var today = new Date().toISOString().split('T')[0];
       var fromEl = document.getElementById('leaveFromDate');
       var toEl = document.getElementById('leaveToDate');
       if (fromEl) fromEl.value = today;
       if (toEl) toEl.value = today;
+      var ftEl = document.getElementById('leaveFromTime');
+      var ttEl = document.getElementById('leaveToTime');
+      if (ftEl && !ftEl.value) ftEl.value = '09:00';
+      if (ttEl && !ttEl.value) ttEl.value = '11:00';
+      document.getElementById('permissionTimeRow').style.display = '';
+      document.getElementById('halfDayRow').style.display = 'none';
     } else {
       var rem = bal.casual || 0;
       var usedThisMonth = getCasualLeavesUsedThisMonth(currentUser.code);
@@ -10251,6 +10251,8 @@ function selectLeaveType(type, el) {
       balText.innerHTML = 'Casual Leave: <strong>' + rem + '</strong> of 12 remaining this year' +
         '<br><span style="font-size:.7rem;color:' + (monthlyPaid > 0 ? 'var(--success)' : 'var(--danger)') + '">' +
         (monthlyPaid > 0 ? '1 paid leave available this month' : 'Paid leave used this month — additional leave will be LOP (salary deducted)') + '</span>';
+      document.getElementById('permissionTimeRow').style.display = 'none';
+      document.getElementById('halfDayRow').style.display = '';
     }
   }
 }
@@ -10314,10 +10316,14 @@ async function submitLeave() {
     }
   }
 
+  var fromTime = leaveType === 'permission' ? (document.getElementById('leaveFromTime')?.value || '09:00') : null;
+  var toTime   = leaveType === 'permission' ? (document.getElementById('leaveToTime')?.value   || '11:00') : null;
+
   try {
     var apiRes = await apiCall('POST', '/leaves', {
       type: leaveType, from: from, to: to, reason: reason,
-      isLOP: isLOP, isHalfDay: isHalfDay, halfDaySession: halfDaySession
+      isLOP: isLOP, isHalfDay: isHalfDay, halfDaySession: halfDaySession,
+      fromTime: fromTime, toTime: toTime
     });
     // Server returns actual paidDays/lopDays in response
     var serverPaidDays = apiRes && apiRes.paidDays !== undefined ? apiRes.paidDays : days;
