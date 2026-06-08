@@ -7,6 +7,10 @@ const { auditLog } = require('../middleware/audit');
 const VALID_LEAVE_TYPES = ['casual', 'comp', 'permission'];
 // Note: earned and sick leave types removed from UI. Only casual, comp off, and permission (4/month, 0.5 days each) are active.
 
+// Self-healing: ensure from_time / to_time columns exist (silently no-ops if already present)
+pool.query("ALTER TABLE leave_applications ADD COLUMN from_time TIME NULL").catch(() => {});
+pool.query("ALTER TABLE leave_applications ADD COLUMN to_time TIME NULL").catch(() => {});
+
 // Ensure monthly CL accrual is up-to-date for an employee.
 // CL year starts in April. Each month from April onwards adds +1 to the balance.
 // Accrual is lazy: runs when balance is read or a leave is applied.
