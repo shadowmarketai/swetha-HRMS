@@ -1716,7 +1716,7 @@ function showOverlay(id) {
     if (id === 'onboarding') resetWizard();
     if (id === 'notifications') renderNotifications();
     if (id === 'location') openLocationTracker();
-    if (id === 'advance-requests') { advReqActiveTab = 'pending'; advReqTypeFilter = 'all'; advReqSearchQuery = ''; var srch = document.getElementById('advReqSearch'); if (srch) srch.value = ''; renderAdvanceRequests('pending'); document.querySelectorAll('#advReqTabs .tab-pill').forEach((p,i) => p.classList.toggle('active', i===0)); document.querySelectorAll('#advReqTypeFilter .loc-filter-chip').forEach((c,i) => c.classList.toggle('active', i===0)); }
+    if (id === 'advance-requests') { advReqActiveTab = 'pending'; advReqTypeFilter = 'all'; advReqMonthFilter = 'all'; advReqSearchQuery = ''; var srch = document.getElementById('advReqSearch'); if (srch) srch.value = ''; _renderAdvMonthBar(); renderAdvanceRequests('pending'); document.querySelectorAll('#advReqTabs .tab-pill').forEach((p,i) => p.classList.toggle('active', i===0)); document.querySelectorAll('#advReqTypeFilter .loc-filter-chip').forEach((c,i) => c.classList.toggle('active', i===0)); }
     if (id === 'settings') initSettingsToggles();
     if (id === 'accounts-payments') renderAccountsPayments();
     if (id === 'peb') renderPebOverlay();
@@ -3922,7 +3922,31 @@ function renderAdvancePendingBanner() { renderAllPendingBanners(); }
 function renderMyAdvanceRequests() { renderAllMyRequests(); }
 
 let advReqTypeFilter = 'all';
+let advReqMonthFilter = 'all';
 let advReqSearchQuery = '';
+
+function _renderAdvMonthBar() {
+  var bar = document.getElementById('advReqMonthBar');
+  if (!bar) return;
+  var months = new Set();
+  advanceRequests.forEach(function(r) { if (r.appliedDate) months.add(String(r.appliedDate).substring(0, 7)); });
+  expenseReimbursements.forEach(function(e) { if (e.date) months.add(String(e.date).substring(0, 7)); });
+  var sorted = Array.from(months).filter(Boolean).sort().reverse();
+  var html = '<button class="loc-filter-chip' + (advReqMonthFilter === 'all' ? ' active' : '') + '" onclick="filterAdvReqByMonth(\'all\',this)">All</button>';
+  sorted.forEach(function(m) {
+    var parts = m.split('-');
+    var label = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1).toLocaleDateString('en-IN', {month: 'short', year: 'numeric'});
+    html += '<button class="loc-filter-chip' + (advReqMonthFilter === m ? ' active' : '') + '" style="white-space:nowrap" onclick="filterAdvReqByMonth(\'' + m + '\',this)">' + label + '</button>';
+  });
+  bar.innerHTML = html;
+}
+
+function filterAdvReqByMonth(month, btn) {
+  advReqMonthFilter = month;
+  document.querySelectorAll('#advReqMonthBar .loc-filter-chip').forEach(function(c) { c.classList.remove('active'); });
+  if (btn) btn.classList.add('active');
+  renderAdvanceRequests(advReqActiveTab);
+}
 
 function switchAdvReqTab(tab, btn) {
   advReqActiveTab = tab;
@@ -4009,6 +4033,13 @@ function renderAdvanceRequests(filter) {
     reqs = allItems.filter(r => r.status === filter);
   }
   if (advReqTypeFilter !== 'all') reqs = reqs.filter(r => r.type === advReqTypeFilter);
+  // Month filter
+  if (advReqMonthFilter !== 'all') {
+    reqs = reqs.filter(function(r) {
+      var d = (r.appliedDate || '').substring(0, 7);
+      return d === advReqMonthFilter;
+    });
+  }
   // Search filter
   if (advReqSearchQuery) {
     reqs = reqs.filter(r => {
