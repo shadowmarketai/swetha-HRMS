@@ -108,8 +108,8 @@ router.post('/', verifyToken, [
   body('from').isISO8601().withMessage('Valid from date required'),
   body('to').isISO8601().withMessage('Valid to date required'),
   body('reason').optional().trim().isLength({ max: 500 }),
-  body('isLOP').optional().isBoolean(),
-  body('isHalfDay').optional().isBoolean(),
+  body('isLOP').optional(),
+  body('isHalfDay').optional(),
   body('halfDaySession').optional().isIn(['first', 'second'])
 ], async (req, res) => {
   const errors = validationResult(req);
