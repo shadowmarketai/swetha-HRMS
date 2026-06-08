@@ -176,18 +176,37 @@ router.post('/', verifyToken, [
     const empName = emp.length ? emp[0].name : '';
     const dept = emp.length ? emp[0].dept : '';
 
-    const [result] = await pool.query(
-      `INSERT INTO leave_applications
-         (emp_code, emp_name, dept, leave_type, from_date, to_date, days,
-          reason, is_lop, is_half_day, half_day_session, paid_days, lop_days,
-          from_time, to_time)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [req.user.empCode, empName, dept, type, from, to, days,
-       reason || '', lopFlag ? 1 : 0,
-       isHalfDay ? 1 : 0, halfDaySession || null,
-       paidDays, lopDays,
-       fromTime || null, toTime || null]
-    );
+    let result;
+    try {
+      [result] = await pool.query(
+        `INSERT INTO leave_applications
+           (emp_code, emp_name, dept, leave_type, from_date, to_date, days,
+            reason, is_lop, is_half_day, half_day_session, paid_days, lop_days,
+            from_time, to_time)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [req.user.empCode, empName, dept, type, from, to, days,
+         reason || '', lopFlag ? 1 : 0,
+         isHalfDay ? 1 : 0, halfDaySession || null,
+         paidDays, lopDays,
+         fromTime || null, toTime || null]
+      );
+    } catch (insertErr) {
+      if (insertErr.code === 'ER_BAD_FIELD_ERROR') {
+        // from_time/to_time columns not yet in DB — insert without them
+        [result] = await pool.query(
+          `INSERT INTO leave_applications
+             (emp_code, emp_name, dept, leave_type, from_date, to_date, days,
+              reason, is_lop, is_half_day, half_day_session, paid_days, lop_days)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [req.user.empCode, empName, dept, type, from, to, days,
+           reason || '', lopFlag ? 1 : 0,
+           isHalfDay ? 1 : 0, halfDaySession || null,
+           paidDays, lopDays]
+        );
+      } else {
+        throw insertErr;
+      }
+    }
 
     // Notify HR and MD
     const managers = await getEmpCodesByRole(pool, ['HR', 'MD']);
