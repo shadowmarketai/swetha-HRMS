@@ -15706,10 +15706,10 @@ async function loadAttendanceSummaryTable() {
     }
 
     var tdStyle = 'padding:8px 10px;border-bottom:1px solid var(--gray-100)';
-    var desig = emp.designation ? '<div style="font-size:.65rem;color:var(--gray-500);margin-top:2px;font-weight:400">' + escapeHTML(emp.designation) + '</div>' : '';
     return '<tr>' +
       '<td style="' + tdStyle + ';font-size:.78rem;font-weight:600">' + escapeHTML(emp.code) + '</td>' +
-      '<td style="' + tdStyle + ';font-size:.78rem;font-weight:600">' + escapeHTML(emp.name) + desig + '</td>' +
+      '<td style="' + tdStyle + ';font-size:.78rem;font-weight:600">' + escapeHTML(emp.name) + '</td>' +
+      '<td style="' + tdStyle + ';font-size:.78rem;color:var(--gray-500)">' + escapeHTML(emp.designation || '') + '</td>' +
       '<td style="' + tdStyle + ';text-align:center">' + statusBadge + '</td>' +
       '<td style="' + tdStyle + ';text-align:center">' + inTimeHtml + '</td>' +
       '<td style="' + tdStyle + ';text-align:center">' + outTimeHtml + '</td>' +
@@ -15725,7 +15725,7 @@ async function loadAttendanceSummaryTable() {
     + ' &middot; <span style="color:#1d4ed8;font-weight:600">' + leaveCount + ' Leave/HD</span>';
   var html = '<div style="padding:10px 12px 6px;font-size:.75rem;color:var(--gray-500)">' + summary + '</div>';
   html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">';
-  html += '<thead><tr style="background:var(--gray-50)"><th style="' + thStyle + '">Emp Code</th><th style="' + thStyle + '">Name</th><th style="' + thStyle + ';text-align:center">Status</th><th style="' + thStyle + ';text-align:center">In</th><th style="' + thStyle + ';text-align:center">Out</th><th style="' + thStyle + ';text-align:center">Hours</th><th style="' + thStyle + ';text-align:center">Selfie</th></tr></thead>';
+  html += '<thead><tr style="background:var(--gray-50)"><th style="' + thStyle + '">Emp Code</th><th style="' + thStyle + '">Name</th><th style="' + thStyle + '">Designation</th><th style="' + thStyle + ';text-align:center">Status</th><th style="' + thStyle + ';text-align:center">In</th><th style="' + thStyle + ';text-align:center">Out</th><th style="' + thStyle + ';text-align:center">Hours</th><th style="' + thStyle + ';text-align:center">Selfie</th></tr></thead>';
   html += '<tbody>' + rows.join('') + '</tbody></table></div>';
 
   if (activeEmps.length === 0) {
