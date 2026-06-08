@@ -29,7 +29,7 @@ const REVIEWER_ROLES = ['MD', 'Accounts', 'HR'];
 router.get('/', verifyToken, async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+    const limit = Math.min(1000, Math.max(1, parseInt(req.query.limit) || 20));
     const offset = (page - 1) * limit;
     let countQuery, dataQuery, params;
     if (REVIEWER_ROLES.includes(req.user.role)) {
