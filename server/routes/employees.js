@@ -383,6 +383,12 @@ router.put('/:code', verifyToken, requireRole('MD', 'HR'), auditLog('update', 'e
       }
     }
 
+    // Handle status → is_active (0/1) separately since it needs value translation
+    if (b.status !== undefined) {
+      setClauses.push('is_active = ?');
+      values.push(b.status === 'Active' ? 1 : 0);
+    }
+
     if (setClauses.length === 0) return res.status(400).json({ error: 'No fields to update' });
 
     values.push(req.params.code);

@@ -2902,7 +2902,7 @@ function renderAllEmpList() {
   const isMD = currentUser && currentUser.role === 'MD';
   const isHR = currentUser && currentUser.role === 'HR';
   const canDelete = (isMD && !isTemporaryMD()) || isHR || _isSuperAdmin;
-  const isHRorMD = currentUser && (currentUser.role === 'MD' || currentUser.role === 'HR' || currentUser.role === 'Manager' || _isSuperAdmin);
+  const isHRorMD = currentUser && (currentUser.role === 'MD' || currentUser.role === 'HR' || _isSuperAdmin);
   let html = '';
   departments.forEach((dept, di) => {
     const emps = EMPLOYEES.filter(e => e.dept === dept);
