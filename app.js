@@ -1716,7 +1716,7 @@ function showOverlay(id) {
     if (id === 'onboarding') resetWizard();
     if (id === 'notifications') renderNotifications();
     if (id === 'location') openLocationTracker();
-    if (id === 'advance-requests') { advReqActiveTab = 'pending'; advReqTypeFilter = 'all'; advReqMonthFilter = 'all'; advReqSearchQuery = ''; var srch = document.getElementById('advReqSearch'); if (srch) srch.value = ''; _renderAdvMonthBar(); renderAdvanceRequests('pending'); document.querySelectorAll('#advReqTabs .tab-pill').forEach((p,i) => p.classList.toggle('active', i===0)); document.querySelectorAll('#advReqTypeFilter .loc-filter-chip').forEach((c,i) => c.classList.toggle('active', i===0)); }
+    if (id === 'advance-requests') { advReqActiveTab = 'pending'; advReqTypeFilter = 'all'; advReqMonthFilter = 'all'; advReqSearchQuery = ''; advReqEmpFilter = 'all'; var srch = document.getElementById('advReqSearch'); if (srch) srch.value = ''; _renderAdvMonthBar(); renderAdvanceRequests('pending'); document.querySelectorAll('#advReqTabs .tab-pill').forEach((p,i) => p.classList.toggle('active', i===0)); document.querySelectorAll('#advReqTypeFilter .loc-filter-chip').forEach((c,i) => c.classList.toggle('active', i===0)); }
     if (id === 'settings') initSettingsToggles();
     if (id === 'accounts-payments') renderAccountsPayments();
     if (id === 'peb') renderPebOverlay();
@@ -3930,6 +3930,7 @@ function renderMyAdvanceRequests() { renderAllMyRequests(); }
 let advReqTypeFilter = 'all';
 let advReqMonthFilter = 'all';
 let advReqSearchQuery = '';
+let advReqEmpFilter = 'all';
 
 function _renderAdvMonthBar() {
   var bar = document.getElementById('advReqMonthBar');
@@ -3996,6 +3997,11 @@ function filterAdvReqBySearch(query) {
   renderAdvanceRequests(advReqActiveTab);
 }
 
+function filterAdvReqByEmp(code) {
+  advReqEmpFilter = code;
+  renderAdvanceRequests(advReqActiveTab);
+}
+
 function renderAdvanceRequests(filter) {
   const container = document.getElementById('advReqList');
   // Render Excel export buttons for MD/Accounts (visible only for these reviewer roles)
@@ -4043,6 +4049,24 @@ function renderAdvanceRequests(filter) {
     btn.textContent = tabBaseLabels[i] + (cnt > 0 ? ' (' + cnt + ')' : '');
   });
 
+  // Employee selector — build from unique employees in allItems
+  var empBar = document.getElementById('advReqEmpBar');
+  if (empBar) {
+    var empMap = {};
+    allItems.forEach(function(r) { if (r.empCode) empMap[r.empCode] = r.empName || r.empCode; });
+    var empEntries = Object.entries(empMap).sort(function(a, b) { return (a[1] || '').localeCompare(b[1] || ''); });
+    var selHtml = '<div style="display:flex;align-items:center;gap:8px">';
+    selHtml += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--gray-500)" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
+    selHtml += '<select id="advReqEmpSelect" onchange="filterAdvReqByEmp(this.value)" style="flex:1;padding:7px 10px;border:1.5px solid var(--gray-200);border-radius:var(--radius);font-size:.8rem;background:var(--card);color:var(--gray-700);outline:none;cursor:pointer" onfocus="this.style.borderColor=\'var(--primary)\'" onblur="this.style.borderColor=\'var(--gray-200)\'">';
+    selHtml += '<option value="all">All Employees</option>';
+    empEntries.forEach(function(e) {
+      var selected = advReqEmpFilter === e[0] ? ' selected' : '';
+      selHtml += '<option value="' + escapeHTML(e[0]) + '"' + selected + '>' + escapeHTML(e[1]) + ' (' + escapeHTML(e[0]) + ')</option>';
+    });
+    selHtml += '</select></div>';
+    empBar.innerHTML = selHtml;
+  }
+
   let reqs;
   if (filter === 'all') {
     reqs = [...allItems];
@@ -4053,6 +4077,8 @@ function renderAdvanceRequests(filter) {
   } else {
     reqs = allItems.filter(r => r.status === filter);
   }
+  // Employee filter
+  if (advReqEmpFilter !== 'all') reqs = reqs.filter(r => r.empCode === advReqEmpFilter);
   if (advReqTypeFilter !== 'all') reqs = reqs.filter(r => r.type === advReqTypeFilter);
   // Month filter
   if (advReqMonthFilter !== 'all') {
@@ -4230,29 +4256,37 @@ function _renderAdvExportBar(uiFilter) {
     '<button class="nf-btn nf-btn-sm" onclick="downloadAdvExport(\'expenses\',\'' + uiFilter + '\')" style="display:inline-flex;align-items:center;gap:4px;font-size:.7rem">' + dlSvg + ' Expenses (.xlsx)</button>';
 }
 
+
 // Triggers an authenticated download by hitting the export endpoint with the bearer token
 // (server uses verifyToken middleware) and saving the resulting blob.
 // NOTE: uses the project's existing API_BASE + JWT_TOKEN globals (defined at line ~6599)
 // instead of fetch defaults, so it works with the same auth as apiCall().
 async function downloadAdvExport(kind, uiFilter) {
   try {
-    var statusQ = '';
+    var params = [];
     var role = currentUser ? currentUser.role : '';
     var isAdv = (kind === 'advances');
     if (uiFilter === 'approved') {
-      statusQ = '?status=' + (isAdv ? 'approved' : 'Approved');
+      params.push('status=' + (isAdv ? 'approved' : 'Approved'));
     } else if (uiFilter === 'rejected') {
-      statusQ = '?status=' + (isAdv ? 'rejected' : 'Rejected');
+      params.push('status=' + (isAdv ? 'rejected' : 'Rejected'));
     } else if (uiFilter === 'pending') {
-      // MD acts on accounts_accepted items; Accounts/HR act on pending (review) + approved (disburse)
       if (role === 'MD') {
-        statusQ = '?status=' + (isAdv ? 'pending,accounts_accepted' : 'Pending,accounts_accepted');
+        params.push('status=' + (isAdv ? 'pending,accounts_accepted' : 'Pending,accounts_accepted'));
       } else {
-        statusQ = '?status=' + (isAdv ? 'pending,approved' : 'Pending,Approved');
+        params.push('status=' + (isAdv ? 'pending,approved' : 'Pending,Approved'));
       }
     }
-    // 'all' → no filter
-    var url = API_BASE + '/' + kind + '/export' + statusQ;
+    // Apply active employee filter to download
+    if (advReqEmpFilter && advReqEmpFilter !== 'all') params.push('empCode=' + encodeURIComponent(advReqEmpFilter));
+    // Apply active month filter to download (from = first of month, to = last of month)
+    if (advReqMonthFilter && advReqMonthFilter !== 'all') {
+      params.push('from=' + advReqMonthFilter + '-01');
+      var d = new Date(advReqMonthFilter + '-01');
+      var lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+      params.push('to=' + advReqMonthFilter + '-' + String(lastDay).padStart(2, '0'));
+    }
+    var url = API_BASE + '/' + kind + '/export' + (params.length ? '?' + params.join('&') : '');
     var headers = (typeof apiHeaders === 'function') ? apiHeaders() : (JWT_TOKEN ? { 'Authorization': 'Bearer ' + JWT_TOKEN } : {});
     // Excel endpoint returns a binary buffer; don't send/expect JSON content-type on the response
     delete headers['Content-Type'];
