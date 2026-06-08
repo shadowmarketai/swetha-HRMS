@@ -3869,24 +3869,30 @@ function renderMyRequestsForType(type, containerId) {
   if (!currentUser) return;
   const container = document.getElementById(containerId);
   if (!container) return;
-  const myReqs = advanceRequests.filter(r => r.empCode === currentUser.code && r.type === type);
-  if (myReqs.length === 0) { container.innerHTML = ''; return; }
-  let html = '<div class="section-title">My ' + ADV_TYPE_LABELS[type] + ' Requests</div>';
-  myReqs.sort((a, b) => b.id - a.id).forEach(r => {
-    const badgeClass = r.status === 'approved' ? 'badge-approved' : r.status === 'rejected' ? 'badge-rejected' : 'badge-pending';
-    const statusLabel = r.status.charAt(0).toUpperCase() + r.status.slice(1);
-    html += `<div class="adv-request-card ${r.status}">
-      <div class="adv-request-header">
-        <h4>\u20B9${r.amount.toLocaleString('en-IN')} <span class="adv-urgency ${r.urgency}">${r.urgency}</span></h4>
-        <span class="badge-status ${badgeClass}">${statusLabel}</span>
-      </div>
-      <div class="adv-request-meta">
-        ${getAdvMeta(r)}<br>Applied: ${formatAdvDate(r.appliedDate)}
-        ${r.reviewedBy ? '<br>Reviewed by: ' + escapeHTML(r.reviewedBy) + ' on ' + formatAdvDate(r.reviewDate) : ''}
-        ${r.rejectReason ? '<br><span style="color:var(--danger)">Reason: ' + escapeHTML(r.rejectReason) + '</span>' : ''}
-      </div>
-    </div>`;
-  });
+  var allReqs = advanceRequests.filter(function(r) { return r.empCode === currentUser.code && r.type === type; });
+  if (allReqs.length === 0) { container.innerHTML = ''; return; }
+  var chips = _buildMonthChipsHtml(allReqs.map(function(r) { return r.appliedDate; }), myAdvMonthFilter, 'setMyAdvMonth');
+  var myReqs = myAdvMonthFilter === 'all' ? allReqs.slice() : allReqs.filter(function(r) { return String(r.appliedDate || '').substring(0, 7) === myAdvMonthFilter; });
+  let html = '<div class="section-title">My ' + ADV_TYPE_LABELS[type] + ' Requests</div>' + chips;
+  if (myReqs.length === 0) {
+    html += '<div style="text-align:center;padding:16px;color:var(--gray-400);font-size:.78rem">No records for this month</div>';
+  } else {
+    myReqs.sort((a, b) => b.id - a.id).forEach(r => {
+      const badgeClass = r.status === 'approved' ? 'badge-approved' : r.status === 'rejected' ? 'badge-rejected' : 'badge-pending';
+      const statusLabel = r.status.charAt(0).toUpperCase() + r.status.slice(1);
+      html += `<div class="adv-request-card ${r.status}">
+        <div class="adv-request-header">
+          <h4>\u20B9${r.amount.toLocaleString('en-IN')} <span class="adv-urgency ${r.urgency}">${r.urgency}</span></h4>
+          <span class="badge-status ${badgeClass}">${statusLabel}</span>
+        </div>
+        <div class="adv-request-meta">
+          ${getAdvMeta(r)}<br>Applied: ${formatAdvDate(r.appliedDate)}
+          ${r.reviewedBy ? '<br>Reviewed by: ' + escapeHTML(r.reviewedBy) + ' on ' + formatAdvDate(r.reviewDate) : ''}
+          ${r.rejectReason ? '<br><span style="color:var(--danger)">Reason: ' + escapeHTML(r.rejectReason) + '</span>' : ''}
+        </div>
+      </div>`;
+    });
+  }
   container.innerHTML = html;
 }
 
@@ -3947,6 +3953,29 @@ function filterAdvReqByMonth(month, btn) {
   if (btn) btn.classList.add('active');
   renderAdvanceRequests(advReqActiveTab);
 }
+
+let myAdvMonthFilter = 'all';
+let siteExpMonthFilter = 'all';
+let travelExpMonthFilter = 'all';
+
+function _buildMonthChipsHtml(dates, currentFilter, callbackFn) {
+  var months = new Set();
+  dates.forEach(function(d) { if (d) months.add(String(d).substring(0, 7)); });
+  var sorted = Array.from(months).filter(Boolean).sort().reverse();
+  if (sorted.length <= 1) return '';
+  var html = '<div style="display:flex;gap:6px;overflow-x:auto;margin-bottom:10px;padding-bottom:2px;scrollbar-width:none">';
+  html += '<button class="loc-filter-chip' + (currentFilter === 'all' ? ' active' : '') + '" onclick="' + callbackFn + '(\'all\')">All</button>';
+  sorted.forEach(function(m) {
+    var parts = m.split('-');
+    var label = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, 1).toLocaleDateString('en-IN', {month:'short', year:'numeric'});
+    html += '<button class="loc-filter-chip' + (currentFilter === m ? ' active' : '') + '" style="white-space:nowrap" onclick="' + callbackFn + '(\'' + m + '\')">' + label + '</button>';
+  });
+  return html + '</div>';
+}
+
+function setMyAdvMonth(m) { myAdvMonthFilter = m; renderAllMyRequests(); }
+function setSiteExpMonth(m) { siteExpMonthFilter = m; renderSiteExpenseScreen(); }
+function setTravelExpMonth(m) { travelExpMonthFilter = m; renderTravelExpenseScreen(); }
 
 function switchAdvReqTab(tab, btn) {
   advReqActiveTab = tab;
@@ -4317,17 +4346,23 @@ function renderSiteExpenseScreen() {
   }
   // Previously submitted bills
   if (myBills.length > 0) {
-    html += '<div class="section-title">Submitted Bills</div>';
-    myBills.sort(function(a, b) { return b.id - a.id; }).forEach(function(b) {
-      var badgeCls = b.status === 'Approved' ? 'badge-approved' : b.status === 'Rejected' ? 'badge-rejected' : b.status === 'hr_accepted' ? 'badge-pending' : 'badge-pending';
-      var statusTxt = b.status === 'hr_accepted' ? 'HR Accepted' : b.status;
-      html += '<div class="expense-item fade-in"><div style="flex:1"><div style="font-weight:600;font-size:.82rem">' + escapeHTML(b.category || 'Site Bill') + '</div>';
-      html += '<div style="font-size:.72rem;color:var(--gray-500)">' + escapeHTML(b.project || '') + ' &middot; ' + (b.date || '') + '</div>';
-      if (b.description) html += '<div style="font-size:.68rem;color:var(--gray-400);margin-top:2px">' + escapeHTML(b.description) + '</div>';
-      if (b.billUrl) html += '<a href="' + escapeHTML(b.billUrl) + '" target="_blank" style="font-size:.68rem;color:var(--primary);font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:3px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>View Bill</a>';
-      html += '</div><div style="text-align:right"><div class="expense-amount">Rs.' + (b.amount || 0).toLocaleString('en-IN') + '</div>';
-      html += '<span class="badge-status ' + badgeCls + '">' + escapeHTML(statusTxt) + '</span></div></div>';
-    });
+    var siteMonthChips = _buildMonthChipsHtml(myBills.map(function(b) { return b.date; }), siteExpMonthFilter, 'setSiteExpMonth');
+    var filteredSiteBills = siteExpMonthFilter === 'all' ? myBills.slice() : myBills.filter(function(b) { return String(b.date || '').substring(0, 7) === siteExpMonthFilter; });
+    html += '<div class="section-title">Submitted Bills</div>' + siteMonthChips;
+    if (filteredSiteBills.length === 0) {
+      html += '<div style="text-align:center;padding:16px;color:var(--gray-400);font-size:.78rem">No bills for this month</div>';
+    } else {
+      filteredSiteBills.sort(function(a, b) { return b.id - a.id; }).forEach(function(b) {
+        var badgeCls = b.status === 'Approved' ? 'badge-approved' : b.status === 'Rejected' ? 'badge-rejected' : b.status === 'hr_accepted' ? 'badge-pending' : 'badge-pending';
+        var statusTxt = b.status === 'hr_accepted' ? 'HR Accepted' : b.status;
+        html += '<div class="expense-item fade-in"><div style="flex:1"><div style="font-weight:600;font-size:.82rem">' + escapeHTML(b.category || 'Site Bill') + '</div>';
+        html += '<div style="font-size:.72rem;color:var(--gray-500)">' + escapeHTML(b.project || '') + ' &middot; ' + (b.date || '') + '</div>';
+        if (b.description) html += '<div style="font-size:.68rem;color:var(--gray-400);margin-top:2px">' + escapeHTML(b.description) + '</div>';
+        if (b.billUrl) html += '<a href="' + escapeHTML(b.billUrl) + '" target="_blank" style="font-size:.68rem;color:var(--primary);font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:3px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>View Bill</a>';
+        html += '</div><div style="text-align:right"><div class="expense-amount">Rs.' + (b.amount || 0).toLocaleString('en-IN') + '</div>';
+        html += '<span class="badge-status ' + badgeCls + '">' + escapeHTML(statusTxt) + '</span></div></div>';
+      });
+    }
   }
   // New bill form
   html += '<div style="margin-top:14px"><button class="btn btn-primary w-full" style="border-radius:var(--radius)" onclick="showSiteExpenseBillForm()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New Bill</button></div>';
@@ -4504,17 +4539,23 @@ function renderTravelExpenseScreen() {
   }
   // Previous bills
   if (myBills.length > 0) {
-    html += '<div class="section-title">Submitted Bills</div>';
-    myBills.sort(function(a, b) { return b.id - a.id; }).forEach(function(b) {
-      var badgeCls = b.status === 'Approved' ? 'badge-approved' : b.status === 'Rejected' ? 'badge-rejected' : b.status === 'hr_accepted' ? 'badge-pending' : 'badge-pending';
-      var statusTxt = b.status === 'hr_accepted' ? 'HR Accepted' : b.status;
-      html += '<div class="expense-item fade-in"><div style="flex:1"><div style="font-weight:600;font-size:.82rem">' + escapeHTML(b.travelFrom || '') + ' → ' + escapeHTML(b.travelTo || '') + '</div>';
-      html += '<div style="font-size:.72rem;color:var(--gray-500)">' + escapeHTML(b.vehicle || '') + (b.travelKm ? ' &middot; ' + b.travelKm + ' km' : '') + ' &middot; ' + (b.date || '') + '</div>';
-      if (b.description) html += '<div style="font-size:.68rem;color:var(--gray-400);margin-top:2px">' + escapeHTML(b.description) + '</div>';
-      if (b.billUrl) html += '<a href="' + escapeHTML(b.billUrl) + '" target="_blank" style="font-size:.68rem;color:var(--primary);font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:3px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>View Bill</a>';
-      html += '</div><div style="text-align:right"><div class="expense-amount">Rs.' + (b.amount || 0).toLocaleString('en-IN') + '</div>';
-      html += '<span class="badge-status ' + badgeCls + '">' + escapeHTML(statusTxt) + '</span></div></div>';
-    });
+    var travelMonthChips = _buildMonthChipsHtml(myBills.map(function(b) { return b.date; }), travelExpMonthFilter, 'setTravelExpMonth');
+    var filteredTravelBills = travelExpMonthFilter === 'all' ? myBills.slice() : myBills.filter(function(b) { return String(b.date || '').substring(0, 7) === travelExpMonthFilter; });
+    html += '<div class="section-title">Submitted Bills</div>' + travelMonthChips;
+    if (filteredTravelBills.length === 0) {
+      html += '<div style="text-align:center;padding:16px;color:var(--gray-400);font-size:.78rem">No bills for this month</div>';
+    } else {
+      filteredTravelBills.sort(function(a, b) { return b.id - a.id; }).forEach(function(b) {
+        var badgeCls = b.status === 'Approved' ? 'badge-approved' : b.status === 'Rejected' ? 'badge-rejected' : b.status === 'hr_accepted' ? 'badge-pending' : 'badge-pending';
+        var statusTxt = b.status === 'hr_accepted' ? 'HR Accepted' : b.status;
+        html += '<div class="expense-item fade-in"><div style="flex:1"><div style="font-weight:600;font-size:.82rem">' + escapeHTML(b.travelFrom || '') + ' → ' + escapeHTML(b.travelTo || '') + '</div>';
+        html += '<div style="font-size:.72rem;color:var(--gray-500)">' + escapeHTML(b.vehicle || '') + (b.travelKm ? ' &middot; ' + b.travelKm + ' km' : '') + ' &middot; ' + (b.date || '') + '</div>';
+        if (b.description) html += '<div style="font-size:.68rem;color:var(--gray-400);margin-top:2px">' + escapeHTML(b.description) + '</div>';
+        if (b.billUrl) html += '<a href="' + escapeHTML(b.billUrl) + '" target="_blank" style="font-size:.68rem;color:var(--primary);font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:3px;margin-top:3px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>View Bill</a>';
+        html += '</div><div style="text-align:right"><div class="expense-amount">Rs.' + (b.amount || 0).toLocaleString('en-IN') + '</div>';
+        html += '<span class="badge-status ' + badgeCls + '">' + escapeHTML(statusTxt) + '</span></div></div>';
+      });
+    }
   }
   // New bill form
   html += '<div style="margin-top:14px"><button class="btn btn-primary w-full" style="border-radius:var(--radius)" onclick="showTravelExpenseBillForm()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New Bill</button></div>';
