@@ -10549,9 +10549,7 @@ function restoreNotifPrefToggles() {
 // =====================================================
 function getLeaveBalance(empCode) {
   if (!leaveBalances[empCode]) {
-    var now = new Date();
-    var accruedCL = now.getMonth() >= 3 ? Math.min(now.getMonth() - 2, 12) : 0;
-    leaveBalances[empCode] = { casual: accruedCL, comp: 3, permission: 2 };
+    leaveBalances[empCode] = { casual: 12, permission: 2 };
   }
   return leaveBalances[empCode];
 }
@@ -10864,11 +10862,8 @@ function renderLeaveScreen() {
     if (isMD) {
       balGrid.innerHTML = '';
     } else {
-      const _now = new Date();
-      const _clMax = _now.getMonth() >= 3 ? Math.min(_now.getMonth() - 2, 12) : 1;
       const leaveTypes = [
-        {key:'casual',label:'Casual Leave',total:_clMax,color:'#E85D04',cls:'casual'},
-        {key:'comp',label:'Comp Off',total:3,color:'#0891b2',cls:'comp'},
+        {key:'casual',label:'Casual Leave',total:12,color:'#E85D04',cls:'casual'},
         {key:'permission',label:'Permission (2hr)',total:4,color:'#d97706',cls:'permission'}
       ];
       balGrid.innerHTML = '<div class="section-title" style="margin-top:4px">Leave Balance</div><div class="leave-balance-grid fade-in">' +
@@ -12054,7 +12049,6 @@ function renderHomeQuickStats() {
   var myAttendance = Object.keys(myAttDays).length;
 
   // Leave balance
-  var compLeft = bal.comp !== undefined ? bal.comp : 3;
   var permLeft = Math.round((bal.permission !== undefined ? parseFloat(bal.permission) : 2) * 2);
 
   var html = '<div class="section-title" style="margin-top:4px">Quick Stats</div>';
@@ -12066,9 +12060,8 @@ function renderHomeQuickStats() {
 
   // Leave balance breakdown
   html += '<div class="section-title" style="margin-top:10px">Leave Balance</div>';
-  html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px">';
+  html += '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px">';
   html += '<div class="home-stat-card" style="padding:8px;text-align:center"><div style="font-size:1.1rem;font-weight:700;color:var(--blue)">' + casualLeft + '</div><div style="font-size:.62rem;color:var(--gray-500)">Casual</div></div>';
-  html += '<div class="home-stat-card" style="padding:8px;text-align:center"><div style="font-size:1.1rem;font-weight:700;color:var(--teal)">' + compLeft + '</div><div style="font-size:.62rem;color:var(--gray-500)">Comp Off</div></div>';
   html += '<div class="home-stat-card" style="padding:8px;text-align:center"><div style="font-size:1.1rem;font-weight:700;color:var(--warning-dark,#92400e)">' + permLeft + '</div><div style="font-size:.62rem;color:var(--gray-500)">Permission (2hr)</div></div>';
   html += '</div>';
   c.innerHTML = html;

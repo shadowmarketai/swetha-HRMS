@@ -4,7 +4,7 @@ const { verifyToken, requireRole } = require('../middleware/auth');
 const { body, validationResult } = require('express-validator');
 const { auditLog } = require('../middleware/audit');
 
-const VALID_LEAVE_TYPES = ['casual', 'comp', 'permission'];
+const VALID_LEAVE_TYPES = ['casual', 'permission'];
 // Note: earned and sick leave types removed from UI. Only casual, comp off, and permission (4/month, 0.5 days each) are active.
 
 // Self-healing: ensure from_time / to_time columns exist (silently no-ops if already present)
@@ -137,9 +137,6 @@ router.post('/', verifyToken, [
     } else {
       days = Math.round((toDate - fromDate) / 86400000) + 1;
     }
-
-    // Ensure monthly CL accrual is up-to-date before balance check
-    if (type === 'casual') await ensureCLAccrual(pool, req.user.empCode);
 
     // Fetch balance
     const [balRows] = await pool.query('SELECT * FROM leave_balances WHERE emp_code = ?', [req.user.empCode]);
@@ -339,14 +336,13 @@ router.patch('/:id/reject', verifyToken, requireRole('MD', 'HR'), auditLog('reje
 // GET /api/leaves/balance — get leave balance for logged-in user
 router.get('/balance', verifyToken, async (req, res) => {
   try {
-    await ensureCLAccrual(pool, req.user.empCode);
     const [rows] = await pool.query('SELECT * FROM leave_balances WHERE emp_code = ?', [req.user.empCode]);
     if (rows.length === 0) {
-      await pool.query('INSERT INTO leave_balances (emp_code, casual, permission) VALUES (?, 0, 2)', [req.user.empCode]);
-      return res.json({ casual: 0, comp: 3, permission: 2 });
+      await pool.query('INSERT INTO leave_balances (emp_code, casual, permission) VALUES (?, 12, 2)', [req.user.empCode]);
+      return res.json({ casual: 12, permission: 2 });
     }
     const b = rows[0];
-    res.json({ casual: parseFloat(b.casual) || 0, comp: b.comp || 0, permission: b.permission !== undefined ? parseFloat(b.permission) : 2 });
+    res.json({ casual: Math.min(parseFloat(b.casual) || 0, 12), permission: b.permission !== undefined ? parseFloat(b.permission) : 2 });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
@@ -359,7 +355,7 @@ router.get('/balance/all', verifyToken, requireRole('MD', 'HR'), async (req, res
     const [rows] = await pool.query('SELECT * FROM leave_balances');
     const result = {};
     rows.forEach(r => {
-      result[r.emp_code] = { casual: r.casual, comp: r.comp, permission: r.permission !== undefined ? parseFloat(r.permission) : 2 };
+      result[r.emp_code] = { casual: Math.min(parseFloat(r.casual) || 0, 12), permission: r.permission !== undefined ? parseFloat(r.permission) : 2 };
     });
     res.json(result);
   } catch (err) {
@@ -372,9 +368,9 @@ router.get('/balance/all', verifyToken, requireRole('MD', 'HR'), async (req, res
 router.get('/balance/:code', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT * FROM leave_balances WHERE emp_code = ?', [req.params.code]);
-    if (rows.length === 0) return res.json({ casual: 12, comp: 3, permission: 2 });
+    if (rows.length === 0) return res.json({ casual: 12, permission: 2 });
     const b = rows[0];
-    res.json({ casual: b.casual || 0, comp: b.comp || 0, permission: b.permission !== undefined ? parseFloat(b.permission) : 2 });
+    res.json({ casual: Math.min(parseFloat(b.casual) || 0, 12), permission: b.permission !== undefined ? parseFloat(b.permission) : 2 });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
