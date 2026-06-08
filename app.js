@@ -4031,12 +4031,9 @@ function renderAdvanceRequests(filter) {
   var isHR = currentUser && currentUser.role === 'HR';
   var isReviewerRole = isAccounts || isHR;
 
-  // Update tab count badges so the approver can see at a glance what's waiting.
-  // Pending = role-specific actionable items; Approved = items already approved (for rechecking).
-  var pendingCount = isMD
-    ? allItems.filter(r => r.status === 'accounts_accepted').length
-    : allItems.filter(r => r.status === 'pending').length;
-  var approvedCount = allItems.filter(r => r.status === 'approved').length;
+  // Counts: pending = any in-flight status; approved = approved+paid; all statuses sum to All.
+  var pendingCount = allItems.filter(r => r.status === 'pending' || r.status === 'accounts_accepted' || r.status === 'hr_accepted').length;
+  var approvedCount = allItems.filter(r => r.status === 'approved' || r.status === 'paid').length;
   var rejectedCount = allItems.filter(r => r.status === 'rejected').length;
   var tabBtns = document.querySelectorAll('#advReqTabs .tab-pill');
   var tabCounts = [pendingCount, approvedCount, rejectedCount, allItems.length];
@@ -4050,14 +4047,9 @@ function renderAdvanceRequests(filter) {
   if (filter === 'all') {
     reqs = [...allItems];
   } else if (filter === 'pending') {
-    // Each role sees only items they need to act on — no cross-stage mixing.
-    // Accounts/HR use the Approved tab to see disbursement-ready items and for rechecking.
-    // MD uses the Approved tab to recheck what they approved.
-    if (isMD) {
-      reqs = allItems.filter(r => r.status === 'accounts_accepted');
-    } else {
-      reqs = allItems.filter(r => r.status === 'pending');
-    }
+    reqs = allItems.filter(r => r.status === 'pending' || r.status === 'accounts_accepted' || r.status === 'hr_accepted');
+  } else if (filter === 'approved') {
+    reqs = allItems.filter(r => r.status === 'approved' || r.status === 'paid');
   } else {
     reqs = allItems.filter(r => r.status === filter);
   }
