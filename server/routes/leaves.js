@@ -107,10 +107,10 @@ router.post('/', verifyToken, [
   body('type').trim().isIn(VALID_LEAVE_TYPES).withMessage('Invalid leave type'),
   body('from').isISO8601().withMessage('Valid from date required'),
   body('to').isISO8601().withMessage('Valid to date required'),
-  body('reason').optional().trim().isLength({ max: 500 }),
+  body('reason').optional().trim().isLength({ max: 500 }).withMessage('Reason must be under 500 characters'),
   body('isLOP').optional(),
   body('isHalfDay').optional(),
-  body('halfDaySession').optional().isIn(['first', 'second'])
+  body('halfDaySession').optional({ nullable: true }).isIn(['first', 'second'])
 ], async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
