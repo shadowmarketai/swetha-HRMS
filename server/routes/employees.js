@@ -12,12 +12,14 @@ router.get('/', verifyToken, async (req, res) => {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(200, Math.max(1, parseInt(req.query.limit) || 20));
     const offset = (page - 1) * limit;
-    const [countResult] = await pool.query('SELECT COUNT(*) as total FROM employees WHERE is_active = 1');
-    const total = (countResult && countResult[0]) ? countResult[0].total : 0;
     if (['MD', 'HR'].includes(req.user.role)) {
-      const [rows] = await pool.query('SELECT * FROM employees WHERE is_active = 1 ORDER BY dept, name LIMIT ? OFFSET ?', [limit, offset]);
+      const [countResult] = await pool.query('SELECT COUNT(*) as total FROM employees');
+      const total = (countResult && countResult[0]) ? countResult[0].total : 0;
+      const [rows] = await pool.query('SELECT * FROM employees ORDER BY is_active DESC, dept, name LIMIT ? OFFSET ?', [limit, offset]);
       return res.json({ data: rows, total, page, limit });
     }
+    const [countResult] = await pool.query('SELECT COUNT(*) as total FROM employees WHERE is_active = 1');
+    const total = (countResult && countResult[0]) ? countResult[0].total : 0;
     // Employee: return all employees with public fields; own record gets full details
     const [pubRows] = await pool.query(
       'SELECT code, name, dept, designation, role, phone, doj, email, photo_url, is_active FROM employees WHERE is_active = 1 AND code != ? ORDER BY dept, name LIMIT ? OFFSET ?',
