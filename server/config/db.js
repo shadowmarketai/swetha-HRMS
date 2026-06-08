@@ -76,6 +76,14 @@ async function runMigrations(conn) {
       sql: "ALTER TABLE expense_reimbursements ADD COLUMN expense_date DATE"
     },
     {
+      name: 'add_from_time_to_leave_applications',
+      sql: "ALTER TABLE leave_applications ADD COLUMN IF NOT EXISTS from_time TIME NULL"
+    },
+    {
+      name: 'add_to_time_to_leave_applications',
+      sql: "ALTER TABLE leave_applications ADD COLUMN IF NOT EXISTS to_time TIME NULL"
+    },
+    {
       name: 'update_expense_status_enum',
       sql: "ALTER TABLE expense_reimbursements MODIFY COLUMN status ENUM('Pending','hr_accepted','Approved','Rejected') DEFAULT 'Pending'"
     },
