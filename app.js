@@ -15591,6 +15591,8 @@ async function loadAttendanceSummaryTable() {
   var selectedDate = dateInput ? dateInput.value : new Date().toISOString().split('T')[0];
   var monthStr = selectedDate.substring(0, 7);
   var dateLabel = new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric', weekday:'long'});
+  var today = new Date().toISOString().split('T')[0];
+  var isPastDate = selectedDate < today;
 
   area.innerHTML = '<div style="text-align:center;padding:16px;color:var(--gray-400);font-size:.78rem">Loading...</div>';
 
@@ -15613,60 +15615,101 @@ async function loadAttendanceSummaryTable() {
     }
   });
 
+  // Index approved leaves for this date from leaveApplications global
+  var approvedLeavesForDate = {};
+  (leaveApplications || []).forEach(function(a) {
+    if (a.status !== 'approved') return;
+    var from = (a.from || '').substring(0, 10);
+    var to = (a.to || '').substring(0, 10);
+    if (from <= selectedDate && selectedDate <= to) {
+      approvedLeavesForDate[a.empCode] = a;
+    }
+  });
+
   // Build table rows for all active employees sorted by code ascending
   var activeEmps = EMPLOYEES.filter(function(e) { return e.status !== 'Inactive'; });
   activeEmps.sort(function(a, b) { return a.code.localeCompare(b.code); });
 
-  var presentCount = 0, absentCount = 0;
+  var presentCount = 0, absentCount = 0, leaveCount = 0;
   var rows = activeEmps.map(function(emp) {
     var log = dayLogs[emp.code];
-    var isPresent = !!log;
-    if (isPresent) presentCount++; else absentCount++;
-    var statusBadge = isPresent
-      ? '<span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:.72rem;font-weight:600;background:#dcfce7;color:#16a34a">Present</span>'
-      : '<span style="display:inline-block;padding:2px 10px;border-radius:12px;font-size:.72rem;font-weight:600;background:#fee2e2;color:#dc2626">Absent</span>';
-    // Calculate hours worked from all sessions
+    var sessions = dayAllLogs[emp.code] || [];
+    var approvedLeave = approvedLeavesForDate[emp.code];
+
+    // Compute first check-in and last check-out across all sessions
+    var firstIn = null, lastOut = null, totalMin = 0;
+    sessions.forEach(function(s) {
+      if (s.check_in) {
+        if (!firstIn) firstIn = s.check_in;
+        var start = new Date(s.check_in).getTime();
+        var end = s.check_out ? new Date(s.check_out).getTime() : Date.now();
+        if (end > start) totalMin += (end - start) / 60000;
+      }
+      if (s.check_out) lastOut = s.check_out;
+    });
+
+    // Determine status badge
+    var statusLabel, statusBg, statusColor;
+    if (log) {
+      var checkInHour = firstIn ? new Date(firstIn).getHours() : 0;
+      var hasMissedCheckout = !lastOut && isPastDate;
+      var lateMorning = firstIn && checkInHour >= 12; // arrived only after noon → morning miss punch
+
+      if (lateMorning) {
+        // Morning miss punch: came only after noon → 1st half treated as leave
+        statusLabel = '1st Half Leave'; statusBg = '#FEF3C7'; statusColor = '#92400E';
+        leaveCount++;
+      } else if (hasMissedCheckout) {
+        // Evening miss punch: checked in but no checkout on a past date
+        statusLabel = '2nd Half Absent'; statusBg = '#FFEDD5'; statusColor = '#C2410C';
+        absentCount++;
+      } else {
+        statusLabel = 'Present'; statusBg = '#DCFCE7'; statusColor = '#16A34A';
+        presentCount++;
+      }
+    } else if (approvedLeave) {
+      if (approvedLeave.isLOP || approvedLeave.lopDays > 0) {
+        statusLabel = 'Loss of Pay'; statusBg = '#FEE2E2'; statusColor = '#DC2626';
+      } else {
+        statusLabel = 'Leave'; statusBg = '#DBEAFE'; statusColor = '#1D4ED8';
+      }
+      leaveCount++;
+    } else {
+      statusLabel = 'Absent'; statusBg = '#FEE2E2'; statusColor = '#DC2626';
+      absentCount++;
+    }
+
+    var statusBadge = '<span style="display:inline-block;padding:2px 8px;border-radius:12px;font-size:.7rem;font-weight:600;white-space:nowrap;background:' + statusBg + ';color:' + statusColor + '">' + statusLabel + '</span>';
+
+    // Time columns
     var hoursHtml = '<span style="color:var(--gray-300);font-size:.68rem">—</span>';
     var inTimeHtml = '<span style="color:var(--gray-300);font-size:.68rem">—</span>';
     var outTimeHtml = '<span style="color:var(--gray-300);font-size:.68rem">—</span>';
-    if (isPresent) {
-      var sessions = dayAllLogs[emp.code] || [];
-      var totalMin = 0;
-      var firstIn = null, lastOut = null;
-      sessions.forEach(function(s) {
-        if (s.check_in) {
-          if (!firstIn) firstIn = s.check_in;
-          var start = new Date(s.check_in).getTime();
-          var end = s.check_out ? new Date(s.check_out).getTime() : Date.now();
-          if (end > start) totalMin += (end - start) / 60000;
-        }
-        if (s.check_out) lastOut = s.check_out;
-      });
-      if (firstIn) inTimeHtml = '<span style="font-size:.72rem;color:var(--success);font-weight:600">' + new Date(firstIn).toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit',hour12:true}) + '</span>';
-      if (lastOut) outTimeHtml = '<span style="font-size:.72rem;color:var(--danger);font-weight:600">' + new Date(lastOut).toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit',hour12:true}) + '</span>';
+    if (firstIn) inTimeHtml = '<span style="font-size:.72rem;color:#16a34a;font-weight:600">' + new Date(firstIn).toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit',hour12:true}) + '</span>';
+    if (lastOut) outTimeHtml = '<span style="font-size:.72rem;color:#dc2626;font-weight:600">' + new Date(lastOut).toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit',hour12:true}) + '</span>';
+    if (totalMin > 0 && log) {
       var h = Math.floor(totalMin / 60), m = Math.round(totalMin % 60);
-      if (totalMin > 0) {
-        var color = totalMin >= 480 ? '#16a34a' : totalMin >= 240 ? '#d97706' : '#dc2626';
-        hoursHtml = '<span style="font-size:.75rem;font-weight:700;color:' + color + '">' + h + 'h ' + m + 'm</span>';
-      }
+      var hColor = totalMin >= 480 ? '#16a34a' : totalMin >= 240 ? '#d97706' : '#dc2626';
+      hoursHtml = '<span style="font-size:.75rem;font-weight:700;color:' + hColor + '">' + h + 'h ' + m + 'm</span>';
     }
 
-    // Selfie column
+    // Selfie columns
     var selfieHtml = '<span style="color:var(--gray-300);font-size:.68rem">—</span>';
     if (log && log.selfie_checkin_url) {
       var selfieUrl = log.selfie_checkin_url + (log.selfie_checkin_url.indexOf('?') === -1 ? '?' : '&') + 'token=' + encodeURIComponent(JWT_TOKEN);
       selfieHtml = '<img src="' + escapeHTML(selfieUrl) + '" style="width:40px;height:40px;object-fit:cover;border-radius:8px;border:2px solid #16a34a;cursor:pointer" onclick="window.open(this.src,\'_blank\')" title="Check-in selfie">';
     }
-    // Check-out selfie
     var selfieOutHtml = '';
     if (log && log.selfie_checkout_url) {
       var selfieOutUrl = log.selfie_checkout_url + (log.selfie_checkout_url.indexOf('?') === -1 ? '?' : '&') + 'token=' + encodeURIComponent(JWT_TOKEN);
       selfieOutHtml = '<img src="' + escapeHTML(selfieOutUrl) + '" style="width:40px;height:40px;object-fit:cover;border-radius:8px;border:2px solid #dc2626;cursor:pointer;margin-left:4px" onclick="window.open(this.src,\'_blank\')" title="Check-out selfie">';
     }
+
     var tdStyle = 'padding:8px 10px;border-bottom:1px solid var(--gray-100)';
+    var desig = emp.designation ? '<span style="font-size:.65rem;color:var(--gray-400);margin-left:4px">' + escapeHTML(emp.designation) + '</span>' : '';
     return '<tr>' +
       '<td style="' + tdStyle + ';font-size:.78rem;font-weight:600">' + escapeHTML(emp.code) + '</td>' +
-      '<td style="' + tdStyle + ';font-size:.78rem">' + escapeHTML(emp.name) + '</td>' +
+      '<td style="' + tdStyle + ';font-size:.78rem">' + escapeHTML(emp.name) + desig + '</td>' +
       '<td style="' + tdStyle + ';text-align:center">' + statusBadge + '</td>' +
       '<td style="' + tdStyle + ';text-align:center">' + inTimeHtml + '</td>' +
       '<td style="' + tdStyle + ';text-align:center">' + outTimeHtml + '</td>' +
@@ -15676,7 +15719,11 @@ async function loadAttendanceSummaryTable() {
   });
 
   var thStyle = 'padding:8px 10px;text-align:left;font-size:.72rem;font-weight:700;color:var(--gray-500);text-transform:uppercase;letter-spacing:.5px;border-bottom:2px solid var(--gray-200)';
-  var html = '<div style="padding:10px 12px 6px;font-size:.75rem;color:var(--gray-500)">' + escapeHTML(dateLabel) + ' &mdash; <span style="color:#16a34a;font-weight:600">' + presentCount + ' Present</span> &middot; <span style="color:#dc2626;font-weight:600">' + absentCount + ' Absent</span></div>';
+  var summary = escapeHTML(dateLabel) + ' &mdash; '
+    + '<span style="color:#16a34a;font-weight:600">' + presentCount + ' Present</span>'
+    + ' &middot; <span style="color:#dc2626;font-weight:600">' + absentCount + ' Absent</span>'
+    + ' &middot; <span style="color:#1d4ed8;font-weight:600">' + leaveCount + ' Leave/HD</span>';
+  var html = '<div style="padding:10px 12px 6px;font-size:.75rem;color:var(--gray-500)">' + summary + '</div>';
   html += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">';
   html += '<thead><tr style="background:var(--gray-50)"><th style="' + thStyle + '">Emp Code</th><th style="' + thStyle + '">Name</th><th style="' + thStyle + ';text-align:center">Status</th><th style="' + thStyle + ';text-align:center">In</th><th style="' + thStyle + ';text-align:center">Out</th><th style="' + thStyle + ';text-align:center">Hours</th><th style="' + thStyle + ';text-align:center">Selfie</th></tr></thead>';
   html += '<tbody>' + rows.join('') + '</tbody></table></div>';
