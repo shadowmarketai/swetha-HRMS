@@ -15,42 +15,49 @@ pool.query("ALTER TABLE leave_applications ADD COLUMN to_time TIME NULL").catch(
 // CL year starts in April. Each month from April onwards adds +1 to the balance.
 // Accrual is lazy: runs when balance is read or a leave is applied.
 async function ensureCLAccrual(pool, empCode) {
-  const now = new Date();
-  const currentYM = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
-  // Only accrue from April onwards
-  if (now.getMonth() < 3) return; // Jan-Mar: no accrual yet for new FY
+  try {
+    const now = new Date();
+    const currentYM = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+    // Only accrue from April onwards
+    if (now.getMonth() < 3) return; // Jan-Mar: no accrual yet for new FY
 
-  const [rows] = await pool.query('SELECT casual, cl_accrued_month FROM leave_balances WHERE emp_code = ?', [empCode]);
-  if (rows.length === 0) {
-    // Create balance row with 1 CL for current month
+    const [rows] = await pool.query('SELECT * FROM leave_balances WHERE emp_code = ?', [empCode]);
+    if (rows.length === 0) {
+      // Create balance row — use only columns that exist (permission/cl_accrued_month may be absent)
+      await pool.query(
+        'INSERT INTO leave_balances (emp_code, casual) VALUES (?, 1) ON DUPLICATE KEY UPDATE casual = casual + 1',
+        [empCode]
+      );
+      // Try to set cl_accrued_month if column exists
+      await pool.query('UPDATE leave_balances SET cl_accrued_month = ? WHERE emp_code = ?', [currentYM, empCode]).catch(() => {});
+      return;
+    }
+    const lastAccrued = rows[0].cl_accrued_month;
+    if (lastAccrued === currentYM) return; // already accrued this month
+
+    // Calculate how many months to add (may be > 1 if system was down)
+    const aprilThisYear = new Date(now.getFullYear(), 3, 1); // April 1
+    const startFrom = lastAccrued
+      ? new Date(lastAccrued + '-01T00:00:00')
+      : aprilThisYear;
+
+    let monthsToAdd = 0;
+    let cursor = new Date(startFrom.getFullYear(), startFrom.getMonth() + (lastAccrued ? 1 : 0), 1);
+    while (cursor <= now && cursor.getMonth() >= 3) {
+      monthsToAdd++;
+      cursor.setMonth(cursor.getMonth() + 1);
+      if (cursor.getFullYear() > now.getFullYear()) break;
+    }
+    if (monthsToAdd <= 0) return;
+
     await pool.query(
-      'INSERT INTO leave_balances (emp_code, casual, permission, cl_accrued_month) VALUES (?, 1, 2, ?) ON DUPLICATE KEY UPDATE cl_accrued_month = VALUES(cl_accrued_month), casual = casual + 1',
-      [empCode, currentYM]
+      'UPDATE leave_balances SET casual = casual + ?, cl_accrued_month = ? WHERE emp_code = ?',
+      [monthsToAdd, currentYM, empCode]
     );
-    return;
+  } catch (e) {
+    // Non-fatal: skip accrual if schema columns are missing
+    console.error('[ensureCLAccrual] skipped:', e.message);
   }
-  const lastAccrued = rows[0].cl_accrued_month;
-  if (lastAccrued === currentYM) return; // already accrued this month
-
-  // Calculate how many months to add (may be > 1 if system was down)
-  const aprilThisYear = new Date(now.getFullYear(), 3, 1); // April 1
-  const startFrom = lastAccrued
-    ? new Date(lastAccrued + '-01T00:00:00')
-    : aprilThisYear;
-
-  let monthsToAdd = 0;
-  let cursor = new Date(startFrom.getFullYear(), startFrom.getMonth() + (lastAccrued ? 1 : 0), 1);
-  while (cursor <= now && cursor.getMonth() >= 3) {
-    monthsToAdd++;
-    cursor.setMonth(cursor.getMonth() + 1);
-    if (cursor.getFullYear() > now.getFullYear()) break;
-  }
-  if (monthsToAdd <= 0) return;
-
-  await pool.query(
-    'UPDATE leave_balances SET casual = casual + ?, cl_accrued_month = ? WHERE emp_code = ?',
-    [monthsToAdd, currentYM, empCode]
-  );
 }
 
 // Helper: create notifications for multiple users

@@ -76,6 +76,42 @@ async function runMigrations(conn) {
       sql: "ALTER TABLE expense_reimbursements ADD COLUMN expense_date DATE"
     },
     {
+      name: 'add_permission_to_leave_balances',
+      sql: "ALTER TABLE leave_balances ADD COLUMN permission DECIMAL(4,2) DEFAULT 2"
+    },
+    {
+      name: 'add_cl_accrued_month_to_leave_balances',
+      sql: "ALTER TABLE leave_balances ADD COLUMN cl_accrued_month VARCHAR(7) DEFAULT NULL"
+    },
+    {
+      name: 'add_is_half_day_to_leave_applications',
+      sql: "ALTER TABLE leave_applications ADD COLUMN is_half_day TINYINT(1) DEFAULT 0"
+    },
+    {
+      name: 'add_half_day_session_to_leave_applications',
+      sql: "ALTER TABLE leave_applications ADD COLUMN half_day_session ENUM('first','second') NULL"
+    },
+    {
+      name: 'add_paid_days_to_leave_applications',
+      sql: "ALTER TABLE leave_applications ADD COLUMN paid_days DECIMAL(4,2) DEFAULT 0"
+    },
+    {
+      name: 'add_lop_days_to_leave_applications',
+      sql: "ALTER TABLE leave_applications ADD COLUMN lop_days DECIMAL(4,2) DEFAULT 0"
+    },
+    {
+      name: 'add_is_lop_to_leave_applications',
+      sql: "ALTER TABLE leave_applications ADD COLUMN is_lop TINYINT(1) DEFAULT 0"
+    },
+    {
+      name: 'add_cancelled_at_to_leave_applications',
+      sql: "ALTER TABLE leave_applications ADD COLUMN cancelled_at DATETIME NULL"
+    },
+    {
+      name: 'add_cancelled_by_to_leave_applications',
+      sql: "ALTER TABLE leave_applications ADD COLUMN cancelled_by VARCHAR(20) NULL"
+    },
+    {
       name: 'add_from_time_to_leave_applications',
       sql: "ALTER TABLE leave_applications ADD COLUMN from_time TIME NULL"
     },
