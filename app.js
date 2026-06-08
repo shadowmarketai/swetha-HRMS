@@ -10832,14 +10832,18 @@ function switchLeaveTab(tab, el) {
 }
 
 function _fmtLeaveDate(a) {
-  var fromD = new Date(a.from).toLocaleDateString('en-IN', {day:'2-digit', month:'short'});
+  if (!a.from) return '—';
+  var fromDate = new Date(a.from);
+  if (isNaN(fromDate.getTime())) return a.from || '—';
+  var fromD = fromDate.toLocaleDateString('en-IN', {day:'2-digit', month:'short'});
   if (a.type === 'permission') {
     return fromD + ' · ' + (a.fromTime || '09:00') + ' - ' + (a.toTime || '11:00');
   }
   if (a.from === a.to) {
     return fromD + ' · ' + (a.days === 0.5 ? 'Half Day' : '1 day');
   }
-  var toD = new Date(a.to).toLocaleDateString('en-IN', {day:'2-digit', month:'short'});
+  var toDate = new Date(a.to);
+  var toD = isNaN(toDate.getTime()) ? (a.to || '—') : toDate.toLocaleDateString('en-IN', {day:'2-digit', month:'short'});
   return fromD + ' — ' + toD + ' · ' + a.days + ' day(s)';
 }
 

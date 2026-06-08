@@ -69,7 +69,7 @@ async function getEmpCodesByRole(pool, roles) {
 router.get('/', verifyToken, async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page) || 1);
-    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+    const limit = Math.min(1000, Math.max(1, parseInt(req.query.limit) || 20));
     const offset = (page - 1) * limit;
     let countQuery, dataQuery, params;
     if (['MD', 'HR'].includes(req.user.role)) {
@@ -104,7 +104,7 @@ router.post('/', verifyToken, [
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
   try {
-    const { type, from, to, reason, isLOP, isHalfDay, halfDaySession } = req.body;
+    const { type, from, to, reason, isLOP, isHalfDay, halfDaySession, fromTime, toTime } = req.body;
     if (!type || !from || !to) return res.status(400).json({ error: 'Type, from and to dates required' });
 
     const fromDate = new Date(from + 'T00:00:00');
@@ -175,12 +175,14 @@ router.post('/', verifyToken, [
     const [result] = await pool.query(
       `INSERT INTO leave_applications
          (emp_code, emp_name, dept, leave_type, from_date, to_date, days,
-          reason, is_lop, is_half_day, half_day_session, paid_days, lop_days)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          reason, is_lop, is_half_day, half_day_session, paid_days, lop_days,
+          from_time, to_time)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [req.user.empCode, empName, dept, type, from, to, days,
        reason || '', lopFlag ? 1 : 0,
        isHalfDay ? 1 : 0, halfDaySession || null,
-       paidDays, lopDays]
+       paidDays, lopDays,
+       fromTime || null, toTime || null]
     );
 
     // Notify HR and MD

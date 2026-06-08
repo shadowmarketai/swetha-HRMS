@@ -790,7 +790,9 @@ ALTER TABLE leave_applications
   ADD COLUMN IF NOT EXISTS lop_days DECIMAL(4,2) DEFAULT 0,
   ADD COLUMN IF NOT EXISTS is_lop TINYINT(1) DEFAULT 0,
   ADD COLUMN IF NOT EXISTS cancelled_at DATETIME NULL,
-  ADD COLUMN IF NOT EXISTS cancelled_by VARCHAR(20) NULL;
+  ADD COLUMN IF NOT EXISTS cancelled_by VARCHAR(20) NULL,
+  ADD COLUMN IF NOT EXISTS from_time TIME NULL,
+  ADD COLUMN IF NOT EXISTS to_time TIME NULL;
 
 -- leave_balances: add monthly CL accrual tracking, permission column, decimal casual
 ALTER TABLE leave_balances
