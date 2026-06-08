@@ -208,7 +208,9 @@ const NAV_ICONS = {
   ta:       '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>',
   store:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l1-4h16l1 4"/><path d="M3 9v11a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V9"/><path d="M9 21V13h6v8"/><path d="M3 9h18"/></svg>',
   purchase: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>',
-  more:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>'
+  more:     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="19" r="1.5"/></svg>',
+  download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>',
+  database: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>'
 };
 
 const NAV_CONFIG = {
@@ -247,6 +249,8 @@ const NAV_CONFIG = {
       { id:'md-so-approved', label:'Approved Requests', action:{type:'overlay',target:'peb'} },
       { id:'md-so-factory', label:'Factory Issue Log', action:{type:'overlay',target:'peb'} }
     ]},
+    { id:'md-export-data', label:'Export Data', icon:'download', action:{type:'overlay',target:'export-data'} },
+    { id:'md-data-mgmt', label:'Data Management', icon:'database', action:{type:'overlay',target:'data-mgmt'} },
     // Footer items
     { id:'md-profile', label:'Profile', icon:'profile', action:{type:'overlay',target:'profile'}, isFooter:true },
     { id:'md-admin', label:'Admin Panel', icon:'admin', action:{type:'overlay',target:'admin'}, isFooter:true },
@@ -296,6 +300,8 @@ const NAV_CONFIG = {
       { id:'hr-so-approved', label:'Approved Requests', action:{type:'overlay',target:'peb'} },
       { id:'hr-so-factory', label:'Factory Issue Log', action:{type:'overlay',target:'peb'} }
     ]},
+    { id:'hr-export-data', label:'Export Data', icon:'download', action:{type:'overlay',target:'export-data'} },
+    { id:'hr-data-mgmt', label:'Data Management', icon:'database', action:{type:'overlay',target:'data-mgmt'} },
     // Footer
     { id:'hr-profile', label:'Profile', icon:'profile', action:{type:'overlay',target:'profile'}, isFooter:true },
     { id:'hr-admin', label:'Admin Panel', icon:'admin', action:{type:'overlay',target:'admin'}, isFooter:true },
@@ -1699,6 +1705,8 @@ let _overlayPreviousFocus = [];
 function showOverlay(id) {
   if (id === 'superadmin' && !_isSuperAdmin && currentUser.role !== 'MD') return;
   if (id === 'admin' && currentUser.role !== 'MD' && currentUser.role !== 'HR') return;
+  if (id === 'export-data' && currentUser.role !== 'MD' && currentUser.role !== 'HR') return;
+  if (id === 'data-mgmt' && currentUser.role !== 'MD' && currentUser.role !== 'HR') return;
   if (id === 'location' && currentUser.role !== 'MD') return;
   if (id === 'peb' && currentUser.role !== 'MD' && currentUser.role !== 'HR' && !(['Site Engineer','Admin','Accounts','Execution','Production'].indexOf(currentUser.dept) >= 0)) return;
   if (id === 'onboarding' && currentUser.role !== 'MD' && currentUser.role !== 'HR' && currentUser.role !== 'Manager') return;

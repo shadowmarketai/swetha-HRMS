@@ -540,28 +540,40 @@
         <button id="btnUpdatePassword" class="btn btn-primary w-full" style="border-radius:var(--radius-sm);margin-top:8px" onclick="changePassword()">Update Password</button>
       </div>
 
-      <div class="md-hr-only">
-      <div class="section-title">Export Data</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
-        <button class="btn btn-sm btn-outline" onclick="exportEmployeeList()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Employees</button>
-        <button class="btn btn-sm btn-outline" onclick="exportKPIReport()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> KPI Scores</button>
-        <button class="btn btn-sm btn-outline" onclick="exportSalaryReport()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Salary</button>
-        <button class="btn btn-sm btn-outline" onclick="openConsolidatedAttModal()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Attendance</button>
-        <button class="btn btn-sm btn-outline" onclick="exportTaskReport()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Tasks</button>
-        <button class="btn btn-sm btn-outline" onclick="exportAdvanceReport()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Advances</button>
-        <button class="btn btn-sm btn-outline" onclick="exportAnalyticsReport()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Analytics</button>
-        <button class="btn btn-sm btn-outline" onclick="exportIncentiveReport()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Incentives</button>
-      </div>
-
-      <div class="section-title">Data Management</div>
-      <div style="display:flex;gap:8px;margin-bottom:8px">
-        <button class="btn" style="flex:1;background:var(--primary-50);color:var(--primary);border-radius:var(--radius-sm)" onclick="exportAllData()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Export Data</button>
-        <button class="btn" style="flex:1;background:var(--success-light);color:var(--success-dark);border-radius:var(--radius-sm)" onclick="importAllData()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Import Data</button>
-      </div>
-      <button class="btn w-full" style="background:var(--danger-light);color:var(--danger-dark);border-radius:var(--radius-sm);margin-bottom:8px" onclick="clearAllData()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Reset All Data to Defaults</button>
-      </div>
 
       <div style="margin-top:24px;text-align:center"><div style="font-size:.72rem;color:var(--gray-400)">Swetha Structures HRMS v3.0</div><div style="font-size:.65rem;color:var(--gray-300);margin-top:2px">Swetha Structures Private Limited</div></div>
+    </div>
+  </div>
+
+  <!-- EXPORT DATA OVERLAY (MD/HR only) -->
+  <div class="overlay-screen" id="overlay-export-data" role="dialog" aria-modal="true" aria-label="Export Data">
+    <div class="overlay-header"><button class="back-btn" aria-label="Go back" onclick="hideOverlay('export-data')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button><h2>Export Data</h2></div>
+    <div style="padding:16px">
+      <div class="section-title" style="margin-top:4px">Reports</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px">
+        <button class="btn btn-sm btn-outline" style="padding:12px 8px;font-size:.78rem" onclick="exportEmployeeList()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Employees</button>
+        <button class="btn btn-sm btn-outline" style="padding:12px 8px;font-size:.78rem" onclick="exportKPIReport()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> KPI Scores</button>
+        <button class="btn btn-sm btn-outline" style="padding:12px 8px;font-size:.78rem" onclick="exportSalaryReport()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Salary</button>
+        <button class="btn btn-sm btn-outline" style="padding:12px 8px;font-size:.78rem" onclick="openConsolidatedAttModal()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Attendance</button>
+        <button class="btn btn-sm btn-outline" style="padding:12px 8px;font-size:.78rem" onclick="exportTaskReport()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Tasks</button>
+        <button class="btn btn-sm btn-outline" style="padding:12px 8px;font-size:.78rem" onclick="exportAdvanceReport()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Advances</button>
+        <button class="btn btn-sm btn-outline" style="padding:12px 8px;font-size:.78rem" onclick="exportAnalyticsReport()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Analytics</button>
+        <button class="btn btn-sm btn-outline" style="padding:12px 8px;font-size:.78rem" onclick="exportIncentiveReport()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Incentives</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- DATA MANAGEMENT OVERLAY (MD/HR only) -->
+  <div class="overlay-screen" id="overlay-data-mgmt" role="dialog" aria-modal="true" aria-label="Data Management">
+    <div class="overlay-header"><button class="back-btn" aria-label="Go back" onclick="hideOverlay('data-mgmt')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button><h2>Data Management</h2></div>
+    <div style="padding:16px">
+      <div class="section-title" style="margin-top:4px">Backup & Restore</div>
+      <div style="display:flex;gap:10px;margin-bottom:12px">
+        <button class="btn" style="flex:1;padding:14px 8px;font-size:.82rem;background:var(--primary-50);color:var(--primary);border-radius:var(--radius-sm)" onclick="exportAllData()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Export Data</button>
+        <button class="btn" style="flex:1;padding:14px 8px;font-size:.82rem;background:var(--success-light);color:var(--success-dark);border-radius:var(--radius-sm)" onclick="importAllData()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg> Import Data</button>
+      </div>
+      <div class="section-title">Danger Zone</div>
+      <button class="btn w-full" style="padding:14px;font-size:.82rem;background:var(--danger-light);color:var(--danger-dark);border-radius:var(--radius-sm);margin-bottom:8px" onclick="clearAllData()"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg> Reset All Data to Defaults</button>
     </div>
   </div>
 
