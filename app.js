@@ -4049,23 +4049,35 @@ function renderAdvanceRequests(filter) {
     btn.textContent = tabBaseLabels[i] + (cnt > 0 ? ' (' + cnt + ')' : '');
   });
 
-  // Employee selector — build from unique employees in allItems
+  // Employee selector + download buttons — single row
   var empBar = document.getElementById('advReqEmpBar');
+  var canExport = currentUser && (currentUser.role === 'MD' || currentUser.role === 'Accounts' || currentUser.role === 'HR');
   if (empBar) {
     var empMap = {};
     allItems.forEach(function(r) { if (r.empCode) empMap[r.empCode] = r.empName || r.empCode; });
     var empEntries = Object.entries(empMap).sort(function(a, b) { return (a[1] || '').localeCompare(b[1] || ''); });
+    var dlSvg = '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
     var selHtml = '<div style="display:flex;align-items:center;gap:8px">';
-    selHtml += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--gray-500)" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
-    selHtml += '<select id="advReqEmpSelect" onchange="filterAdvReqByEmp(this.value)" style="flex:1;padding:7px 10px;border:1.5px solid var(--gray-200);border-radius:var(--radius);font-size:.8rem;background:var(--card);color:var(--gray-700);outline:none;cursor:pointer" onfocus="this.style.borderColor=\'var(--primary)\'" onblur="this.style.borderColor=\'var(--gray-200)\'">';
+    selHtml += '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--gray-400)" stroke-width="2" style="flex-shrink:0"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>';
+    selHtml += '<select id="advReqEmpSelect" onchange="filterAdvReqByEmp(this.value)" style="width:180px;max-width:180px;padding:6px 8px;border:1.5px solid var(--gray-200);border-radius:var(--radius);font-size:.78rem;background:var(--card);color:var(--gray-700);outline:none;cursor:pointer" onfocus="this.style.borderColor=\'var(--primary)\'" onblur="this.style.borderColor=\'var(--gray-200)\'">';
     selHtml += '<option value="all">All Employees</option>';
     empEntries.forEach(function(e) {
       var selected = advReqEmpFilter === e[0] ? ' selected' : '';
       selHtml += '<option value="' + escapeHTML(e[0]) + '"' + selected + '>' + escapeHTML(e[1]) + ' (' + escapeHTML(e[0]) + ')</option>';
     });
-    selHtml += '</select></div>';
+    selHtml += '</select>';
+    if (canExport) {
+      selHtml += '<div style="margin-left:auto;display:flex;gap:6px">';
+      selHtml += '<button onclick="downloadAdvExport(\'advances\',\'' + filter + '\')" style="display:inline-flex;align-items:center;gap:4px;padding:6px 10px;border:none;border-radius:var(--radius);background:#2563EB;color:#fff;font-size:.72rem;font-weight:600;cursor:pointer;white-space:nowrap">' + dlSvg + ' Advances</button>';
+      selHtml += '<button onclick="downloadAdvExport(\'expenses\',\'' + filter + '\')" style="display:inline-flex;align-items:center;gap:4px;padding:6px 10px;border:none;border-radius:var(--radius);background:#059669;color:#fff;font-size:.72rem;font-weight:600;cursor:pointer;white-space:nowrap">' + dlSvg + ' Expenses</button>';
+      selHtml += '</div>';
+    }
+    selHtml += '</div>';
     empBar.innerHTML = selHtml;
   }
+  // Hide the separate export bar — buttons are now in the emp row above
+  var oldBar = document.getElementById('advReqExportBar');
+  if (oldBar) { oldBar.style.display = 'none'; oldBar.innerHTML = ''; }
 
   let reqs;
   if (filter === 'all') {
