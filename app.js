@@ -249,8 +249,7 @@ const NAV_CONFIG = {
       { id:'md-so-approved', label:'Approved Requests', action:{type:'overlay',target:'peb'} },
       { id:'md-so-factory', label:'Factory Issue Log', action:{type:'overlay',target:'peb'} }
     ]},
-    { id:'md-export-data', label:'Export Data', icon:'download', action:{type:'overlay',target:'export-data'} },
-    { id:'md-data-mgmt', label:'Data Management', icon:'database', action:{type:'overlay',target:'data-mgmt'} },
+    { id:'md-downloads', label:'Downloads', icon:'download', action:{type:'overlay',target:'downloads'} },
     // Footer items
     { id:'md-profile', label:'Profile', icon:'profile', action:{type:'overlay',target:'profile'}, isFooter:true },
     { id:'md-admin', label:'Admin Panel', icon:'admin', action:{type:'overlay',target:'admin'}, isFooter:true },
@@ -300,8 +299,7 @@ const NAV_CONFIG = {
       { id:'hr-so-approved', label:'Approved Requests', action:{type:'overlay',target:'peb'} },
       { id:'hr-so-factory', label:'Factory Issue Log', action:{type:'overlay',target:'peb'} }
     ]},
-    { id:'hr-export-data', label:'Export Data', icon:'download', action:{type:'overlay',target:'export-data'} },
-    { id:'hr-data-mgmt', label:'Data Management', icon:'database', action:{type:'overlay',target:'data-mgmt'} },
+    { id:'hr-downloads', label:'Downloads', icon:'download', action:{type:'overlay',target:'downloads'} },
     // Footer
     { id:'hr-profile', label:'Profile', icon:'profile', action:{type:'overlay',target:'profile'}, isFooter:true },
     { id:'hr-admin', label:'Admin Panel', icon:'admin', action:{type:'overlay',target:'admin'}, isFooter:true },
@@ -1705,8 +1703,7 @@ let _overlayPreviousFocus = [];
 function showOverlay(id) {
   if (id === 'superadmin' && !_isSuperAdmin && currentUser.role !== 'MD') return;
   if (id === 'admin' && currentUser.role !== 'MD' && currentUser.role !== 'HR') return;
-  if (id === 'export-data' && currentUser.role !== 'MD' && currentUser.role !== 'HR') return;
-  if (id === 'data-mgmt' && currentUser.role !== 'MD' && currentUser.role !== 'HR') return;
+  if (id === 'downloads' && currentUser.role !== 'MD' && currentUser.role !== 'HR') return;
   if (id === 'location' && currentUser.role !== 'MD') return;
   if (id === 'peb' && currentUser.role !== 'MD' && currentUser.role !== 'HR' && !(['Site Engineer','Admin','Accounts','Execution','Production'].indexOf(currentUser.dept) >= 0)) return;
   if (id === 'onboarding' && currentUser.role !== 'MD' && currentUser.role !== 'HR' && currentUser.role !== 'Manager') return;
