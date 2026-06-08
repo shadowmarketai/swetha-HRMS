@@ -218,14 +218,14 @@ const NAV_CONFIG = {
     { id:'home', label:'Home', icon:'home', action:{type:'tab',target:'home'} },
     { id:'md-attendance', label:'Attendance', icon:'attendance', children:[
       { id:'md-att-report', label:'Employee Attendance', action:{type:'tab',target:'attendance'} },
-      { id:'md-att-leave', label:'Employee Leave Request', action:{type:'tab',target:'leaves'} }
+      { id:'md-att-leave', label:'Employee Leave Request', action:{type:'tab',target:'leaves'} },
+      { id:'md-perf-onboard', label:'Add Employee', action:{type:'overlay',target:'onboarding'} }
     ]},
     { id:'md-advance', label:'Advance & Expense', icon:'advance', action:{type:'overlay',target:'advance-requests'} },
     { id:'md-location', label:'Live Location', icon:'location', action:{type:'overlay',target:'location'} },
     { id:'md-progress', label:'Progress', icon:'progress', action:{type:'tab',target:'progress'} },
     { id:'md-performance', label:'Employee Performance', icon:'performance', children:[
-      { id:'md-perf-track', label:'Performance Review', action:{type:'overlay',target:'hr-kpi'} },
-      { id:'md-perf-onboard', label:'Add Employee', action:{type:'overlay',target:'onboarding'} }
+      { id:'md-perf-track', label:'Performance Review', action:{type:'overlay',target:'hr-kpi'} }
     ]},
     { id:'md-tax', label:'Form 16 & Tax', icon:'tax', action:{type:'overlay',target:'hr-tax'} },
     { id:'md-salary', label:'Salary', icon:'salary', children:[
@@ -263,15 +263,15 @@ const NAV_CONFIG = {
       { id:'hr-att-self', label:'Summary', action:{type:'tab',target:'attendance'} },
       { id:'hr-att-leave', label:'Apply Leave', action:{type:'tab',target:'leaves'} },
       { id:'hr-att-emp', label:'Employee Attendance', action:{type:'tab',target:'attendance'} },
-      { id:'hr-att-leavereq', label:'Employee Leave Req', action:{type:'tab',target:'leaves'} }
+      { id:'hr-att-leavereq', label:'Employee Leave Req', action:{type:'tab',target:'leaves'} },
+      { id:'hr-perf-onboard', label:'Add Employee', action:{type:'overlay',target:'onboarding'} }
     ]},
     { id:'hr-advance', label:'Advance', icon:'advance', children:[
       { id:'hr-adv-salary', label:'Salary Advance', action:{type:'tab',target:'advance'} },
       { id:'hr-adv-requests', label:'Approve Requests', action:{type:'overlay',target:'advance-requests'} }
     ]},
     { id:'hr-performance', label:'Employee Performance', icon:'performance', children:[
-      { id:'hr-perf-track', label:'Performance Review', action:{type:'overlay',target:'hr-kpi'} },
-      { id:'hr-perf-onboard', label:'Add Employee', action:{type:'overlay',target:'onboarding'} }
+      { id:'hr-perf-track', label:'Performance Review', action:{type:'overlay',target:'hr-kpi'} }
     ]},
     { id:'hr-recruit', label:'Interview Process', icon:'recruit', children:[
       { id:'hr-rec-positions', label:'Open Positions', action:{type:'overlay',target:'hr-recruit'} },
