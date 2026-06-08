@@ -15706,10 +15706,10 @@ async function loadAttendanceSummaryTable() {
     }
 
     var tdStyle = 'padding:8px 10px;border-bottom:1px solid var(--gray-100)';
-    var desig = emp.designation ? '<span style="font-size:.65rem;color:var(--gray-400);margin-left:4px">' + escapeHTML(emp.designation) + '</span>' : '';
+    var desig = emp.designation ? '<div style="font-size:.65rem;color:var(--gray-500);margin-top:2px;font-weight:400">' + escapeHTML(emp.designation) + '</div>' : '';
     return '<tr>' +
       '<td style="' + tdStyle + ';font-size:.78rem;font-weight:600">' + escapeHTML(emp.code) + '</td>' +
-      '<td style="' + tdStyle + ';font-size:.78rem">' + escapeHTML(emp.name) + desig + '</td>' +
+      '<td style="' + tdStyle + ';font-size:.78rem;font-weight:600">' + escapeHTML(emp.name) + desig + '</td>' +
       '<td style="' + tdStyle + ';text-align:center">' + statusBadge + '</td>' +
       '<td style="' + tdStyle + ';text-align:center">' + inTimeHtml + '</td>' +
       '<td style="' + tdStyle + ';text-align:center">' + outTimeHtml + '</td>' +
