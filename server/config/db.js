@@ -77,11 +77,11 @@ async function runMigrations(conn) {
     },
     {
       name: 'add_from_time_to_leave_applications',
-      sql: "ALTER TABLE leave_applications ADD COLUMN IF NOT EXISTS from_time TIME NULL"
+      sql: "ALTER TABLE leave_applications ADD COLUMN from_time TIME NULL"
     },
     {
       name: 'add_to_time_to_leave_applications',
-      sql: "ALTER TABLE leave_applications ADD COLUMN IF NOT EXISTS to_time TIME NULL"
+      sql: "ALTER TABLE leave_applications ADD COLUMN to_time TIME NULL"
     },
     {
       name: 'update_expense_status_enum',
