@@ -2584,7 +2584,11 @@ function isTemporaryMD(user) {
   return user && user.role === 'MD' && user.code !== 'MD001';
 }
 
-function renderEmpDatabase() {
+function filterEmpDatabase(query) {
+  renderEmpDatabase(query ? query.trim().toLowerCase() : '');
+}
+
+function renderEmpDatabase(filterQuery) {
   const container = document.getElementById('empDbList');
   if (!container) return;
   const colors = ['#E85D04','#D62828','#14B8A6','#22C55E','#EC4899'];
@@ -2593,9 +2597,14 @@ function renderEmpDatabase() {
   const canDelete = (isMD && !isTemporaryMD()) || isHR || _isSuperAdmin;
   const isHRorMD = currentUser && (currentUser.role === 'MD' || currentUser.role === 'HR' || _isSuperAdmin);
   let html = '';
+  var matchCount = 0;
   departments.forEach((dept, di) => {
-    const emps = EMPLOYEES.filter(e => e.dept === dept);
+    const allDeptEmps = EMPLOYEES.filter(e => e.dept === dept);
+    const emps = filterQuery
+      ? allDeptEmps.filter(e => e.name.toLowerCase().includes(filterQuery) || e.code.toLowerCase().includes(filterQuery))
+      : allDeptEmps;
     if (emps.length === 0) return;
+    matchCount += emps.length;
     html += `<div style="margin-top:12px;margin-bottom:6px;font-family:var(--font-display);font-size:.75rem;font-weight:600;color:${colors[di % colors.length]};text-transform:uppercase;letter-spacing:.04em">${dept} (${emps.length})</div>`;
     emps.forEach(e => {
       const isMD001 = e.code === 'MD001';
@@ -2642,7 +2651,20 @@ function renderEmpDatabase() {
       if (isHRorMD) html += `<div class="emp-detail-expanded" id="empDetail-${e.code}" style="display:none"></div>`;
     });
   });
+  if (filterQuery && matchCount === 0) {
+    html = '<div style="text-align:center;padding:24px;color:var(--gray-400);font-size:.82rem">No employee found for <strong>' + filterQuery + '</strong></div>';
+  }
   container.innerHTML = html;
+  // Auto-expand when exactly one match found
+  if (filterQuery && matchCount === 1 && isHRorMD) {
+    var match = EMPLOYEES.find(function(e) {
+      return e.name.toLowerCase().includes(filterQuery) || e.code.toLowerCase().includes(filterQuery);
+    });
+    if (match) {
+      var detailEl = document.getElementById('empDetail-' + match.code);
+      if (detailEl) { detailEl.style.display = 'block'; renderEmployeeDetailCard(match.code); }
+    }
+  }
 }
 
 async function changeRole(empCode, newRole) {
