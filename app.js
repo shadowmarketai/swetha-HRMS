@@ -3010,31 +3010,72 @@ function toggleEmpDetail(code, el) {
 function renderEmployeeDetailCard(empCode) {
   var emp = EMPLOYEES.find(function(e) { return e.code === empCode; });
   if (!emp) return;
-  var ext = getExtendedData(empCode);
   var container = document.getElementById('empDetail-' + empCode);
   if (!container) return;
+  var isMD = currentUser && currentUser.role === 'MD';
+
+  function sec(title) {
+    return '<div style="grid-column:1/-1;font-size:.68rem;font-weight:700;color:var(--primary);text-transform:uppercase;letter-spacing:.06em;padding:8px 0 2px;border-bottom:1px solid var(--border-color);margin-bottom:2px">' + title + '</div>';
+  }
 
   var html = '<div class="emp-detail-form">';
-  html += '<div class="emp-detail-grid">';
-  html += empDetailField('Name', emp.name, empCode, 'name');
-  html += empDetailField('Code', emp.code, empCode, 'code', true);
-  html += empDetailField('Department', emp.dept, empCode, 'dept');
-  html += empDetailField('Designation', emp.designation, empCode, 'designation');
-  html += empDetailField('Salary', emp.salary, empCode, 'salary');
-  html += empDetailField('Bank', emp.bank || '', empCode, 'bank');
-  html += empDetailField('Account No', emp.accNo || '', empCode, 'accNo');
+  html += '<div class="emp-detail-grid" style="grid-template-columns:1fr 1fr 1fr">';
+
+  // Basic Info
+  html += sec('Basic Info');
+  html += empDetailField('Name', emp.name || '', empCode, 'name');
+  html += empDetailField('Employee Code', emp.code || '', empCode, 'code', true);
+  html += empDetailField('Department', emp.dept || '', empCode, 'dept');
+  html += empDetailField('Designation', emp.designation || '', empCode, 'designation');
+  html += empDetailField('Salary', emp.salary || '', empCode, 'salary');
+  if (isMD) {
+    var roleOpts = ['Employee','HR','Accounts','MD'].map(function(r) { return '<option' + (r === emp.role ? ' selected' : '') + '>' + r + '</option>'; }).join('');
+    html += '<div class="emp-detail-field"><label class="emp-detail-label">Role</label><select class="emp-detail-input" id="empField-' + empCode + '-role">' + roleOpts + '</select></div>';
+  } else {
+    html += empDetailField('Role', emp.role || '', empCode, 'role', true);
+  }
+  html += empDetailField('Date of Joining', emp.doj || '', empCode, 'doj');
+  html += empDetailField('Date of Birth', emp.dob || '', empCode, 'dob');
+  html += empDetailField('Blood Group', emp.bloodGroup || '', empCode, 'bloodGroup');
+  html += empDetailField('Marital Status', emp.maritalStatus || '', empCode, 'maritalStatus');
+
+  // Contact
+  html += sec('Contact');
   html += empDetailField('Phone', emp.phone || '', empCode, 'phone');
-  html += empDetailField('DOJ', emp.doj || '', empCode, 'doj');
   html += empDetailField('Email', emp.email || '', empCode, 'email');
-  html += empDetailField('Father\'s Name', ext.fatherName, empCode, 'ext_fatherName');
-  html += empDetailField('Mother\'s Name', ext.motherName, empCode, 'ext_motherName');
-  html += empDetailField('Blood Group', ext.bloodGroup, empCode, 'ext_bloodGroup');
-  html += empDetailField('Emergency Contact', ext.emergencyContact, empCode, 'ext_emergencyContact');
-  html += empDetailField('Address', ext.address, empCode, 'ext_address');
-  html += empDetailField('Aadhaar', ext.aadhaar, empCode, 'ext_aadhaar');
-  html += empDetailField('PAN', ext.pan, empCode, 'ext_pan');
-  html += empDetailField('UAN', ext.uan, empCode, 'ext_uan');
-  html += empDetailField('ESI No', ext.esiNo, empCode, 'ext_esiNo');
+  html += empDetailField('Present Address', emp.presentAddress || emp.address || '', empCode, 'presentAddress');
+  html += empDetailField('Permanent Address', emp.permanentAddress || '', empCode, 'permanentAddress');
+
+  // Family
+  html += sec('Family');
+  html += empDetailField("Father's Name", emp.fatherName || '', empCode, 'fatherName');
+  html += empDetailField('Father Mobile', emp.fatherMobile || '', empCode, 'fatherMobile');
+  html += empDetailField("Mother's Name", emp.motherName || '', empCode, 'motherName');
+  html += empDetailField('Mother Mobile', emp.motherMobile || '', empCode, 'motherMobile');
+  html += empDetailField('Spouse Name', emp.spouseName || '', empCode, 'spouseName');
+  html += empDetailField('Spouse Mobile', emp.spouseMobile || '', empCode, 'spouseMobile');
+  html += empDetailField('Emergency Contact', emp.emergencyContact || '', empCode, 'emergencyContact');
+  html += empDetailField('Emergency Phone', emp.emergencyPhone || '', empCode, 'emergencyPhone');
+
+  // Bank & Identity
+  html += sec('Bank & Identity');
+  html += empDetailField('Bank Name', emp.bank || '', empCode, 'bank');
+  html += empDetailField('Account No', emp.accNo || '', empCode, 'accNo');
+  html += empDetailField('IFSC Code', emp.ifscCode || '', empCode, 'ifscCode');
+  html += empDetailField('Bank Branch', emp.bankBranch || '', empCode, 'bankBranch');
+  html += empDetailField('PAN', emp.pan || '', empCode, 'pan');
+  html += empDetailField('Aadhaar', emp.aadhaar || '', empCode, 'aadhaar');
+  html += empDetailField('UAN', emp.uan || '', empCode, 'uan');
+
+  // Education & Experience
+  html += sec('Education & Experience');
+  html += empDetailField('Qualification', emp.qualification || '', empCode, 'qualification');
+  html += empDetailField('Institution', emp.institution || '', empCode, 'institution');
+  html += empDetailField('Year of Passing', emp.yearOfPassing || '', empCode, 'yearOfPassing');
+  html += empDetailField('Previous Employer', emp.previousEmployer || '', empCode, 'previousEmployer');
+  html += empDetailField('Previous Role', emp.previousRole || '', empCode, 'previousRole');
+  html += empDetailField('Years of Experience', emp.yearsOfExperience !== '' ? emp.yearsOfExperience : '', empCode, 'yearsOfExperience');
+
   html += '</div>';
   // Documents section
   html += '<div style="margin-top:10px"><div style="font-size:.72rem;font-weight:600;color:var(--text-secondary);margin-bottom:6px">Employee Documents</div><div id="inlineDocsList-' + empCode + '" style="font-size:.7rem;color:var(--gray-400)">Loading documents...</div></div>';
@@ -3093,39 +3134,29 @@ function empDetailField(label, value, empCode, fieldKey, readOnly) {
 async function saveEmployeeDetailsInline(empCode) {
   var emp = EMPLOYEES.find(function(e) { return e.code === empCode; });
   if (!emp) return;
-  var fields = ['name','dept','designation','salary','bank','accNo','phone','doj','email'];
-  var optionalFields = ['bank','accNo','phone','doj','email'];
+  var fields = [
+    'name','dept','designation','salary','role',
+    'doj','dob','bloodGroup','maritalStatus',
+    'phone','email','presentAddress','permanentAddress',
+    'fatherName','fatherMobile','motherName','motherMobile',
+    'spouseName','spouseMobile','emergencyContact','emergencyPhone',
+    'bank','accNo','ifscCode','bankBranch','pan','aadhaar','uan',
+    'qualification','institution','yearOfPassing',
+    'previousEmployer','previousRole','yearsOfExperience'
+  ];
   var updateData = {};
   fields.forEach(function(f) {
     var input = document.getElementById('empField-' + empCode + '-' + f);
-    if (input) {
-      var val = input.value.trim();
-      if (f === 'salary') { updateData[f] = parseFloat(val) || 0; return; }
-      if (optionalFields.includes(f) && !val) return; // skip empty optional fields
-      updateData[f] = val;
-    }
-  });
-  // Collect extended fields and map to camelCase keys for the API
-  var extFieldMap = {
-    fatherName: 'fatherName', motherName: 'motherName', bloodGroup: 'bloodGroup',
-    emergencyContact: 'emergencyContact', address: 'presentAddress',
-    aadhaar: 'aadhaar', pan: 'pan', uan: 'uan', esiNo: 'esiNo'
-  };
-  var ext = getExtendedData(empCode);
-  Object.keys(extFieldMap).forEach(function(f) {
-    var input = document.getElementById('empField-' + empCode + '-ext_' + f);
-    if (input) {
-      var val = input.value.trim();
-      updateData[extFieldMap[f]] = val;
-      ext[f] = val;
-    }
+    if (!input) return;
+    var val = input.tagName === 'SELECT' ? input.value : input.value.trim();
+    if (f === 'salary' || f === 'yearsOfExperience') { updateData[f] = parseFloat(val) || 0; return; }
+    updateData[f] = val;
   });
   if (Object.keys(updateData).length === 0) { showToast('No changes to save'); return; }
   try {
     await apiCall('PUT', '/employees/' + empCode, updateData);
     Object.assign(emp, updateData);
     showToast('Employee details saved');
-    // Re-render just the detail card instead of collapsing it
     renderEmployeeDetailCard(empCode);
   } catch (e) { showToast(e.message || 'Error saving employee details'); }
 }
@@ -7896,7 +7927,8 @@ function mapEmployee(row) {
     institution: row.institution || '', yearOfPassing: row.year_of_passing || '',
     previousEmployer: row.previous_employer || '', previousRole: row.previous_role || '',
     yearsOfExperience: row.years_of_experience != null ? parseFloat(row.years_of_experience) : '',
-    maritalStatus: row.marital_status || ''
+    maritalStatus: row.marital_status || '',
+    ifscCode: row.ifsc_code || '', bankBranch: row.bank_branch || ''
   };
 }
 function mapLeave(row) {

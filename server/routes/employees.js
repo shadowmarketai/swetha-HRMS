@@ -385,7 +385,8 @@ router.put('/:code', verifyToken, requireRole('MD', 'HR'), auditLog('update', 'e
       qualification: 'qualification', institution: 'institution',
       yearOfPassing: 'year_of_passing', previousEmployer: 'previous_employer',
       previousRole: 'previous_role', yearsOfExperience: 'years_of_experience',
-      maritalStatus: 'marital_status', ifscCode: 'ifsc_code', bankBranch: 'bank_branch'
+      maritalStatus: 'marital_status', ifscCode: 'ifsc_code', bankBranch: 'bank_branch',
+      emergencyContact: 'emergency_contact', emergencyPhone: 'emergency_phone'
     };
 
     const setClauses = [];
