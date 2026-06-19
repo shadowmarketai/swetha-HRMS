@@ -16863,29 +16863,56 @@ function renderHRLeaveRequests() {
   html += '<span style="color:var(--gray-400)">\u2192</span>';
   html += '<span style="padding:3px 8px;background:var(--success-light);color:var(--success-dark);border-radius:10px">3. MD Confirmed</span>';
   html += '</div>';
+  function typeChip(type) {
+    var t = (type || '').toLowerCase();
+    var label = t.charAt(0).toUpperCase() + t.slice(1);
+    if (t === 'casual' || t === 'cl') return '<span style="font-size:.6rem;padding:1px 7px;border-radius:8px;background:#FEF3C7;color:#92400E;font-weight:600;white-space:nowrap">Casual</span>';
+    if (t === 'permission') return '<span style="font-size:.6rem;padding:1px 7px;border-radius:8px;background:#DBEAFE;color:#1D4ED8;font-weight:600;white-space:nowrap">Permission</span>';
+    if (t === 'sick' || t === 'sl') return '<span style="font-size:.6rem;padding:1px 7px;border-radius:8px;background:#FEE2E2;color:#DC2626;font-weight:600;white-space:nowrap">Sick</span>';
+    if (t === 'annual' || t === 'pl' || t === 'earned') return '<span style="font-size:.6rem;padding:1px 7px;border-radius:8px;background:#D1FAE5;color:#065F46;font-weight:600;white-space:nowrap">Annual</span>';
+    return '<span style="font-size:.6rem;padding:1px 7px;border-radius:8px;background:var(--gray-100);color:var(--gray-600);font-weight:600;white-space:nowrap">' + escapeHTML(label) + '</span>';
+  }
+  function leaveRow(a, dotColor, rightSlot) {
+    var sep = '<span style="color:var(--gray-300);margin:0 3px">·</span>';
+    var info = '<strong style="color:var(--text-primary)">' + escapeHTML(a.empName) + '</strong>' +
+      ' <span style="color:var(--gray-400)">-</span> ' +
+      '<span style="color:var(--gray-500)">' + escapeHTML(a.empCode) + '</span>' +
+      sep + '<span style="color:var(--gray-500)">' + escapeHTML(a.dept) + '</span>' +
+      sep + '<span style="color:var(--text-secondary)">' + _fmtLeaveDate(a) + '</span>' +
+      sep + typeChip(a.type);
+    return '<div style="display:flex;align-items:center;gap:8px;padding:6px 2px;border-bottom:1px solid var(--border-color)">' +
+      '<span style="width:7px;height:7px;min-width:7px;border-radius:50%;background:' + dotColor + '"></span>' +
+      '<div style="flex:1;font-size:.76rem;line-height:1.7;overflow:hidden">' + info + '</div>' +
+      (rightSlot || '') +
+      '</div>';
+  }
+
   if (pending.length > 0) {
-    html += '<div class="section-title" style="font-size:.75rem;color:var(--warning-dark)">Pending (' + pending.length + ')</div>';
+    html += '<div style="font-size:.7rem;font-weight:700;color:var(--warning-dark);padding:8px 0 3px;text-transform:uppercase;letter-spacing:.04em">Pending (' + pending.length + ')</div>';
     pending.forEach(function(a) {
-      var fromD = new Date(a.from).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
-      var toD = new Date(a.to).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
-      html += '<div class="request-item" style="flex-wrap:wrap"><div class="req-icon" style="background:#FCE7F3;color:#DB2777"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><div class="req-info"><h4>' + escapeHTML(a.empName) + ' — ' + escapeHTML(a.type) + ' Leave</h4><p>' + escapeHTML(a.dept) + ' &middot; ' + _fmtLeaveDate(a) + '</p><p style="font-size:.65rem;color:var(--gray-500);margin-top:2px">' + escapeHTML(a.reason) + '</p></div><div class="leave-action-btns" style="width:100%;margin-top:8px"><button style="background:#DBEAFE;color:#1D4ED8" onclick="hrAcceptLeave(' + a.id + ')">Accept</button><button style="background:var(--danger-light);color:var(--danger-dark)" onclick="rejectLeave(' + a.id + ')">Reject</button></div></div>';
+      var btns = '<div style="display:flex;gap:4px;flex-shrink:0">' +
+        '<button style="font-size:.6rem;padding:3px 9px;border-radius:6px;background:#DBEAFE;color:#1D4ED8;border:none;cursor:pointer;font-weight:600" onclick="hrAcceptLeave(' + a.id + ')">Accept</button>' +
+        '<button style="font-size:.6rem;padding:3px 9px;border-radius:6px;background:var(--danger-light);color:var(--danger-dark);border:none;cursor:pointer;font-weight:600" onclick="rejectLeave(' + a.id + ')">Reject</button>' +
+        '</div>';
+      html += leaveRow(a, '#F59E0B', btns);
     });
   }
   if (hrAccepted.length > 0) {
-    html += '<div class="section-title" style="font-size:.75rem;color:#1D4ED8;margin-top:12px">HR Accepted — Awaiting MD (' + hrAccepted.length + ')</div>';
+    html += '<div style="font-size:.7rem;font-weight:700;color:#1D4ED8;padding:8px 0 3px;text-transform:uppercase;letter-spacing:.04em">HR Accepted — Awaiting MD (' + hrAccepted.length + ')</div>';
     hrAccepted.forEach(function(a) {
-      var fromD = new Date(a.from).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
-      var toD = new Date(a.to).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
-      html += '<div class="request-item"><div class="req-icon" style="background:#DBEAFE;color:#1D4ED8"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/></svg></div><div class="req-info"><h4>' + escapeHTML(a.empName) + ' — ' + escapeHTML(a.type) + '</h4><p>' + escapeHTML(a.dept) + ' &middot; ' + _fmtLeaveDate(a) + '</p></div><span class="badge-status" style="background:#DBEAFE;color:#1D4ED8">HR Accepted</span></div>';
+      var badge = '<span style="font-size:.6rem;padding:2px 8px;border-radius:8px;background:#DBEAFE;color:#1D4ED8;font-weight:600;flex-shrink:0;white-space:nowrap">HR Accepted</span>';
+      html += leaveRow(a, '#3B82F6', badge);
     });
   }
   if (others.length > 0) {
-    html += '<div class="section-title" style="font-size:.75rem;color:var(--gray-500);margin-top:12px">Resolved</div>';
+    html += '<div style="font-size:.7rem;font-weight:700;color:var(--gray-500);padding:8px 0 3px;text-transform:uppercase;letter-spacing:.04em">Resolved (last 15)</div>';
     others.slice(0, 15).forEach(function(a) {
-      var badgeCls = a.status === 'approved' ? 'badge-approved' : 'badge-rejected';
-      var fromD = new Date(a.from).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
-      var toD = new Date(a.to).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
-      html += '<div class="request-item"><div class="req-icon" style="background:#D1FAE5;color:#059669"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><div class="req-info"><h4>' + escapeHTML(a.empName) + ' — ' + escapeHTML(a.type) + '</h4><p>' + escapeHTML(a.dept) + ' &middot; ' + _fmtLeaveDate(a) + '</p></div><div class="req-meta"><span class="badge-status ' + badgeCls + '">' + escapeHTML(a.status) + '</span></div></div>';
+      var isApproved = a.status === 'approved';
+      var dotColor = isApproved ? '#22C55E' : '#EF4444';
+      var badgeStyle = isApproved ? 'background:#D1FAE5;color:#065F46' : 'background:#FEE2E2;color:#DC2626';
+      var label = a.status.charAt(0).toUpperCase() + a.status.slice(1);
+      var badge = '<span style="font-size:.6rem;padding:2px 8px;border-radius:8px;' + badgeStyle + ';font-weight:600;flex-shrink:0;white-space:nowrap">' + escapeHTML(label) + '</span>';
+      html += leaveRow(a, dotColor, badge);
     });
   }
   if (!pending.length && !hrAccepted.length && !others.length) {
