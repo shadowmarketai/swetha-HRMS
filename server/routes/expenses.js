@@ -218,8 +218,8 @@ function buildFilters(query) {
     else { where.push('status IN (' + statuses.map(() => '?').join(',') + ')'); params.push(...statuses); }
   }
   if (query.empCode) { where.push('emp_code = ?'); params.push(query.empCode); }
-  if (query.from) { where.push('DATE(submitted_at) >= ?'); params.push(query.from); }
-  if (query.to) { where.push('DATE(submitted_at) <= ?'); params.push(query.to); }
+  if (query.from) { where.push('expense_date >= ?'); params.push(query.from); }
+  if (query.to) { where.push('expense_date <= ?'); params.push(query.to); }
   return { sql: where.length ? ' WHERE ' + where.join(' AND ') : '', params };
 }
 

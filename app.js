@@ -4331,11 +4331,20 @@ async function downloadAdvExport(kind, uiFilter) {
     // Apply active employee filter to download
     if (advReqEmpFilter && advReqEmpFilter !== 'all') params.push('empCode=' + encodeURIComponent(advReqEmpFilter));
     // Apply active month filter to download (from = first of month, to = last of month)
+    // For advances: extend to by 7 days grace to capture requests submitted in the
+    // first week of next month that relate to the selected month's work.
+    // For expenses: backend filters by expense_date (not submitted_at), so the
+    // exact month boundary is correct — no grace period needed.
     if (advReqMonthFilter && advReqMonthFilter !== 'all') {
       params.push('from=' + advReqMonthFilter + '-01');
       var d = new Date(advReqMonthFilter + '-01');
-      var lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
-      params.push('to=' + advReqMonthFilter + '-' + String(lastDay).padStart(2, '0'));
+      if (isAdv) {
+        var graceDate = new Date(d.getFullYear(), d.getMonth() + 1, 7);
+        params.push('to=' + graceDate.toISOString().slice(0, 10));
+      } else {
+        var lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+        params.push('to=' + advReqMonthFilter + '-' + String(lastDay).padStart(2, '0'));
+      }
     }
     var url = API_BASE + '/' + kind + '/export' + (params.length ? '?' + params.join('&') : '');
     var headers = (typeof apiHeaders === 'function') ? apiHeaders() : (JWT_TOKEN ? { 'Authorization': 'Bearer ' + JWT_TOKEN } : {});
