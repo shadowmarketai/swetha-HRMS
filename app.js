@@ -2626,6 +2626,7 @@ function renderEmpDatabase() {
         actions = `<div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">
           <button onclick="deactivateEmployee('${e.code}')" style="font-size:.6rem;padding:3px 8px;border:1px solid ${toggleColor};color:${toggleColor};background:transparent;border-radius:6px;cursor:pointer">${toggleLabel}</button>
           <button onclick="resetEmployeePassword('${e.code}')" style="font-size:.6rem;padding:3px 8px;border:1px solid #3B82F6;color:#3B82F6;background:transparent;border-radius:6px;cursor:pointer">Reset Pwd</button>
+          <button onclick="event.stopPropagation();downloadEmployeeProfilePDF('${e.code}')" style="font-size:.6rem;padding:3px 8px;border:1px solid #8B5CF6;color:#8B5CF6;background:transparent;border-radius:6px;cursor:pointer">PDF</button>
           ${canDelete ? `<button onclick="deleteEmployeePermanently('${e.code}')" style="font-size:.6rem;padding:3px 8px;border:1px solid #EF4444;color:#EF4444;background:transparent;border-radius:6px;cursor:pointer">Delete</button>` : ''}
         </div>`;
       }
@@ -3178,6 +3179,145 @@ async function saveEmployeeDetailsInline(empCode) {
     showToast('Employee details saved');
     renderEmployeeDetailCard(empCode);
   } catch (e) { showToast(e.message || 'Error saving employee details'); }
+}
+
+async function downloadEmployeeProfilePDF(empCode) {
+  var emp = EMPLOYEES.find(function(e) { return e.code === empCode; });
+  if (!emp) { showToast('Employee not found'); return; }
+  showToast('Generating employee profile PDF...');
+  try {
+    await loadJsPdf();
+    var { jsPDF } = window.jspdf;
+    var doc = new jsPDF('p', 'mm', 'a4');
+    var pw = 210, lm = 14, rm = 196, cw = rm - lm;
+    var primary = [76,81,191], dark = [30,30,60], mid = [100,100,120];
+    var y = 0;
+
+    // HEADER BAND
+    doc.setFillColor(primary[0], primary[1], primary[2]);
+    doc.rect(0, 0, pw, 34, 'F');
+    try { doc.addImage('data:image/png;base64,' + COMPANY_LOGO_B64, 'PNG', lm, 5, 22, 8); } catch(e) {}
+    doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(255,255,255);
+    doc.text('SWETHA STRUCTURES PVT LTD', lm + 26, 12);
+    doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(200,205,255);
+    doc.text('No.44, Alagu Nagar, Saravanampatti, Coimbatore - 641035', lm + 26, 18);
+    doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.setTextColor(200,205,255);
+    doc.text('EMPLOYEE PROFILE', rm, 29, {align:'right'});
+    y = 34;
+
+    // EMPLOYEE SUMMARY ROW
+    doc.setFillColor(245,246,255);
+    doc.rect(0, y, pw, 34, 'F');
+    var initials = emp.name.split(' ').filter(function(w){return w.length;}).map(function(w){return w[0];}).join('').substring(0,2).toUpperCase();
+    var circleColors = [[232,93,4],[214,40,40],[20,184,166],[34,197,94],[236,72,153]];
+    var cIdx = (emp.name.charCodeAt(0)||0) % circleColors.length;
+    doc.setFillColor(circleColors[cIdx][0], circleColors[cIdx][1], circleColors[cIdx][2]);
+    doc.circle(lm + 11, y + 17, 11, 'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor(255,255,255);
+    doc.text(initials, lm + 11, y + 21, {align:'center'});
+    var sx = lm + 27;
+    doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor(dark[0], dark[1], dark[2]);
+    doc.text(emp.name, sx, y + 10);
+    doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(mid[0], mid[1], mid[2]);
+    var desigDept = [emp.designation, emp.dept].filter(Boolean).join(' • ');
+    doc.text(desigDept || '', sx, y + 17);
+    var dojStr = emp.doj ? new Date(emp.doj + 'T00:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}) : '-';
+    doc.text('Code: ' + emp.code + '   |   DOJ: ' + dojStr, sx, y + 24);
+    var isActive = emp.status !== 'Inactive';
+    doc.setFillColor(isActive ? 34 : 239, isActive ? 197 : 68, isActive ? 94 : 68);
+    doc.roundedRect(rm - 20, y + 6, 20, 7, 2, 2, 'F');
+    doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(255,255,255);
+    doc.text(isActive ? 'ACTIVE' : 'INACTIVE', rm - 10, y + 11, {align:'center'});
+    y += 34;
+
+    doc.setDrawColor(200,205,230); doc.setLineWidth(0.3);
+    doc.line(lm, y, rm, y);
+    y += 5;
+
+    function section(title) {
+      if (y > 272) { doc.addPage(); y = 14; }
+      doc.setFillColor(235,237,255);
+      doc.rect(lm, y, cw, 6.5, 'F');
+      doc.setFont('helvetica','bold'); doc.setFontSize(7); doc.setTextColor(primary[0], primary[1], primary[2]);
+      doc.text(title, lm + 3, y + 4.5);
+      y += 7.5;
+    }
+
+    function row2(l1, v1, l2, v2) {
+      if (y > 272) { doc.addPage(); y = 14; }
+      var colW = cw / 2;
+      var lw = 30, lineH = 4.5;
+      var v1Str = (v1 !== undefined && v1 !== null && v1 !== '') ? String(v1) : '-';
+      var v2Str = (l2 !== null && l2 !== undefined) ? ((v2 !== undefined && v2 !== null && v2 !== '') ? String(v2) : '-') : null;
+      var v1Lines = doc.splitTextToSize(v1Str, colW - lw - 3);
+      var v2Lines = v2Str !== null ? doc.splitTextToSize(v2Str, colW - lw - 3) : [];
+      var maxLines = Math.max(v1Lines.length, v2Lines.length || 1);
+      var rowH = Math.max(8, maxLines * lineH + 4);
+      doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(mid[0], mid[1], mid[2]);
+      doc.text(l1, lm + 2, y + 5);
+      doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(dark[0], dark[1], dark[2]);
+      v1Lines.forEach(function(line, i) { doc.text(line, lm + lw, y + 5 + i * lineH); });
+      if (v2Str !== null) {
+        doc.setDrawColor(220,222,240); doc.setLineWidth(0.2);
+        doc.line(lm + colW, y, lm + colW, y + rowH);
+        doc.setFont('helvetica','bold'); doc.setFontSize(6.5); doc.setTextColor(mid[0], mid[1], mid[2]);
+        doc.text(l2, lm + colW + 2, y + 5);
+        doc.setFont('helvetica','normal'); doc.setFontSize(7.5); doc.setTextColor(dark[0], dark[1], dark[2]);
+        v2Lines.forEach(function(line, i) { doc.text(line, lm + colW + lw, y + 5 + i * lineH); });
+      }
+      doc.setDrawColor(230,232,244); doc.setLineWidth(0.2);
+      doc.line(lm, y + rowH, rm, y + rowH);
+      y += rowH;
+    }
+
+    section('Basic Information');
+    row2('Blood Group', emp.bloodGroup, 'Marital Status', emp.maritalStatus);
+    row2('Date of Birth', emp.dob, 'Monthly Salary', emp.salary ? 'Rs.' + Number(emp.salary).toLocaleString('en-IN') : '');
+    row2('Role', emp.role, 'Gender', emp.gender);
+    y += 3;
+
+    section('Contact Information');
+    row2('Phone', emp.phone, 'Email', emp.email);
+    row2('Present Address', emp.presentAddress || emp.address, 'Permanent Address', emp.permanentAddress);
+    y += 3;
+
+    section('Family & Emergency');
+    row2("Father's Name", emp.fatherName, "Father's Mobile", emp.fatherMobile);
+    row2("Mother's Name", emp.motherName, "Mother's Mobile", emp.motherMobile);
+    row2('Spouse Name', emp.spouseName, 'Spouse Mobile', emp.spouseMobile);
+    row2('Emergency Contact', emp.emergencyContact, 'Emergency Phone', emp.emergencyPhone);
+    y += 3;
+
+    section('Bank & Identity');
+    row2('Bank Name', emp.bank, 'Account No', emp.accNo);
+    row2('IFSC Code', emp.ifscCode, 'Bank Branch', emp.bankBranch);
+    row2('PAN Number', emp.pan, 'Aadhaar Number', emp.aadhaar);
+    row2('UAN', emp.uan, null, undefined);
+    y += 3;
+
+    section('Education & Experience');
+    row2('Qualification', emp.qualification, 'Institution', emp.institution);
+    row2('Year of Passing', emp.yearOfPassing ? String(emp.yearOfPassing) : '', 'Previous Employer', emp.previousEmployer);
+    row2('Previous Role', emp.previousRole, 'Yrs of Experience', (emp.yearsOfExperience !== '' && emp.yearsOfExperience != null) ? String(emp.yearsOfExperience) : '');
+
+    // FOOTER on every page
+    var totalPages = doc.internal.getNumberOfPages();
+    for (var p = 1; p <= totalPages; p++) {
+      doc.setPage(p);
+      doc.setFillColor(primary[0], primary[1], primary[2]);
+      doc.rect(0, 287, pw, 10, 'F');
+      doc.setFont('helvetica','normal'); doc.setFontSize(6.5); doc.setTextColor(200,205,255);
+      var genDate = new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+      doc.text('Generated by Swetha HRMS on ' + genDate + '  |  CONFIDENTIAL', lm, 293);
+      doc.text('Page ' + p + ' of ' + totalPages, rm, 293, {align:'right'});
+    }
+
+    var safeName = emp.name.replace(/[^a-zA-Z0-9]/g, '_');
+    doc.save('EmployeeProfile_' + emp.code + '_' + safeName + '.pdf');
+    showToast('Downloaded: ' + emp.name + ' profile PDF');
+  } catch(err) {
+    showToast('PDF generation failed: ' + (err.message || err), 'error');
+  }
 }
 
 // =====================================================
