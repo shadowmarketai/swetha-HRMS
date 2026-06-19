@@ -385,12 +385,15 @@ router.put('/:code', verifyToken, requireRole('MD', 'HR'), auditLog('update', 'e
       emergencyContact: 'emergency_contact', emergencyPhone: 'emergency_phone'
     };
 
+    const DATE_FIELDS = ['doj', 'dob'];
     const setClauses = [];
     const values = [];
     for (const [jsKey, dbCol] of Object.entries(fieldMap)) {
       if (b[jsKey] !== undefined) {
         setClauses.push(`${dbCol} = ?`);
-        values.push(b[jsKey]);
+        // Empty string is not a valid DATE value — convert to NULL
+        const val = DATE_FIELDS.includes(jsKey) && b[jsKey] === '' ? null : b[jsKey];
+        values.push(val);
       }
     }
 
