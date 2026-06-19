@@ -9389,30 +9389,207 @@ async function downloadConsolidatedXLSX() {
   showToast('Excel report downloaded!');
 }
 
-// ── Punch In/Out Detail XLSX Download ──
+// ── Punch In/Out Detail XLSX Download (client-side) ──
 async function downloadPunchDetailXLSX() {
   closeConsolidatedAttModal();
   showToast('Generating punch detail report…');
+  await loadXlsx();
   var selMonth = parseInt(document.getElementById('conAttMonth').value);
   var selYear  = parseInt(document.getElementById('conAttYear').value);
-  var monthStr = selYear + '-' + String(selMonth + 1).padStart(2, '0');
   var monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
   var monthLabel = monthNames[selMonth] + ' ' + selYear;
   try {
-    var url = API_BASE + '/attendance/export/punch-detail?month=' + monthStr;
-    var headers = (typeof apiHeaders === 'function') ? apiHeaders() : (JWT_TOKEN ? { 'Authorization': 'Bearer ' + JWT_TOKEN } : {});
-    delete headers['Content-Type'];
-    var res = await fetch(url, { headers: headers });
-    if (!res.ok) { showToast('Export failed (' + res.status + ')'); return; }
-    var blob = await res.blob();
-    var dlUrl = URL.createObjectURL(blob);
-    var a = document.createElement('a');
-    a.href = dlUrl;
-    a.download = monthLabel + ' PunchDetail.xlsx';
-    document.body.appendChild(a); a.click();
-    setTimeout(function() { URL.revokeObjectURL(dlUrl); a.remove(); }, 0);
+    var monthStr = selYear + '-' + String(selMonth + 1).padStart(2, '0');
+    var daysInMonth = new Date(selYear, selMonth + 1, 0).getDate();
+    var today = new Date(); today.setHours(0,0,0,0);
+    var isCurrentMonth = (today.getFullYear() === selYear && today.getMonth() === selMonth);
+    var lastDay = isCurrentMonth ? today.getDate() : daysInMonth;
+
+    // Fetch raw logs (have check_in/check_out), leaves, holidays in parallel
+    var [logs, allLeaves] = await Promise.all([
+      apiCall('GET', '/attendance?month=' + monthStr).catch(function() { return []; }),
+      apiCall('GET', '/leaves').catch(function() { return []; })
+    ]);
+    var holidays = {};
+    try {
+      var hols = await apiCall('GET', '/holidays');
+      if (Array.isArray(hols)) hols.forEach(function(h) { if (h.date) holidays[h.date.substring(0,10)] = h.name || 'Holiday'; });
+    } catch(e) {}
+
+    // Build attMap: empCode → dayNum → { checkIn, checkOut, mins }
+    var attMap = {};
+    (Array.isArray(logs) ? logs : []).forEach(function(row) {
+      var code = row.emp_code || row.empCode;
+      var dayNum = parseInt(String(row.log_date || row.check_in).substring(0,10).split('-')[2], 10);
+      if (!attMap[code]) attMap[code] = {};
+      if (!attMap[code][dayNum]) attMap[code][dayNum] = { checkIn: null, checkOut: null, mins: 0 };
+      var entry = attMap[code][dayNum];
+      if (row.check_in) {
+        if (!entry.checkIn || new Date(row.check_in) < new Date(entry.checkIn)) entry.checkIn = row.check_in;
+        var start = new Date(row.check_in).getTime(), end;
+        if (row.check_out) {
+          end = new Date(row.check_out).getTime();
+          if (!entry.checkOut || new Date(row.check_out) > new Date(entry.checkOut)) entry.checkOut = row.check_out;
+        } else if (isCurrentMonth && dayNum === today.getDate()) {
+          end = Date.now();
+        } else {
+          end = start + 480 * 60000;
+        }
+        if (end > start) entry.mins += (end - start) / 60000;
+      }
+    });
+
+    // Build leaveMap: empCode → 'YYYY-MM-DD' → 'Leave'|'Half Day'
+    var leaveMap = {};
+    (Array.isArray(allLeaves) ? allLeaves : []).filter(function(lv) { return lv.status === 'approved'; }).forEach(function(lv) {
+      var code = lv.emp_code || lv.empCode;
+      if (!leaveMap[code]) leaveMap[code] = {};
+      var from = new Date(String(lv.from_date || lv.from).slice(0,10) + 'T00:00:00');
+      var to   = new Date(String(lv.to_date   || lv.to  ).slice(0,10) + 'T00:00:00');
+      for (var dd = new Date(from); dd <= to; dd.setDate(dd.getDate() + 1)) {
+        if (dd.getDay() === 0) continue;
+        var ymd = dd.getFullYear() + '-' + String(dd.getMonth()+1).padStart(2,'0') + '-' + String(dd.getDate()).padStart(2,'0');
+        if (holidays[ymd]) continue;
+        leaveMap[code][ymd] = lv.is_half_day ? 'Half Day' : 'Leave';
+      }
+    });
+
+    var totalWorkingDays = 0;
+    for (var d = 1; d <= lastDay; d++) {
+      var dow0 = new Date(selYear, selMonth, d).getDay();
+      var ymd0 = monthStr + '-' + String(d).padStart(2,'0');
+      if (dow0 !== 0 && !holidays[ymd0]) totalWorkingDays++;
+    }
+
+    // SheetJS cell builder
+    var XS = window.XLSX;
+    var COLORS = { title:'1F3864', header:'D9E1F2', summary:'BDD7EE', yellow:'FFFF00', green:'92D050', blue:'A6CAEC', amber:'FFC000', white:'FFFFFF' };
+    function mk(v, bg, bold, alignLeft) {
+      return {
+        v: (v === null || v === undefined) ? '' : v,
+        t: typeof v === 'number' ? 'n' : 's',
+        s: {
+          fill: { patternType:'solid', fgColor:{ rgb: bg || 'FFFFFF' } },
+          font: { sz: 9, bold: !!bold, color:{ rgb: (bg === COLORS.title) ? 'FFFFFF' : '000000' } },
+          alignment: { horizontal: alignLeft ? 'left' : 'center', vertical:'center', wrapText: true },
+          border: { top:{style:'thin',color:{rgb:'BFBFBF'}}, bottom:{style:'thin',color:{rgb:'BFBFBF'}}, left:{style:'thin',color:{rgb:'BFBFBF'}}, right:{style:'thin',color:{rgb:'BFBFBF'}} }
+        }
+      };
+    }
+
+    var dayLetters = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+    var SUMMARY = ['Working\nDays','Full\nDay','Half\nDay','Leave','Absent','Total\nHours'];
+    var totalCols = 3 + daysInMonth * 2 + SUMMARY.length;
+    var wsData = [], merges = [];
+
+    // Row 0: Title
+    var titleRow = [mk(monthLabel + ' — Attendance Report', COLORS.title, true, true)];
+    for (var i = 1; i < totalCols; i++) titleRow.push(mk('', COLORS.title));
+    wsData.push(titleRow);
+    merges.push({ s:{r:0,c:0}, e:{r:0,c:totalCols-1} });
+
+    // Row 1: Day headers + fixed + summary
+    var hdr1 = [mk('S.No',COLORS.header,true), mk('Name',COLORS.header,true,true), mk('Code',COLORS.header,true)];
+    merges.push({s:{r:1,c:0},e:{r:2,c:0}});  // S.No spans rows 1-2
+    merges.push({s:{r:1,c:1},e:{r:2,c:1}});  // Name spans rows 1-2
+    merges.push({s:{r:1,c:2},e:{r:2,c:2}});  // Code spans rows 1-2
+    for (var d = 1; d <= daysInMonth; d++) {
+      var dow = new Date(selYear, selMonth, d).getDay();
+      var ymd = monthStr + '-' + String(d).padStart(2,'0');
+      var isWknd = dow === 0, isHol = !!holidays[ymd];
+      var dayBg = (isWknd || isHol) ? COLORS.yellow : COLORS.header;
+      var colC = 3 + (d-1)*2;
+      hdr1.push(mk(d + '\n' + dayLetters[dow], dayBg, true));
+      hdr1.push(mk('', dayBg));  // placeholder for merged pair
+      merges.push({s:{r:1,c:colC},e:{r:1,c:colC+1}});  // day spans 2 cols
+    }
+    SUMMARY.forEach(function(s, i) {
+      var sc = 3 + daysInMonth*2 + i;
+      hdr1.push(mk(s, COLORS.summary, true));
+      merges.push({s:{r:1,c:sc},e:{r:2,c:sc}});  // summary spans rows 1-2
+    });
+    wsData.push(hdr1);
+
+    // Row 2: IN/OUT sub-headers (only day columns; fixed + summary cols are merged from row 1)
+    var hdr2 = [mk('',COLORS.header), mk('',COLORS.header,false,true), mk('',COLORS.header)];
+    for (var d = 1; d <= daysInMonth; d++) {
+      var dow = new Date(selYear, selMonth, d).getDay();
+      var ymd = monthStr + '-' + String(d).padStart(2,'0');
+      var isWknd = dow === 0, isHol = !!holidays[ymd];
+      var subBg = (isWknd || isHol) ? COLORS.yellow : COLORS.header;
+      hdr2.push(mk('IN',  subBg, true));
+      hdr2.push(mk('OUT', subBg, true));
+    }
+    SUMMARY.forEach(function() { hdr2.push(mk('', COLORS.summary)); });
+    wsData.push(hdr2);
+
+    // Data rows
+    var activeEmps = (EMPLOYEES || []).filter(function(e) { return e.status !== 'Inactive' && e.code !== 'SADMIN'; });
+    activeEmps.forEach(function(emp, idx) {
+      var row = [mk(idx+1), mk(emp.name, null, false, true), mk(emp.code)];
+      var totalMins = 0, fullDays = 0, halfDays = 0, leaveDays = 0, absentDays = 0;
+
+      for (var d = 1; d <= daysInMonth; d++) {
+        var dow = new Date(selYear, selMonth, d).getDay();
+        var ymd = monthStr + '-' + String(d).padStart(2,'0');
+        var isHol = !!holidays[ymd];
+        var isFuture = isCurrentMonth && d > lastDay;
+
+        if (dow === 0) {
+          row.push(mk('Sun', COLORS.yellow)); row.push(mk('', COLORS.yellow));
+        } else if (isHol) {
+          row.push(mk('Holiday', COLORS.yellow)); row.push(mk('', COLORS.yellow));
+        } else if (isFuture) {
+          row.push(mk('')); row.push(mk(''));
+        } else {
+          var att = attMap[emp.code] && attMap[emp.code][d];
+          var lv  = leaveMap[emp.code] && leaveMap[emp.code][ymd];
+          if (att && att.checkIn) {
+            var inT = _fmtTime(att.checkIn), outT = att.checkOut ? _fmtTime(att.checkOut) : '';
+            var bg = att.mins < 480 ? COLORS.amber : null;
+            row.push(mk(inT, bg)); row.push(mk(outT, bg));
+            if (att.mins >= 480) fullDays++; else if (att.mins >= 240) halfDays++;
+            totalMins += att.mins;
+          } else if (lv === 'Leave' || lv === 'Half Day') {
+            row.push(mk(lv, COLORS.green)); row.push(mk('', COLORS.green));
+            if (lv === 'Leave') leaveDays++; else halfDays++;
+          } else {
+            row.push(mk('Absent', COLORS.blue)); row.push(mk('', COLORS.blue));
+            absentDays++;
+          }
+        }
+      }
+
+      var tH = Math.floor(totalMins/60), tM = Math.round(totalMins%60);
+      row.push(mk(totalWorkingDays, COLORS.summary));
+      row.push(mk(fullDays, COLORS.summary));
+      row.push(mk(halfDays || '', COLORS.summary));
+      row.push(mk(leaveDays || '', COLORS.summary));
+      row.push(mk(absentDays || '', COLORS.summary));
+      row.push(mk(tH + 'h ' + (tM < 10 ? '0'+tM : tM) + 'm', COLORS.summary));
+      wsData.push(row);
+    });
+
+    // Build sheet
+    var ws = XS.utils.aoa_to_sheet(wsData.map(function(r) { return r.map(function(c) { return c.v; }); }));
+    wsData.forEach(function(row, R) {
+      row.forEach(function(cell, C) {
+        var addr = XS.utils.encode_cell({r:R, c:C});
+        if (ws[addr]) ws[addr].s = cell.s;
+      });
+    });
+    ws['!merges'] = merges;
+    ws['!cols'] = [{wch:5},{wch:24},{wch:11}].concat(
+      Array(daysInMonth * 2).fill({wch:7}),
+      [{wch:10},{wch:8},{wch:8},{wch:8},{wch:8},{wch:11}]
+    );
+    ws['!rows'] = [{hpt:20},{hpt:28},{hpt:16}].concat(wsData.slice(3).map(function() { return {hpt:15}; }));
+
+    var wb = XS.utils.book_new();
+    XS.utils.book_append_sheet(wb, ws, monthLabel.substring(0,7));
+    XS.writeFile(wb, 'Attendance_PunchDetail_' + monthNames[selMonth] + '_' + selYear + '.xlsx');
     showToast('Downloaded: ' + monthLabel + ' PunchDetail.xlsx');
-  } catch (e) { showToast(e.message || 'Error exporting punch detail'); }
+  } catch (e) { showToast(e.message || 'Error generating punch detail'); }
 }
 
 // ── PDF Download (grid format) ──
