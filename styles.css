@@ -1074,6 +1074,7 @@ a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.cal-nav bu
     background: var(--bg) !important;
   }
   .overlay-screen.active { display: block !important; }
+  .overlay-screen.overlay-page { position: fixed !important; top: 70px !important; left: 200px !important; right: 0 !important; bottom: 0 !important; width: auto !important; height: auto !important; max-width: none !important; max-height: none !important; }
   .overlay-header { height: 60px; padding: 0 20px; }
   .overlay-header h2 { font-size: 1.15rem; }
   .hr-overlay-body { padding: 20px 20px 32px; }
@@ -1476,6 +1477,7 @@ a:focus-visible,.notif-item:focus-visible,.setting-row:focus-visible,.cal-nav bu
   .overlay-screen.active {
     display: block !important;
   }
+  .overlay-screen.overlay-page { position: fixed !important; top: 80px !important; left: 260px !important; right: 0 !important; bottom: 0 !important; width: auto !important; height: auto !important; max-width: none !important; max-height: none !important; }
   .hr-overlay-body { padding: 24px 24px 40px; }
 }
 /* Feature 8: Mobile Responsiveness */

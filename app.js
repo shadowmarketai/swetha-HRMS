@@ -1772,6 +1772,7 @@ function showOverlay(id) {
 }
 // Force overlay to cover entire viewport via inline styles (beats all CSS)
 function _forceOverlayFullScreen(el) {
+  if (el.classList.contains('overlay-page')) return;
   var s = el.style;
   s.setProperty('position', 'fixed', 'important');
   s.setProperty('top', '0', 'important');
