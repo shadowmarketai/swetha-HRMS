@@ -16863,58 +16863,79 @@ function renderHRLeaveRequests() {
   html += '<span style="color:var(--gray-400)">\u2192</span>';
   html += '<span style="padding:3px 8px;background:var(--success-light);color:var(--success-dark);border-radius:10px">3. MD Confirmed</span>';
   html += '</div>';
+  // shared column widths: Name | Code | Dept | Date Range | Days | Type | Action
+  var COL = '160px 60px 90px 140px 45px 80px auto';
+
   function typeChip(type) {
     var t = (type || '').toLowerCase();
-    var label = t.charAt(0).toUpperCase() + t.slice(1);
-    if (t === 'casual' || t === 'cl') return '<span style="font-size:.6rem;padding:1px 7px;border-radius:8px;background:#FEF3C7;color:#92400E;font-weight:600;white-space:nowrap">Casual</span>';
-    if (t === 'permission') return '<span style="font-size:.6rem;padding:1px 7px;border-radius:8px;background:#DBEAFE;color:#1D4ED8;font-weight:600;white-space:nowrap">Permission</span>';
-    if (t === 'sick' || t === 'sl') return '<span style="font-size:.6rem;padding:1px 7px;border-radius:8px;background:#FEE2E2;color:#DC2626;font-weight:600;white-space:nowrap">Sick</span>';
-    if (t === 'annual' || t === 'pl' || t === 'earned') return '<span style="font-size:.6rem;padding:1px 7px;border-radius:8px;background:#D1FAE5;color:#065F46;font-weight:600;white-space:nowrap">Annual</span>';
-    return '<span style="font-size:.6rem;padding:1px 7px;border-radius:8px;background:var(--gray-100);color:var(--gray-600);font-weight:600;white-space:nowrap">' + escapeHTML(label) + '</span>';
+    if (t === 'casual' || t === 'cl')     return '<span style="font-size:.6rem;padding:1px 7px;border-radius:8px;background:#FEF3C7;color:#92400E;font-weight:600">Casual</span>';
+    if (t === 'permission')                return '<span style="font-size:.6rem;padding:1px 7px;border-radius:8px;background:#DBEAFE;color:#1D4ED8;font-weight:600">Permission</span>';
+    if (t === 'sick' || t === 'sl')       return '<span style="font-size:.6rem;padding:1px 7px;border-radius:8px;background:#FEE2E2;color:#DC2626;font-weight:600">Sick</span>';
+    if (t === 'annual' || t === 'pl' || t === 'earned') return '<span style="font-size:.6rem;padding:1px 7px;border-radius:8px;background:#D1FAE5;color:#065F46;font-weight:600">Annual</span>';
+    var label = (type||'').charAt(0).toUpperCase()+(type||'').slice(1);
+    return '<span style="font-size:.6rem;padding:1px 7px;border-radius:8px;background:var(--gray-100);color:var(--gray-600);font-weight:600">' + escapeHTML(label) + '</span>';
   }
-  function leaveRow(a, dotColor, rightSlot) {
-    var sep = '<span style="color:var(--gray-300);margin:0 3px">·</span>';
-    var info = '<strong style="color:var(--text-primary)">' + escapeHTML(a.empName) + '</strong>' +
-      ' <span style="color:var(--gray-400)">-</span> ' +
-      '<span style="color:var(--gray-500)">' + escapeHTML(a.empCode) + '</span>' +
-      sep + '<span style="color:var(--gray-500)">' + escapeHTML(a.dept) + '</span>' +
-      sep + '<span style="color:var(--text-secondary)">' + _fmtLeaveDate(a) + '</span>' +
-      sep + typeChip(a.type);
-    return '<div style="display:flex;align-items:center;gap:8px;padding:6px 2px;border-bottom:1px solid var(--border-color)">' +
-      '<span style="width:7px;height:7px;min-width:7px;border-radius:50%;background:' + dotColor + '"></span>' +
-      '<div style="flex:1;font-size:.76rem;line-height:1.7;overflow:hidden">' + info + '</div>' +
-      (rightSlot || '') +
+
+  function tableHeader(accentColor) {
+    return '<div style="display:grid;grid-template-columns:' + COL + ';gap:0;padding:5px 8px;background:var(--gray-50,#f9fafb);border-radius:6px 6px 0 0;border:1px solid var(--border-color);border-bottom:none">' +
+      ['Name','Code','Dept','Date / Time','Days','Type','Action'].map(function(h) {
+        return '<div style="font-size:.62rem;font-weight:700;color:' + (accentColor||'var(--gray-500)') + ';text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + h + '</div>';
+      }).join('') + '</div>';
+  }
+
+  function leaveRow(a, rightSlot, isLast) {
+    var daysLabel = a.type && a.type.toLowerCase() === 'permission' ? '-' : (a.days != null ? a.days + '' : '-');
+    var dateStr = _fmtLeaveDate(a);
+    var border = isLast ? 'border-radius:0 0 6px 6px' : '';
+    return '<div style="display:grid;grid-template-columns:' + COL + ';gap:0;padding:6px 8px;border:1px solid var(--border-color);border-top:none;align-items:center;' + border + '">' +
+      '<div style="font-size:.74rem;font-weight:600;color:var(--text-primary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHTML(a.empName) + '">' + escapeHTML(a.empName) + '</div>' +
+      '<div style="font-size:.7rem;color:var(--gray-500)">' + escapeHTML(a.empCode) + '</div>' +
+      '<div style="font-size:.7rem;color:var(--gray-500);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHTML(a.dept) + '">' + escapeHTML(a.dept) + '</div>' +
+      '<div style="font-size:.7rem;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHTML(dateStr) + '">' + escapeHTML(dateStr) + '</div>' +
+      '<div style="font-size:.7rem;color:var(--gray-600);text-align:center">' + escapeHTML(daysLabel) + '</div>' +
+      '<div>' + typeChip(a.type) + '</div>' +
+      '<div>' + (rightSlot || '') + '</div>' +
       '</div>';
   }
 
+  function sectionLabel(text, color) {
+    return '<div style="font-size:.7rem;font-weight:700;color:' + color + ';padding:10px 0 4px;text-transform:uppercase;letter-spacing:.05em">' + text + '</div>';
+  }
+
   if (pending.length > 0) {
-    html += '<div style="font-size:.7rem;font-weight:700;color:var(--warning-dark);padding:8px 0 3px;text-transform:uppercase;letter-spacing:.04em">Pending (' + pending.length + ')</div>';
-    pending.forEach(function(a) {
-      var btns = '<div style="display:flex;gap:4px;flex-shrink:0">' +
-        '<button style="font-size:.6rem;padding:3px 9px;border-radius:6px;background:#DBEAFE;color:#1D4ED8;border:none;cursor:pointer;font-weight:600" onclick="hrAcceptLeave(' + a.id + ')">Accept</button>' +
-        '<button style="font-size:.6rem;padding:3px 9px;border-radius:6px;background:var(--danger-light);color:var(--danger-dark);border:none;cursor:pointer;font-weight:600" onclick="rejectLeave(' + a.id + ')">Reject</button>' +
+    html += sectionLabel('Pending (' + pending.length + ')', 'var(--warning-dark)');
+    html += tableHeader('var(--warning-dark)');
+    pending.forEach(function(a, i) {
+      var btns = '<div style="display:flex;gap:3px">' +
+        '<button style="font-size:.58rem;padding:2px 7px;border-radius:5px;background:#DBEAFE;color:#1D4ED8;border:none;cursor:pointer;font-weight:600;white-space:nowrap" onclick="hrAcceptLeave(' + a.id + ')">Accept</button>' +
+        '<button style="font-size:.58rem;padding:2px 7px;border-radius:5px;background:var(--danger-light);color:var(--danger-dark);border:none;cursor:pointer;font-weight:600;white-space:nowrap" onclick="rejectLeave(' + a.id + ')">Reject</button>' +
         '</div>';
-      html += leaveRow(a, '#F59E0B', btns);
+      html += leaveRow(a, btns, i === pending.length - 1);
     });
   }
+
   if (hrAccepted.length > 0) {
-    html += '<div style="font-size:.7rem;font-weight:700;color:#1D4ED8;padding:8px 0 3px;text-transform:uppercase;letter-spacing:.04em">HR Accepted — Awaiting MD (' + hrAccepted.length + ')</div>';
-    hrAccepted.forEach(function(a) {
-      var badge = '<span style="font-size:.6rem;padding:2px 8px;border-radius:8px;background:#DBEAFE;color:#1D4ED8;font-weight:600;flex-shrink:0;white-space:nowrap">HR Accepted</span>';
-      html += leaveRow(a, '#3B82F6', badge);
+    html += sectionLabel('HR Accepted — Awaiting MD (' + hrAccepted.length + ')', '#1D4ED8');
+    html += tableHeader('#1D4ED8');
+    hrAccepted.forEach(function(a, i) {
+      var badge = '<span style="font-size:.58rem;padding:2px 8px;border-radius:8px;background:#DBEAFE;color:#1D4ED8;font-weight:600;white-space:nowrap">HR Accepted</span>';
+      html += leaveRow(a, badge, i === hrAccepted.length - 1);
     });
   }
+
   if (others.length > 0) {
-    html += '<div style="font-size:.7rem;font-weight:700;color:var(--gray-500);padding:8px 0 3px;text-transform:uppercase;letter-spacing:.04em">Resolved (last 15)</div>';
-    others.slice(0, 15).forEach(function(a) {
+    html += sectionLabel('Resolved (last 15)', 'var(--gray-500)');
+    html += tableHeader('var(--gray-500)');
+    var slice = others.slice(0, 15);
+    slice.forEach(function(a, i) {
       var isApproved = a.status === 'approved';
-      var dotColor = isApproved ? '#22C55E' : '#EF4444';
       var badgeStyle = isApproved ? 'background:#D1FAE5;color:#065F46' : 'background:#FEE2E2;color:#DC2626';
       var label = a.status.charAt(0).toUpperCase() + a.status.slice(1);
-      var badge = '<span style="font-size:.6rem;padding:2px 8px;border-radius:8px;' + badgeStyle + ';font-weight:600;flex-shrink:0;white-space:nowrap">' + escapeHTML(label) + '</span>';
-      html += leaveRow(a, dotColor, badge);
+      var badge = '<span style="font-size:.58rem;padding:2px 8px;border-radius:8px;' + badgeStyle + ';font-weight:600;white-space:nowrap">' + escapeHTML(label) + '</span>';
+      html += leaveRow(a, badge, i === slice.length - 1);
     });
   }
+
   if (!pending.length && !hrAccepted.length && !others.length) {
     html += '<div style="text-align:center;padding:24px;color:var(--gray-400);font-size:.78rem">No leave applications</div>';
   }
