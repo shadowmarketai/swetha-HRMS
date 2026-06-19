@@ -667,25 +667,20 @@
   <div class="overlay-screen" id="overlay-admin" role="dialog" aria-modal="true" aria-label="Admin Panel">
     <div class="overlay-header"><button class="back-btn" aria-label="Go back" onclick="hideOverlay('admin')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg></button><h2>Admin Panel</h2><span class="role-badge md" style="margin-left:auto">MD</span></div>
     <div class="admin-tabs">
-      <button class="admin-tab active" onclick="switchAdminTab('roles',this)">Manage Roles</button>
+      <button class="admin-tab active" onclick="switchAdminTab('empdb',this)">Employee Database</button>
       <button class="admin-tab" onclick="switchAdminTab('depts',this)">Departments</button>
-      <button class="admin-tab" onclick="switchAdminTab('emplist',this)">All Employees</button>
       <button class="admin-tab" onclick="switchAdminTab('geofence',this)">Geofence Sites</button>
       <button class="admin-tab" onclick="switchAdminTab('editRequests',this)">Edit Requests</button>
     </div>
-    <div class="admin-section" id="adminRoles">
-      <div class="section-title">Assign Employee Roles</div>
-      <div id="rolesList"></div>
+    <div class="admin-section" id="adminEmpDb">
+      <div class="section-title">Employee Database</div>
+      <div id="empDbList"></div>
     </div>
     <div class="admin-section hidden" id="adminDepts">
       <div class="section-title">Manage Departments</div>
       <div id="deptsList"></div>
       <div class="section-title">Add New Department</div>
       <div class="add-dept-row"><input type="text" id="newDeptName" placeholder="Department name"><button onclick="addDepartment()">Add</button></div>
-    </div>
-    <div class="admin-section hidden" id="adminEmpList">
-      <div class="section-title">All Employees (by Department)</div>
-      <div id="allEmpList"></div>
     </div>
     <div class="admin-section hidden" id="adminEditRequests">
       <div class="section-title">Document Edit Requests</div>

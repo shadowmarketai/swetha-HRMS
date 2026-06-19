@@ -2212,9 +2212,8 @@ async function submitOnboarding() {
 function switchAdminTab(tab, btn) {
   document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
   btn.classList.add('active');
-  document.getElementById('adminRoles').classList.toggle('hidden', tab !== 'roles');
+  document.getElementById('adminEmpDb').classList.toggle('hidden', tab !== 'empdb');
   document.getElementById('adminDepts').classList.toggle('hidden', tab !== 'depts');
-  document.getElementById('adminEmpList').classList.toggle('hidden', tab !== 'emplist');
   document.getElementById('adminGeofence').classList.toggle('hidden', tab !== 'geofence');
   var editReqEl = document.getElementById('adminEditRequests');
   if (editReqEl) editReqEl.classList.toggle('hidden', tab !== 'editRequests');
@@ -2223,9 +2222,8 @@ function switchAdminTab(tab, btn) {
 }
 
 function renderAdminPanel() {
-  renderRolesList();
+  renderEmpDatabase();
   renderDeptsList();
-  renderAllEmpList();
 }
 
 // =====================================================
@@ -2536,31 +2534,64 @@ function isTemporaryMD(user) {
   return user && user.role === 'MD' && user.code !== 'MD001';
 }
 
-function renderRolesList() {
-  const container = document.getElementById('rolesList');
-  const colors = ['#E85D04','#22C55E','#F59E0B','#EF4444','#14B8A6','#EC4899','#D62828'];
-  container.innerHTML = EMPLOYEES.map((e,i) => {
-    const c = colors[i % colors.length];
-    const init = e.name.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
-    const isMD001 = e.code === 'MD001';
-    const tempBadge = (e.role === 'MD' && !isMD001) ? ' <span class="role-badge temp-md">Temp</span>' : '';
-    return `<div class="emp-list-item">
-      <div class="emp-avatar" style="background:${c}">${init}</div>
-      <div class="emp-details">
-        <h4><span class="emp-name-link" onclick="event.stopPropagation();showEmployeeDetailModal('${e.code}')">${escapeHTML(e.name)}</span>${tempBadge}</h4>
-        <p>${e.code} &middot; ${escapeHTML(e.dept)} &middot; ${escapeHTML(e.designation)}</p>
-      </div>
-      ${isMD001 ? '<span class="role-badge md" style="font-size:.65rem">Primary MD</span>' :
-        (currentUser && currentUser.role === 'MD' ?
-        `<select class="emp-role-select" onclick="event.stopPropagation()" onchange="changeRole('${e.code}',this.value)">
-        <option value="Employee"${e.role==='Employee'?' selected':''}>Employee</option>
-        <option value="HR"${e.role==='HR'?' selected':''}>HR</option>
-        <option value="Accounts"${e.role==='Accounts'?' selected':''}>Accounts</option>
-        <option value="Manager"${e.role==='Manager'?' selected':''}>Manager</option>
-        <option value="MD"${e.role==='MD'?' selected':''}>MD</option>
-      </select>` : `<span class="role-badge ${e.role.toLowerCase()}" style="font-size:.65rem">${e.role}</span>`)}
-    </div>`;
-  }).join('');
+function renderEmpDatabase() {
+  const container = document.getElementById('empDbList');
+  if (!container) return;
+  const colors = ['#E85D04','#D62828','#14B8A6','#22C55E','#EC4899'];
+  const isMD = currentUser && currentUser.role === 'MD';
+  const isHR = currentUser && currentUser.role === 'HR';
+  const canDelete = (isMD && !isTemporaryMD()) || isHR || _isSuperAdmin;
+  const isHRorMD = currentUser && (currentUser.role === 'MD' || currentUser.role === 'HR' || _isSuperAdmin);
+  let html = '';
+  departments.forEach((dept, di) => {
+    const emps = EMPLOYEES.filter(e => e.dept === dept);
+    if (emps.length === 0) return;
+    html += `<div style="margin-top:12px;margin-bottom:6px;font-family:var(--font-display);font-size:.75rem;font-weight:600;color:${colors[di % colors.length]};text-transform:uppercase;letter-spacing:.04em">${dept} (${emps.length})</div>`;
+    emps.forEach(e => {
+      const isMD001 = e.code === 'MD001';
+      const init = e.name.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
+      const isInactive = e.status === 'Inactive';
+      const statusBadge = isInactive
+        ? '<span style="display:inline-block;font-size:.6rem;padding:2px 6px;border-radius:8px;background:#EF4444;color:#fff;margin-left:6px">Inactive</span>'
+        : '<span style="display:inline-block;font-size:.6rem;padding:2px 6px;border-radius:8px;background:#22C55E;color:#fff;margin-left:6px">Active</span>';
+      const tempBadge = (e.role === 'MD' && !isMD001) ? '<span class="role-badge temp-md" style="font-size:.6rem;margin-left:4px">Temp</span>' : '';
+      let roleControl;
+      if (isMD001) {
+        roleControl = '<span class="role-badge md" style="font-size:.65rem">Primary MD</span>';
+      } else if (isMD) {
+        roleControl = `<select class="emp-role-select" onclick="event.stopPropagation()" onchange="changeRole('${e.code}',this.value)" style="font-size:.65rem;padding:3px 6px;border:1px solid var(--gray-200);border-radius:6px;background:var(--card);color:var(--text-primary)">
+          <option value="Employee"${e.role==='Employee'?' selected':''}>Employee</option>
+          <option value="HR"${e.role==='HR'?' selected':''}>HR</option>
+          <option value="Accounts"${e.role==='Accounts'?' selected':''}>Accounts</option>
+          <option value="Manager"${e.role==='Manager'?' selected':''}>Manager</option>
+          <option value="MD"${e.role==='MD'?' selected':''}>MD</option>
+        </select>${tempBadge}`;
+      } else {
+        roleControl = `<span class="role-badge ${e.role.toLowerCase()}" style="font-size:.65rem">${e.role}</span>${tempBadge}`;
+      }
+      let actions = '';
+      if (isHRorMD && !isMD001) {
+        const toggleLabel = isInactive ? 'Activate' : 'Deactivate';
+        const toggleColor = isInactive ? '#22C55E' : '#F59E0B';
+        actions = `<div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">
+          <button onclick="deactivateEmployee('${e.code}')" style="font-size:.6rem;padding:3px 8px;border:1px solid ${toggleColor};color:${toggleColor};background:transparent;border-radius:6px;cursor:pointer">${toggleLabel}</button>
+          <button onclick="resetEmployeePassword('${e.code}')" style="font-size:.6rem;padding:3px 8px;border:1px solid #3B82F6;color:#3B82F6;background:transparent;border-radius:6px;cursor:pointer">Reset Pwd</button>
+          ${canDelete ? `<button onclick="deleteEmployeePermanently('${e.code}')" style="font-size:.6rem;padding:3px 8px;border:1px solid #EF4444;color:#EF4444;background:transparent;border-radius:6px;cursor:pointer">Delete</button>` : ''}
+        </div>`;
+      }
+      html += `<div class="emp-list-item" style="${isInactive ? 'opacity:.6' : ''}" ${isHRorMD ? 'onclick="toggleEmpDetail(\'' + e.code + '\', this)"' : ''}>
+        <div class="emp-avatar" style="background:${colors[di % colors.length]}">${init}</div>
+        <div class="emp-details">
+          <h4>${escapeHTML(e.name)}${statusBadge}</h4>
+          <p>${e.code} &middot; ${escapeHTML(e.designation)} &middot; &#8377;${e.salary.toLocaleString('en-IN')}</p>
+          ${actions}
+        </div>
+        ${roleControl}
+      </div>`;
+      if (isHRorMD) html += `<div class="emp-detail-expanded" id="empDetail-${e.code}" style="display:none"></div>`;
+    });
+  });
+  container.innerHTML = html;
 }
 
 async function changeRole(empCode, newRole) {
@@ -2573,7 +2604,7 @@ async function changeRole(empCode, newRole) {
     confirmMsg += '\n\nNote: This will be a Temporary MD with edit-only access (no delete permissions).';
   }
   if (!confirm(confirmMsg)) {
-    renderRolesList();
+    renderEmpDatabase();
     return;
   }
   // Disable the select during API call
@@ -2587,10 +2618,10 @@ async function changeRole(empCode, newRole) {
       currentUser.role = newRole;
     }
     showToast(emp.name + ' role changed to ' + newRole + (newRole === 'MD' ? ' (Temporary)' : '') + ' successfully!');
-    renderRolesList();
+    renderEmpDatabase();
   } catch (e) {
     showToast(e.message || 'Error changing role');
-    renderRolesList();
+    renderEmpDatabase();
   }
 }
 
@@ -2798,8 +2829,7 @@ async function saveEmployeeDetails(empCode) {
     showToast('Employee details saved successfully');
     hideOverlay('emp-detail');
     // Re-render admin panel if visible
-    if (document.getElementById('rolesList')) renderRolesList();
-    if (document.getElementById('allEmpList')) renderAllEmpList();
+    if (document.getElementById('empDbList')) renderEmpDatabase();
   } catch (e) { showToast(e.message || 'Error saving details'); }
 }
 
@@ -2890,7 +2920,7 @@ async function editDepartment(deptId, currentName) {
     // Update employee dept references locally
     EMPLOYEES.forEach(function(e) { if (e.dept === currentName) e.dept = newName; });
     renderDeptsList();
-    if (document.getElementById('allEmpList')) renderAllEmpList();
+    if (document.getElementById('empDbList')) renderEmpDatabase();
     showToast('Department renamed to "' + newName + '"');
   } catch (e) {
     showToast(e.message || 'Failed to rename department', 'error');
@@ -2909,45 +2939,6 @@ async function deleteDepartment(deptId, name) {
   } catch (e) {
     showToast(e.message || 'Failed to delete department', 'error');
   }
-}
-
-function renderAllEmpList() {
-  const container = document.getElementById('allEmpList');
-  const colors = ['#E85D04','#D62828','#14B8A6','#22C55E','#EC4899'];
-  const isMD = currentUser && currentUser.role === 'MD';
-  const isHR = currentUser && currentUser.role === 'HR';
-  const canDelete = (isMD && !isTemporaryMD()) || isHR || _isSuperAdmin;
-  const isHRorMD = currentUser && (currentUser.role === 'MD' || currentUser.role === 'HR' || _isSuperAdmin);
-  let html = '';
-  departments.forEach((dept, di) => {
-    const emps = EMPLOYEES.filter(e => e.dept === dept);
-    if (emps.length === 0) return;
-    html += `<div style="margin-top:12px;margin-bottom:6px;font-family:var(--font-display);font-size:.75rem;font-weight:600;color:${colors[di % colors.length]};text-transform:uppercase;letter-spacing:.04em">${dept} (${emps.length})</div>`;
-    emps.forEach(e => {
-      const init = e.name.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
-      const isInactive = e.status === 'Inactive';
-      const statusBadge = isInactive
-        ? '<span style="display:inline-block;font-size:.6rem;padding:2px 6px;border-radius:8px;background:#EF4444;color:#fff;margin-left:6px">Inactive</span>'
-        : '<span style="display:inline-block;font-size:.6rem;padding:2px 6px;border-radius:8px;background:#22C55E;color:#fff;margin-left:6px">Active</span>';
-      let actions = '';
-      if (isHRorMD && e.code !== 'MD001') {
-        const toggleLabel = isInactive ? 'Activate' : 'Deactivate';
-        const toggleColor = isInactive ? '#22C55E' : '#F59E0B';
-        actions = `<div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">
-          <button onclick="deactivateEmployee('${e.code}')" style="font-size:.6rem;padding:3px 8px;border:1px solid ${toggleColor};color:${toggleColor};background:transparent;border-radius:6px;cursor:pointer">${toggleLabel}</button>
-          <button onclick="resetEmployeePassword('${e.code}')" style="font-size:.6rem;padding:3px 8px;border:1px solid #3B82F6;color:#3B82F6;background:transparent;border-radius:6px;cursor:pointer">Reset Pwd</button>
-          ${canDelete ? `<button onclick="deleteEmployeePermanently('${e.code}')" style="font-size:.6rem;padding:3px 8px;border:1px solid #EF4444;color:#EF4444;background:transparent;border-radius:6px;cursor:pointer">Delete</button>` : ''}
-        </div>`;
-      }
-      html += `<div class="emp-list-item" style="${isInactive ? 'opacity:.6' : ''}" ${isHRorMD ? 'onclick="toggleEmpDetail(\'' + e.code + '\', this)"' : ''}>
-        <div class="emp-avatar" style="background:${colors[di % colors.length]}">${init}</div>
-        <div class="emp-details"><h4>${escapeHTML(e.name)}${statusBadge}</h4><p>${e.code} &middot; ${escapeHTML(e.designation)} &middot; &#8377;${e.salary.toLocaleString('en-IN')}</p>${actions}</div>
-        <span class="role-badge ${e.role.toLowerCase()}">${e.role}</span>
-      </div>`;
-      if (isHRorMD) html += `<div class="emp-detail-expanded" id="empDetail-${e.code}" style="display:none"></div>`;
-    });
-  });
-  container.innerHTML = html;
 }
 
 // Extended employee data (dummy fields for existing employees)
@@ -3119,7 +3110,7 @@ async function deactivateEmployee(code) {
   try {
     await apiCall('PUT', '/employees/' + code, { status: newStatus });
     emp.status = newStatus;
-    renderAllEmpList();
+    renderEmpDatabase();
     showToast(emp.name + ' is now ' + newStatus);
   } catch (e) { showToast(e.message || 'Error updating employee status'); }
 }
@@ -3136,7 +3127,7 @@ async function deleteEmployeePermanently(code) {
     await apiCall('DELETE', '/employees/' + code, {});
     var idx = EMPLOYEES.findIndex(function(e) { return e.code === code; });
     if (idx >= 0) EMPLOYEES.splice(idx, 1);
-    renderAllEmpList();
+    renderEmpDatabase();
     showToast(emp.name + ' has been permanently deleted');
   } catch (e) { showToast(e.message || 'Error deleting employee'); }
 }
