@@ -69,8 +69,8 @@ router.put('/:id', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
   }
 });
 
-// DELETE /api/departments/:id — remove a department (MD only)
-router.delete('/:id', verifyToken, requireRole('MD'), async (req, res) => {
+// DELETE /api/departments/:id — remove a department (MD/HR)
+router.delete('/:id', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
   try {
     const [dept] = await pool.query('SELECT name FROM departments WHERE id = ?', [req.params.id]);
     if (dept.length === 0) return res.status(404).json({ error: 'Department not found' });

@@ -2819,7 +2819,7 @@ function renderDeptsList() {
       </div>
       <div style="display:flex;gap:4px;align-items:center">
         <button onclick="event.stopPropagation();editDepartment(${deptId},'${escapeAttr(d)}')" style="background:none;border:none;cursor:pointer;padding:4px;color:var(--text-secondary)" title="Rename"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
-        ${(currentUser && currentUser.role === 'MD') ? `<button onclick="event.stopPropagation();deleteDepartment(${deptId},'${escapeAttr(d)}')" style="background:none;border:none;cursor:pointer;padding:4px;color:#EF4444" title="Delete"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>` : ''}
+        ${(currentUser && (currentUser.role === 'MD' || currentUser.role === 'HR')) ? `<button onclick="event.stopPropagation();deleteDepartment(${deptId},'${escapeAttr(d)}')" style="background:none;border:none;cursor:pointer;padding:4px;color:#EF4444" title="Delete"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>` : ''}
         <svg class="dept-chevron" id="chevron-${safeId}" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" onclick="toggleDeptEmployees('${escapeHTML(d)}')" style="cursor:pointer"><polyline points="9 18 15 12 9 6"/></svg>
       </div>
     </div>
@@ -2999,11 +2999,11 @@ function renderEmployeeDetailCard(empCode) {
   html += empDetailField('Department', emp.dept, empCode, 'dept');
   html += empDetailField('Designation', emp.designation, empCode, 'designation');
   html += empDetailField('Salary', emp.salary, empCode, 'salary');
-  html += empDetailField('Bank', emp.bank || 'Indian Bank', empCode, 'bank');
-  html += empDetailField('Account No', emp.accNo || 'N/A', empCode, 'accNo');
-  html += empDetailField('Phone', emp.phone || 'N/A', empCode, 'phone');
-  html += empDetailField('DOJ', emp.doj || 'N/A', empCode, 'doj');
-  html += empDetailField('Email', emp.email || 'N/A', empCode, 'email');
+  html += empDetailField('Bank', emp.bank || '', empCode, 'bank');
+  html += empDetailField('Account No', emp.accNo || '', empCode, 'accNo');
+  html += empDetailField('Phone', emp.phone || '', empCode, 'phone');
+  html += empDetailField('DOJ', emp.doj || '', empCode, 'doj');
+  html += empDetailField('Email', emp.email || '', empCode, 'email');
   html += empDetailField('Father\'s Name', ext.fatherName, empCode, 'ext_fatherName');
   html += empDetailField('Mother\'s Name', ext.motherName, empCode, 'ext_motherName');
   html += empDetailField('Blood Group', ext.bloodGroup, empCode, 'ext_bloodGroup');
@@ -3072,12 +3072,14 @@ async function saveEmployeeDetailsInline(empCode) {
   var emp = EMPLOYEES.find(function(e) { return e.code === empCode; });
   if (!emp) return;
   var fields = ['name','dept','designation','salary','bank','accNo','phone','doj','email'];
+  var optionalFields = ['bank','accNo','phone','doj','email'];
   var updateData = {};
   fields.forEach(function(f) {
     var input = document.getElementById('empField-' + empCode + '-' + f);
     if (input) {
       var val = input.value.trim();
-      if (f === 'salary') val = parseFloat(val) || 0;
+      if (f === 'salary') { updateData[f] = parseFloat(val) || 0; return; }
+      if (optionalFields.includes(f) && !val) return; // skip empty optional fields
       updateData[f] = val;
     }
   });
