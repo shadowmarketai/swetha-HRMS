@@ -578,4 +578,285 @@ router.get('/export/consolidated', verifyToken, requireRole('MD', 'HR'), async (
   }
 });
 
+// ─────────────────────────────────────────────────────────────────
+// GET /api/attendance/export/punch-detail  — Punch In/Out detail XLSX
+// Matches "Sheet1" format: 3 header rows, each day has IN/OUT columns
+// ─────────────────────────────────────────────────────────────────
+router.get('/export/punch-detail', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
+  try {
+    const ExcelJS = require('exceljs');
+    const month = (req.query.month || new Date().toISOString().slice(0, 7)).slice(0, 7);
+    const [yr, mo] = month.split('-').map(Number);
+    const daysInMonth = new Date(yr, mo, 0).getDate();
+    const today = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    const isCurrentMonth = (today.getFullYear() === yr && today.getMonth() + 1 === mo);
+    const lastDay = isCurrentMonth ? today.getDate() : daysInMonth;
+
+    function fmtTime(dtStr) {
+      if (!dtStr) return '';
+      const d = new Date(dtStr);
+      const h = d.getHours(), m = d.getMinutes();
+      return String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
+    }
+
+    const [attRows, leaveRows, holidayRows, empRows] = await Promise.all([
+      pool.query(
+        `SELECT a.emp_code, a.log_date, a.check_in, a.check_out
+         FROM attendance_logs a WHERE a.log_date LIKE ? ORDER BY a.emp_code, a.log_date`,
+        [month + '%']
+      ),
+      pool.query(
+        `SELECT emp_code, from_date, to_date, days, paid_days, lop_days, is_half_day, leave_type, status
+         FROM leave_applications WHERE status = 'approved'
+         AND ((from_date LIKE ? OR to_date LIKE ?) OR (from_date < ? AND to_date > ?))`,
+        [month + '%', month + '%', month + '-01', month + '-' + String(daysInMonth).padStart(2,'0')]
+      ),
+      pool.query(`SELECT holiday_date, name FROM public_holidays WHERE holiday_date LIKE ?`, [month + '%']),
+      pool.query(`SELECT code, name FROM employees WHERE status != 'Inactive' ORDER BY name`)
+    ]);
+
+    const holidays = {};
+    (holidayRows[0] || []).forEach(h => { holidays[String(h.holiday_date).slice(0,10)] = h.name || 'Holiday'; });
+
+    // attMap: empCode -> dayNum -> { checkIn, checkOut, mins }
+    const attMap = {};
+    (attRows[0] || []).forEach(row => {
+      const dateStr = String(row.log_date).slice(0, 10);
+      const d = parseInt(dateStr.slice(8), 10);
+      if (!attMap[row.emp_code]) attMap[row.emp_code] = {};
+      if (!attMap[row.emp_code][d]) attMap[row.emp_code][d] = { checkIn: null, checkOut: null, mins: 0 };
+      const entry = attMap[row.emp_code][d];
+      if (row.check_in) {
+        if (!entry.checkIn || new Date(row.check_in) < new Date(entry.checkIn)) entry.checkIn = row.check_in;
+        const start = new Date(row.check_in).getTime();
+        let end;
+        if (row.check_out) {
+          end = new Date(row.check_out).getTime();
+          if (!entry.checkOut || new Date(row.check_out) > new Date(entry.checkOut)) entry.checkOut = row.check_out;
+        } else if (isCurrentMonth && d === today.getDate()) {
+          end = Date.now();
+        } else {
+          const autoOut = new Date(new Date(row.check_in).toDateString() + ' 21:00:00').getTime();
+          end = Math.min(autoOut, start + 480 * 60000);
+        }
+        if (end > start) entry.mins += (end - start) / 60000;
+      }
+    });
+
+    const leaveMap = {};
+    (leaveRows[0] || []).forEach(la => {
+      const code = la.emp_code;
+      if (!leaveMap[code]) leaveMap[code] = {};
+      const from = new Date(String(la.from_date).slice(0,10) + 'T00:00:00');
+      const to   = new Date(String(la.to_date).slice(0,10) + 'T00:00:00');
+      let paidRemain = parseFloat(la.paid_days) > 0 ? parseFloat(la.paid_days) : parseFloat(la.days);
+      for (let ld = new Date(from); ld <= to; ld.setDate(ld.getDate() + 1)) {
+        if (ld.getDay() === 0) continue;
+        const ymd = ld.toISOString().slice(0,10);
+        if (holidays[ymd]) continue;
+        leaveMap[code][ymd] = paidRemain > 0 ? (la.is_half_day ? 'Half Day' : 'Leave') : 'LOP';
+        paidRemain -= la.is_half_day ? 0.5 : 1;
+      }
+    });
+
+    let totalWorkingDays = 0;
+    for (let d = 1; d <= lastDay; d++) {
+      const dow = new Date(yr, mo - 1, d).getDay();
+      const ymd = `${yr}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      if (dow !== 0 && !holidays[ymd]) totalWorkingDays++;
+    }
+
+    const wb = new ExcelJS.Workbook();
+    wb.creator = 'SweRMS';
+    const ws = wb.addWorksheet('Punch Detail');
+
+    const FILL_YELLOW  = { type:'pattern', pattern:'solid', fgColor:{ argb:'FFFFFF00' } };
+    const FILL_BLUE    = { type:'pattern', pattern:'solid', fgColor:{ argb:'FFA6CAEC' } };
+    const FILL_GREEN   = { type:'pattern', pattern:'solid', fgColor:{ argb:'FF92D050' } };
+    const FILL_AMBER   = { type:'pattern', pattern:'solid', fgColor:{ argb:'FFFFC000' } };
+    const FILL_HEADER  = { type:'pattern', pattern:'solid', fgColor:{ argb:'FFD9E1F2' } };
+    const FILL_SUMMARY = { type:'pattern', pattern:'solid', fgColor:{ argb:'FFBDD7EE' } };
+    const FILL_TITLE   = { type:'pattern', pattern:'solid', fgColor:{ argb:'FF1F3864' } };
+    const BORDER_THIN  = { style:'thin', color:{ argb:'FFBFBFBF' } };
+    const BORDER_ALL   = { top:BORDER_THIN, left:BORDER_THIN, bottom:BORDER_THIN, right:BORDER_THIN };
+    const FONT_DATA    = { name:'Calibri', size:9 };
+    const FONT_BOLD    = { name:'Calibri', size:9, bold:true };
+    const FONT_TITLE   = { name:'Calibri', size:11, bold:true, color:{ argb:'FFFFFFFF' } };
+    const ALIGN_CTR    = { horizontal:'center', vertical:'middle', wrapText:true };
+    const ALIGN_LEFT   = { horizontal:'left', vertical:'middle' };
+
+    const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const dayLetters  = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+    const SUMMARY_COLS = ['Working\nDays','Full\nDay','Half\nDay','Leave','Absent','Total\nHours'];
+
+    // Column layout: col 1=S.No, 2=Name, 3=Code, then 2 cols per day, then 6 summary
+    const totalCols = 3 + daysInMonth * 2 + SUMMARY_COLS.length;
+
+    // ── Row 1: Title ─────────────────────────────────────────────
+    ws.getRow(1).height = 22;
+    const titleCell = ws.getCell(1, 1);
+    titleCell.value = `${monthNames[mo-1]} ${yr} — Attendance Report`;
+    titleCell.font = FONT_TITLE;
+    titleCell.fill = FILL_TITLE;
+    titleCell.alignment = { horizontal:'left', vertical:'middle' };
+    ws.mergeCells(1, 1, 1, totalCols);
+
+    // ── Row 2: Day headers (each day spans 2 cols: IN+OUT) ───────
+    ws.getRow(2).height = 28;
+    function setR2(col, val, fill) {
+      const cell = ws.getCell(2, col);
+      cell.value = val; cell.font = FONT_BOLD;
+      cell.alignment = ALIGN_CTR; cell.border = BORDER_ALL;
+      cell.fill = fill || FILL_HEADER;
+    }
+    setR2(1, 'S.No'); setR2(2, 'Name'); setR2(3, 'Code');
+    ws.mergeCells(2, 2, 3, 2); // Name spans rows 2-3
+    ws.mergeCells(2, 3, 3, 3); // Code spans rows 2-3
+    ws.mergeCells(2, 1, 3, 1); // S.No spans rows 2-3
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const ymd = `${yr}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const dow = new Date(yr, mo - 1, d).getDay();
+      const isWeekend = dow === 0;
+      const isHol = !!holidays[ymd];
+      const colStart = 3 + (d - 1) * 2 + 1;
+      const dayFill = (isWeekend || isHol) ? FILL_YELLOW : FILL_HEADER;
+      const dayLabel = d + '\n' + dayLetters[dow];
+      ws.getCell(2, colStart).value = dayLabel;
+      ws.getCell(2, colStart).font = FONT_BOLD;
+      ws.getCell(2, colStart).alignment = ALIGN_CTR;
+      ws.getCell(2, colStart).border = BORDER_ALL;
+      ws.getCell(2, colStart).fill = dayFill;
+      ws.mergeCells(2, colStart, 2, colStart + 1);
+    }
+    for (let i = 0; i < SUMMARY_COLS.length; i++) {
+      const c = 3 + daysInMonth * 2 + 1 + i;
+      ws.getCell(2, c).value = SUMMARY_COLS[i];
+      ws.getCell(2, c).font = FONT_BOLD;
+      ws.getCell(2, c).alignment = ALIGN_CTR;
+      ws.getCell(2, c).border = BORDER_ALL;
+      ws.getCell(2, c).fill = FILL_SUMMARY;
+      ws.mergeCells(2, c, 3, c);
+    }
+
+    // ── Row 3: IN/OUT sub-headers ─────────────────────────────────
+    ws.getRow(3).height = 16;
+    for (let d = 1; d <= daysInMonth; d++) {
+      const ymd = `${yr}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const dow = new Date(yr, mo - 1, d).getDay();
+      const isWeekend = dow === 0;
+      const isHol = !!holidays[ymd];
+      const subFill = (isWeekend || isHol) ? FILL_YELLOW : FILL_HEADER;
+      const colIN  = 3 + (d - 1) * 2 + 1;
+      const colOUT = colIN + 1;
+      ['IN','OUT'].forEach((lbl, i) => {
+        const cell = ws.getCell(3, colIN + i);
+        cell.value = lbl; cell.font = FONT_BOLD;
+        cell.alignment = ALIGN_CTR; cell.border = BORDER_ALL;
+        cell.fill = subFill;
+      });
+    }
+
+    // ── Data rows ─────────────────────────────────────────────────
+    const employees = empRows[0] || [];
+    const monthStr = `${yr}-${String(mo).padStart(2,'0')}`;
+
+    employees.forEach((emp, idx) => {
+      const rowIdx = idx + 4;
+      ws.getRow(rowIdx).height = 15;
+
+      function setCell(col, val, fill, alignLeft) {
+        const cell = ws.getCell(rowIdx, col);
+        cell.value = val === null || val === undefined ? '' : val;
+        cell.font = FONT_DATA;
+        cell.alignment = alignLeft ? ALIGN_LEFT : ALIGN_CTR;
+        cell.border = BORDER_ALL;
+        if (fill) cell.fill = fill;
+      }
+
+      setCell(1, idx + 1);
+      setCell(2, emp.name, null, true);
+      setCell(3, emp.code);
+
+      let totalMins = 0, fullDays = 0, halfDays = 0, leaveDays = 0, absentDays = 0;
+
+      for (let d = 1; d <= daysInMonth; d++) {
+        const ymd = `${monthStr}-${String(d).padStart(2,'0')}`;
+        const dow = new Date(yr, mo - 1, d).getDay();
+        const isFuture = isCurrentMonth && d > lastDay;
+        const colIN  = 3 + (d - 1) * 2 + 1;
+        const colOUT = colIN + 1;
+
+        if (dow === 0) {
+          setCell(colIN,  'Sun', FILL_YELLOW);
+          setCell(colOUT, '',   FILL_YELLOW);
+        } else if (holidays[ymd]) {
+          setCell(colIN,  'Holiday', FILL_YELLOW);
+          setCell(colOUT, '',        FILL_YELLOW);
+        } else if (isFuture) {
+          setCell(colIN, ''); setCell(colOUT, '');
+        } else {
+          const att = attMap[emp.code] && attMap[emp.code][d];
+          const leaveStatus = leaveMap[emp.code] && leaveMap[emp.code][ymd];
+          if (att && att.checkIn) {
+            const inTime  = fmtTime(att.checkIn);
+            const outTime = att.checkOut ? fmtTime(att.checkOut) : '';
+            const isShort = att.mins < 480;
+            const cellFill = isShort ? FILL_AMBER : null;
+            setCell(colIN,  inTime,  cellFill);
+            setCell(colOUT, outTime, cellFill);
+            if (att.mins >= 480) fullDays++;
+            else if (att.mins >= 240) halfDays++;
+            totalMins += att.mins;
+          } else if (leaveStatus === 'Leave' || leaveStatus === 'Half Day') {
+            setCell(colIN,  leaveStatus, FILL_GREEN);
+            setCell(colOUT, '',          FILL_GREEN);
+            if (leaveStatus === 'Leave') leaveDays++;
+            else halfDays++;
+          } else if (leaveStatus === 'LOP') {
+            setCell(colIN,  'LOP', FILL_BLUE);
+            setCell(colOUT, '',    FILL_BLUE);
+            absentDays++;
+          } else {
+            setCell(colIN,  'Absent', FILL_BLUE);
+            setCell(colOUT, '',       FILL_BLUE);
+            absentDays++;
+          }
+        }
+      }
+
+      const tH = Math.floor(totalMins / 60), tM = Math.round(totalMins % 60);
+      const summaryBase = 3 + daysInMonth * 2 + 1;
+      setCell(summaryBase + 0, totalWorkingDays, FILL_SUMMARY);
+      setCell(summaryBase + 1, fullDays, FILL_SUMMARY);
+      setCell(summaryBase + 2, halfDays || '', FILL_SUMMARY);
+      setCell(summaryBase + 3, leaveDays || '', FILL_SUMMARY);
+      setCell(summaryBase + 4, absentDays || '', FILL_SUMMARY);
+      setCell(summaryBase + 5, `${tH}h ${tM < 10 ? '0'+tM : tM}m`, FILL_SUMMARY);
+    });
+
+    // ── Column widths ─────────────────────────────────────────────
+    ws.getColumn(1).width = 6;
+    ws.getColumn(2).width = 22;
+    ws.getColumn(3).width = 11;
+    for (let d = 1; d <= daysInMonth; d++) {
+      ws.getColumn(3 + (d-1)*2 + 1).width = 7;
+      ws.getColumn(3 + (d-1)*2 + 2).width = 7;
+    }
+    const summaryBase = 3 + daysInMonth * 2 + 1;
+    [12, 7, 7, 7, 7, 10].forEach((w, i) => { ws.getColumn(summaryBase + i).width = w; });
+
+    ws.views = [{ state:'frozen', xSplit:3, ySplit:3, topLeftCell:'D4' }];
+
+    const filename = `${monthNames[mo-1]}_${yr}_PunchDetail.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    await wb.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    console.error('[attendance/export/punch-detail]', err);
+    res.status(500).json({ error: 'Failed to generate punch detail report' });
+  }
+});
+
 module.exports = router;

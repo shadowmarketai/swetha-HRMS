@@ -9389,6 +9389,32 @@ async function downloadConsolidatedXLSX() {
   showToast('Excel report downloaded!');
 }
 
+// ── Punch In/Out Detail XLSX Download ──
+async function downloadPunchDetailXLSX() {
+  closeConsolidatedAttModal();
+  showToast('Generating punch detail report…');
+  var selMonth = parseInt(document.getElementById('conAttMonth').value);
+  var selYear  = parseInt(document.getElementById('conAttYear').value);
+  var monthStr = selYear + '-' + String(selMonth + 1).padStart(2, '0');
+  var monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var monthLabel = monthNames[selMonth] + ' ' + selYear;
+  try {
+    var url = API_BASE + '/attendance/export/punch-detail?month=' + monthStr;
+    var headers = (typeof apiHeaders === 'function') ? apiHeaders() : (JWT_TOKEN ? { 'Authorization': 'Bearer ' + JWT_TOKEN } : {});
+    delete headers['Content-Type'];
+    var res = await fetch(url, { headers: headers });
+    if (!res.ok) { showToast('Export failed (' + res.status + ')'); return; }
+    var blob = await res.blob();
+    var dlUrl = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = dlUrl;
+    a.download = monthLabel + ' PunchDetail.xlsx';
+    document.body.appendChild(a); a.click();
+    setTimeout(function() { URL.revokeObjectURL(dlUrl); a.remove(); }, 0);
+    showToast('Downloaded: ' + monthLabel + ' PunchDetail.xlsx');
+  } catch (e) { showToast(e.message || 'Error exporting punch detail'); }
+}
+
 // ── PDF Download (grid format) ──
 async function downloadConsolidatedPDFReport() {
   closeConsolidatedAttModal();

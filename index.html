@@ -1085,8 +1085,19 @@ try{var s=localStorage.getItem('hrms_session');if(s){var p=JSON.parse(s);if(p&&p
           </select>
         </div>
       </div>
+      <div style="margin-bottom:10px">
+        <div style="font-size:.72rem;font-weight:600;color:var(--gray-500);margin-bottom:6px;text-transform:uppercase;letter-spacing:.04em">Format</div>
+        <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--border-color);border-radius:var(--radius);margin-bottom:6px;cursor:pointer">
+          <input type="radio" name="attDownloadFmt" value="consolidated" checked style="accent-color:var(--primary)">
+          <span style="font-size:.82rem"><strong>Monthly Summary</strong> — hours per day (colored Excel)</span>
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--border-color);border-radius:var(--radius);cursor:pointer">
+          <input type="radio" name="attDownloadFmt" value="punch-detail" style="accent-color:var(--primary)">
+          <span style="font-size:.82rem"><strong>Punch In/Out Detail</strong> — IN &amp; OUT times per day</span>
+        </label>
+      </div>
       <div style="display:flex;gap:8px;margin-top:8px">
-        <button class="btn btn-primary" style="flex:1;border-radius:var(--radius-sm)" onclick="downloadConsolidatedXLSX()">
+        <button class="btn btn-primary" style="flex:1;border-radius:var(--radius-sm)" onclick="(document.querySelector('input[name=attDownloadFmt]:checked').value==='punch-detail'?downloadPunchDetailXLSX():downloadConsolidatedXLSX())">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px;vertical-align:middle"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Excel (.xlsx)
         </button>
         <button class="btn btn-outline" style="flex:1;border-radius:var(--radius-sm)" onclick="downloadConsolidatedPDFReport()">
