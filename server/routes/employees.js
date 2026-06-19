@@ -165,17 +165,18 @@ router.post('/', verifyToken, requireRole('MD', 'HR'), [
   try {
     const { code, name, dept, designation, salary, bank, accNo, role, phone, doj,
             email, dob, gender, address, aadhaar, pan, ifscCode,
-            emergencyContact, emergencyPhone } = req.body;
+            emergencyContact, emergencyPhone, reportingManager } = req.body;
     if (!code || !name || !dept) {
       return res.status(400).json({ error: 'Code, name, and department required' });
     }
     await pool.query(
       `INSERT INTO employees (code, name, dept, designation, salary, bank, acc_no, role, phone, doj,
-        email, dob, gender, address, aadhaar, pan, ifsc_code, emergency_contact, emergency_phone)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        email, dob, gender, address, aadhaar, pan, ifsc_code, emergency_contact, emergency_phone, reporting_manager)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [code, name, dept, designation || '', salary || 0, bank || '', accNo || '', role || 'Employee',
        phone || '', doj || null, email || '', dob || null, gender || '', address || '',
-       aadhaar || '', pan || '', ifscCode || '', emergencyContact || '', emergencyPhone || '']
+       aadhaar || '', pan || '', ifscCode || '', emergencyContact || '', emergencyPhone || '',
+       reportingManager || null]
     );
     res.status(201).json({ message: 'Employee added', code });
   } catch (err) {
@@ -382,7 +383,8 @@ router.put('/:code', verifyToken, requireRole('MD', 'HR'), auditLog('update', 'e
       yearOfPassing: 'year_of_passing', previousEmployer: 'previous_employer',
       previousRole: 'previous_role', yearsOfExperience: 'years_of_experience',
       maritalStatus: 'marital_status', ifscCode: 'ifsc_code', bankBranch: 'bank_branch',
-      emergencyContact: 'emergency_contact', emergencyPhone: 'emergency_phone'
+      emergencyContact: 'emergency_contact', emergencyPhone: 'emergency_phone',
+      reportingManager: 'reporting_manager'
     };
 
     const DATE_FIELDS = ['doj', 'dob'];

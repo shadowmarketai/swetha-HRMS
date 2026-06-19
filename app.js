@@ -2123,6 +2123,13 @@ function resetWizard() {
   const deptSel = document.getElementById('obDept');
   deptSel.innerHTML = '<option value="">Select Dept</option>';
   departments.forEach(d => { deptSel.innerHTML += `<option>${d}</option>`; });
+  // Populate reporting manager dropdown from employees with senior roles
+  const mgrSel = document.getElementById('obManager');
+  if (mgrSel) {
+    mgrSel.innerHTML = '<option value="">Select Manager</option>';
+    const managers = EMPLOYEES.filter(e => ['MD','HR','Manager'].includes(e.role) && e.status === 'Active');
+    managers.forEach(m => { mgrSel.innerHTML += `<option value="${m.code}">${m.name} (${m.code})</option>`; });
+  }
   // Reset document upload statuses
   document.querySelectorAll('.doc-status').forEach(s => s.textContent = '');
 }
@@ -2174,6 +2181,7 @@ async function submitOnboarding() {
   var ifscCode = (document.getElementById('obIfsc').value || '').trim();
   var emergencyContact = (document.getElementById('obEmgName').value || '').trim();
   var emergencyPhone = (document.getElementById('obEmgPhone').value || '').trim();
+  var reportingManager = (document.getElementById('obManager') || {}).value || '';
 
   if (!name || !code || !dept || !designation) {
     showToast('Please fill all required fields (Name, Code, Dept, Designation)');
@@ -2191,6 +2199,7 @@ async function submitOnboarding() {
     email: email, dob: dob || null, gender: gender, address: address,
     aadhaar: aadhaar, pan: pan, ifscCode: ifscCode,
     emergencyContact: emergencyContact, emergencyPhone: emergencyPhone,
+    reportingManager: reportingManager || null,
     status: 'Active'
   };
   var submitBtn = document.querySelector('#overlay-onboarding .btn-primary, #overlay-onboarding button[onclick*="submitOnboarding"]');
@@ -2232,7 +2241,8 @@ async function submitOnboarding() {
       bloodGroup: '', pan: newEmp.pan || '', aadhaar: newEmp.aadhaar || '',
       uan: '', qualification: '', institution: '', yearOfPassing: '',
       previousEmployer: '', previousRole: '', yearsOfExperience: '',
-      maritalStatus: '', ifscCode: newEmp.ifscCode || '', bankBranch: ''
+      maritalStatus: '', ifscCode: newEmp.ifscCode || '', bankBranch: '',
+      reportingManager: newEmp.reportingManager || ''
     });
     if (loginCreated) {
       showToast('Employee added successfully! Login credentials created for ' + name + ' (' + code + ')');
@@ -3080,6 +3090,9 @@ function renderEmployeeDetailCard(empCode) {
   html += empDetailField('Date of Birth', emp.dob || '', empCode, 'dob');
   html += empDetailField('Blood Group', emp.bloodGroup || '', empCode, 'bloodGroup');
   html += empDetailField('Marital Status', emp.maritalStatus || '', empCode, 'maritalStatus');
+  var mgrEmp = emp.reportingManager ? EMPLOYEES.find(function(m) { return m.code === emp.reportingManager; }) : null;
+  var mgrDisplay = mgrEmp ? mgrEmp.name + ' (' + emp.reportingManager + ')' : (emp.reportingManager || '');
+  html += empDetailField('Reporting Manager', mgrDisplay, empCode, 'reportingManager', true);
 
   // Contact
   html += sec('Contact');
@@ -8109,7 +8122,8 @@ function mapEmployee(row) {
     previousEmployer: row.previous_employer || '', previousRole: row.previous_role || '',
     yearsOfExperience: row.years_of_experience != null ? parseFloat(row.years_of_experience) : '',
     maritalStatus: row.marital_status || '',
-    ifscCode: row.ifsc_code || '', bankBranch: row.bank_branch || ''
+    ifscCode: row.ifsc_code || '', bankBranch: row.bank_branch || '',
+    reportingManager: row.reporting_manager || ''
   };
 }
 function mapLeave(row) {

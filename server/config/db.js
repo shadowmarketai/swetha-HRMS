@@ -140,6 +140,10 @@ async function runMigrations(conn) {
       sql: "ALTER TABLE employees ADD COLUMN pan VARCHAR(10)"
     },
     {
+      name: 'add_reporting_manager_to_employees',
+      sql: "ALTER TABLE employees ADD COLUMN reporting_manager VARCHAR(20)"
+    },
+    {
       name: 'create_document_edit_requests',
       sql: `CREATE TABLE IF NOT EXISTS document_edit_requests (
         id INT AUTO_INCREMENT PRIMARY KEY,
