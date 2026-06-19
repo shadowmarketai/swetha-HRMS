@@ -218,6 +218,18 @@ router.put('/:code/self', verifyToken, auditLog('update', 'employee'), async (re
       }
     }
 
+    // Check bank_details lock separately — prevent bank field changes without explicit approval
+    let bankEditable = true;
+    if (locks.bank_details) {
+      const [bankApproval] = await pool.query(
+        "SELECT id FROM document_edit_requests WHERE emp_code = ? AND section = 'bank_details' AND status = 'approved' LIMIT 1",
+        [req.params.code]
+      );
+      bankEditable = bankApproval.length > 0;
+    }
+    // If bank_details locked and no approval, preserve existing bank values
+    const bk = (val) => bankEditable ? val : undefined;
+
     // Personal profile fields only — employees CANNOT change dept, designation, doj, salary, role
     await pool.query(
       `UPDATE employees SET phone=?, dob=?, email=?, blood_group=?, marital_status=?,
@@ -236,12 +248,12 @@ router.put('/:code/self', verifyToken, auditLog('update', 'employee'), async (re
         v(b.motherName, cur.mother_name), v(b.motherMobile, cur.mother_mobile),
         v(b.spouseName, cur.spouse_name), v(b.spouseMobile, cur.spouse_mobile),
         v(b.emergencyContact, cur.emergency_contact), v(b.emergencyPhone, cur.emergency_phone),
-        v(b.bank, cur.bank), v(b.accNo, cur.acc_no), v(b.pan, cur.pan), v(b.aadhaar, cur.aadhaar), v(b.uan, cur.uan),
+        v(bk(b.bank), cur.bank), v(bk(b.accNo), cur.acc_no), v(bk(b.pan), cur.pan), v(bk(b.aadhaar), cur.aadhaar), v(bk(b.uan), cur.uan),
         v(b.qualification, cur.qualification), v(b.institution, cur.institution),
         v(b.yearOfPassing, cur.year_of_passing),
         v(b.previousEmployer, cur.previous_employer), v(b.previousRole, cur.previous_role),
         v(b.yearsOfExperience, cur.years_of_experience),
-        v(b.ifscCode, cur.ifsc_code), v(b.bankBranch, cur.bank_branch), req.params.code
+        v(bk(b.ifscCode), cur.ifsc_code), v(bk(b.bankBranch), cur.bank_branch), req.params.code
       ]
     );
 

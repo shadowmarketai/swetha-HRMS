@@ -2218,7 +2218,7 @@ function switchAdminTab(tab, btn) {
   var editReqEl = document.getElementById('adminEditRequests');
   if (editReqEl) editReqEl.classList.toggle('hidden', tab !== 'editRequests');
   if (tab === 'geofence') renderGeofenceSites();
-  if (tab === 'editRequests') renderEditRequestsPanel('pending');
+  if (tab === 'editRequests') { _activateEditReqFilter('pending'); renderEditRequestsPanel('pending'); }
 }
 
 function renderAdminPanel() {
@@ -2508,10 +2508,18 @@ function filterEditRequests(status, btn) {
   renderEditRequestsPanel(status);
 }
 
+function _activateEditReqFilter(status) {
+  var marker = "filterEditRequests('" + status + "'";
+  document.querySelectorAll('.edit-req-filter').forEach(function(b) {
+    b.classList.toggle('active', (b.getAttribute('onclick') || '').indexOf(marker) >= 0);
+  });
+}
+
 function approveEditRequest(id) {
   if (!confirm('Approve this edit request? The employee will be able to modify the locked section.')) return;
   apiCall('PATCH', '/edit-requests/' + id + '/approve', {}).then(function() {
     showToast('Edit request approved');
+    _activateEditReqFilter('pending');
     renderEditRequestsPanel('pending');
   }).catch(function(err) {
     showToast(err.message || 'Failed to approve', 'error');
@@ -2522,6 +2530,7 @@ function rejectEditRequest(id) {
   var note = prompt('Optional rejection reason:');
   apiCall('PATCH', '/edit-requests/' + id + '/reject', { note: note || '' }).then(function() {
     showToast('Edit request rejected');
+    _activateEditReqFilter('pending');
     renderEditRequestsPanel('pending');
   }).catch(function(err) {
     showToast(err.message || 'Failed to reject', 'error');
