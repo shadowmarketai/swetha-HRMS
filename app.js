@@ -755,16 +755,14 @@ function _isProfileSectionLocked(section, lockStatus) {
 }
 
 function _renderLockBadge(section, lockStatus) {
-  var locked = _isProfileSectionLocked(section, lockStatus);
   var pending = (lockStatus.pending_requests || []).find(function(r) { return r.section === section; });
   var approved = (lockStatus.approved_requests || []).find(function(r) { return r.section === section; });
+  var isLocked = lockStatus.locks && lockStatus.locks[section];
   var html = '';
-  if (lockStatus.locks && lockStatus.locks[section]) {
-    if (approved) {
-      html += '<span class="lock-badge unlocked"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0"/></svg>Unlocked</span>';
-    } else {
-      html += '<span class="lock-badge locked"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Locked</span>';
-    }
+  if (approved) {
+    html += '<span class="lock-badge unlocked"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0"/></svg>Unlocked</span>';
+  } else if (isLocked) {
+    html += '<span class="lock-badge locked"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>Locked</span>';
   }
   if (pending && !approved) {
     html += '<div class="edit-request-status pending"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>Edit request pending HR approval</div>';
@@ -885,21 +883,38 @@ function _renderProfileContent(c, emp, initials, isMDUser, isHrMd, lockStatus) {
   html += '<div class="ss-form-group"><label>Payment Mode</label><div class="ss-readonly">NEFT</div></div>';
   html += '</div></div>';
 
-  // Section 5: Bank & Identity (read-only — managed by HR/MD)
+  // Section 5: Bank & Identity
+  var bankLocked = _isProfileSectionLocked('bank_details', lockStatus);
+  var bankReadonly = bankLocked ? ' readonly' : '';
+  var bankDisabled = bankLocked ? ' disabled' : '';
+  var bankClass = bankLocked ? ' class="ss-readonly-locked"' : '';
   html += '<div class="card profile-section" style="margin:0 16px 12px;border-radius:var(--radius)">';
-  html += '<div class="profile-section-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>Bank & Identity <span style="font-size:.6rem;font-weight:500;color:var(--gray-400);margin-left:6px">Contact HR to update</span></div>';
-  html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
-  html += '<div class="ss-form-group"><label>Bank</label><div class="ss-readonly">' + escapeHTML(emp.bank || '—') + '</div></div>';
-  var accDisplay = emp.accNo ? (emp.accNo.length > 4 ? emp.accNo.replace(/.(?=.{4})/g, 'X') : emp.accNo) : '—';
-  html += '<div class="ss-form-group"><label>Account No</label><div class="ss-readonly">' + escapeHTML(accDisplay) + '</div></div>';
-  html += '<div class="ss-form-group"><label>IFSC Code</label><div class="ss-readonly">' + escapeHTML(emp.ifscCode || emp.ifsc_code || '—') + '</div></div>';
-  html += '<div class="ss-form-group"><label>Bank Branch</label><div class="ss-readonly">' + escapeHTML(emp.bankBranch || emp.bank_branch || '—') + '</div></div>';
-  html += '<div class="ss-form-group"><label>PAN</label><div class="ss-readonly">' + escapeHTML(emp.pan || '—') + '</div></div>';
-  var aadhaarDisplay = emp.aadhaar ? (emp.aadhaar.length > 4 ? emp.aadhaar.replace(/.(?=.{4})/g, 'X') : emp.aadhaar) : '—';
-  html += '<div class="ss-form-group"><label>Aadhaar</label><div class="ss-readonly">' + escapeHTML(aadhaarDisplay) + '</div></div>';
-  html += '<div class="ss-form-group"><label>UAN</label><div class="ss-readonly">' + escapeHTML(emp.uan || '—') + '</div></div>';
-  html += '</div>';
-  // Document photo uploads
+  html += '<div class="profile-section-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>Bank & Identity' + _renderLockBadge('bank_details', lockStatus) + '</div>';
+  if (bankLocked) {
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+    var accDisplay = emp.accNo ? (emp.accNo.length > 4 ? emp.accNo.replace(/.(?=.{4})/g, 'X') : emp.accNo) : '—';
+    var aadhaarDisplay = emp.aadhaar ? (emp.aadhaar.length > 4 ? emp.aadhaar.replace(/.(?=.{4})/g, 'X') : emp.aadhaar) : '—';
+    html += '<div class="ss-form-group"><label>Bank</label><div class="ss-readonly">' + escapeHTML(emp.bank || '—') + '</div></div>';
+    html += '<div class="ss-form-group"><label>Account No</label><div class="ss-readonly">' + escapeHTML(accDisplay) + '</div></div>';
+    html += '<div class="ss-form-group"><label>IFSC Code</label><div class="ss-readonly">' + escapeHTML(emp.ifscCode || emp.ifsc_code || '—') + '</div></div>';
+    html += '<div class="ss-form-group"><label>Bank Branch</label><div class="ss-readonly">' + escapeHTML(emp.bankBranch || emp.bank_branch || '—') + '</div></div>';
+    html += '<div class="ss-form-group"><label>PAN</label><div class="ss-readonly">' + escapeHTML(emp.pan || '—') + '</div></div>';
+    html += '<div class="ss-form-group"><label>Aadhaar</label><div class="ss-readonly">' + escapeHTML(aadhaarDisplay) + '</div></div>';
+    html += '<div class="ss-form-group"><label>UAN</label><div class="ss-readonly">' + escapeHTML(emp.uan || '—') + '</div></div>';
+    html += '</div>';
+    html += '<button class="request-edit-btn" onclick="requestSectionEdit(\'bank_details\')" style="margin-top:8px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>Request Edit Access</button>';
+  } else {
+    html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+    html += '<div class="ss-form-group"><label>Bank</label><input type="text" id="profBank" value="' + escapeHTML(emp.bank || '') + '" placeholder="Bank name"' + bankReadonly + bankClass + '></div>';
+    html += '<div class="ss-form-group"><label>Account No</label><input type="text" id="profAccNo" value="' + escapeHTML(emp.accNo || '') + '" placeholder="Account number"' + bankReadonly + bankClass + '></div>';
+    html += '<div class="ss-form-group"><label>IFSC Code</label><input type="text" id="profIfscCode" value="' + escapeHTML(emp.ifscCode || emp.ifsc_code || '') + '" placeholder="e.g. SBIN0001234"' + bankReadonly + bankClass + '></div>';
+    html += '<div class="ss-form-group"><label>Bank Branch</label><input type="text" id="profBankBranch" value="' + escapeHTML(emp.bankBranch || emp.bank_branch || '') + '" placeholder="Branch name"' + bankReadonly + bankClass + '></div>';
+    html += '<div class="ss-form-group"><label>PAN</label><input type="text" id="profPan" value="' + escapeHTML(emp.pan || '') + '" placeholder="PAN number"' + bankReadonly + bankClass + '></div>';
+    html += '<div class="ss-form-group"><label>Aadhaar</label><input type="text" id="profAadhaar" value="' + escapeHTML(emp.aadhaar || '') + '" placeholder="Aadhaar number"' + bankReadonly + bankClass + '></div>';
+    html += '<div class="ss-form-group"><label>UAN</label><input type="text" id="profUan" value="' + escapeHTML(emp.uan || '') + '" placeholder="UAN number"' + bankReadonly + bankClass + '></div>';
+    html += '</div>';
+  }
+  // Document photo uploads (gated by bank_details lock)
   html += '<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--gray-200)">';
   html += '<div style="font-size:.72rem;font-weight:600;color:var(--gray-600);margin-bottom:8px">Document Uploads</div>';
   html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
@@ -914,7 +929,7 @@ function _renderProfileContent(c, emp, initials, isMDUser, isHrMd, lockStatus) {
   } else {
     html += '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.5" style="margin-bottom:6px"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/><circle cx="8" cy="15" r="2"/><path d="M14 13h4m-4 3h4"/></svg>';
     html += '<div style="font-size:.72rem;font-weight:600;color:var(--gray-500);margin-bottom:6px">Aadhaar Card</div>';
-    if (!profileLocked) {
+    if (!bankLocked) {
       html += '<button onclick="scanAndUploadDoc(\'aadhaar_photo\')" style="font-size:.68rem;padding:6px 14px;border:1px solid var(--primary);color:var(--primary);background:transparent;border-radius:8px;cursor:pointer;transition:all .15s" onmouseover="this.style.background=\'var(--primary)\';this.style.color=\'#fff\'" onmouseout="this.style.background=\'transparent\';this.style.color=\'var(--primary)\'">';
       html += '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
       html += 'Scan & Upload</button>';
@@ -932,7 +947,7 @@ function _renderProfileContent(c, emp, initials, isMDUser, isHrMd, lockStatus) {
   } else {
     html += '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" stroke-width="1.5" style="margin-bottom:6px"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M7 9h10M7 13h6"/></svg>';
     html += '<div style="font-size:.72rem;font-weight:600;color:var(--gray-500);margin-bottom:6px">PAN Card</div>';
-    if (!profileLocked) {
+    if (!bankLocked) {
       html += '<button onclick="scanAndUploadDoc(\'pan_photo\')" style="font-size:.68rem;padding:6px 14px;border:1px solid var(--primary);color:var(--primary);background:transparent;border-radius:8px;cursor:pointer;transition:all .15s" onmouseover="this.style.background=\'var(--primary)\';this.style.color=\'#fff\'" onmouseout="this.style.background=\'transparent\';this.style.color=\'var(--primary)\'">';
       html += '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:middle;margin-right:3px"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
       html += 'Scan & Upload</button>';
@@ -1008,8 +1023,8 @@ function _renderProfileContent(c, emp, initials, isMDUser, isHrMd, lockStatus) {
   }
   html += '</div>';
 
-  // Save button (centered) — hidden when profile is locked
-  if (!profileLocked) {
+  // Save button (centered) — shown when either profile or bank section is editable
+  if (!profileLocked || !bankLocked) {
     html += '<div style="padding:12px 16px;text-align:center"><button class="nf-btn nf-btn-primary ss-save-btn" id="profSaveBtn" style="border-radius:var(--radius);min-width:200px;padding:12px 32px;font-size:.85rem" onclick="saveProfileDetails()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="vertical-align:middle;margin-right:6px"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>Save Changes</button><div id="profSaveMsg" style="margin-top:8px;font-size:.78rem;font-weight:600;display:none"></div></div>';
   }
 
@@ -1082,7 +1097,14 @@ function saveProfileDetails() {
     yearOfPassing: g('profYearOfPassing'),
     previousEmployer: g('profPrevEmployer'),
     previousRole: g('profPrevRole'),
-    yearsOfExperience: g('profYearsExp')
+    yearsOfExperience: g('profYearsExp'),
+    bank: g('profBank'),
+    accNo: g('profAccNo'),
+    ifscCode: g('profIfscCode'),
+    bankBranch: g('profBankBranch'),
+    pan: g('profPan'),
+    aadhaar: g('profAadhaar'),
+    uan: g('profUan')
   };
   var btn = document.getElementById('profSaveBtn');
   apiCall('PUT', '/employees/' + currentUser.code + '/self', payload).then(function() {
