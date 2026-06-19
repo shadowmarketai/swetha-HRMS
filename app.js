@@ -16864,7 +16864,7 @@ function renderHRLeaveRequests() {
   html += '<span style="padding:3px 8px;background:var(--success-light);color:var(--success-dark);border-radius:10px">3. MD Confirmed</span>';
   html += '</div>';
   // shared column widths: Name | Code | Dept | Date Range | Days | Type | Action
-  var COL = '160px 60px 90px 140px 45px 80px auto';
+  var COL = '2fr 0.65fr 1fr 1.8fr 0.45fr 0.8fr 1.1fr';
 
   function typeChip(type) {
     var t = (type || '').toLowerCase();
