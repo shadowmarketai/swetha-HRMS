@@ -130,14 +130,7 @@ router.get('/:code/documents', verifyToken, async (req, res) => {
       'SELECT id, doc_type, doc_name, file_path, file_size, mime_type, uploaded_at FROM documents WHERE emp_code = ? ORDER BY uploaded_at DESC',
       [req.params.code]
     );
-    // Also include aadhaar/pan photo URLs from employees table
-    const [empRows] = await pool.query('SELECT aadhaar_photo_url, pan_photo_url FROM employees WHERE code = ?', [req.params.code]);
-    const idDocs = [];
-    if (empRows.length > 0) {
-      if (empRows[0].aadhaar_photo_url) idDocs.push({ doc_type: 'aadhaar_photo', doc_name: 'Aadhaar Card', file_path: empRows[0].aadhaar_photo_url });
-      if (empRows[0].pan_photo_url) idDocs.push({ doc_type: 'pan_photo', doc_name: 'PAN Card', file_path: empRows[0].pan_photo_url });
-    }
-    res.json({ data: idDocs.concat(docs) });
+    res.json({ data: docs });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
@@ -283,10 +276,13 @@ router.post('/upload-doc', verifyToken, upload.single('document'), async (req, r
     const { docType } = req.body || {};
     if (docType && req.user.empCode) {
       // Whitelist docType to prevent column injection
-      if (docType === 'aadhaar_photo') {
-        await pool.query('UPDATE employees SET aadhaar_photo_url = ? WHERE code = ?', [url, req.user.empCode]).catch(() => {});
-      } else if (docType === 'pan_photo') {
-        await pool.query('UPDATE employees SET pan_photo_url = ? WHERE code = ?', [url, req.user.empCode]).catch(() => {});
+      if (docType === 'aadhaar_photo' || docType === 'pan_photo') {
+        const docName = docType === 'aadhaar_photo' ? 'Aadhaar Card' : 'PAN Card';
+        await pool.query('DELETE FROM documents WHERE emp_code = ? AND doc_type = ?', [req.user.empCode, docType]).catch(() => {});
+        await pool.query(
+          'INSERT INTO documents (emp_code, doc_type, doc_name, file_path, file_size, mime_type) VALUES (?, ?, ?, ?, ?, ?)',
+          [req.user.empCode, docType, docName, url, req.file.size || 0, req.file.mimetype || 'application/octet-stream']
+        ).catch(() => {});
       } else if (['educational_cert', 'bank_passbook', 'experience_cert'].includes(docType)) {
         // Check lock status before allowing upload
         const sectionMap = { educational_cert: 'educational_certs', bank_passbook: 'bank_passbook', experience_cert: 'experience_certs' };

@@ -2215,7 +2215,25 @@ async function submitOnboarding() {
       } catch (photoErr) {}
       empPhotoFile = null;
     }
-    EMPLOYEES.push(newEmp);
+    EMPLOYEES.push({
+      code: newEmp.code, name: newEmp.name, dept: newEmp.dept,
+      designation: newEmp.designation, salary: newEmp.salary,
+      bank: newEmp.bank || '', accNo: newEmp.accNo || '', role: newEmp.role,
+      phone: newEmp.phone || '', doj: newEmp.doj || '',
+      email: newEmp.email || '', address: newEmp.address || '',
+      emergencyContact: newEmp.emergencyContact || '',
+      emergencyPhone: newEmp.emergencyPhone || '',
+      photoUrl: '', status: 'Active',
+      dob: newEmp.dob || '', gender: newEmp.gender || '',
+      presentAddress: newEmp.address || '', permanentAddress: '',
+      fatherName: '', fatherMobile: '',
+      motherName: '', motherMobile: '',
+      spouseName: '', spouseMobile: '',
+      bloodGroup: '', pan: newEmp.pan || '', aadhaar: newEmp.aadhaar || '',
+      uan: '', qualification: '', institution: '', yearOfPassing: '',
+      previousEmployer: '', previousRole: '', yearsOfExperience: '',
+      maritalStatus: '', ifscCode: newEmp.ifscCode || '', bankBranch: ''
+    });
     if (loginCreated) {
       showToast('Employee added successfully! Login credentials created for ' + name + ' (' + code + ')');
     } else {
