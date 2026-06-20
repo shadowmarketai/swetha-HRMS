@@ -196,8 +196,8 @@ router.put('/:code/self', verifyToken, auditLog('update', 'employee'), async (re
     if (existing.length === 0) return res.status(404).json({ error: 'Employee not found' });
     const cur = existing[0];
     const b = req.body;
-    // Helper: use new value if provided (non-empty), else keep current
-    const v = (newVal, curVal) => (newVal !== undefined && newVal !== null && newVal !== '') ? newVal : curVal;
+    // Use new value if field was sent in payload (even empty → null to clear); keep old only if field absent (undefined)
+    const v = (newVal, curVal) => newVal !== undefined ? (newVal || null) : curVal;
     // Check lock status — if profile is locked, block all changes unless approved
     let locks = {};
     try { locks = JSON.parse(cur.profile_sections_locked || '{}'); } catch (e) { locks = {}; }

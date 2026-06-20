@@ -1108,38 +1108,18 @@ function saveProfileDetails() {
   };
   var btn = document.getElementById('profSaveBtn');
   apiCall('PUT', '/employees/' + currentUser.code + '/self', payload).then(function() {
-    // Refresh employee data from DB
+    // Refresh employee data from DB using proper mapEmployee mapping
     return apiCall('GET', '/employees');
   }).then(function(resp) {
     var freshData = resp && resp.data ? resp.data : (Array.isArray(resp) ? resp : []);
     freshData.forEach(function(dbEmp) {
-      // Map snake_case DB fields to camelCase used in frontend
-      dbEmp.accNo = dbEmp.acc_no || dbEmp.accNo;
-      dbEmp.photoUrl = dbEmp.photo_url || dbEmp.photoUrl;
-      dbEmp.presentAddress = dbEmp.present_address || dbEmp.presentAddress;
-      dbEmp.permanentAddress = dbEmp.permanent_address || dbEmp.permanentAddress;
-      dbEmp.fatherName = dbEmp.father_name || dbEmp.fatherName;
-      dbEmp.fatherMobile = dbEmp.father_mobile || dbEmp.fatherMobile;
-      dbEmp.motherName = dbEmp.mother_name || dbEmp.motherName;
-      dbEmp.motherMobile = dbEmp.mother_mobile || dbEmp.motherMobile;
-      dbEmp.spouseName = dbEmp.spouse_name || dbEmp.spouseName;
-      dbEmp.spouseMobile = dbEmp.spouse_mobile || dbEmp.spouseMobile;
-      dbEmp.bloodGroup = dbEmp.blood_group || dbEmp.bloodGroup;
-      dbEmp.maritalStatus = dbEmp.marital_status || dbEmp.maritalStatus;
-      dbEmp.emergencyContact = dbEmp.emergency_contact || dbEmp.emergencyContact;
-      dbEmp.emergencyPhone = dbEmp.emergency_phone || dbEmp.emergencyPhone;
-      dbEmp.yearOfPassing = dbEmp.year_of_passing || dbEmp.yearOfPassing;
-      dbEmp.previousEmployer = dbEmp.previous_employer || dbEmp.previousEmployer;
-      dbEmp.previousRole = dbEmp.previous_role || dbEmp.previousRole;
-      dbEmp.yearsOfExperience = dbEmp.years_of_experience || dbEmp.yearsOfExperience;
-      dbEmp.ifscCode = dbEmp.ifsc_code || dbEmp.ifscCode;
-      dbEmp.bankBranch = dbEmp.bank_branch || dbEmp.bankBranch;
-      // Update EMPLOYEES array
-      var idx = EMPLOYEES.findIndex(function(e) { return e.code === dbEmp.code; });
-      if (idx >= 0) Object.assign(EMPLOYEES[idx], dbEmp);
+      var mapped = mapEmployee(dbEmp);
+      var idx = EMPLOYEES.findIndex(function(e) { return e.code === mapped.code; });
+      if (idx >= 0) EMPLOYEES[idx] = mapped;
+      else EMPLOYEES.push(mapped);
     });
-    var emp = EMPLOYEES.find(function(e) { return e.code === currentUser.code; });
-    if (emp) currentUser = Object.assign({}, currentUser, emp);
+    var selfEmp = EMPLOYEES.find(function(e) { return e.code === currentUser.code; });
+    if (selfEmp) currentUser = Object.assign({}, currentUser, selfEmp);
     renderProfileOverlay();
     // Show success message after re-render
     setTimeout(function() {
@@ -8563,8 +8543,8 @@ async function loadFromBackend() {
       var mapped = empData.map(mapEmployee);
       EMPLOYEES.length = 0;
       mapped.forEach(function(e) { EMPLOYEES.push(e); });
-      // Re-apply DOB map
-      EMPLOYEES.forEach(function(e) { if (EMP_DOB_MAP[e.code]) e.dob = EMP_DOB_MAP[e.code]; });
+      // Re-apply DOB map only as fallback when DB has no DOB saved yet
+      EMPLOYEES.forEach(function(e) { if (!e.dob && EMP_DOB_MAP[e.code]) e.dob = EMP_DOB_MAP[e.code]; });
       // Ensure core accounts active
       EMPLOYEES.forEach(function(e) { if (e.code === 'MD001' || e.code === 'HR001' || e.code === 'SS001') e.status = 'Active'; });
     }
