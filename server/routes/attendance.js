@@ -574,7 +574,7 @@ router.get('/export/consolidated', verifyToken, requireRole('MD', 'HR'), async (
     res.end();
   } catch (err) {
     console.error('[attendance/export/consolidated]', err);
-    res.status(500).json({ error: 'Failed to generate consolidated report' });
+    if (!res.headersSent) res.status(500).json({ error: 'Failed to generate consolidated report', detail: String(err.message), stack: String(err.stack).split('\n').slice(0,3).join(' | ') });
   }
 });
 
@@ -860,7 +860,7 @@ router.get('/export/punch-detail', verifyToken, requireRole('MD', 'HR'), async (
     res.end();
   } catch (err) {
     console.error('[attendance/export/punch-detail]', err);
-    res.status(500).json({ error: 'Failed to generate punch detail report' });
+    if (!res.headersSent) res.status(500).json({ error: 'Failed to generate punch detail report', detail: String(err.message), stack: String(err.stack).split('\n').slice(0,3).join(' | ') });
   }
 });
 
