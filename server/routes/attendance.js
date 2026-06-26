@@ -595,8 +595,8 @@ router.get('/export/punch-detail', verifyToken, requireRole('MD', 'HR'), async (
     function fmtTime(dtStr) {
       if (!dtStr) return '';
       const d = new Date(dtStr);
-      const h = d.getHours(), m = d.getMinutes();
-      return String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
+      if (isNaN(d.getTime())) return '';
+      return d.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: true });
     }
 
     const [attRows, leaveRows, holidayRows, empRows] = await Promise.all([
@@ -612,7 +612,7 @@ router.get('/export/punch-detail', verifyToken, requireRole('MD', 'HR'), async (
         [month + '%', month + '%', month + '-01', month + '-' + String(daysInMonth).padStart(2,'0')]
       ),
       pool.query(`SELECT holiday_date, name FROM public_holidays WHERE holiday_date LIKE ?`, [month + '%']),
-      pool.query(`SELECT code, name FROM employees WHERE status != 'Inactive' ORDER BY name`)
+      pool.query(`SELECT code, name FROM employees WHERE status != 'Inactive' ORDER BY CHAR_LENGTH(code), code`)
     ]);
 
     const holidays = {};
@@ -787,41 +787,46 @@ router.get('/export/punch-detail', verifyToken, requireRole('MD', 'HR'), async (
         const colIN  = 3 + (d - 1) * 2 + 1;
         const colOUT = colIN + 1;
 
-        if (dow === 0) {
-          setCell(colIN,  'Sun', FILL_YELLOW);
-          setCell(colOUT, '',   FILL_YELLOW);
-        } else if (holidays[ymd]) {
-          setCell(colIN,  'Holiday', FILL_YELLOW);
-          setCell(colOUT, '',        FILL_YELLOW);
-        } else if (isFuture) {
+        const att = attMap[emp.code] && attMap[emp.code][d];
+        const leaveStatus = leaveMap[emp.code] && leaveMap[emp.code][ymd];
+        const isSun = dow === 0;
+        const isHol = !!holidays[ymd];
+
+        if (isFuture) {
           setCell(colIN, ''); setCell(colOUT, '');
+        } else if ((isSun || isHol) && att && att.checkIn) {
+          // Employee worked on Sunday/holiday — show actual punch times in orange
+          const FILL_ORANGE = { type:'pattern', pattern:'solid', fgColor:{ argb:'FFFF6600' } };
+          setCell(colIN,  fmtTime(att.checkIn),  FILL_ORANGE);
+          setCell(colOUT, att.checkOut ? fmtTime(att.checkOut) : '', FILL_ORANGE);
+          totalMins += att.mins;
+        } else if (isSun) {
+          setCell(colIN, 'Sun', FILL_YELLOW); setCell(colOUT, '', FILL_YELLOW);
+        } else if (isHol) {
+          setCell(colIN, 'Holiday', FILL_YELLOW); setCell(colOUT, '', FILL_YELLOW);
+        } else if (att && att.checkIn) {
+          const inTime  = fmtTime(att.checkIn);
+          const outTime = att.checkOut ? fmtTime(att.checkOut) : '';
+          const isShort = att.mins < 480;
+          const cellFill = isShort ? FILL_AMBER : null;
+          setCell(colIN,  inTime,  cellFill);
+          setCell(colOUT, outTime, cellFill);
+          if (att.mins >= 480) fullDays++;
+          else if (att.mins >= 240) halfDays++;
+          totalMins += att.mins;
+        } else if (leaveStatus === 'Leave' || leaveStatus === 'Half Day') {
+          setCell(colIN,  leaveStatus, FILL_GREEN);
+          setCell(colOUT, '',          FILL_GREEN);
+          if (leaveStatus === 'Leave') leaveDays++;
+          else halfDays++;
+        } else if (leaveStatus === 'LOP') {
+          setCell(colIN,  'LOP', FILL_BLUE);
+          setCell(colOUT, '',    FILL_BLUE);
+          absentDays++;
         } else {
-          const att = attMap[emp.code] && attMap[emp.code][d];
-          const leaveStatus = leaveMap[emp.code] && leaveMap[emp.code][ymd];
-          if (att && att.checkIn) {
-            const inTime  = fmtTime(att.checkIn);
-            const outTime = att.checkOut ? fmtTime(att.checkOut) : '';
-            const isShort = att.mins < 480;
-            const cellFill = isShort ? FILL_AMBER : null;
-            setCell(colIN,  inTime,  cellFill);
-            setCell(colOUT, outTime, cellFill);
-            if (att.mins >= 480) fullDays++;
-            else if (att.mins >= 240) halfDays++;
-            totalMins += att.mins;
-          } else if (leaveStatus === 'Leave' || leaveStatus === 'Half Day') {
-            setCell(colIN,  leaveStatus, FILL_GREEN);
-            setCell(colOUT, '',          FILL_GREEN);
-            if (leaveStatus === 'Leave') leaveDays++;
-            else halfDays++;
-          } else if (leaveStatus === 'LOP') {
-            setCell(colIN,  'LOP', FILL_BLUE);
-            setCell(colOUT, '',    FILL_BLUE);
-            absentDays++;
-          } else {
-            setCell(colIN,  'Absent', FILL_BLUE);
-            setCell(colOUT, '',       FILL_BLUE);
-            absentDays++;
-          }
+          setCell(colIN,  'Absent', FILL_BLUE);
+          setCell(colOUT, '',       FILL_BLUE);
+          absentDays++;
         }
       }
 
