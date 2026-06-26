@@ -2575,12 +2575,23 @@ function isTemporaryMD(user) {
 }
 
 function filterEmpDatabase(query) {
-  renderEmpDatabase(query ? query.trim().toLowerCase() : '');
+  var deptSel = document.getElementById('empDeptFilter');
+  var deptFilter = deptSel ? deptSel.value : '';
+  renderEmpDatabase(query ? query.trim().toLowerCase() : '', deptFilter);
 }
 
-function renderEmpDatabase(filterQuery) {
+function renderEmpDatabase(filterQuery, deptFilter) {
   const container = document.getElementById('empDbList');
   if (!container) return;
+  // Populate department dropdown if not already done
+  var deptSel = document.getElementById('empDeptFilter');
+  if (deptSel && deptSel.options.length <= 1) {
+    departments.forEach(function(d) {
+      var opt = document.createElement('option');
+      opt.value = d; opt.textContent = d;
+      deptSel.appendChild(opt);
+    });
+  }
   const colors = ['#E85D04','#D62828','#14B8A6','#22C55E','#EC4899'];
   const isMD = currentUser && currentUser.role === 'MD';
   const isHR = currentUser && currentUser.role === 'HR';
@@ -2588,14 +2599,16 @@ function renderEmpDatabase(filterQuery) {
   const isHRorMD = currentUser && (currentUser.role === 'MD' || currentUser.role === 'HR' || _isSuperAdmin);
   let html = '';
   var matchCount = 0;
-  departments.forEach((dept, di) => {
+  var deptsToShow = (deptFilter) ? departments.filter(function(d) { return d === deptFilter; }) : departments;
+  deptsToShow.forEach((dept, di) => {
+    const colorIdx = departments.indexOf(dept);
     const allDeptEmps = EMPLOYEES.filter(e => e.dept === dept);
     const emps = filterQuery
       ? allDeptEmps.filter(e => e.name.toLowerCase().includes(filterQuery) || e.code.toLowerCase().includes(filterQuery))
       : allDeptEmps;
     if (emps.length === 0) return;
     matchCount += emps.length;
-    html += `<div style="margin-top:12px;margin-bottom:6px;font-family:var(--font-display);font-size:.75rem;font-weight:600;color:${colors[di % colors.length]};text-transform:uppercase;letter-spacing:.04em">${dept} (${emps.length})</div>`;
+    html += `<div style="margin-top:12px;margin-bottom:6px;font-family:var(--font-display);font-size:.75rem;font-weight:600;color:${colors[colorIdx % colors.length]};text-transform:uppercase;letter-spacing:.04em">${dept} (${emps.length})</div>`;
     emps.forEach(e => {
       const isMD001 = e.code === 'MD001';
       const init = e.name.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase();
@@ -2630,7 +2643,7 @@ function renderEmpDatabase(filterQuery) {
         </div>`;
       }
       html += `<div class="emp-list-item" style="${isInactive ? 'opacity:.6' : ''}" ${isHRorMD ? 'onclick="toggleEmpDetail(\'' + e.code + '\', this)"' : ''}>
-        <div class="emp-avatar" style="background:${colors[di % colors.length]}">${init}</div>
+        <div class="emp-avatar" style="background:${colors[colorIdx % colors.length]}">${init}</div>
         <div class="emp-details">
           <h4>${escapeHTML(e.name)}${statusBadge}</h4>
           <p>${e.code} &middot; ${escapeHTML(e.designation)} &middot; &#8377;${e.salary.toLocaleString('en-IN')}</p>
@@ -2641,14 +2654,16 @@ function renderEmpDatabase(filterQuery) {
       if (isHRorMD) html += `<div class="emp-detail-expanded" id="empDetail-${e.code}" style="display:none"></div>`;
     });
   });
-  if (filterQuery && matchCount === 0) {
-    html = '<div style="text-align:center;padding:24px;color:var(--gray-400);font-size:.82rem">No employee found for <strong>' + filterQuery + '</strong></div>';
+  if ((filterQuery || deptFilter) && matchCount === 0) {
+    var noMatchMsg = deptFilter ? 'No employees in <strong>' + deptFilter + '</strong>' : 'No employee found for <strong>' + filterQuery + '</strong>';
+    html = '<div style="text-align:center;padding:24px;color:var(--gray-400);font-size:.82rem">' + noMatchMsg + '</div>';
   }
   container.innerHTML = html;
-  // Auto-expand when exactly one match found
+  // Auto-expand when exactly one match found (only for text search, not dept filter)
   if (filterQuery && matchCount === 1 && isHRorMD) {
     var match = EMPLOYEES.find(function(e) {
-      return e.name.toLowerCase().includes(filterQuery) || e.code.toLowerCase().includes(filterQuery);
+      var inDept = !deptFilter || e.dept === deptFilter;
+      return inDept && (e.name.toLowerCase().includes(filterQuery) || e.code.toLowerCase().includes(filterQuery));
     });
     if (match) {
       var detailEl = document.getElementById('empDetail-' + match.code);
