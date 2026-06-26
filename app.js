@@ -9697,8 +9697,16 @@ async function downloadPunchDetailXLSX() {
     SUMMARY.forEach(function() { hdr2.push(mk('', COLORS.summary)); });
     wsData.push(hdr2);
 
-    // Data rows
+    // Data rows — sorted by SS numeric code (SS001, SS002 … then others alphabetically)
     var activeEmps = (EMPLOYEES || []).filter(function(e) { return e.status !== 'Inactive' && e.code !== 'SADMIN'; });
+    activeEmps.sort(function(a, b) {
+      var mA = a.code.match(/^([A-Za-z]+)(\d+)$/), mB = b.code.match(/^([A-Za-z]+)(\d+)$/);
+      if (mA && mB) {
+        if (mA[1] !== mB[1]) return mA[1].localeCompare(mB[1]);
+        return parseInt(mA[2], 10) - parseInt(mB[2], 10);
+      }
+      return a.code.localeCompare(b.code);
+    });
     activeEmps.forEach(function(emp, idx) {
       var row = [mk(idx+1), mk(emp.name, null, false, true), mk(emp.code)];
       var totalMins = 0, fullDays = 0, halfDays = 0, leaveDays = 0, absentDays = 0;
@@ -9707,16 +9715,23 @@ async function downloadPunchDetailXLSX() {
         var dow = new Date(selYear, selMonth, d).getDay();
         var ymd = monthStr + '-' + String(d).padStart(2,'0');
         var isHol = !!holidays[ymd];
+        var isSun = dow === 0;
         var isFuture = isCurrentMonth && d > lastDay;
+        var att = attMap[emp.code] && attMap[emp.code][d];
 
-        if (dow === 0) {
+        if (isFuture) {
+          row.push(mk('')); row.push(mk(''));
+        } else if ((isSun || isHol) && att && att.checkIn) {
+          // Employee worked on Sunday/holiday — show actual punch times with orange highlight
+          var inT = _fmtTime(att.checkIn), outT = att.checkOut ? _fmtTime(att.checkOut) : '';
+          var workedHolBg = 'FF6600';  // orange to distinguish Sunday/holiday work
+          row.push(mk(inT, workedHolBg)); row.push(mk(outT, workedHolBg));
+          totalMins += att.mins;
+        } else if (isSun) {
           row.push(mk('Sun', COLORS.yellow)); row.push(mk('', COLORS.yellow));
         } else if (isHol) {
           row.push(mk('Holiday', COLORS.yellow)); row.push(mk('', COLORS.yellow));
-        } else if (isFuture) {
-          row.push(mk('')); row.push(mk(''));
         } else {
-          var att = attMap[emp.code] && attMap[emp.code][d];
           var lv  = leaveMap[emp.code] && leaveMap[emp.code][ymd];
           if (att && att.checkIn) {
             var inT = _fmtTime(att.checkIn), outT = att.checkOut ? _fmtTime(att.checkOut) : '';
