@@ -9424,6 +9424,13 @@ function closeConsolidatedAttModal() {
 }
 
 // ── Shared: fetch and pivot attendance data for the month ──
+function fmtShortTimeIST(dtStr) {
+  if (!dtStr) return '';
+  const d = new Date(dtStr);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: true });
+}
+
 async function _buildConsolidatedData(selMonth, selYear) {
   const monthStr = selYear + '-' + String(selMonth + 1).padStart(2, '0');
   const daysInMonth = new Date(selYear, selMonth + 1, 0).getDate();
@@ -9453,7 +9460,7 @@ async function _buildConsolidatedData(selMonth, selYear) {
     } else {
       hrs = 8; mn = 0; // no checkout — assume 8h
     }
-    attMap[code][day] = { hrs, mn };
+    attMap[code][day] = { hrs, mn, checkIn: l.check_in || null, checkOut: l.check_out || null };
   });
 
   // Leave map: empCode → { day → 'Leave' }
@@ -9492,8 +9499,8 @@ async function _buildConsolidatedData(selMonth, selYear) {
         const h = att.hrs, m = att.mn;
         totalMins += h * 60 + m;
         const label = h + 'h ' + m + 'm';
-        if (h < 5) { days.push({ label, type:'half' }); halfDays++; }
-        else       { days.push({ label, type:'present' }); fullDays++; }
+        if (h < 5) { days.push({ label, type:'half', checkIn: att.checkIn, checkOut: att.checkOut }); halfDays++; }
+        else       { days.push({ label, type:'present', checkIn: att.checkIn, checkOut: att.checkOut }); fullDays++; }
       } else {
         if (date < today) { days.push({ label:'Absent', type:'absent' }); absentDays++; }
         else              { days.push({ label:'', type:'future' }); }
@@ -9912,6 +9919,114 @@ async function downloadConsolidatedPDFReport() {
 
   savePdfSafe(doc, 'Attendance_' + monthNames[mo] + '_' + yr + '.pdf');
   showToast('PDF report downloaded!');
+}
+
+async function downloadPunchDetailPDFReport() {
+  closeConsolidatedAttModal();
+  showToast('Generating punch detail PDF…');
+  await loadJsPdf();
+  var selMonth = parseInt(document.getElementById('conAttMonth').value);
+  var selYear  = parseInt(document.getElementById('conAttYear').value);
+  var data = await _buildConsolidatedData(selMonth, selYear);
+  var rows = data.rows, daysInMonth = data.daysInMonth, holidays = data.holidays, yr = data.selYear, mo = data.selMonth;
+  var monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  var jsPDFCtor = window.jspdf.jsPDF;
+
+  var doc = new jsPDFCtor('l', 'mm', 'a4');
+  var pw = 297, ph = 210, lm = 6, rm = 291, cw = rm - lm;
+  var primary = [68,114,196], dark = [30,30,60], mid = [100,100,120];
+
+  var y = 8;
+  try { doc.addImage('data:image/png;base64,' + COMPANY_LOGO_B64, 'PNG', lm, y-2, 22, 8); } catch(e) {}
+  doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(primary[0],primary[1],primary[2]);
+  doc.text('SWETHA STRUCTURES — ' + monthNames[mo].toUpperCase() + ' ' + yr + ' PUNCH IN/OUT REPORT', lm+25, y+4);
+  doc.setFont('helvetica','normal'); doc.setFontSize(6); doc.setTextColor(mid[0],mid[1],mid[2]);
+  doc.text('Generated: ' + new Date().toLocaleDateString('en-IN'), rm, y+4, {align:'right'});
+  y += 10; doc.setDrawColor(primary[0],primary[1],primary[2]); doc.setLineWidth(0.4); doc.line(lm, y, rm, y); y += 2;
+
+  var fixedW = [5, 30, 10];
+  var dayW = Math.max(3.8, (cw - fixedW.reduce(function(a,b){return a+b;},0)) / daysInMonth);
+  var rowH = 8, hdrH = 7;
+  var dayLetters = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+  var SUN_COLOR = [255,255,153], LEAVE_COLOR = [146,208,80], ABSENT_COLOR = [166,202,236], HALF_COLOR = [255,192,0];
+
+  function drawPunchCell(x, yy, w, h, inTime, outTime, bgRgb) {
+    if (bgRgb) { doc.setFillColor(bgRgb[0],bgRgb[1],bgRgb[2]); doc.rect(x, yy, w, h, 'F'); }
+    doc.setDrawColor(200,200,200); doc.setLineWidth(0.1); doc.rect(x, yy, w, h);
+    doc.setFont('helvetica','normal'); doc.setTextColor(dark[0],dark[1],dark[2]);
+    if (inTime) { doc.setFontSize(3.5); doc.text(String(inTime), x+w/2, yy+2.8, {align:'center', maxWidth:w-0.3}); }
+    if (outTime) { doc.setFontSize(3.5); doc.text(String(outTime), x+w/2, yy+5.8, {align:'center', maxWidth:w-0.3}); }
+  }
+
+  function drawFixedCell(x, yy, w, h, text, bgRgb, bold, fs) {
+    if (bgRgb) { doc.setFillColor(bgRgb[0],bgRgb[1],bgRgb[2]); doc.rect(x, yy, w, h, 'F'); }
+    doc.setDrawColor(200,200,200); doc.setLineWidth(0.1); doc.rect(x, yy, w, h);
+    if (text !== null && text !== undefined && text !== '') {
+      doc.setFont('helvetica', bold ? 'bold' : 'normal'); doc.setFontSize(fs || 4.5); doc.setTextColor(dark[0],dark[1],dark[2]);
+      doc.text(String(text), x+w/2, yy+h/2+1.5, {align:'center', maxWidth:w-0.3});
+    }
+  }
+
+  // Header
+  var x = lm;
+  ['#','Name','Code'].forEach(function(h,i) {
+    doc.setFillColor(primary[0],primary[1],primary[2]); doc.rect(x, y, fixedW[i], hdrH, 'F');
+    doc.setDrawColor(200,200,200); doc.setLineWidth(0.1); doc.rect(x, y, fixedW[i], hdrH);
+    doc.setFont('helvetica','bold'); doc.setFontSize(5.5); doc.setTextColor(255,255,255);
+    doc.text(h, x+fixedW[i]/2, y+hdrH/2+1.5, {align:'center'});
+    x += fixedW[i];
+  });
+  for (var d = 1; d <= daysInMonth; d++) {
+    var date = new Date(yr, mo, d);
+    var isSun = date.getDay() === 0;
+    var ymd = yr + '-' + String(mo+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+    var isHol = !!holidays[ymd];
+    var hBg = (isSun || isHol) ? SUN_COLOR : primary;
+    var hTc = (isSun || isHol) ? [0,0,0] : [255,255,255];
+    doc.setFillColor(hBg[0],hBg[1],hBg[2]); doc.rect(x, y, dayW, hdrH, 'F');
+    doc.setDrawColor(200,200,200); doc.setLineWidth(0.1); doc.rect(x, y, dayW, hdrH);
+    doc.setFont('helvetica','bold'); doc.setFontSize(4.5); doc.setTextColor(hTc[0],hTc[1],hTc[2]);
+    doc.text(d + '\n' + dayLetters[date.getDay()], x+dayW/2, y+2.2, {align:'center', lineHeightFactor:1.3});
+    x += dayW;
+  }
+  y += hdrH;
+
+  // Data rows
+  rows.forEach(function(r, idx) {
+    if (y + rowH > ph - 8) { doc.addPage(); y = 10; }
+    x = lm;
+    var rowBg = idx % 2 === 0 ? [245,245,252] : [255,255,255];
+    drawFixedCell(x, y, fixedW[0], rowH, idx+1, rowBg); x += fixedW[0];
+    doc.setFillColor(rowBg[0],rowBg[1],rowBg[2]); doc.rect(x, y, fixedW[1], rowH, 'F');
+    doc.setDrawColor(200,200,200); doc.setLineWidth(0.1); doc.rect(x, y, fixedW[1], rowH);
+    doc.setFont('helvetica','bold'); doc.setFontSize(4.8); doc.setTextColor(dark[0],dark[1],dark[2]);
+    doc.text(r.emp.name.substring(0,24), x+1, y+rowH/2+1.5);
+    x += fixedW[1];
+    drawFixedCell(x, y, fixedW[2], rowH, r.emp.code, rowBg); x += fixedW[2];
+
+    r.days.forEach(function(dd) {
+      var bg, inT = '', outT = '';
+      if (dd.type === 'sun' || dd.type === 'holiday') {
+        bg = SUN_COLOR; inT = dd.label;
+      } else if (dd.type === 'leave') {
+        bg = LEAVE_COLOR; inT = 'Leave';
+      } else if (dd.type === 'absent') {
+        bg = ABSENT_COLOR; inT = 'Absent';
+      } else if (dd.type === 'present' || dd.type === 'half') {
+        bg = dd.type === 'half' ? HALF_COLOR : rowBg;
+        inT  = dd.checkIn  ? fmtShortTimeIST(dd.checkIn)  : '';
+        outT = dd.checkOut ? fmtShortTimeIST(dd.checkOut) : '';
+      } else {
+        bg = rowBg;
+      }
+      drawPunchCell(x, y, dayW, rowH, inT, outT, bg);
+      x += dayW;
+    });
+    y += rowH;
+  });
+
+  savePdfSafe(doc, 'Attendance_PunchDetail_' + monthNames[mo] + '_' + yr + '.pdf');
+  showToast('Punch detail PDF downloaded!');
 }
 
 // =====================================================

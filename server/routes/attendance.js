@@ -341,7 +341,7 @@ router.get('/export/consolidated', verifyToken, requireRole('MD', 'HR'), async (
         [month + '%', month + '%', month + '-01', month + '-' + String(daysInMonth).padStart(2,'0')]
       ),
       pool.query(`SELECT holiday_date, name FROM public_holidays WHERE holiday_date LIKE ?`, [month + '%']),
-      pool.query(`SELECT code, name, dept FROM employees WHERE status != 'Inactive' ORDER BY name`)
+      pool.query(`SELECT code, name, dept FROM employees WHERE is_active = 1 ORDER BY name`)
     ]);
 
     // Build holiday lookup  { 'YYYY-MM-DD': name }
@@ -568,13 +568,13 @@ router.get('/export/consolidated', verifyToken, requireRole('MD', 'HR'), async (
     // ── Send response ─────────────────────────────────────────────
     const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
     const filename = `${monthNames[mo-1]}_${yr}_Consolidated.xlsx`;
+    const buf = await wb.xlsx.writeBuffer();
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    await wb.xlsx.write(res);
-    res.end();
+    res.send(buf);
   } catch (err) {
     console.error('[attendance/export/consolidated]', err);
-    if (!res.headersSent) res.status(500).json({ error: 'Failed to generate consolidated report', detail: String(err.message), stack: String(err.stack).split('\n').slice(0,3).join(' | ') });
+    if (!res.headersSent) res.status(500).json({ error: 'Failed to generate consolidated report' });
   }
 });
 
@@ -594,7 +594,7 @@ router.get('/export/punch-detail', verifyToken, requireRole('MD', 'HR'), async (
 
     function fmtTime(dtStr) {
       if (!dtStr) return '';
-      const d = new Date(dtStr);
+      const d = dtStr instanceof Date ? dtStr : new Date(typeof dtStr === 'string' ? dtStr.replace(' ', 'T') : dtStr);
       if (isNaN(d.getTime())) return '';
       return d.toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: true });
     }
@@ -612,7 +612,7 @@ router.get('/export/punch-detail', verifyToken, requireRole('MD', 'HR'), async (
         [month + '%', month + '%', month + '-01', month + '-' + String(daysInMonth).padStart(2,'0')]
       ),
       pool.query(`SELECT holiday_date, name FROM public_holidays WHERE holiday_date LIKE ?`, [month + '%']),
-      pool.query(`SELECT code, name FROM employees WHERE status != 'Inactive' ORDER BY CHAR_LENGTH(code), code`)
+      pool.query(`SELECT code, name FROM employees WHERE is_active = 1 ORDER BY CHAR_LENGTH(code), code`)
     ]);
 
     const holidays = {};
@@ -854,13 +854,13 @@ router.get('/export/punch-detail', verifyToken, requireRole('MD', 'HR'), async (
     ws.views = [{ state:'frozen', xSplit:3, ySplit:3, topLeftCell:'D4' }];
 
     const filename = `${monthNames[mo-1]}_${yr}_PunchDetail.xlsx`;
+    const buf = await wb.xlsx.writeBuffer();
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-    await wb.xlsx.write(res);
-    res.end();
+    res.send(buf);
   } catch (err) {
     console.error('[attendance/export/punch-detail]', err);
-    if (!res.headersSent) res.status(500).json({ error: 'Failed to generate punch detail report', detail: String(err.message), stack: String(err.stack).split('\n').slice(0,3).join(' | ') });
+    if (!res.headersSent) res.status(500).json({ error: 'Failed to generate punch detail report' });
   }
 });
 
