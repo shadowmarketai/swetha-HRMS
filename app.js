@@ -1945,7 +1945,7 @@ function _computeCalendarStatuses(logs, empCode, year, month, maxDay) {
         if (s.checkIn) {
           var start = new Date(s.checkIn).getTime();
           var end;
-          if (s.checkOut) {
+          if (s.checkOut && (new Date(s.checkOut).getTime() - start) >= 5 * 60000) {
             end = new Date(s.checkOut).getTime();
           } else if (isCurrentMonth && dd === now.getDate()) {
             // Still active today — count up to current time
@@ -9454,11 +9454,12 @@ async function _buildConsolidatedData(selMonth, selYear) {
     const day = d.getDate();
     if (!attMap[code]) attMap[code] = {};
     let hrs = 0, mn = 0;
-    if (l.check_in && l.check_out) {
+    if (l.check_in && l.check_out && (new Date(l.check_out) - new Date(l.check_in)) >= 5 * 60000) {
+      // Valid session — at least 5 minutes between check-in and check-out
       const diff = (new Date(l.check_out) - new Date(l.check_in)) / 60000;
       hrs = Math.floor(diff / 60); mn = Math.round(diff % 60);
     } else if (l.check_in) {
-      hrs = 8; mn = 0; // check_in only — assume full day for past days
+      hrs = 8; mn = 0; // check_in only (or same-time/near-instant checkout) — assume full day
     } else {
       hrs = 4; mn = 0; // check_out only single punch — credit half day
     }

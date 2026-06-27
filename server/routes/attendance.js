@@ -630,9 +630,12 @@ router.get('/export/punch-detail', verifyToken, requireRole('MD', 'HR'), async (
         if (!entry.checkIn || new Date(row.check_in) < new Date(entry.checkIn)) entry.checkIn = row.check_in;
         const start = new Date(row.check_in).getTime();
         let end;
-        if (row.check_out) {
+        if (row.check_out && (new Date(row.check_out).getTime() - start) >= 5 * 60000) {
+          // Valid checkout — gap is at least 5 minutes
           end = new Date(row.check_out).getTime();
           if (!entry.checkOut || new Date(row.check_out) > new Date(entry.checkOut)) entry.checkOut = row.check_out;
+        } else if (row.check_out) {
+          // Same-time or near-instant checkout (< 5 min) — treat as single check-in only
         } else if (isCurrentMonth && d === today.getDate()) {
           end = Date.now();
         } else {
