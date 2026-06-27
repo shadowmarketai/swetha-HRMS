@@ -9457,10 +9457,22 @@ async function _buildConsolidatedData(selMonth, selYear) {
     if (l.check_in && l.check_out) {
       const diff = (new Date(l.check_out) - new Date(l.check_in)) / 60000;
       hrs = Math.floor(diff / 60); mn = Math.round(diff % 60);
+    } else if (l.check_in) {
+      hrs = 8; mn = 0; // check_in only — assume full day for past days
     } else {
-      hrs = 8; mn = 0; // no checkout — assume 8h
+      hrs = 4; mn = 0; // check_out only single punch — credit half day
     }
-    attMap[code][day] = { hrs, mn, checkIn: l.check_in || null, checkOut: l.check_out || null };
+    const _existing = attMap[code][day];
+    if (!_existing) {
+      attMap[code][day] = { hrs, mn, checkIn: l.check_in || null, checkOut: l.check_out || null };
+    } else {
+      // Multiple sessions same day: accumulate minutes, keep earliest IN and latest OUT
+      const _totalMn = (_existing.hrs * 60 + _existing.mn) + (hrs * 60 + mn);
+      _existing.hrs = Math.floor(_totalMn / 60);
+      _existing.mn = Math.round(_totalMn % 60);
+      if (l.check_in && (!_existing.checkIn || new Date(l.check_in) < new Date(_existing.checkIn))) _existing.checkIn = l.check_in;
+      if (l.check_out && (!_existing.checkOut || new Date(l.check_out) > new Date(_existing.checkOut))) _existing.checkOut = l.check_out;
+    }
   });
 
   // Leave map: empCode → { day → 'Leave' }
@@ -10014,8 +10026,8 @@ async function downloadPunchDetailPDFReport() {
         bg = ABSENT_COLOR; inT = 'Absent';
       } else if (dd.type === 'present' || dd.type === 'half') {
         bg = dd.type === 'half' ? HALF_COLOR : rowBg;
-        inT  = dd.checkIn  ? fmtShortTimeIST(dd.checkIn)  : '';
-        outT = dd.checkOut ? fmtShortTimeIST(dd.checkOut) : '';
+        inT  = dd.checkIn  ? fmtShortTimeIST(dd.checkIn)  : (dd.checkOut ? '—' : '');
+        outT = dd.checkOut ? fmtShortTimeIST(dd.checkOut) : (dd.checkIn  ? '—' : '');
       } else {
         bg = rowBg;
       }

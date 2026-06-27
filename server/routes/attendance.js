@@ -641,6 +641,12 @@ router.get('/export/punch-detail', verifyToken, requireRole('MD', 'HR'), async (
         }
         if (end > start) entry.mins += (end - start) / 60000;
       }
+      // Capture check_out for single-punch records where check_in is missing
+      if (!row.check_in && row.check_out) {
+        if (!entry.checkOut || new Date(row.check_out) > new Date(entry.checkOut)) {
+          entry.checkOut = row.check_out;
+        }
+      }
     });
 
     const leaveMap = {};
@@ -806,7 +812,7 @@ router.get('/export/punch-detail', verifyToken, requireRole('MD', 'HR'), async (
           setCell(colIN, 'Holiday', FILL_YELLOW); setCell(colOUT, '', FILL_YELLOW);
         } else if (att && att.checkIn) {
           const inTime  = fmtTime(att.checkIn);
-          const outTime = att.checkOut ? fmtTime(att.checkOut) : '';
+          const outTime = att.checkOut ? fmtTime(att.checkOut) : '—';
           const isShort = att.mins < 480;
           const cellFill = isShort ? FILL_AMBER : null;
           setCell(colIN,  inTime,  cellFill);
@@ -814,6 +820,13 @@ router.get('/export/punch-detail', verifyToken, requireRole('MD', 'HR'), async (
           if (att.mins >= 480) fullDays++;
           else if (att.mins >= 240) halfDays++;
           totalMins += att.mins;
+        } else if (att && att.checkOut) {
+          // Single punch — check-in missing, only check-out recorded
+          const FILL_SINGLE = { type:'pattern', pattern:'solid', fgColor:{ argb:'FFFFD966' } };
+          setCell(colIN,  '—',                   FILL_SINGLE);
+          setCell(colOUT, fmtTime(att.checkOut), FILL_SINGLE);
+          halfDays++;
+          totalMins += 240;
         } else if (leaveStatus === 'Leave' || leaveStatus === 'Half Day') {
           setCell(colIN,  leaveStatus, FILL_GREEN);
           setCell(colOUT, '',          FILL_GREEN);
