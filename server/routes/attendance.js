@@ -852,6 +852,7 @@ router.get('/export/punch-detail', verifyToken, requireRole('MD', 'HR'), async (
           setCell(colOUT, outTime, cellFill);
           if (att.mins >= 480) fullDays++;
           else if (att.mins >= 240) halfDays++;
+          else if (att.eveningOnly) absentDays++; // evening-only < 4h = absent (gaming the system)
           totalMins += att.mins;
         } else if (att && att.checkOut) {
           // Single punch — check-in missing, only check-out recorded

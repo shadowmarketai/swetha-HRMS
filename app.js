@@ -9532,10 +9532,19 @@ async function _buildConsolidatedData(selMonth, selYear) {
         days.push({ label:'Leave', type:'leave' }); leaveDays++;
       } else if (att) {
         const h = att.hrs, m = att.mn;
-        totalMins += h * 60 + m;
+        const totalMn = h * 60 + m;
+        // Check if evening-only (check_in after 14:00 IST)
+        let isEveningOnly = false;
+        if (att.checkIn) {
+          const ist = new Date(new Date(att.checkIn).toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+          if (ist.getHours() >= 14) isEveningOnly = true;
+        }
+        totalMins += totalMn;
         const label = h + 'h ' + m + 'm';
-        if (h < 5) { days.push({ label, type:'half', checkIn: att.checkIn, checkOut: att.checkOut }); halfDays++; }
-        else       { days.push({ label, type:'present', checkIn: att.checkIn, checkOut: att.checkOut }); fullDays++; }
+        if (h >= 8)               { days.push({ label, type:'present', checkIn: att.checkIn, checkOut: att.checkOut }); fullDays++; }
+        else if (totalMn >= 240)  { days.push({ label, type:'half',    checkIn: att.checkIn, checkOut: att.checkOut }); halfDays++; }
+        else if (isEveningOnly)   { days.push({ label:'Evening', type:'absent', checkIn: att.checkIn, checkOut: att.checkOut }); absentDays++; }
+        else                      { days.push({ label, type:'half',    checkIn: att.checkIn, checkOut: att.checkOut }); halfDays++; }
       } else {
         if (date < today) { days.push({ label:'Absent', type:'absent' }); absentDays++; }
         else              { days.push({ label:'', type:'future' }); }
