@@ -889,6 +889,53 @@ router.get('/export/punch-detail', verifyToken, requireRole('MD', 'HR'), async (
       setCell(summaryBase + 7, eveningOnlyDays || '', FILL_EVENING);
     });
 
+    // ── Legend / Colour Key ───────────────────────────────────────
+    const FILL_SINGLE_LEG = { type:'pattern', pattern:'solid', fgColor:{ argb:'FFFFD966' } };
+    const FILL_ORANGE_LEG = { type:'pattern', pattern:'solid', fgColor:{ argb:'FFFF6600' } };
+    const legendItems = [
+      { fill: null,             label: 'Full Day',             desc: 'Valid IN + OUT  ·  ≥ 8 hours worked' },
+      { fill: FILL_AMBER,       label: 'Short Day',            desc: 'Valid IN + OUT  ·  < 8 hours worked' },
+      { fill: FILL_MISSING_OUT, label: 'Missing Out-Punch',    desc: 'Checked IN but no OUT recorded — credited max 4h (half day)' },
+      { fill: FILL_EVENING,     label: 'Evening Only',         desc: 'Check-IN after 2:00 PM IST — credited max 4h (half day)' },
+      { fill: FILL_SINGLE_LEG,  label: 'Single Punch',         desc: 'Only one of IN/OUT was recorded — counted as half day' },
+      { fill: FILL_BLUE,        label: 'Absent / LOP',         desc: 'No attendance record, or Loss of Pay day' },
+      { fill: FILL_GREEN,       label: 'Leave',                desc: 'Approved paid leave' },
+      { fill: FILL_YELLOW,      label: 'Sunday / Holiday',     desc: 'Non-working day' },
+      { fill: FILL_ORANGE_LEG,  label: 'Worked on Holiday',    desc: 'Attended on Sunday or a public holiday' },
+    ];
+
+    const legStart = employees.length + 5; // blank gap of 1 after last data row
+    ws.getRow(legStart).height = 15;
+    const legTitleCell = ws.getCell(legStart, 1);
+    legTitleCell.value = 'COLOUR KEY';
+    legTitleCell.font  = { name:'Calibri', size:9, bold:true, color:{ argb:'FFFFFFFF' } };
+    legTitleCell.fill  = FILL_TITLE;
+    legTitleCell.alignment = { horizontal:'left', vertical:'middle' };
+    legTitleCell.border = BORDER_ALL;
+    ws.mergeCells(legStart, 1, legStart, 6);
+
+    legendItems.forEach((item, i) => {
+      const r = legStart + 1 + i;
+      ws.getRow(r).height = 13;
+
+      // Swatch + label (cols 1-2)
+      const swCell = ws.getCell(r, 1);
+      swCell.value = item.label;
+      swCell.font  = { name:'Calibri', size:8, bold:true };
+      swCell.fill  = item.fill || { type:'pattern', pattern:'solid', fgColor:{ argb:'FFFFFFFF' } };
+      swCell.alignment = { horizontal:'center', vertical:'middle' };
+      swCell.border = BORDER_ALL;
+      ws.mergeCells(r, 1, r, 2);
+
+      // Description (cols 3-6)
+      const dscCell = ws.getCell(r, 3);
+      dscCell.value = item.desc;
+      dscCell.font  = { name:'Calibri', size:8 };
+      dscCell.alignment = { horizontal:'left', vertical:'middle' };
+      dscCell.border = BORDER_ALL;
+      ws.mergeCells(r, 3, r, 6);
+    });
+
     // ── Column widths ─────────────────────────────────────────────
     ws.getColumn(1).width = 6;
     ws.getColumn(2).width = 22;
