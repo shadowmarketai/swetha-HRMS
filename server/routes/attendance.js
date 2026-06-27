@@ -67,6 +67,20 @@ router.post('/checkin', verifyToken, upload.single('selfie'), async (req, res) =
     );
 
     const [rows] = await pool.query('SELECT * FROM attendance_logs WHERE id = ?', [result.insertId]);
+
+    // Detect evening check-in without any prior morning punch today
+    let morningAbsent = false;
+    const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    if (nowIST.getHours() >= 14) {
+      const [morningPunches] = await pool.query(
+        `SELECT id FROM attendance_logs
+         WHERE emp_code = ? AND log_date = ? AND check_in IS NOT NULL
+         AND HOUR(CONVERT_TZ(check_in, '+00:00', '+05:30')) < 14`,
+        [req.user.empCode, today]
+      );
+      morningAbsent = morningPunches.length === 0;
+    }
+
     // Real-time: broadcast check-in to MD/HR
     const io = req.app.get('io');
     if (io) {
@@ -75,7 +89,12 @@ router.post('/checkin', verifyToken, upload.single('selfie'), async (req, res) =
         time: new Date().toISOString(), isWithinGeofence: geo.within
       });
     }
-    res.json({ message: 'Checked in successfully', time: new Date().toISOString(), row: rows[0] || null });
+    res.json({
+      message: 'Checked in successfully',
+      time: new Date().toISOString(),
+      row: rows[0] || null,
+      ...(morningAbsent ? { warning: 'morningAbsent' } : {})
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
@@ -336,7 +355,7 @@ router.get('/export/consolidated', verifyToken, requireRole('MD', 'HR'), async (
       ),
       pool.query(
         `SELECT emp_code, from_date, to_date, days, paid_days, lop_days, is_half_day, half_day_session, leave_type, status
-         FROM leave_applications WHERE status = 'approved'
+         FROM leave_applications WHERE status IN ('approved', 'HR Accepted')
          AND ((from_date LIKE ? OR to_date LIKE ?) OR (from_date < ? AND to_date > ?))`,
         [month + '%', month + '%', month + '-01', month + '-' + String(daysInMonth).padStart(2,'0')]
       ),
@@ -607,7 +626,7 @@ router.get('/export/punch-detail', verifyToken, requireRole('MD', 'HR'), async (
       ),
       pool.query(
         `SELECT emp_code, from_date, to_date, days, paid_days, lop_days, is_half_day, leave_type, status
-         FROM leave_applications WHERE status = 'approved'
+         FROM leave_applications WHERE status IN ('approved', 'HR Accepted')
          AND ((from_date LIKE ? OR to_date LIKE ?) OR (from_date < ? AND to_date > ?))`,
         [month + '%', month + '%', month + '-01', month + '-' + String(daysInMonth).padStart(2,'0')]
       ),

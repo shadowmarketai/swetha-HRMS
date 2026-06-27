@@ -3398,8 +3398,8 @@ async function resetEmployeePassword(code) {
 // =====================================================
 const _toastQueue = [];
 let _toastActive = false;
-function showToast(msg) {
-  _toastQueue.push(msg);
+function showToast(msg, type) {
+  _toastQueue.push(type ? { msg, type } : msg);
   if (!_toastActive) _processToastQueue();
 }
 
@@ -3417,9 +3417,12 @@ function hideLoadingSpinner() {
 function _processToastQueue() {
   if (_toastQueue.length === 0) { _toastActive = false; return; }
   _toastActive = true;
-  const msg = _toastQueue.shift();
+  const item = _toastQueue.shift();
+  const msg = typeof item === 'object' ? item.msg : item;
+  const type = typeof item === 'object' ? item.type : null;
+  const duration = type === 'warning' ? 6000 : 2500;
   const t = document.createElement('div');
-  t.className = 'toast';
+  t.className = 'toast' + (type ? ' toast-' + type : '');
   t.setAttribute('role', 'status');
   t.setAttribute('aria-live', 'polite');
   t.textContent = msg;
@@ -3427,7 +3430,7 @@ function _processToastQueue() {
   setTimeout(() => {
     t.classList.add('toast-exit');
     t.addEventListener('animationend', () => { t.remove(); _processToastQueue(); }, { once: true });
-  }, 2500);
+  }, duration);
 }
 // =====================================================
 // LIVE LOCATION TRACKER (MD Only)
@@ -7550,6 +7553,7 @@ function gpsCheckIn() {
       remark = prompt('You are outside the geofenced area. Please provide a reason:') || '';
     }
     var locationName = geoResult.inside ? geoResult.location : 'Outside geofence';
+    var _checkinWarning = null;
     try {
       var fd = new FormData();
       fd.append('lat', pos.coords.latitude);
@@ -7561,6 +7565,7 @@ function gpsCheckIn() {
       if (window._attendanceSelfie) fd.append('selfie', window._attendanceSelfie);
       var result = await apiUpload('/attendance/checkin', fd);
       window._attendanceSelfie = null;
+      if (result && result.warning) _checkinWarning = result.warning;
       // Push mapped result to local array
       if (result && result.row) {
         attendanceLogs.push(mapAttendanceLog(result.row));
@@ -7581,7 +7586,11 @@ function gpsCheckIn() {
         location: locationName, remark: remark
       });
     }
-    showToast('Checked in at ' + (geoResult.inside ? geoResult.location : pos.coords.latitude.toFixed(4) + '\u00B0N, ' + pos.coords.longitude.toFixed(4) + '\u00B0E'));
+    if (_checkinWarning === 'morningAbsent') {
+      showToast('Warning: No morning punch recorded. Evening-only attendance will be counted as Absent.', 'warning');
+    } else {
+      showToast('Checked in at ' + (geoResult.inside ? geoResult.location : pos.coords.latitude.toFixed(4) + '\u00B0N, ' + pos.coords.longitude.toFixed(4) + '\u00B0E'));
+    }
     addNotification('Check-In Recorded', 'Location: ' + (geoResult.inside ? geoResult.location : pos.coords.latitude.toFixed(4) + '\u00B0N'), 'checkin');
     // Notify MD & HR if outside geofence
     if (!geoResult.inside) {
@@ -9500,7 +9509,7 @@ async function _buildConsolidatedData(selMonth, selYear) {
 
   // Leave map: empCode → { day → 'Leave' }
   const leaveMap = {};
-  (Array.isArray(allLeaves) ? allLeaves : []).filter(lv => lv.status === 'approved' && lv.type !== 'permission').forEach(lv => {
+  (Array.isArray(allLeaves) ? allLeaves : []).filter(lv => (lv.status === 'approved' || lv.status === 'HR Accepted') && lv.type !== 'permission').forEach(lv => {
     const code = lv.emp_code || lv.empCode;
     if (!leaveMap[code]) leaveMap[code] = {};
     const from = new Date(lv.from_date || lv.from);
@@ -9701,7 +9710,7 @@ async function _downloadPunchDetailXLSX_legacy() {
 
     // Build leaveMap: empCode → 'YYYY-MM-DD' → 'Leave'|'Half Day'
     var leaveMap = {};
-    (Array.isArray(allLeaves) ? allLeaves : []).filter(function(lv) { return lv.status === 'approved'; }).forEach(function(lv) {
+    (Array.isArray(allLeaves) ? allLeaves : []).filter(function(lv) { return lv.status === 'approved' || lv.status === 'HR Accepted'; }).forEach(function(lv) {
       var code = lv.emp_code || lv.empCode;
       if (!leaveMap[code]) leaveMap[code] = {};
       var from = new Date(String(lv.from_date || lv.from).slice(0,10) + 'T00:00:00');
