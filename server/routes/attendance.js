@@ -618,13 +618,14 @@ router.get('/export/punch-detail', verifyToken, requireRole('MD', 'HR'), async (
     const holidays = {};
     (holidayRows[0] || []).forEach(h => { holidays[String(h.holiday_date).slice(0,10)] = h.name || 'Holiday'; });
 
-    // attMap: empCode -> dayNum -> { checkIn, checkOut, mins }
+    // attMap: empCode -> dayNum -> { checkIn, checkOut, mins, missingOut, eveningOnly }
+    const EVENING_CUTOFF_HOUR = 14; // 2:00 PM IST — check_in at/after this = evening-only
     const attMap = {};
     (attRows[0] || []).forEach(row => {
       const dateStr = String(row.log_date).slice(0, 10);
       const d = parseInt(dateStr.slice(8), 10);
       if (!attMap[row.emp_code]) attMap[row.emp_code] = {};
-      if (!attMap[row.emp_code][d]) attMap[row.emp_code][d] = { checkIn: null, checkOut: null, mins: 0 };
+      if (!attMap[row.emp_code][d]) attMap[row.emp_code][d] = { checkIn: null, checkOut: null, mins: 0, missingOut: false, eveningOnly: false };
       const entry = attMap[row.emp_code][d];
       if (row.check_in) {
         if (!entry.checkIn || new Date(row.check_in) < new Date(entry.checkIn)) entry.checkIn = row.check_in;
@@ -637,12 +638,13 @@ router.get('/export/punch-detail', verifyToken, requireRole('MD', 'HR'), async (
         } else if (row.check_out) {
           // Same-time or near-instant checkout (< 5 min) — treat as single check-in only
         } else if (isCurrentMonth && d === today.getDate()) {
-          end = Date.now();
+          end = Date.now(); // still active today — credit up to now
         } else {
-          const autoOut = new Date(new Date(row.check_in).toDateString() + ' 21:00:00').getTime();
-          end = Math.min(autoOut, start + 480 * 60000);
+          // Rule A: missing checkout on past day — credit only 4h (half day), not 8h
+          entry.missingOut = true;
+          end = start + 4 * 60 * 60000;
         }
-        if (end > start) entry.mins += (end - start) / 60000;
+        if (end && end > start) entry.mins += (end - start) / 60000;
       }
       // Capture check_out for single-punch records where check_in is missing
       if (!row.check_in && row.check_out) {
@@ -651,6 +653,20 @@ router.get('/export/punch-detail', verifyToken, requireRole('MD', 'HR'), async (
         }
       }
     });
+
+    // Rule B: Evening-only detection — check_in at/after 14:00 IST caps credited hours at 4h
+    for (const code of Object.keys(attMap)) {
+      for (const d of Object.keys(attMap[code])) {
+        const entry = attMap[code][d];
+        if (entry.checkIn) {
+          const ist = new Date(new Date(entry.checkIn).toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+          if (ist.getHours() >= EVENING_CUTOFF_HOUR) {
+            entry.eveningOnly = true;
+            if (entry.mins > 240) entry.mins = 240;
+          }
+        }
+      }
+    }
 
     const leaveMap = {};
     (leaveRows[0] || []).forEach(la => {
@@ -679,13 +695,15 @@ router.get('/export/punch-detail', verifyToken, requireRole('MD', 'HR'), async (
     wb.creator = 'SweRMS';
     const ws = wb.addWorksheet('Punch Detail');
 
-    const FILL_YELLOW  = { type:'pattern', pattern:'solid', fgColor:{ argb:'FFFFFF00' } };
-    const FILL_BLUE    = { type:'pattern', pattern:'solid', fgColor:{ argb:'FFA6CAEC' } };
-    const FILL_GREEN   = { type:'pattern', pattern:'solid', fgColor:{ argb:'FF92D050' } };
-    const FILL_AMBER   = { type:'pattern', pattern:'solid', fgColor:{ argb:'FFFFC000' } };
-    const FILL_HEADER  = { type:'pattern', pattern:'solid', fgColor:{ argb:'FFD9E1F2' } };
-    const FILL_SUMMARY = { type:'pattern', pattern:'solid', fgColor:{ argb:'FFBDD7EE' } };
-    const FILL_TITLE   = { type:'pattern', pattern:'solid', fgColor:{ argb:'FF1F3864' } };
+    const FILL_YELLOW      = { type:'pattern', pattern:'solid', fgColor:{ argb:'FFFFFF00' } };
+    const FILL_BLUE        = { type:'pattern', pattern:'solid', fgColor:{ argb:'FFA6CAEC' } };
+    const FILL_GREEN       = { type:'pattern', pattern:'solid', fgColor:{ argb:'FF92D050' } };
+    const FILL_AMBER       = { type:'pattern', pattern:'solid', fgColor:{ argb:'FFFFC000' } };
+    const FILL_MISSING_OUT = { type:'pattern', pattern:'solid', fgColor:{ argb:'FFFFB3C1' } }; // Rule C: pink — missing checkout
+    const FILL_EVENING     = { type:'pattern', pattern:'solid', fgColor:{ argb:'FFFFC19B' } }; // Rule D: peach/orange — evening-only
+    const FILL_HEADER      = { type:'pattern', pattern:'solid', fgColor:{ argb:'FFD9E1F2' } };
+    const FILL_SUMMARY     = { type:'pattern', pattern:'solid', fgColor:{ argb:'FFBDD7EE' } };
+    const FILL_TITLE       = { type:'pattern', pattern:'solid', fgColor:{ argb:'FF1F3864' } };
     const BORDER_THIN  = { style:'thin', color:{ argb:'FFBFBFBF' } };
     const BORDER_ALL   = { top:BORDER_THIN, left:BORDER_THIN, bottom:BORDER_THIN, right:BORDER_THIN };
     const FONT_DATA    = { name:'Calibri', size:9 };
@@ -696,9 +714,9 @@ router.get('/export/punch-detail', verifyToken, requireRole('MD', 'HR'), async (
 
     const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
     const dayLetters  = ['Su','Mo','Tu','We','Th','Fr','Sa'];
-    const SUMMARY_COLS = ['Working\nDays','Full\nDay','Half\nDay','Leave','Absent','Total\nHours'];
+    const SUMMARY_COLS = ['Working\nDays','Full\nDay','Half\nDay','Leave','Absent','Total\nHours','Missing\nOut','Evening\nOnly'];
 
-    // Column layout: col 1=S.No, 2=Name, 3=Code, then 2 cols per day, then 6 summary
+    // Column layout: col 1=S.No, 2=Name, 3=Code, then 2 cols per day, then 8 summary
     const totalCols = 3 + daysInMonth * 2 + SUMMARY_COLS.length;
 
     // ── Row 1: Title ─────────────────────────────────────────────
@@ -787,7 +805,7 @@ router.get('/export/punch-detail', verifyToken, requireRole('MD', 'HR'), async (
       setCell(2, emp.name, null, true);
       setCell(3, emp.code);
 
-      let totalMins = 0, fullDays = 0, halfDays = 0, leaveDays = 0, absentDays = 0;
+      let totalMins = 0, fullDays = 0, halfDays = 0, leaveDays = 0, absentDays = 0, missingOutDays = 0, eveningOnlyDays = 0;
 
       for (let d = 1; d <= daysInMonth; d++) {
         const ymd = `${monthStr}-${String(d).padStart(2,'0')}`;
@@ -816,8 +834,20 @@ router.get('/export/punch-detail', verifyToken, requireRole('MD', 'HR'), async (
         } else if (att && att.checkIn) {
           const inTime  = fmtTime(att.checkIn);
           const outTime = att.checkOut ? fmtTime(att.checkOut) : '—';
-          const isShort = att.mins < 480;
-          const cellFill = isShort ? FILL_AMBER : null;
+          // Rule C/D: pick fill based on punch quality
+          let cellFill;
+          if (att.eveningOnly && att.missingOut) {
+            cellFill = FILL_EVENING;        // both flags — evening takes priority
+            eveningOnlyDays++; missingOutDays++;
+          } else if (att.eveningOnly) {
+            cellFill = FILL_EVENING;        // Rule D: peach — evening-only session
+            eveningOnlyDays++;
+          } else if (att.missingOut) {
+            cellFill = FILL_MISSING_OUT;    // Rule C: pink — no checkout
+            missingOutDays++;
+          } else if (att.mins < 480) {
+            cellFill = FILL_AMBER;          // short day (< 8h) but valid punches
+          }
           setCell(colIN,  inTime,  cellFill);
           setCell(colOUT, outTime, cellFill);
           if (att.mins >= 480) fullDays++;
@@ -848,12 +878,15 @@ router.get('/export/punch-detail', verifyToken, requireRole('MD', 'HR'), async (
 
       const tH = Math.floor(totalMins / 60), tM = Math.round(totalMins % 60);
       const summaryBase = 3 + daysInMonth * 2 + 1;
-      setCell(summaryBase + 0, totalWorkingDays, FILL_SUMMARY);
-      setCell(summaryBase + 1, fullDays, FILL_SUMMARY);
-      setCell(summaryBase + 2, halfDays || '', FILL_SUMMARY);
-      setCell(summaryBase + 3, leaveDays || '', FILL_SUMMARY);
-      setCell(summaryBase + 4, absentDays || '', FILL_SUMMARY);
-      setCell(summaryBase + 5, `${tH}h ${tM < 10 ? '0'+tM : tM}m`, FILL_SUMMARY);
+      setCell(summaryBase + 0, totalWorkingDays,                         FILL_SUMMARY);
+      setCell(summaryBase + 1, fullDays,                                  FILL_SUMMARY);
+      setCell(summaryBase + 2, halfDays      || '',                       FILL_SUMMARY);
+      setCell(summaryBase + 3, leaveDays     || '',                       FILL_SUMMARY);
+      setCell(summaryBase + 4, absentDays    || '',                       FILL_SUMMARY);
+      setCell(summaryBase + 5, `${tH}h ${tM < 10 ? '0'+tM : tM}m`,      FILL_SUMMARY);
+      // Rule E & F: extra audit columns
+      setCell(summaryBase + 6, missingOutDays  || '', FILL_MISSING_OUT);
+      setCell(summaryBase + 7, eveningOnlyDays || '', FILL_EVENING);
     });
 
     // ── Column widths ─────────────────────────────────────────────
@@ -865,7 +898,7 @@ router.get('/export/punch-detail', verifyToken, requireRole('MD', 'HR'), async (
       ws.getColumn(3 + (d-1)*2 + 2).width = 7;
     }
     const summaryBase = 3 + daysInMonth * 2 + 1;
-    [12, 7, 7, 7, 7, 10].forEach((w, i) => { ws.getColumn(summaryBase + i).width = w; });
+    [12, 7, 7, 7, 7, 10, 9, 9].forEach((w, i) => { ws.getColumn(summaryBase + i).width = w; });
 
     ws.views = [{ state:'frozen', xSplit:3, ySplit:3, topLeftCell:'D4' }];
 

@@ -9459,7 +9459,15 @@ async function _buildConsolidatedData(selMonth, selYear) {
       const diff = (new Date(l.check_out) - new Date(l.check_in)) / 60000;
       hrs = Math.floor(diff / 60); mn = Math.round(diff % 60);
     } else if (l.check_in) {
-      hrs = 8; mn = 0; // check_in only (or same-time/near-instant checkout) — assume full day
+      // Rule A: check_in only / near-instant checkout — credit 4h (half day) for past days
+      const logDate = String(l.log_date || '').slice(0, 10);
+      const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+      if (logDate === todayStr) {
+        const elapsed = (Date.now() - new Date(l.check_in).getTime()) / 60000;
+        hrs = Math.floor(elapsed / 60); mn = Math.round(elapsed % 60);
+      } else {
+        hrs = 4; mn = 0; // Rule A: missing checkout — half day credit only
+      }
     } else {
       hrs = 4; mn = 0; // check_out only single punch — credit half day
     }
@@ -9475,6 +9483,20 @@ async function _buildConsolidatedData(selMonth, selYear) {
       if (l.check_out && (!_existing.checkOut || new Date(l.check_out) > new Date(_existing.checkOut))) _existing.checkOut = l.check_out;
     }
   });
+
+  // Rule B: Evening-only cap — check_in at/after 14:00 IST → max 4h credited
+  for (const code of Object.keys(attMap)) {
+    for (const day of Object.keys(attMap[code])) {
+      const entry = attMap[code][day];
+      if (entry.checkIn) {
+        const ist = new Date(new Date(entry.checkIn).toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+        if (ist.getHours() >= 14) {
+          const totalMn = entry.hrs * 60 + entry.mn;
+          if (totalMn > 240) { entry.hrs = 4; entry.mn = 0; }
+        }
+      }
+    }
+  }
 
   // Leave map: empCode → { day → 'Leave' }
   const leaveMap = {};
