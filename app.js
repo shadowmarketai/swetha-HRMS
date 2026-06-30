@@ -11446,7 +11446,9 @@ async function cancelLeave(id) {
       if (wasApproved) {
         const bal = getLeaveBalance(app.empCode);
         if (app.type !== 'permission') {
-          bal[app.type] = (bal[app.type] || 0) + (app.paidDays || app.days);
+          const restore = app.paidDays > 0 ? app.paidDays
+            : (app.isLOP && app.lopDays > 0 ? 0 : app.days);
+          bal[app.type] = (bal[app.type] || 0) + restore;
         } else {
           bal.permission = Math.min(2, (bal.permission || 0) + 0.5);
         }
@@ -11477,11 +11479,13 @@ async function approveLeave(id) {
     await apiCall('PATCH', '/leaves/' + id + '/approve');
     app.status = 'approved';
     const bal = getLeaveBalance(app.empCode);
-    const deduct = app.paidDays > 0 ? app.paidDays : app.days;
-    bal[app.type] = Math.max(0, bal[app.type] - deduct);
+    const deduct = app.paidDays > 0 ? app.paidDays
+      : (app.isLOP && app.lopDays > 0 ? 0 : app.days);
+    bal[app.type] = Math.max(0, (bal[app.type] || 0) - deduct);
     renderLeaveScreen();
     showToast('Leave approved');
     refreshNotifications();
+    refreshLeaveBalance().then(() => renderLeaveScreen());
   } catch (err) { showToast(err.message || 'Error approving leave'); }
 }
 

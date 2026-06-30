@@ -245,7 +245,12 @@ router.patch('/:id/approve', verifyToken, requireRole('MD'), auditLog('approve',
       return res.status(400).json({ error: 'Invalid leave type in application' });
     }
     const col = app.leave_type;
-    const deductDays = parseFloat(app.paid_days || 0) || parseFloat(app.days || 0);
+    const _paid = parseFloat(app.paid_days);
+    const _lop  = parseFloat(app.lop_days);
+    // paid_days > 0 → use it directly; LOP-only → deduct 0; old records (paid_days=0, is_lop=0) → use is_half_day flag
+    const deductDays = _paid > 0 ? _paid
+      : (app.is_lop && _lop > 0 ? 0
+      : (app.is_half_day ? 0.5 : parseFloat(app.days || 0)));
     if (deductDays > 0) {
       await pool.query(
         `UPDATE leave_balances SET \`${col}\` = GREATEST(0, \`${col}\` - ?) WHERE emp_code = ?`,
@@ -396,7 +401,11 @@ router.patch('/:id/cancel', verifyToken, async (req, res) => {
 
     // Restore balance only if leave was already approved (balance was already deducted)
     if (app.status === 'approved' && VALID_LEAVE_TYPES.includes(app.leave_type)) {
-      const restoreDays = parseFloat(app.paid_days || 0) || parseFloat(app.days || 0);
+      const _rpaid = parseFloat(app.paid_days);
+      const _rlop  = parseFloat(app.lop_days);
+      const restoreDays = _rpaid > 0 ? _rpaid
+        : (app.is_lop && _rlop > 0 ? 0
+        : (app.is_half_day ? 0.5 : parseFloat(app.days || 0)));
       if (restoreDays > 0) {
         await pool.query(
           `UPDATE leave_balances SET \`${app.leave_type}\` = \`${app.leave_type}\` + ? WHERE emp_code = ?`,
