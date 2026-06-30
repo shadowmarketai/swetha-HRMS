@@ -11241,7 +11241,13 @@ function openLeaveForm() {
     var rem = bal.casual || 0;
     var usedThisMonth = getCasualLeavesUsedThisMonth(currentUser.code);
     var monthlyPaid = Math.max(0, 1 - usedThisMonth);
-    balText.innerHTML = 'Casual Leave: <strong>' + rem + '</strong> of 12 remaining this year' +
+    var _pendingCL = leaveApplications.filter(function(a) {
+      return a.empCode === currentUser.code && a.type === 'casual' && (a.status === 'pending' || a.status === 'hr_accepted');
+    }).reduce(function(s, a) {
+      return s + (a.paidDays > 0 ? a.paidDays : (a.isHalfDay ? 0.5 : (a.isLOP && a.lopDays > 0 ? 0 : a.days)));
+    }, 0);
+    var pendingNote = _pendingCL > 0 ? '<br><span style="font-size:.7rem;color:#d97706">⏳ ' + _pendingCL + ' day(s) pending approval — will be deducted on approval</span>' : '';
+    balText.innerHTML = 'Casual Leave: <strong>' + rem + '</strong> of 12 remaining this year' + pendingNote +
       '<br><span style="font-size:.7rem;color:' + (monthlyPaid > 0 ? 'var(--success)' : 'var(--danger)') + '">' +
       (monthlyPaid > 0 ? '1 paid leave available this month' : 'Paid leave used this month — additional leave will be LOP (salary deducted)') + '</span>';
   }
@@ -11546,6 +11552,12 @@ function renderLeaveScreen() {
         {key:'casual',label:'Casual Leave',total:12,color:'#E85D04',cls:'casual'},
         {key:'permission',label:'Permission (2hr)',total:4,color:'#d97706',cls:'permission'}
       ];
+      // Compute pending deductions (not yet approved) for current user
+      const _pendingMap = {};
+      leaveApplications.filter(a => a.empCode === currentUser.code && (a.status === 'pending' || a.status === 'hr_accepted')).forEach(a => {
+        const days = a.paidDays > 0 ? a.paidDays : (a.isHalfDay ? 0.5 : (a.isLOP && a.lopDays > 0 ? 0 : a.days));
+        _pendingMap[a.type] = (_pendingMap[a.type] || 0) + days;
+      });
       balGrid.innerHTML = '<div class="section-title" style="margin-top:4px">Leave Balance</div><div class="leave-balance-grid fade-in">' +
         leaveTypes.map(lt => {
           // Permission balance is stored in days (0–2.0); display as count (0–4) by multiplying by 2
@@ -11554,7 +11566,12 @@ function renderLeaveScreen() {
           const used = lt.total - rem;
           const offset = circumference * (used / lt.total);
           const detail = lt.key === 'permission' ? `2hr (0.5 × ${rem})` : `${rem} of ${lt.total} remaining`;
-          return `<div class="leave-balance-card ${lt.cls}"><div class="donut-chart"><svg viewBox="0 0 65 65"><circle class="donut-bg" cx="32.5" cy="32.5" r="26"/><circle class="donut-fill" cx="32.5" cy="32.5" r="26" stroke="${lt.color}" stroke-dasharray="${circumference}" stroke-dashoffset="${offset}"/></svg><div class="donut-center">${rem}</div></div><div class="leave-type-name">${lt.label}</div><div class="leave-detail">${detail}</div></div>`;
+          const pendingRaw = _pendingMap[lt.key] || 0;
+          const pendingDisp = lt.key === 'permission' ? Math.round(pendingRaw * 2) : pendingRaw;
+          const pendingLine = pendingDisp > 0
+            ? `<div style="font-size:.62rem;color:#d97706;margin-top:3px;font-weight:600">⏳ ${pendingDisp} ${lt.key === 'permission' ? 'permission' : 'day' + (pendingDisp !== 1 ? 's' : '')} pending approval</div>`
+            : '';
+          return `<div class="leave-balance-card ${lt.cls}"><div class="donut-chart"><svg viewBox="0 0 65 65"><circle class="donut-bg" cx="32.5" cy="32.5" r="26"/><circle class="donut-fill" cx="32.5" cy="32.5" r="26" stroke="${lt.color}" stroke-dasharray="${circumference}" stroke-dashoffset="${offset}"/></svg><div class="donut-center">${rem}</div></div><div class="leave-type-name">${lt.label}</div><div class="leave-detail">${detail}</div>${pendingLine}</div>`;
         }).join('') + '</div>';
     }
   }
