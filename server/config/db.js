@@ -144,6 +144,14 @@ async function runMigrations(conn) {
       sql: "ALTER TABLE employees ADD COLUMN reporting_manager VARCHAR(20)"
     },
     {
+      name: 'fix_leave_applications_days_decimal',
+      sql: "ALTER TABLE leave_applications MODIFY COLUMN days DECIMAL(4,2) NOT NULL DEFAULT 0"
+    },
+    {
+      name: 'fix_half_day_days_value',
+      sql: "UPDATE leave_applications SET days = 0.5 WHERE is_half_day = 1 AND days = 1"
+    },
+    {
       name: 'create_document_edit_requests',
       sql: `CREATE TABLE IF NOT EXISTS document_edit_requests (
         id INT AUTO_INCREMENT PRIMARY KEY,

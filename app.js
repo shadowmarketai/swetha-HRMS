@@ -8136,7 +8136,7 @@ function mapLeave(row) {
     dept: row.dept || '', type: row.leave_type || row.type || 'casual',
     from: row.from_date ? String(row.from_date).substring(0, 10) : (row.from || ''),
     to: row.to_date ? String(row.to_date).substring(0, 10) : (row.to || ''),
-    days: parseFloat(row.days) || 1, reason: row.reason || '',
+    days: (row.is_half_day || row.isHalfDay) ? 0.5 : (parseFloat(row.days) || 1), reason: row.reason || '',
     status: row.status || 'pending',
     isHalfDay: !!(row.is_half_day || row.isHalfDay),
     halfDaySession: row.half_day_session || row.halfDaySession || null,
@@ -11514,7 +11514,7 @@ function _fmtLeaveDate(a) {
     return fromD + ' · ' + (a.fromTime || '09:00') + ' - ' + (a.toTime || '11:00');
   }
   if (a.from === a.to) {
-    return fromD + ' · ' + (a.days === 0.5 ? 'Half Day' : '1 day');
+    return fromD + ' · ' + (a.isHalfDay || a.days === 0.5 ? 'Half Day' : '1 day');
   }
   var toDate = new Date(a.to);
   var toD = isNaN(toDate.getTime()) ? (a.to || '—') : toDate.toLocaleDateString('en-IN', {day:'2-digit', month:'short'});
@@ -17096,7 +17096,7 @@ function renderHRLeaveRequests() {
   }
 
   function leaveRow(a, rightSlot, isLast) {
-    var daysLabel = a.type && a.type.toLowerCase() === 'permission' ? '-' : (a.days != null ? a.days + '' : '-');
+    var daysLabel = a.type && a.type.toLowerCase() === 'permission' ? '-' : (a.isHalfDay ? '½' : (a.days != null ? a.days + '' : '-'));
     var dateStr = _fmtLeaveDate(a);
     var border = isLast ? 'border-radius:0 0 6px 6px' : '';
     return '<div style="display:grid;grid-template-columns:' + COL + ';gap:0;padding:6px 8px;border:1px solid var(--border-color);border-top:none;align-items:center;' + border + '">' +
