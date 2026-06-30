@@ -11618,12 +11618,25 @@ function renderLeaveScreen() {
       const pending = leaveApplications.filter(a => a.status === 'pending');
       const hrAccepted = leaveApplications.filter(a => a.status === 'hr_accepted');
       const others = leaveApplications.filter(a => a.status !== 'pending' && a.status !== 'hr_accepted');
+
+      function _teamBalLine(a) {
+        var empBal = getLeaveBalance(a.empCode);
+        var isPermission = a.type && a.type.toLowerCase() === 'permission';
+        var rawBal = isPermission ? (empBal.permission || 0) : (empBal[a.type] || 0);
+        var dispBal = isPermission ? Math.round(rawBal * 2) : rawBal;
+        var pendingRaw = leaveApplications
+          .filter(function(x) { return x.empCode === a.empCode && x.type === a.type && (x.status === 'pending' || x.status === 'hr_accepted'); })
+          .reduce(function(s, x) { return s + (x.paidDays > 0 ? x.paidDays : (x.isHalfDay ? 0.5 : (x.isLOP && x.lopDays > 0 ? 0 : x.days))); }, 0);
+        var pendingDisp = isPermission ? Math.round(pendingRaw * 2) : pendingRaw;
+        var balStr = isPermission ? dispBal + ' left' : dispBal + ' day' + (dispBal !== 1 ? 's' : '');
+        var pendingStr = pendingDisp > 0 ? ' &nbsp;<span style="color:#d97706;font-weight:600">⏳ ' + pendingDisp + ' pending</span>' : '';
+        return '<p style="font-size:.62rem;color:var(--gray-500);margin-top:2px">Balance: ' + balStr + pendingStr + '</p>';
+      }
+
       let html = '';
       if (pending.length > 0) {
         if (isMD) html += '<div style="font-size:.72rem;font-weight:600;color:var(--gray-400);margin:8px 0 4px">Pending — Awaiting HR Acceptance</div>';
         html += pending.map(a => {
-          const fromD = new Date(a.from).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
-          const toD = new Date(a.to).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
           // HR sees Accept/Reject buttons, MD sees "Awaiting HR" badge (cannot act on pending)
           var actionsHtml = '';
           if (isHR) {
@@ -11631,22 +11644,18 @@ function renderLeaveScreen() {
           } else if (isMD) {
             actionsHtml = `<div style="margin-top:6px"><span class="badge-status badge-pending">Awaiting HR</span></div>`;
           }
-          return `<div class="request-item" style="flex-wrap:wrap"><div class="req-icon" style="background:#FCE7F3;color:#DB2777"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><div class="req-info"><h4>${escapeHTML(a.empName)} — ${escapeHTML(a.type)} Leave</h4><p>${escapeHTML(a.dept)} &middot; ${_fmtLeaveDate(a)}</p><p style="font-size:.65rem;color:var(--gray-500);margin-top:2px">${escapeHTML(a.reason)}</p></div>${actionsHtml}</div>`;
+          return `<div class="request-item" style="flex-wrap:wrap"><div class="req-icon" style="background:#FCE7F3;color:#DB2777"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div><div class="req-info"><h4>${escapeHTML(a.empName)} — ${escapeHTML(a.type)} Leave</h4><p>${escapeHTML(a.dept)} &middot; ${_fmtLeaveDate(a)}</p>${_teamBalLine(a)}<p style="font-size:.65rem;color:var(--gray-500);margin-top:2px">${escapeHTML(a.reason)}</p></div>${actionsHtml}</div>`;
         }).join('');
       }
       if (hrAccepted.length > 0 && isMD) {
         html += '<div style="font-size:.72rem;font-weight:600;color:#1D4ED8;margin:8px 0 4px">HR Accepted — Awaiting Confirmation</div>';
         html += hrAccepted.map(a => {
-          const fromD = new Date(a.from).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
-          const toD = new Date(a.to).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
-          return `<div class="request-item" style="flex-wrap:wrap"><div class="req-icon" style="background:#DBEAFE;color:#1D4ED8"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/></svg></div><div class="req-info"><h4>${escapeHTML(a.empName)} — ${escapeHTML(a.type)} Leave</h4><p>${escapeHTML(a.dept)} &middot; ${_fmtLeaveDate(a)}</p></div><div class="leave-action-btns" style="width:100%;margin-top:8px"><button style="background:var(--success-light);color:var(--success-dark)" onclick="approveLeave(${a.id})">Confirm</button><button style="background:var(--danger-light);color:var(--danger-dark)" onclick="rejectLeave(${a.id})">Reject</button></div></div>`;
+          return `<div class="request-item" style="flex-wrap:wrap"><div class="req-icon" style="background:#DBEAFE;color:#1D4ED8"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/></svg></div><div class="req-info"><h4>${escapeHTML(a.empName)} — ${escapeHTML(a.type)} Leave</h4><p>${escapeHTML(a.dept)} &middot; ${_fmtLeaveDate(a)}</p>${_teamBalLine(a)}</div><div class="leave-action-btns" style="width:100%;margin-top:8px"><button style="background:var(--success-light);color:var(--success-dark)" onclick="approveLeave(${a.id})">Confirm</button><button style="background:var(--danger-light);color:var(--danger-dark)" onclick="rejectLeave(${a.id})">Reject</button></div></div>`;
         }).join('');
       } else if (hrAccepted.length > 0 && isHR) {
         html += '<div style="font-size:.72rem;font-weight:600;color:#1D4ED8;margin:8px 0 4px">Awaiting MD Confirmation</div>';
         html += hrAccepted.map(a => {
-          const fromD = new Date(a.from).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
-          const toD = new Date(a.to).toLocaleDateString('en-IN',{day:'2-digit',month:'short'});
-          return `<div class="request-item"><div class="req-icon" style="background:#DBEAFE;color:#1D4ED8"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/></svg></div><div class="req-info"><h4>${escapeHTML(a.empName)} — ${escapeHTML(a.type)}</h4><p>${escapeHTML(a.dept)} &middot; ${_fmtLeaveDate(a)}</p></div><span class="badge-status" style="background:#DBEAFE;color:#1D4ED8">HR Accepted</span></div>`;
+          return `<div class="request-item"><div class="req-icon" style="background:#DBEAFE;color:#1D4ED8"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 11 12 14 22 4"/></svg></div><div class="req-info"><h4>${escapeHTML(a.empName)} — ${escapeHTML(a.type)}</h4><p>${escapeHTML(a.dept)} &middot; ${_fmtLeaveDate(a)}</p>${_teamBalLine(a)}</div><span class="badge-status" style="background:#DBEAFE;color:#1D4ED8">HR Accepted</span></div>`;
         }).join('');
       }
       if (others.length > 0) {
@@ -17096,8 +17105,26 @@ function renderHRLeaveRequests() {
   html += '<span style="color:var(--gray-400)">\u2192</span>';
   html += '<span style="padding:3px 8px;background:var(--success-light);color:var(--success-dark);border-radius:10px">3. MD Confirmed</span>';
   html += '</div>';
-  // shared column widths: Name | Code | Dept | Date Range | Days | Type | Action
-  var COL = '2fr 0.65fr 1fr 1.8fr 0.45fr 0.8fr 1.1fr';
+  // shared column widths: Name | Code | Dept | Date Range | Days | Type | Balance | Action
+  var COL = '2fr 0.65fr 1fr 1.8fr 0.45fr 0.7fr 0.9fr 1.1fr';
+
+  function _empPendingDays(empCode, type) {
+    return leaveApplications
+      .filter(function(x) { return x.empCode === empCode && x.type === type && (x.status === 'pending' || x.status === 'hr_accepted'); })
+      .reduce(function(s, x) { return s + (x.paidDays > 0 ? x.paidDays : (x.isHalfDay ? 0.5 : (x.isLOP && x.lopDays > 0 ? 0 : x.days))); }, 0);
+  }
+
+  function balanceCell(a) {
+    var empBal = getLeaveBalance(a.empCode);
+    var isPermission = a.type && a.type.toLowerCase() === 'permission';
+    var rawBal = isPermission ? (empBal.permission || 0) : (empBal[a.type] || 0);
+    var dispBal = isPermission ? Math.round(rawBal * 2) : rawBal;
+    var pendingRaw = _empPendingDays(a.empCode, a.type);
+    var pendingDisp = isPermission ? Math.round(pendingRaw * 2) : pendingRaw;
+    var balStr = isPermission ? dispBal + ' left' : dispBal + ' day' + (dispBal !== 1 ? 's' : '');
+    var pendingStr = pendingDisp > 0 ? '<div style="color:#d97706;font-size:.58rem;margin-top:1px">⏳ ' + pendingDisp + ' pending</div>' : '';
+    return '<div style="font-size:.65rem;color:var(--gray-600);line-height:1.3">' + balStr + pendingStr + '</div>';
+  }
 
   function typeChip(type) {
     var t = (type || '').toLowerCase();
@@ -17111,7 +17138,7 @@ function renderHRLeaveRequests() {
 
   function tableHeader(accentColor) {
     return '<div style="display:grid;grid-template-columns:' + COL + ';gap:0;padding:5px 8px;background:var(--gray-50,#f9fafb);border-radius:6px 6px 0 0;border:1px solid var(--border-color);border-bottom:none">' +
-      ['Name','Code','Dept','Date / Time','Days','Type','Action'].map(function(h) {
+      ['Name','Code','Dept','Date / Time','Days','Type','Balance','Action'].map(function(h) {
         return '<div style="font-size:.62rem;font-weight:700;color:' + (accentColor||'var(--gray-500)') + ';text-transform:uppercase;letter-spacing:.05em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + h + '</div>';
       }).join('') + '</div>';
   }
@@ -17127,6 +17154,7 @@ function renderHRLeaveRequests() {
       '<div style="font-size:.7rem;color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escapeHTML(dateStr) + '">' + escapeHTML(dateStr) + '</div>' +
       '<div style="font-size:.7rem;color:var(--gray-600);text-align:center">' + escapeHTML(daysLabel) + '</div>' +
       '<div>' + typeChip(a.type) + '</div>' +
+      '<div>' + balanceCell(a) + '</div>' +
       '<div>' + (rightSlot || '') + '</div>' +
       '</div>';
   }
