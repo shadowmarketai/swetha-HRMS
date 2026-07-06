@@ -4690,6 +4690,7 @@ function showSiteExpenseBillForm() {
   html += '<option>Other</option></select></div>';
   html += '<div class="form-row"><label>Category *</label><select id="seBillCategory" class="nf-select"><option value="">Select</option><option>Material</option><option>Labour</option><option>Equipment</option><option>Transport</option><option>Fuel</option><option>Food</option><option>Other</option></select></div>';
   html += '<div class="form-row"><label>Amount (Rs.) *</label><input type="number" id="seBillAmount" placeholder="e.g. 5000"></div>';
+  html += '<div class="form-row"><label>Date of Expense *</label><input type="date" id="seBillDate" max="' + new Date().toISOString().split('T')[0] + '"></div>';
   html += '<div class="form-row"><label>Description</label><textarea id="seBillDesc" rows="2" placeholder="Brief explanation..." style="width:100%;padding:8px;border:1.5px solid var(--gray-200);border-radius:var(--radius-xs);font-family:var(--font-body);font-size:.82rem"></textarea></div>';
   html += '<div class="section-title" style="font-size:.72rem;margin-bottom:6px">Attach Bill Photo *</div>';
   html += '<div style="display:flex;gap:8px;flex-wrap:wrap">';
@@ -4713,15 +4714,17 @@ function previewSiteExpenseBill() {
   var project = (document.getElementById('seBillProject') || {}).value || '';
   var category = (document.getElementById('seBillCategory') || {}).value || '';
   var amount = parseInt((document.getElementById('seBillAmount') || {}).value, 10) || 0;
+  var expDate = (document.getElementById('seBillDate') || {}).value || '';
   var desc = (document.getElementById('seBillDesc') || {}).value || '';
   var billInput = document.getElementById('seBillInput');
   if (!project) { showToast('Please select a project/site'); return; }
   if (!category) { showToast('Please select a category'); return; }
   if (!amount) { showToast('Please enter the bill amount'); return; }
+  if (!expDate) { showToast('Please select the date of expense'); return; }
 
   // Store form data + file before preview replaces the HTML
   var billFile = (billInput && billInput.files && billInput.files[0]) ? billInput.files[0] : null;
-  window._siteExpPreview = { project: project, category: category, amount: amount, desc: desc, billFile: billFile };
+  window._siteExpPreview = { project: project, category: category, amount: amount, expDate: expDate, desc: desc, billFile: billFile };
 
   var billPreviewSrc = '';
   var billFileName = '';
@@ -4731,7 +4734,7 @@ function previewSiteExpenseBill() {
 
   var container = document.getElementById('siteExpenseBillForm');
   if (!container) return;
-  var dateLabel = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  var dateLabel = expDate ? new Date(expDate + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
 
   var html = '<div class="card fade-in" style="padding:14px;margin-top:10px">';
   html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><div style="width:36px;height:36px;border-radius:10px;background:var(--primary-50);display:flex;align-items:center;justify-content:center;font-size:1.2rem">\uD83C\uDFD7</div>';
@@ -4772,6 +4775,7 @@ async function submitSiteExpenseBill() {
   var project = stored.project || (document.getElementById('seBillProject') || {}).value || '';
   var category = stored.category || (document.getElementById('seBillCategory') || {}).value || '';
   var amount = stored.amount || parseInt((document.getElementById('seBillAmount') || {}).value, 10) || 0;
+  var expDate = stored.expDate || (document.getElementById('seBillDate') || {}).value || new Date().toISOString().split('T')[0];
   var desc = stored.desc || (document.getElementById('seBillDesc') || {}).value || '';
   var billFile = stored.billFile || null;
   if (!billFile) { var billInput = document.getElementById('seBillInput'); if (billInput && billInput.files && billInput.files[0]) billFile = billInput.files[0]; }
@@ -4783,7 +4787,7 @@ async function submitSiteExpenseBill() {
     fd.append('category', category);
     fd.append('amount', amount);
     fd.append('description', desc);
-    fd.append('date', new Date().toISOString().split('T')[0]);
+    fd.append('date', expDate);
     fd.append('expenseType', 'site_expense');
     fd.append('project', project);
     if (billFile) fd.append('bill', billFile);
@@ -4792,7 +4796,7 @@ async function submitSiteExpenseBill() {
       id: (apiRes && apiRes.id) || (expenseReimbursements.length + 1),
       empCode: currentUser.code, empName: currentUser.name,
       category: category, amount: amount, description: desc, project: project,
-      date: new Date().toISOString().split('T')[0], status: 'Pending',
+      date: expDate, status: 'Pending',
       expenseType: 'site_expense', billUrl: apiRes.billUrl || ''
     });
     var expBtn = document.querySelector('#siteExpenseBillForm .nf-btn-primary');
@@ -4882,7 +4886,7 @@ function showTravelExpenseBillForm() {
   html += '<div class="form-row"><label>From *</label><input type="text" id="teBillFrom" placeholder="e.g. Coimbatore"></div>';
   html += '<div class="form-row"><label>To *</label><input type="text" id="teBillTo" placeholder="e.g. Chennai"></div></div>';
   html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
-  html += '<div class="form-row"><label>Travel Date *</label><input type="date" id="teBillDate" value="' + new Date().toISOString().split('T')[0] + '"></div>';
+  html += '<div class="form-row"><label>Travel Date * <span style="font-size:.65rem;color:var(--gray-400);font-weight:400">(actual date of travel)</span></label><input type="date" id="teBillDate" max="' + new Date().toISOString().split('T')[0] + '"></div>';
   html += '<div class="form-row"><label>Days</label><input type="number" id="teBillDays" placeholder="1" value="1"></div></div>';
   html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
   html += '<div class="form-row"><label>Mode of Travel *</label><select id="teBillVehicle" class="nf-select" onchange="calcTravelExpAmount()"><option value="">Select</option><option>Bike</option><option>Car</option><option>Auto</option><option>Bus</option><option>Train</option><option>Flight</option><option>Other</option></select></div>';
@@ -4911,10 +4915,11 @@ function previewTravelExpenseBill() {
   var km = (document.getElementById('teBillKm') || {}).value || '';
   var days = (document.getElementById('teBillDays') || {}).value || '1';
   var desc = (document.getElementById('teBillDesc') || {}).value || '';
-  var travelDate = (document.getElementById('teBillDate') || {}).value || new Date().toISOString().split('T')[0];
+  var travelDate = (document.getElementById('teBillDate') || {}).value || '';
   var billInput = document.getElementById('teBillInput');
 
   if (!from || !to) { showToast('Please enter From and To locations'); return; }
+  if (!travelDate) { showToast('Please select the actual date of travel'); return; }
   if (!vehicle) { showToast('Please select mode of travel'); return; }
   if (!amount) { showToast('Please enter the bill amount'); return; }
 
