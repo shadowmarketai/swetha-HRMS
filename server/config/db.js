@@ -261,6 +261,13 @@ async function seedNewEmployees(conn) {
   // Deactivate old SSC*** employees that are not in the new list
   await conn.query("UPDATE employees SET is_active = 0 WHERE code LIKE 'SSC%'").catch(() => {});
   await conn.query("UPDATE users SET is_active = 0 WHERE emp_code LIKE 'SSC%'").catch(() => {});
+  // Sync dept and role for all seeded employees (INSERT IGNORE won't update existing rows)
+  for (const emp of employees) {
+    await conn.query(
+      'UPDATE employees SET dept = ?, role = ? WHERE code = ?',
+      [emp.dept, emp.role, emp.code]
+    ).catch(() => {});
+  }
   // Auto-fix: create login accounts for any employees missing from users table
   try {
     const [missing] = await conn.query(
