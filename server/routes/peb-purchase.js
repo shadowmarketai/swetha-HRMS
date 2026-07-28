@@ -306,7 +306,7 @@ router.delete('/vendors/:id', verifyToken, requireFeatureAccess('peb_vendors', [
 // ========================================
 // PURCHASE INDENTS — Full L1/L2/L3 workflow
 // ========================================
-router.get('/indents', verifyToken, requireFeatureAccess('peb_purchase_indents', ['MD', 'HR'], SITE_DEPTS), async (req, res) => {
+router.get('/indents', verifyToken, requireFeatureAccess('peb_purchase_indents', ['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
   try {
     const { status } = req.query;
     let q = `SELECT pi.*, (SELECT COUNT(*) FROM peb_vendor_quotations vq WHERE vq.indent_id = pi.id) as quotation_count FROM peb_purchase_indents pi WHERE 1=1`;
@@ -318,7 +318,7 @@ router.get('/indents', verifyToken, requireFeatureAccess('peb_purchase_indents',
   } catch (err) { res.status(500).json({ error: 'Server error' }); }
 });
 
-router.get('/indents/:id', verifyToken, requireFeatureAccess('peb_purchase_indents', ['MD', 'HR'], SITE_DEPTS), async (req, res) => {
+router.get('/indents/:id', verifyToken, requireFeatureAccess('peb_purchase_indents', ['MD', 'HR'], ADMIN_DEPTS), async (req, res) => {
   try {
     const [indent] = await db.query('SELECT * FROM peb_purchase_indents WHERE id = ?', [req.params.id]);
     if (indent.length === 0) return res.status(404).json({ error: 'Indent not found' });
