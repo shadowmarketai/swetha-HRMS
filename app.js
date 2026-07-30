@@ -270,6 +270,10 @@ const NAV_CONFIG = {
       { id:'hr-adv-salary', label:'Salary Advance', action:{type:'tab',target:'advance'} },
       { id:'hr-adv-requests', label:'Approve Requests', action:{type:'overlay',target:'advance-requests'} }
     ]},
+    { id:'hr-expense', label:'Expense', icon:'expense', children:[
+      { id:'hr-exp-site', label:'Site Expense', action:{type:'tab',target:'site-expense'} },
+      { id:'hr-exp-travel', label:'Travel Expense', action:{type:'tab',target:'travel-expense'} }
+    ]},
     { id:'hr-performance', label:'Employee Performance', icon:'performance', children:[
       { id:'hr-perf-track', label:'Performance Review', action:{type:'overlay',target:'hr-kpi'} }
     ]},
@@ -374,6 +378,10 @@ const NAV_CONFIG = {
     { id:'mgr-advance', label:'Advance', icon:'advance', children:[
       { id:'mgr-adv-salary', label:'Salary Advance', action:{type:'tab',target:'advance'} },
       { id:'mgr-adv-requests', label:'Approve Requests', action:{type:'overlay',target:'advance-requests'} }
+    ]},
+    { id:'mgr-expense', label:'Expense', icon:'expense', children:[
+      { id:'mgr-exp-site', label:'Site Expense', action:{type:'tab',target:'site-expense'} },
+      { id:'mgr-exp-travel', label:'Travel Expense', action:{type:'tab',target:'travel-expense'} }
     ]},
     { id:'mgr-performance', label:'Employee Performance', icon:'performance', children:[
       { id:'mgr-perf-track', label:'Performance Review', action:{type:'overlay',target:'hr-kpi'} }
@@ -8847,7 +8855,7 @@ var NAV_FEATURE_MAP = {
   'attendance':'attendance', 'md-attendance':'attendance', 'hr-attendance':'attendance', 'emp-attendance':'attendance', 'mgr-attendance':'attendance', 'acc-attendance':'attendance',
   'leaves':'leaves', 'md-att-leave':'leaves', 'hr-att-leave':'leaves', 'emp-att-leave':'leaves',
   'advance':'advances', 'md-advance':'advances', 'hr-advance':'advances', 'emp-advance':'advances', 'acc-advance':'advances',
-  'expense':'expenses', 'emp-expense':'expenses',
+  'expense':'expenses', 'emp-expense':'expenses', 'hr-expense':'expenses', 'mgr-expense':'expenses',
   'salary':'salary', 'md-salary':'salary', 'hr-salary':'salary', 'emp-salary':'salary', 'emp-acc-salary':'salary', 'acc-salary':'salary',
   'tax':'tax', 'md-tax':'tax', 'hr-tax':'tax',
   'progress':'projects', 'md-progress':'projects', 'emp-progress':'projects', 'acc-progress':'projects',
