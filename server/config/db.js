@@ -20,12 +20,12 @@ const pool = mysql.createPool({
 async function runMigrations(conn) {
   const migrations = [
     {
-      name: 'add_manager_role_to_users',
-      sql: "ALTER TABLE users MODIFY COLUMN role ENUM('MD','HR','Manager','Employee') DEFAULT 'Employee'"
+      name: 'add_accounts_role_to_users',
+      sql: "ALTER TABLE users MODIFY COLUMN role ENUM('MD','HR','Manager','Employee','Accounts') DEFAULT 'Employee'"
     },
     {
-      name: 'add_manager_role_to_employees',
-      sql: "ALTER TABLE employees MODIFY COLUMN role ENUM('MD','HR','Manager','Employee') DEFAULT 'Employee'"
+      name: 'add_accounts_role_to_employees',
+      sql: "ALTER TABLE employees MODIFY COLUMN role ENUM('MD','HR','Manager','Employee','Accounts') DEFAULT 'Employee'"
     },
     {
       name: 'add_ifsc_code_to_employees',
@@ -227,7 +227,7 @@ async function seedNewEmployees(conn) {
     {code:'SS028',name:'Dinesh Jayabal',dept:'Admin',designation:'Driver',salary:0,role:'Employee',phone:'',doj:null,email:'dineshindira2024@gmail.com'},
     {code:'SS029',name:'Depsingh R',dept:'Admin',designation:'Security',salary:0,role:'Employee',phone:'',doj:null,email:'depsinghrokaya@gmail.com'},
     {code:'SS030',name:'Kathirvel N',dept:'Design',designation:'Designing',salary:0,role:'Employee',phone:'',doj:null,email:'kathirveln2588@gmail.com'},
-    {code:'SS031',name:'Shiyam Raj E',dept:'Accounts',designation:'Accounts',salary:0,role:'Employee',phone:'',doj:null,email:'shiyam0905@gmail.com'},
+    {code:'SS031',name:'Shiyam Raj E',dept:'Accounts',designation:'Accounts',salary:0,role:'Accounts',phone:'',doj:null,email:'shiyam0905@gmail.com'},
     {code:'SS032',name:'Dharmaraj',dept:'Design',designation:'Designing',salary:0,role:'Employee',phone:'',doj:null,email:'thedharmarajm@gmail.com'},
     {code:'SS033',name:'Sakthi Murugan',dept:'Execution',designation:'Execution',salary:0,role:'Employee',phone:'',doj:null,email:'sakthi252636@gmail.com'},
     {code:'SS034',name:'Praveen Kumar J',dept:'Marketing',designation:'Marketing',salary:0,role:'Employee',phone:'',doj:null,email:'forpraveenvideos@gmail.com'},
