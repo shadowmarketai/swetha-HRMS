@@ -8,6 +8,32 @@ function getTodayIST() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 }
 
+// IST calendar date of an absolute instant — same format as getTodayIST().
+// Both routes derive log_date through this so an offline punch replayed the
+// next morning still lands on the day it was actually made.
+function istDateOf(ms) {
+  return new Date(ms).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+}
+
+// Oldest offline punch we are willing to write. Beyond this the queue has held
+// it so long that recording it would corrupt a month that may already be closed.
+// Kept in step with MAX_QUEUE_AGE_MS in sw.js — change both together.
+const MAX_PUNCH_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+// Validate the optional punched_at_ms sent by the offline queue.
+// Absent  -> null, and the caller falls back to NOW() (existing behaviour).
+// Present -> must be a sane instant; anything else is refused outright rather
+// than silently recorded at the wrong time.
+function parsePunchedAt(raw) {
+  if (raw === undefined || raw === null || raw === '') return null;
+  const ms = Number(raw);
+  const now = Date.now();
+  if (!Number.isFinite(ms) || ms <= 0) return { bad: 'Invalid punch timestamp.' };
+  if (ms > now + 5 * 60 * 1000) return { bad: 'Punch timestamp is in the future.' };
+  if (ms < now - MAX_PUNCH_AGE_MS) return { bad: 'Punch is too old to record.' };
+  return { ms, date: istDateOf(ms) };
+}
+
 // Haversine distance in meters between two lat/lng pairs
 function haversineDistance(lat1, lng1, lat2, lng2) {
   const R = 6371000; // Earth radius in meters
@@ -38,12 +64,19 @@ async function checkGeofence(lat, lng) {
 router.post('/checkin', verifyToken, upload.single('selfie'), async (req, res) => {
   try {
     const { lat, lng, location, remark, accuracy } = req.body;
-    const today = getTodayIST();
+
+    // An offline punch replayed by the service worker carries the instant it was
+    // actually made. FROM_UNIXTIME() resolves it in the same frame as NOW(), so
+    // this stays correct whatever timezone the container runs in.
+    const punch = parsePunchedAt(req.body.punched_at_ms);
+    if (punch && punch.bad) return res.status(409).json({ error: punch.bad });
+    const logDate = punch ? punch.date : getTodayIST();
+    const checkInExpr = punch ? 'FROM_UNIXTIME(? / 1000)' : 'NOW()';
 
     // Check if there's an active session (checked in but not checked out)
     const [active] = await pool.query(
       'SELECT id FROM attendance_logs WHERE emp_code = ? AND log_date = ? AND check_in IS NOT NULL AND check_out IS NULL',
-      [req.user.empCode, today]
+      [req.user.empCode, logDate]
     );
 
     if (active.length > 0) {
@@ -57,26 +90,31 @@ router.post('/checkin', verifyToken, upload.single('selfie'), async (req, res) =
     const selfieUrl = req.file ? '/uploads/' + req.file.filename : null;
 
     // Create a new check-in session (allows re-checkin after checkout)
+    const insertParams = [req.user.empCode];
+    if (punch) insertParams.push(punch.ms);
+    insertParams.push(lat || null, lng || null, logDate,
+      geo.site || location || null, remark || null,
+      geo.within ? 1 : 0, accuracy || null, selfieUrl);
     const [result] = await pool.query(
       `INSERT INTO attendance_logs (emp_code, check_in, check_in_lat, check_in_lng, status, log_date,
        location_name, remark, is_within_geofence, accuracy, selfie_checkin_url)
-       VALUES (?, NOW(), ?, ?, "Present", ?, ?, ?, ?, ?, ?)`,
-      [req.user.empCode, lat || null, lng || null, today,
-       geo.site || location || null, remark || null,
-       geo.within ? 1 : 0, accuracy || null, selfieUrl]
+       VALUES (?, ${checkInExpr}, ?, ?, "Present", ?, ?, ?, ?, ?, ?)`,
+      insertParams
     );
 
     const [rows] = await pool.query('SELECT * FROM attendance_logs WHERE id = ?', [result.insertId]);
 
-    // Detect evening check-in without any prior morning punch today
+    // Detect evening check-in without any prior morning punch that day.
+    // Judged against the instant of the punch itself, not the replay time, or a
+    // queued morning punch synced at night would wrongly flag as evening-only.
     let morningAbsent = false;
-    const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
-    if (nowIST.getHours() >= 14) {
+    const punchIST = new Date(new Date(punch ? punch.ms : Date.now()).toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    if (punchIST.getHours() >= 14) {
       const [morningPunches] = await pool.query(
         `SELECT id FROM attendance_logs
          WHERE emp_code = ? AND log_date = ? AND check_in IS NOT NULL
          AND HOUR(CONVERT_TZ(check_in, '+00:00', '+05:30')) < 14`,
-        [req.user.empCode, today]
+        [req.user.empCode, logDate]
       );
       morningAbsent = morningPunches.length === 0;
     }
@@ -96,6 +134,12 @@ router.post('/checkin', verifyToken, upload.single('selfie'), async (req, res) =
       ...(morningAbsent ? { warning: 'morningAbsent' } : {})
     });
   } catch (err) {
+    // Older databases still carry UNIQUE(emp_code, log_date) from schema.sql,
+    // which forbids the second session of a day. Answer 409 so the offline
+    // queue treats it as final and drops it instead of retrying forever.
+    if (err && err.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ error: 'A punch is already recorded for this date.' });
+    }
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -105,12 +149,18 @@ router.post('/checkin', verifyToken, upload.single('selfie'), async (req, res) =
 router.post('/checkout', verifyToken, upload.single('selfie'), async (req, res) => {
   try {
     const { lat, lng, location, remark } = req.body;
-    const today = getTodayIST();
+
+    // A replayed check-out must close the session that was open on the day it
+    // was made, not whichever day the queue happened to drain on.
+    const punch = parsePunchedAt(req.body.punched_at_ms);
+    if (punch && punch.bad) return res.status(409).json({ error: punch.bad });
+    const logDate = punch ? punch.date : getTodayIST();
+    const checkOutExpr = punch ? 'FROM_UNIXTIME(? / 1000)' : 'NOW()';
 
     // Find latest active session (checked in but not checked out)
     const [active] = await pool.query(
       'SELECT id FROM attendance_logs WHERE emp_code = ? AND log_date = ? AND check_in IS NOT NULL AND check_out IS NULL ORDER BY check_in DESC LIMIT 1',
-      [req.user.empCode, today]
+      [req.user.empCode, logDate]
     );
 
     if (active.length === 0) {
@@ -123,11 +173,14 @@ router.post('/checkout', verifyToken, upload.single('selfie'), async (req, res) 
     // Selfie URL if uploaded
     const selfieUrl = req.file ? '/uploads/' + req.file.filename : null;
 
+    const updateParams = [];
+    if (punch) updateParams.push(punch.ms);
+    updateParams.push(lat || null, lng || null, remark || null, selfieUrl, active[0].id);
     await pool.query(
-      `UPDATE attendance_logs SET check_out = NOW(), check_out_lat = ?, check_out_lng = ?,
+      `UPDATE attendance_logs SET check_out = ${checkOutExpr}, check_out_lat = ?, check_out_lng = ?,
        remark = COALESCE(?, remark),
        selfie_checkout_url = COALESCE(?, selfie_checkout_url) WHERE id = ?`,
-      [lat || null, lng || null, remark || null, selfieUrl, active[0].id]
+      updateParams
     );
 
     const [rows] = await pool.query('SELECT * FROM attendance_logs WHERE id = ?', [active[0].id]);

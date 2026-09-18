@@ -3428,7 +3428,7 @@ function _processToastQueue() {
   const item = _toastQueue.shift();
   const msg = typeof item === 'object' ? item.msg : item;
   const type = typeof item === 'object' ? item.type : null;
-  const duration = type === 'warning' ? 6000 : 2500;
+  const duration = (type === 'warning' || type === 'error') ? 6000 : 2500;
   const t = document.createElement('div');
   t.className = 'toast' + (type ? ' toast-' + type : '');
   t.setAttribute('role', 'status');
@@ -7540,6 +7540,26 @@ function _getLocationFast() {
   });
 }
 
+// Build the message for a punch that did not get recorded. Only three states
+// are actually knowable, and saying the wrong one is how employees end up
+// stranded: a 4xx is the server's own verdict, an offline throw never left the
+// phone, and anything else (5xx, dropped response, unparseable body) may well
+// have been written server-side before the reply died — so it must not claim
+// either way, and must not invite a retry that would hit "Already checked in".
+function _punchFailMessage(e, action) {
+  var msg = (e && e.message) ? String(e.message) : '';
+  if (e && e.status >= 400 && e.status < 500 && msg) return msg;
+  // navigator.onLine covers the case where the request left the page but no
+  // service worker was there to queue it, so the fetch simply died.
+  if ((e && e.offline) || /No internet connection/i.test(msg) || navigator.onLine === false) {
+    return action + ' not saved — you are offline. Please try again once you have signal.';
+  }
+  if (/Not authenticated|Session expired/i.test(msg)) {
+    return action + ' not saved — your session expired. Please log in again.';
+  }
+  return 'Could not confirm your ' + action.toLowerCase() + '. Refresh and check your status before punching again.';
+}
+
 function gpsCheckIn() {
   if (!navigator.geolocation) { showToast('Geolocation not supported'); return; }
   var btn = document.getElementById('gpsCheckinBtn');
@@ -7567,6 +7587,7 @@ function gpsCheckIn() {
     }
     var locationName = geoResult.inside ? geoResult.location : 'Outside geofence';
     var _checkinWarning = null;
+    var _queuedOffline = false;
     try {
       var fd = new FormData();
       fd.append('lat', pos.coords.latitude);
@@ -7578,35 +7599,43 @@ function gpsCheckIn() {
       if (window._attendanceSelfie) fd.append('selfie', window._attendanceSelfie);
       var result = await apiUpload('/attendance/checkin', fd);
       window._attendanceSelfie = null;
+      // The service worker answers offline:true when it has queued the punch
+      // rather than sent it. Queued is not the same as recorded — say which.
+      if (result && result.offline) _queuedOffline = true;
       if (result && result.warning) _checkinWarning = result.warning;
       // Push mapped result to local array
       if (result && result.row) {
         attendanceLogs.push(mapAttendanceLog(result.row));
       } else {
         attendanceLogs.push({
-          empCode: currentUser.code, type: 'checkin',
+          empCode: currentUser.code, type: 'checkin', pendingSync: _queuedOffline,
           lat: pos.coords.latitude, lng: pos.coords.longitude,
           accuracy: pos.coords.accuracy, timestamp: new Date().toISOString(),
           location: locationName, remark: remark
         });
       }
     } catch (e) {
-      // Fallback: push local-only if API fails
-      attendanceLogs.push({
-        empCode: currentUser.code, type: 'checkin',
-        lat: pos.coords.latitude, lng: pos.coords.longitude,
-        accuracy: pos.coords.accuracy, timestamp: new Date().toISOString(),
-        location: locationName, remark: remark
-      });
+      // The punch never reached the server. Reporting success here is what used
+      // to strand employees: the UI said "Checked in", the server had no row,
+      // and HR's report showed nothing. Surface the real reason and stop — no
+      // success toast, no phantom local record, no "Recorded" notification.
+      window._attendanceSelfie = null;
+      showToast(_punchFailMessage(e, 'Check-in'), 'error');
+      if (btn) btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Check In';
+      return;
     }
-    if (_checkinWarning === 'morningAbsent') {
+    if (_queuedOffline) {
+      showToast('Saved offline \u2014 your check-in will sync when you are back online.', 'warning');
+    } else if (_checkinWarning === 'morningAbsent') {
       showToast('Warning: No morning punch recorded. Evening-only attendance will be counted as Absent.', 'warning');
     } else {
       showToast('Checked in at ' + (geoResult.inside ? geoResult.location : pos.coords.latitude.toFixed(4) + '\u00B0N, ' + pos.coords.longitude.toFixed(4) + '\u00B0E'));
     }
-    addNotification('Check-In Recorded', 'Location: ' + (geoResult.inside ? geoResult.location : pos.coords.latitude.toFixed(4) + '\u00B0N'), 'checkin');
+    if (!_queuedOffline) {
+      addNotification('Check-In Recorded', 'Location: ' + (geoResult.inside ? geoResult.location : pos.coords.latitude.toFixed(4) + '\u00B0N'), 'checkin');
+    }
     // Notify MD & HR if outside geofence
-    if (!geoResult.inside) {
+    if (!geoResult.inside && !_queuedOffline) {
       var alertMsg = currentUser.name + ' (' + currentUser.code + ') checked in OUTSIDE geofence at ' + pos.coords.latitude.toFixed(4) + '\u00B0N, ' + pos.coords.longitude.toFixed(4) + '\u00B0E' + (remark ? '. Reason: ' + remark : '');
       apiCall('POST', '/notifications', { title: 'Outside Geofence Check-In', body: alertMsg, category: 'checkin', target_emp_code: 'MD001' }).catch(function(){});
       EMPLOYEES.filter(function(e) { return e.role === 'HR'; }).forEach(function(hr) {
@@ -7641,6 +7670,7 @@ function gpsCheckOut() {
       remark = prompt('You are outside the geofenced area. Please provide a reason:') || '';
     }
     var locationName = geoResult.inside ? geoResult.location : 'Outside geofence';
+    var _queuedOffline = false;
     try {
       var fd = new FormData();
       fd.append('lat', pos.coords.latitude);
@@ -7651,27 +7681,32 @@ function gpsCheckOut() {
       if (window._attendanceSelfie) fd.append('selfie', window._attendanceSelfie);
       var result = await apiUpload('/attendance/checkout', fd);
       window._attendanceSelfie = null;
+      if (result && result.offline) _queuedOffline = true;
       if (result && result.row) {
         attendanceLogs.push(mapAttendanceLog(result.row));
       } else {
         attendanceLogs.push({
-          empCode: currentUser.code, type: 'checkout',
+          empCode: currentUser.code, type: 'checkout', pendingSync: _queuedOffline,
           lat: pos.coords.latitude, lng: pos.coords.longitude,
           accuracy: pos.coords.accuracy, timestamp: new Date().toISOString(),
           location: locationName, remark: remark
         });
       }
     } catch (e) {
-      attendanceLogs.push({
-        empCode: currentUser.code, type: 'checkout',
-        lat: pos.coords.latitude, lng: pos.coords.longitude,
-        accuracy: pos.coords.accuracy, timestamp: new Date().toISOString(),
-        location: locationName, remark: remark
-      });
+      // Bail out before the UI flips to "Checked Out". The server still holds
+      // the session open, so leaving the status as "Checked In" is the honest
+      // state, and it keeps the next check-in from hitting "Already checked in".
+      window._attendanceSelfie = null;
+      showToast(_punchFailMessage(e, 'Check-out'), 'error');
+      return;
     }
-    showToast('Checked out at ' + (geoResult.inside ? geoResult.location : pos.coords.latitude.toFixed(4) + '\u00B0N, ' + pos.coords.longitude.toFixed(4) + '\u00B0E'));
-    addNotification('Check-Out Recorded', 'Location: ' + (geoResult.inside ? geoResult.location : pos.coords.latitude.toFixed(4) + '\u00B0N'), 'checkout');
-    if (!geoResult.inside) {
+    if (_queuedOffline) {
+      showToast('Saved offline \u2014 your check-out will sync when you are back online.', 'warning');
+    } else {
+      showToast('Checked out at ' + (geoResult.inside ? geoResult.location : pos.coords.latitude.toFixed(4) + '\u00B0N, ' + pos.coords.longitude.toFixed(4) + '\u00B0E'));
+      addNotification('Check-Out Recorded', 'Location: ' + (geoResult.inside ? geoResult.location : pos.coords.latitude.toFixed(4) + '\u00B0N'), 'checkout');
+    }
+    if (!geoResult.inside && !_queuedOffline) {
       var alertMsg = currentUser.name + ' (' + currentUser.code + ') checked out OUTSIDE geofence at ' + pos.coords.latitude.toFixed(4) + '\u00B0N, ' + pos.coords.longitude.toFixed(4) + '\u00B0E' + (remark ? '. Reason: ' + remark : '');
       apiCall('POST', '/notifications', { title: 'Outside Geofence Check-Out', body: alertMsg, category: 'checkout', target_emp_code: 'MD001' }).catch(function(){});
       EMPLOYEES.filter(function(e) { return e.role === 'HR'; }).forEach(function(hr) {
@@ -8098,7 +8133,15 @@ async function apiCall(method, path, body) {
 }
 
 async function apiUpload(path, formData) {
-  if (!isOnline) throw new Error('No internet connection');
+  // An offline punch has to reach the service worker for it to be queued, so
+  // don't short-circuit it here — that guard is why the queue stayed empty.
+  // Only bypass when a SW is actually controlling this page; otherwise there is
+  // nothing to catch the request and "you are offline" is the honest answer.
+  var isPunch = /\/attendance\/check(in|out)$/.test(path);
+  var swActive = ('serviceWorker' in navigator) && !!navigator.serviceWorker.controller;
+  if (!isOnline && !(isPunch && swActive)) {
+    var offErr = new Error('No internet connection'); offErr.offline = true; throw offErr;
+  }
   if (!JWT_TOKEN) throw new Error('Not authenticated');
   var res = await fetch(API_BASE + path, {
     method: 'POST',
@@ -8109,8 +8152,16 @@ async function apiUpload(path, formData) {
     JWT_TOKEN = null; safeStorage.remove('hrms_jwt'); safeStorage.remove(STORAGE_KEYS.session);
     doLogout(); throw new Error('Session expired. Please login again.');
   }
-  var data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Server error');
+  // A proxy 502/504 returns HTML, not JSON. Parsing that used to throw a
+  // SyntaxError that masked the real status, so callers could not tell a
+  // server rejection from an unknown outcome. Keep the status either way.
+  var data = null;
+  try { data = await res.json(); } catch (parseErr) { data = null; }
+  if (!res.ok) {
+    var err = new Error((data && data.error) || ('Server error (' + res.status + ')'));
+    err.status = res.status;
+    throw err;
+  }
   return data;
 }
 
@@ -10867,18 +10918,39 @@ if ('serviceWorker' in navigator) {
       var token = JWT_TOKEN || safeStorage.get('hrms_jwt');
       event.ports[0].postMessage({ token: token });
     }
+    // The queue drained. Pull the real rows so the UI stops showing pending
+    // punches, and report anything the server refused.
+    if (event.data && event.data.type === 'ATTENDANCE_SYNCED') {
+      if (event.data.synced) showToast(event.data.synced + ' offline punch(es) synced.', 'success');
+      if (event.data.rejected) showToast(event.data.rejected + ' offline punch(es) could not be applied. Please check your attendance.', 'error');
+      if (event.data.expired) showToast(event.data.expired + ' offline punch(es) were too old to record. Please contact HR.', 'error');
+      if (typeof loadFromBackend === 'function') loadFromBackend().catch(function() {});
+    }
   });
+}
+
+// Ask the service worker to drain the punch queue. Background Sync does this
+// on its own where it exists; on iOS Safari it does not exist at all, so this
+// message is the only thing that ever triggers a replay there.
+function requestQueueReplay() {
+  if (!('serviceWorker' in navigator)) return;
+  navigator.serviceWorker.ready.then(function(reg) {
+    if (reg.sync) {
+      reg.sync.register('sync-attendance').catch(function() {
+        if (reg.active) reg.active.postMessage({ type: 'REPLAY_QUEUE' });
+      });
+    } else if (reg.active) {
+      reg.active.postMessage({ type: 'REPLAY_QUEUE' });
+    }
+  }).catch(function() {});
 }
 
 // Detect online/offline status
 window.addEventListener('online', function() {
   showToast('Back online — syncing data...', 'success');
-  // Trigger background sync
-  if ('serviceWorker' in navigator && 'SyncManager' in window) {
-    navigator.serviceWorker.ready.then(function(reg) {
-      reg.sync.register('sync-attendance');
-    });
-  }
+  // Drain any punches queued while offline. Goes through requestQueueReplay so
+  // devices without Background Sync (iOS) still get a replay.
+  requestQueueReplay();
   // Refresh data
   if (typeof refreshNotifications === 'function') refreshNotifications();
 });
