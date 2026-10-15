@@ -135,7 +135,9 @@ router.post('/', verifyToken, [
       days = Math.round((toDate - fromDate) / 86400000) + 1;
     }
 
-    // Fetch balance
+    // Fetch balance (create the default row first — employees added after the
+    // initial seed have none, and a missing row would read as zero balance)
+    await pool.query('INSERT IGNORE INTO leave_balances (emp_code, casual, permission) VALUES (?, 12, 2)', [req.user.empCode]);
     const [balRows] = await pool.query('SELECT * FROM leave_balances WHERE emp_code = ?', [req.user.empCode]);
     let available = 0;
     if (balRows.length > 0) {
@@ -252,6 +254,7 @@ router.patch('/:id/approve', verifyToken, requireRole('MD'), auditLog('approve',
       : (app.is_lop && _lop > 0 ? 0
       : (app.is_half_day ? 0.5 : parseFloat(app.days || 0)));
     if (deductDays > 0) {
+      await pool.query('INSERT IGNORE INTO leave_balances (emp_code, casual, permission) VALUES (?, 12, 2)', [app.emp_code]);
       await pool.query(
         `UPDATE leave_balances SET \`${col}\` = GREATEST(0, \`${col}\` - ?) WHERE emp_code = ?`,
         [deductDays, app.emp_code]

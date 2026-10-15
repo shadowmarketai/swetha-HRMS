@@ -144,17 +144,21 @@ router.get('/me', verifyToken, async (req, res) => {
 // POST /api/auth/register (MD or HR — create new users)
 router.post('/register', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
   try {
-    const { empCode, password, role } = req.body;
+    const { password, role } = req.body;
+    const empCode = String(req.body.empCode || '').replace(/\s+/g, '').toUpperCase();
     if (!empCode || !password) {
       return res.status(400).json({ error: 'Employee code and password required' });
     }
     if (password.length < 6) {
       return res.status(400).json({ error: 'Password must be at least 6 characters' });
     }
+    // Store the login under the employee's exact code so the two always match
+    const [emp] = await pool.query('SELECT code FROM employees WHERE code = ?', [empCode]);
+    if (emp.length === 0) return res.status(404).json({ error: 'Employee not found' });
     const hash = await bcrypt.hash(password, 10);
     await pool.query(
       'INSERT INTO users (emp_code, password_hash, role) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE password_hash = ?, role = ?',
-      [empCode, hash, role || 'Employee', hash, role || 'Employee']
+      [emp[0].code, hash, role || 'Employee', hash, role || 'Employee']
     );
     res.json({ message: 'User registered' });
   } catch (err) {
@@ -166,15 +170,17 @@ router.post('/register', verifyToken, requireRole('MD', 'HR'), async (req, res) 
 // POST /api/auth/reset-password — MD/HR resets an employee's password
 router.post('/reset-password', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
   try {
-    const { empCode, newPassword } = req.body;
-    if (!empCode || !newPassword) return res.status(400).json({ error: 'Employee code and new password required' });
+    // No password given → reset to the default, same as bulk-create-missing
+    const newPassword = req.body.newPassword || 'emp123';
+    const empCode = String(req.body.empCode || '').replace(/\s+/g, '').toUpperCase();
+    if (!empCode) return res.status(400).json({ error: 'Employee code required' });
     if (newPassword.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
     const [emp] = await pool.query('SELECT code, role FROM employees WHERE code = ?', [empCode]);
     if (emp.length === 0) return res.status(404).json({ error: 'Employee not found' });
     const hash = await bcrypt.hash(newPassword, 10);
     await pool.query(
-      'INSERT INTO users (emp_code, password_hash, role) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE password_hash = ?',
-      [empCode, hash, emp[0].role, hash]
+      'INSERT INTO users (emp_code, password_hash, role) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE password_hash = ?, is_active = 1',
+      [emp[0].code, hash, emp[0].role, hash]
     );
     res.json({ message: 'Password reset for ' + empCode });
   } catch (err) {

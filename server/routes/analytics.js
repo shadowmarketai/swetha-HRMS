@@ -48,11 +48,16 @@ router.get('/home', verifyToken, async (req, res) => {
       const sysPlaceholders = SYSTEM_CODES.map(() => '?').join(',');
 
       // Attendance summary today
-      const today = new Date().toISOString().split('T')[0];
+      // IST calendar date, same as check-in's log_date (UTC lagged until 05:30 IST)
+      const istToday = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+      const istMonth = istToday.slice(0, 7);
+      const today = istToday;
+      // Employees whose joining date is still ahead are not expected in yet
       const [totalActiveRows] = await pool.query(
         `SELECT COUNT(*) as totalActive FROM employees
-         WHERE is_active = 1 AND role != 'MD' AND code NOT IN (${sysPlaceholders})`,
-        SYSTEM_CODES
+         WHERE is_active = 1 AND role != 'MD' AND code NOT IN (${sysPlaceholders})
+           AND (doj IS NULL OR doj <= ?)`,
+        [...SYSTEM_CODES, today]
       );
       const totalActive = (totalActiveRows && totalActiveRows[0]) ? totalActiveRows[0].totalActive : 0;
       const [presentTodayRows] = await pool.query(
@@ -74,9 +79,10 @@ router.get('/home', verifyToken, async (req, res) => {
           AND ? BETWEEN la.from_date AND la.to_date
          WHERE e.is_active = 1 AND e.role != 'MD'
            AND e.code NOT IN (${sysPlaceholders})
+           AND (e.doj IS NULL OR e.doj <= ?)
            AND e.code NOT IN (SELECT DISTINCT emp_code FROM attendance_logs WHERE log_date = ?)
          ORDER BY e.dept, e.name`,
-        [today, ...SYSTEM_CODES, today]
+        [today, ...SYSTEM_CODES, today, today]
       ).catch(() => [[]]);
 
       const leaveList = [];
@@ -113,15 +119,38 @@ router.get('/home', verifyToken, async (req, res) => {
       );
       data.leaveStats = leaveStats;
 
-      // Top absentees (most absent days this month)
-      const [absentees] = await pool.query(
-        `SELECT e.name, e.code, e.dept,
+      // Top absentees (lowest attendance rate this month). Each employee's working
+      // days count only from their joining date, so a mid-month hire is not ranked
+      // as absent for days before they joined.
+      const [absenteeRows] = await pool.query(
+        `SELECT e.name, e.code, e.dept, DATE_FORMAT(e.doj, '%Y-%m-%d') AS doj,
          (SELECT COUNT(DISTINCT log_date) FROM attendance_logs WHERE emp_code = e.code AND DATE_FORMAT(log_date, '%Y-%m') = ?) as days_present
          FROM employees e
          WHERE e.is_active = 1 AND e.role != 'MD' AND e.code NOT IN (${sysPlaceholders})
-         ORDER BY days_present ASC LIMIT 10`, [currentMonth, ...SYSTEM_CODES]
+           AND (e.doj IS NULL OR e.doj <= ?)`, [istMonth, ...SYSTEM_CODES, istToday]
       );
-      data.topAbsentees = absentees;
+      const [holRows] = await pool.query(
+        "SELECT DATE_FORMAT(holiday_date, '%Y-%m-%d') AS d FROM public_holidays WHERE DATE_FORMAT(holiday_date, '%Y-%m') = ?", [istMonth]
+      ).catch(() => [[]]);
+      const holidaySet = new Set((holRows || []).map(h => h.d));
+      const workingDaysSince = (fromYmd) => {
+        let n = 0;
+        const [y, m] = istMonth.split('-').map(Number);
+        for (let d = 1; d <= Number(istToday.slice(8, 10)); d++) {
+          const ymd = `${istMonth}-${String(d).padStart(2, '0')}`;
+          if (ymd < fromYmd || holidaySet.has(ymd) || new Date(y, m - 1, d).getDay() === 0) continue;
+          n++;
+        }
+        return n;
+      };
+      data.topAbsentees = absenteeRows
+        .map(r => {
+          const workingDays = workingDaysSince(r.doj && r.doj > istMonth + '-01' ? r.doj : istMonth + '-01');
+          return { name: r.name, code: r.code, dept: r.dept, days_present: r.days_present, working_days: workingDays,
+                   rate: workingDays > 0 ? r.days_present / workingDays : 1 };
+        })
+        .sort((a, b) => a.rate - b.rate)
+        .slice(0, 10);
     }
 
     // ══════════════════════════════════

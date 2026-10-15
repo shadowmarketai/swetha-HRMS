@@ -153,36 +153,70 @@ router.get('/:code', verifyToken, async (req, res) => {
   }
 });
 
+// Employee codes are stored canonically: no whitespace, upper case (e.g. "SS054").
+// Login upper-cases what is typed and the client matches codes exactly, so a code
+// saved as "ss054" or "SS054 " lets the password check pass but then locks the
+// employee out of the app ("Employee not found in database").
+function canonicalCode(v) {
+  return String(v == null ? '' : v).replace(/\s+/g, '').toUpperCase();
+}
+const ROLES = ['Employee', 'Manager', 'Accounts', 'HR', 'MD'];
+
 // POST /api/employees — add new (MD/HR only)
+// Creates the employee, their login and their leave balance in one transaction,
+// so a new hire can never end up with a profile but no way to log in.
 router.post('/', verifyToken, requireRole('MD', 'HR'), [
-  body('code').trim().notEmpty().withMessage('Employee code required'),
+  body('code').customSanitizer(canonicalCode).notEmpty().withMessage('Employee code required')
+    .matches(/^[A-Z0-9_-]+$/).withMessage('Employee code may only contain letters, digits, - and _'),
   body('name').trim().notEmpty().isLength({ max: 100 }).withMessage('Name required (max 100 chars)'),
   body('dept').trim().notEmpty().withMessage('Department required'),
   body('salary').optional().isNumeric()
 ], auditLog('create', 'employee'), async (req, res) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) return res.status(400).json({ error: errors.array()[0].msg });
+  const { code, name, dept, designation, salary, bank, accNo, phone, doj,
+          email, dob, gender, address, aadhaar, pan, ifscCode,
+          emergencyContact, emergencyPhone, reportingManager } = req.body;
+  if (!code || !name || !dept) {
+    return res.status(400).json({ error: 'Code, name, and department required' });
+  }
+  const role = req.body.role || 'Employee';
+  if (!ROLES.includes(role)) return res.status(400).json({ error: 'Invalid role' });
+  // Manager gets HR-level backend access (middleware/auth.js), so it is MD-only too
+  if (['MD', 'HR', 'Manager'].includes(role) && req.user.role !== 'MD') {
+    return res.status(403).json({ error: 'Only MD can create HR, Manager or MD accounts' });
+  }
+  const password = req.body.password || 'emp123';
+  if (String(password).length < 6) {
+    return res.status(400).json({ error: 'Password must be at least 6 characters' });
+  }
+  const conn = await pool.getConnection();
   try {
-    const { code, name, dept, designation, salary, bank, accNo, role, phone, doj,
-            email, dob, gender, address, aadhaar, pan, ifscCode,
-            emergencyContact, emergencyPhone, reportingManager } = req.body;
-    if (!code || !name || !dept) {
-      return res.status(400).json({ error: 'Code, name, and department required' });
-    }
-    await pool.query(
+    await conn.beginTransaction();
+    await conn.query(
       `INSERT INTO employees (code, name, dept, designation, salary, bank, acc_no, role, phone, doj,
         email, dob, gender, address, aadhaar, pan, ifsc_code, emergency_contact, emergency_phone, reporting_manager)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [code, name, dept, designation || '', salary || 0, bank || '', accNo || '', role || 'Employee',
+      [code, name, dept, designation || '', salary || 0, bank || '', accNo || '', role,
        phone || '', doj || null, email || '', dob || null, gender || '', address || '',
        aadhaar || '', pan || '', ifscCode || '', emergencyContact || '', emergencyPhone || '',
        reportingManager || null]
     );
-    res.status(201).json({ message: 'Employee added', code });
+    const hash = await bcrypt.hash(String(password), 10);
+    await conn.query(
+      'INSERT INTO users (emp_code, password_hash, role) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE password_hash = VALUES(password_hash), role = VALUES(role), is_active = 1',
+      [code, hash, role]
+    );
+    await conn.query('INSERT IGNORE INTO leave_balances (emp_code, casual, permission) VALUES (?, 12, 2)', [code]);
+    await conn.commit();
+    res.status(201).json({ message: 'Employee added', code, loginCreated: true });
   } catch (err) {
+    await conn.rollback().catch(() => {});
     if (err.code === 'ER_DUP_ENTRY') return res.status(409).json({ error: 'Employee code already exists' });
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    conn.release();
   }
 });
 

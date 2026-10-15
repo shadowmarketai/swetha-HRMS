@@ -8,6 +8,54 @@ function getTodayIST() {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
 }
 
+// IST calendar date of an absolute instant — same format as getTodayIST().
+// Both routes derive log_date through this so an offline punch replayed the
+// next morning still lands on the day it was actually made.
+function istDateOf(ms) {
+  return new Date(ms).toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+}
+
+// Oldest offline punch we are willing to write. Beyond this the queue has held
+// it so long that recording it would corrupt a month that may already be closed.
+// Kept in step with MAX_QUEUE_AGE_MS in sw.js — change both together.
+const MAX_PUNCH_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+// Validate the optional punched_at_ms sent by the offline queue.
+// Absent  -> null, and the caller falls back to NOW() (existing behaviour).
+// Present -> must be a sane instant; anything else is refused outright rather
+// than silently recorded at the wrong time.
+function parsePunchedAt(raw) {
+  if (raw === undefined || raw === null || raw === '') return null;
+  const ms = Number(raw);
+  const now = Date.now();
+  if (!Number.isFinite(ms) || ms <= 0) return { bad: 'Invalid punch timestamp.' };
+  if (ms > now + 5 * 60 * 1000) return { bad: 'Punch timestamp is in the future.' };
+  if (ms < now - MAX_PUNCH_AGE_MS) return { bad: 'Punch is too old to record.' };
+  return { ms, date: istDateOf(ms) };
+}
+
+// Employee's date of joining as 'YYYY-MM-DD' ('' if unknown). mysql2 returns DATE
+// columns as local-midnight Date objects, so build it from local date parts.
+function dojYmdOf(emp) {
+  const d = emp && emp.doj;
+  if (!d) return '';
+  if (d instanceof Date) {
+    if (isNaN(d)) return '';
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+  return String(d).slice(0, 10);
+}
+
+// Working days (Mon–Sat, non-holiday) in days 1..lastDay that fall on/after joining
+function workingDaysFrom(yr, mo, lastDay, holidays, dojYmd) {
+  let n = 0;
+  for (let d = 1; d <= lastDay; d++) {
+    const ymd = `${yr}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    if (new Date(yr, mo - 1, d).getDay() !== 0 && !holidays[ymd] && !(dojYmd && ymd < dojYmd)) n++;
+  }
+  return n;
+}
+
 // Haversine distance in meters between two lat/lng pairs
 function haversineDistance(lat1, lng1, lat2, lng2) {
   const R = 6371000; // Earth radius in meters
@@ -38,12 +86,19 @@ async function checkGeofence(lat, lng) {
 router.post('/checkin', verifyToken, upload.single('selfie'), async (req, res) => {
   try {
     const { lat, lng, location, remark, accuracy } = req.body;
-    const today = getTodayIST();
+
+    // An offline punch replayed by the service worker carries the instant it was
+    // actually made. FROM_UNIXTIME() resolves it in the same frame as NOW(), so
+    // this stays correct whatever timezone the container runs in.
+    const punch = parsePunchedAt(req.body.punched_at_ms);
+    if (punch && punch.bad) return res.status(409).json({ error: punch.bad });
+    const logDate = punch ? punch.date : getTodayIST();
+    const checkInExpr = punch ? 'FROM_UNIXTIME(? / 1000)' : 'NOW()';
 
     // Check if there's an active session (checked in but not checked out)
     const [active] = await pool.query(
       'SELECT id FROM attendance_logs WHERE emp_code = ? AND log_date = ? AND check_in IS NOT NULL AND check_out IS NULL',
-      [req.user.empCode, today]
+      [req.user.empCode, logDate]
     );
 
     if (active.length > 0) {
@@ -57,26 +112,31 @@ router.post('/checkin', verifyToken, upload.single('selfie'), async (req, res) =
     const selfieUrl = req.file ? '/uploads/' + req.file.filename : null;
 
     // Create a new check-in session (allows re-checkin after checkout)
+    const insertParams = [req.user.empCode];
+    if (punch) insertParams.push(punch.ms);
+    insertParams.push(lat || null, lng || null, logDate,
+      geo.site || location || null, remark || null,
+      geo.within ? 1 : 0, accuracy || null, selfieUrl);
     const [result] = await pool.query(
       `INSERT INTO attendance_logs (emp_code, check_in, check_in_lat, check_in_lng, status, log_date,
        location_name, remark, is_within_geofence, accuracy, selfie_checkin_url)
-       VALUES (?, NOW(), ?, ?, "Present", ?, ?, ?, ?, ?, ?)`,
-      [req.user.empCode, lat || null, lng || null, today,
-       geo.site || location || null, remark || null,
-       geo.within ? 1 : 0, accuracy || null, selfieUrl]
+       VALUES (?, ${checkInExpr}, ?, ?, "Present", ?, ?, ?, ?, ?, ?)`,
+      insertParams
     );
 
     const [rows] = await pool.query('SELECT * FROM attendance_logs WHERE id = ?', [result.insertId]);
 
-    // Detect evening check-in without any prior morning punch today
+    // Detect evening check-in without any prior morning punch that day.
+    // Judged against the instant of the punch itself, not the replay time, or a
+    // queued morning punch synced at night would wrongly flag as evening-only.
     let morningAbsent = false;
-    const nowIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
-    if (nowIST.getHours() >= 14) {
+    const punchIST = new Date(new Date(punch ? punch.ms : Date.now()).toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+    if (punchIST.getHours() >= 14) {
       const [morningPunches] = await pool.query(
         `SELECT id FROM attendance_logs
          WHERE emp_code = ? AND log_date = ? AND check_in IS NOT NULL
          AND HOUR(CONVERT_TZ(check_in, '+00:00', '+05:30')) < 14`,
-        [req.user.empCode, today]
+        [req.user.empCode, logDate]
       );
       morningAbsent = morningPunches.length === 0;
     }
@@ -96,6 +156,12 @@ router.post('/checkin', verifyToken, upload.single('selfie'), async (req, res) =
       ...(morningAbsent ? { warning: 'morningAbsent' } : {})
     });
   } catch (err) {
+    // Older databases still carry UNIQUE(emp_code, log_date) from schema.sql,
+    // which forbids the second session of a day. Answer 409 so the offline
+    // queue treats it as final and drops it instead of retrying forever.
+    if (err && err.code === 'ER_DUP_ENTRY') {
+      return res.status(409).json({ error: 'A punch is already recorded for this date.' });
+    }
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
   }
@@ -105,12 +171,18 @@ router.post('/checkin', verifyToken, upload.single('selfie'), async (req, res) =
 router.post('/checkout', verifyToken, upload.single('selfie'), async (req, res) => {
   try {
     const { lat, lng, location, remark } = req.body;
-    const today = getTodayIST();
+
+    // A replayed check-out must close the session that was open on the day it
+    // was made, not whichever day the queue happened to drain on.
+    const punch = parsePunchedAt(req.body.punched_at_ms);
+    if (punch && punch.bad) return res.status(409).json({ error: punch.bad });
+    const logDate = punch ? punch.date : getTodayIST();
+    const checkOutExpr = punch ? 'FROM_UNIXTIME(? / 1000)' : 'NOW()';
 
     // Find latest active session (checked in but not checked out)
     const [active] = await pool.query(
       'SELECT id FROM attendance_logs WHERE emp_code = ? AND log_date = ? AND check_in IS NOT NULL AND check_out IS NULL ORDER BY check_in DESC LIMIT 1',
-      [req.user.empCode, today]
+      [req.user.empCode, logDate]
     );
 
     if (active.length === 0) {
@@ -123,11 +195,14 @@ router.post('/checkout', verifyToken, upload.single('selfie'), async (req, res) 
     // Selfie URL if uploaded
     const selfieUrl = req.file ? '/uploads/' + req.file.filename : null;
 
+    const updateParams = [];
+    if (punch) updateParams.push(punch.ms);
+    updateParams.push(lat || null, lng || null, remark || null, selfieUrl, active[0].id);
     await pool.query(
-      `UPDATE attendance_logs SET check_out = NOW(), check_out_lat = ?, check_out_lng = ?,
+      `UPDATE attendance_logs SET check_out = ${checkOutExpr}, check_out_lat = ?, check_out_lng = ?,
        remark = COALESCE(?, remark),
        selfie_checkout_url = COALESCE(?, selfie_checkout_url) WHERE id = ?`,
-      [lat || null, lng || null, remark || null, selfieUrl, active[0].id]
+      updateParams
     );
 
     const [rows] = await pool.query('SELECT * FROM attendance_logs WHERE id = ?', [active[0].id]);
@@ -274,18 +349,23 @@ router.put('/missed/:id/approve', verifyToken, requireRole('MD', 'HR'), async (r
     if (rows[0].status !== 'pending') return res.status(400).json({ error: 'Request already ' + rows[0].status });
 
     const request = rows[0];
+    // request_date comes back as a Date; CONCAT on it produced
+    // '2026-10-12 00:00:00.000 09:00:00', which MySQL rejects
+    const reqYmd = dojYmdOf({ doj: request.request_date });
+
+    // Auto-create attendance record for that date — before marking the request
+    // approved, so a failure can't leave it approved with nothing recorded.
+    // check_in is stored in UTC (see CONVERT_TZ above); 09:00 is IST.
+    await pool.query(
+      `INSERT INTO attendance_logs (emp_code, check_in, status, log_date, location_name, remark)
+       VALUES (?, CONVERT_TZ(CONCAT(?, ' 09:00:00'), '+05:30', '+00:00'), 'Present', ?, 'Missed Check-In (Approved)', ?)`,
+      [request.emp_code, reqYmd, reqYmd, 'Missed attendance approved by HR: ' + (request.reason || '')]
+    );
 
     // Mark request as approved
     await pool.query(
       "UPDATE missed_attendance_requests SET status = 'approved', reviewed_by = ?, reviewed_at = NOW(), review_note = ? WHERE id = ?",
       [req.user.empCode, note || null, id]
-    );
-
-    // Auto-create attendance record for that date
-    await pool.query(
-      `INSERT INTO attendance_logs (emp_code, check_in, status, log_date, location_name, remark)
-       VALUES (?, CONCAT(?, ' 09:00:00'), 'Present', ?, 'Missed Check-In (Approved)', ?)`,
-      [request.emp_code, request.request_date, request.request_date, 'Missed attendance approved by HR: ' + (request.reason || '')]
     );
 
     // Notify the employee
@@ -360,7 +440,7 @@ router.get('/export/consolidated', verifyToken, requireRole('MD', 'HR'), async (
         [month + '%', month + '%', month + '-01', month + '-' + String(daysInMonth).padStart(2,'0')]
       ),
       pool.query(`SELECT holiday_date, name FROM public_holidays WHERE holiday_date LIKE ?`, [month + '%']),
-      pool.query(`SELECT code, name, dept FROM employees WHERE is_active = 1 ORDER BY name`)
+      pool.query(`SELECT code, name, dept, doj FROM employees WHERE is_active = 1 ORDER BY name`)
     ]);
 
     // Build holiday lookup  { 'YYYY-MM-DD': name }
@@ -507,14 +587,19 @@ router.get('/export/consolidated', verifyToken, requireRole('MD', 'HR'), async (
       codeCell.alignment = ALIGN_CENTER; codeCell.border = BORDER_ALL;
 
       let totalMins = 0, fullDays = 0, halfDays = 0, leaveDays = 0, absentDays = 0;
+      // Days before a mid-month joiner's DOJ are blank, not Absent
+      const dojYmd = dojYmdOf(emp);
 
       for (let d = 1; d <= daysInMonth; d++) {
         const ymd = `${monthStr}-${String(d).padStart(2,'0')}`;
         const dow = new Date(yr, mo - 1, d).getDay();
         const isFuture = isCurrentMonth && d > lastDay;
         const colIdx = colForDay(d);
+        const beforeJoin = dojYmd && ymd < dojYmd && !(attMap[emp.code] && attMap[emp.code][d]);
 
-        if (dow === 0) {
+        if (beforeJoin) {
+          setCell(colIdx, '');
+        } else if (dow === 0) {
           setCell(colIdx, 'Sun', FILL_YELLOW);
         } else if (holidays[ymd]) {
           setCell(colIdx, 'Holiday', FILL_YELLOW);
@@ -553,7 +638,7 @@ router.get('/export/consolidated', verifyToken, requireRole('MD', 'HR'), async (
       const totalHours = +(totalMins / 60).toFixed(2);
       const avgHours   = fullDays > 0 ? +(totalHours / fullDays).toFixed(2) : 0;
 
-      setCell(summaryCol(0), totalWorkingDays);
+      setCell(summaryCol(0), dojYmd ? workingDaysFrom(yr, mo, lastDay, holidays, dojYmd) : totalWorkingDays);
       setCell(summaryCol(1), fullDays);
       setCell(summaryCol(2), halfDays || '');
       setCell(summaryCol(3), leaveDays || '');
@@ -631,7 +716,7 @@ router.get('/export/punch-detail', verifyToken, requireRole('MD', 'HR'), async (
         [month + '%', month + '%', month + '-01', month + '-' + String(daysInMonth).padStart(2,'0')]
       ),
       pool.query(`SELECT holiday_date, name FROM public_holidays WHERE holiday_date LIKE ?`, [month + '%']),
-      pool.query(`SELECT code, name FROM employees WHERE is_active = 1 ORDER BY CHAR_LENGTH(code), code`)
+      pool.query(`SELECT code, name, doj FROM employees WHERE is_active = 1 ORDER BY CHAR_LENGTH(code), code`)
     ]);
 
     const holidays = {};
@@ -825,6 +910,7 @@ router.get('/export/punch-detail', verifyToken, requireRole('MD', 'HR'), async (
       setCell(3, emp.code);
 
       let totalMins = 0, fullDays = 0, halfDays = 0, leaveDays = 0, absentDays = 0, missingOutDays = 0, eveningOnlyDays = 0;
+      const dojYmd = dojYmdOf(emp);
 
       for (let d = 1; d <= daysInMonth; d++) {
         const ymd = `${monthStr}-${String(d).padStart(2,'0')}`;
@@ -838,7 +924,8 @@ router.get('/export/punch-detail', verifyToken, requireRole('MD', 'HR'), async (
         const isSun = dow === 0;
         const isHol = !!holidays[ymd];
 
-        if (isFuture) {
+        if (isFuture || (dojYmd && ymd < dojYmd && !att)) {
+          // Not yet happened, or before this employee joined — blank, not Absent
           setCell(colIN, ''); setCell(colOUT, '');
         } else if ((isSun || isHol) && att && att.checkIn) {
           // Employee worked on Sunday/holiday — show actual punch times in orange
@@ -898,7 +985,7 @@ router.get('/export/punch-detail', verifyToken, requireRole('MD', 'HR'), async (
 
       const tH = Math.floor(totalMins / 60), tM = Math.round(totalMins % 60);
       const summaryBase = 3 + daysInMonth * 2 + 1;
-      setCell(summaryBase + 0, totalWorkingDays,                         FILL_SUMMARY);
+      setCell(summaryBase + 0, dojYmd ? workingDaysFrom(yr, mo, lastDay, holidays, dojYmd) : totalWorkingDays, FILL_SUMMARY);
       setCell(summaryBase + 1, fullDays,                                  FILL_SUMMARY);
       setCell(summaryBase + 2, halfDays      || '',                       FILL_SUMMARY);
       setCell(summaryBase + 3, leaveDays     || '',                       FILL_SUMMARY);

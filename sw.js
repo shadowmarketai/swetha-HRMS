@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hrms-v208';
+const CACHE_NAME = 'hrms-v209';
 const PRECACHE_URLS = [
   './',
   './index.html',
@@ -33,6 +33,11 @@ self.addEventListener('activate', event => {
     caches.keys().then(keys =>
       Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
     ).then(() => self.clients.claim())
+      // Drain on activate too. An iOS PWA closed while offline has no page to
+      // send REPLAY_QUEUE and no Background Sync, so without this its punches
+      // would sit until someone happened to reopen the app while online.
+      .then(() => syncOfflineQueue())
+      .catch(() => {})
   );
 });
 
@@ -49,29 +54,35 @@ self.addEventListener('fetch', event => {
   // API calls: network-first, queue POST/PUT for offline sync
   if (url.pathname.startsWith('/api/')) {
     if (event.request.method !== 'GET') {
+      const isPunch = url.pathname.includes('/attendance/checkin') || url.pathname.includes('/attendance/checkout');
+      // Parse the body NOW, before fetch touches it. The common site failure is
+      // not a clean offline state — it is an upload that starts and then dies
+      // mid-flight, which disturbs the request stream and makes a later
+      // formData() read reject. Reading up front costs one parse per punch and
+      // is the difference between queueing the punch and losing it.
+      const captured = isPunch ? event.request.clone().formData().catch(() => null) : null;
+      const punchAuth = isPunch ? event.request.headers.get('Authorization') : null;
+      const punchMethod = event.request.method;
+      const offlineResponse = msg => new Response(JSON.stringify({ error: msg }), {
+        status: 503, headers: { 'Content-Type': 'application/json' }
+      });
       // Non-GET API calls — try network, queue on failure
       event.respondWith(
-        fetch(event.request.clone()).catch(() => {
-          // Queue for later sync if it's a checkin/checkout
-          if (url.pathname.includes('/attendance/checkin') || url.pathname.includes('/attendance/checkout')) {
-            return event.request.json().then(body => {
-              return saveToOfflineQueue({
-                url: url.pathname,
-                method: event.request.method,
-                body: body,
-                timestamp: new Date().toISOString()
-              }).then(() => {
-                return new Response(JSON.stringify({
-                  message: 'Saved offline — will sync when online',
-                  offline: true,
-                  time: new Date().toISOString()
-                }), { headers: { 'Content-Type': 'application/json' } });
-              });
-            });
+        fetch(event.request.clone()).catch(async () => {
+          if (!isPunch) return offlineResponse('You are offline. Please try again when connected.');
+          const form = await captured;
+          if (!form) return offlineResponse('Could not save your punch offline. Please try again.');
+          try {
+            await queuePunch(form, punchAuth, url.pathname, punchMethod);
+            return new Response(JSON.stringify({
+              message: 'Saved offline — will sync when online',
+              offline: true,
+              time: new Date().toISOString()
+            }), { headers: { 'Content-Type': 'application/json' } });
+          } catch (e) {
+            // Could not even queue it — say so rather than claim it was saved.
+            return offlineResponse('Could not save your punch offline. Please try again.');
           }
-          return new Response(JSON.stringify({ error: 'You are offline. Please try again when connected.' }), {
-            status: 503, headers: { 'Content-Type': 'application/json' }
-          });
         })
       );
       return;
@@ -165,6 +176,88 @@ function clearOfflineQueue() {
   });
 }
 
+// Rewrite the queue to exactly these items, in this order. Order matters: a
+// check-in must replay before the check-out that closes it. Dropping the old
+// autoIncrement ids lets the store reassign them in array order.
+function replaceQueue(items) {
+  return openOfflineDB().then(db => {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('queue', 'readwrite');
+      const store = tx.objectStore('queue');
+      store.clear();
+      items.forEach(it => {
+        const copy = Object.assign({}, it);
+        delete copy.id;
+        store.add(copy);
+      });
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  });
+}
+
+// Store a punch that could not be sent. Takes an already-parsed FormData: the
+// request is multipart (it carries a selfie), and the previous version called
+// .json() on it, which always threw — which is why nothing was ever queued.
+// The selfie Blob goes into IndexedDB as-is and the bearer token rides along,
+// so a background sync can run with no page open.
+async function queuePunch(form, authHeader, pathname, method) {
+  const fields = {};
+  let selfie = null;
+  for (const entry of form.entries()) {
+    const key = entry[0];
+    const value = entry[1];
+    if (value instanceof Blob) {
+      if (key === 'selfie') selfie = { blob: value, name: value.name || 'selfie.jpg' };
+    } else {
+      fields[key] = value;
+    }
+  }
+  const record = {
+    url: pathname,
+    method: method || 'POST',
+    fields: fields,
+    selfie: selfie,
+    token: authHeader || null,
+    // The instant the employee actually punched. Replayed to the server so the
+    // row records when they were on site, not when the queue happened to drain.
+    punchedAtMs: Date.now(),
+    queuedAt: new Date().toISOString()
+  };
+  try {
+    await saveToOfflineQueue(record);
+  } catch (e) {
+    // Safari has long-standing trouble storing a Blob in IndexedDB from a
+    // service worker, and iOS is exactly where this path matters most. Retry
+    // without the photo: a punch with no selfie beats no punch at all.
+    if (!record.selfie) throw e;
+    record.selfie = null;
+    await saveToOfflineQueue(record);
+  }
+  if (self.registration.sync) {
+    try { await self.registration.sync.register('sync-attendance'); } catch (e) { /* Background Sync unsupported */ }
+  }
+}
+
+// Ask an open page for a current token. The stored one may have expired while
+// the punch sat in the queue. Times out: a closed or busy page never replies,
+// and the old code awaited that reply forever, hanging the whole sync.
+function requestTokenFromClient() {
+  return self.clients.matchAll({ type: 'window' }).then(clients => {
+    if (!clients.length) return null;
+    return new Promise(resolve => {
+      let settled = false;
+      const done = v => { if (!settled) { settled = true; resolve(v); } };
+      setTimeout(() => done(null), 3000);
+      try {
+        const ch = new MessageChannel();
+        ch.port1.onmessage = e => done(e.data && e.data.token ? e.data.token : null);
+        clients[0].postMessage({ type: 'GET_TOKEN' }, [ch.port2]);
+      } catch (e) { done(null); }
+    });
+  }).catch(() => null);
+}
+
 // ── Background Sync ──
 self.addEventListener('sync', event => {
   if (event.tag === 'sync-attendance') {
@@ -172,63 +265,92 @@ self.addEventListener('sync', event => {
   }
 });
 
+// Refuse to post a punch this stale; the month it belongs to may already be
+// closed. Mirrors MAX_PUNCH_AGE_MS in server/routes/attendance.js.
+const MAX_QUEUE_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
 async function syncOfflineQueue() {
   try {
     const queue = await getOfflineQueue();
     if (queue.length === 0) return;
 
-    // Get token from client
-    const clients = await self.clients.matchAll({ type: 'window' });
-    let token = null;
-    for (const client of clients) {
-      // Send message to get token
-      const response = await new Promise(resolve => {
-        const ch = new MessageChannel();
-        ch.port1.onmessage = e => resolve(e.data);
-        client.postMessage({ type: 'GET_TOKEN' }, [ch.port2]);
-      });
-      if (response && response.token) { token = response.token; break; }
-    }
+    const now = Date.now();
+    const keep = [];
+    let synced = 0, rejected = 0, expired = 0;
+    let aborted = false;
 
-    if (!token) return;
+    // A live page's token beats the one stored with the item, which may have
+    // expired while the punch waited. Either works; neither is required to
+    // exist, because each item carries its own.
+    const freshToken = await requestTokenFromClient();
 
-    var synced = 0;
-    var remaining = [];
-    for (const item of queue) {
+    for (let i = 0; i < queue.length; i++) {
+      const item = queue[i];
+      if (aborted) { keep.push(item); continue; }
+
+      const punchedAtMs = item.punchedAtMs || Date.parse(item.queuedAt || '') || null;
+      if (punchedAtMs && now - punchedAtMs > MAX_QUEUE_AGE_MS) { expired++; continue; }
+      // Written by a previous version that never captured a usable body.
+      if (!item.fields) { expired++; continue; }
+
+      const rawToken = freshToken || item.token;
+      if (!rawToken) { keep.push(item); continue; }
+      const authHeader = rawToken.indexOf('Bearer ') === 0 ? rawToken : 'Bearer ' + rawToken;
+
+      // Rebuild the multipart body the route expects, selfie included. Do not
+      // set Content-Type — fetch derives it with the right boundary.
+      const fd = new FormData();
+      Object.keys(item.fields).forEach(k => fd.append(k, item.fields[k]));
+      if (punchedAtMs) fd.append('punched_at_ms', String(punchedAtMs));
+      // Only attach the photo if it survived storage intact. A Blob that came
+      // back null or malformed must not fail the punch — send it without.
+      if (item.selfie && item.selfie.blob instanceof Blob) {
+        fd.append('selfie', item.selfie.blob, item.selfie.name || 'selfie.jpg');
+      }
+
       try {
-        var resp = await fetch(item.url, {
+        const resp = await fetch(item.url, {
           method: item.method || 'POST',
-          headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-          body: JSON.stringify(item.body)
+          headers: { 'Authorization': authHeader },
+          body: fd
         });
-        if (resp.ok || resp.status === 400) {
-          // 400 = already checked in/out — don't retry
+        if (resp.ok) {
           synced++;
+        } else if (resp.status === 400 || resp.status === 409 || resp.status === 422) {
+          // The server has ruled on this punch — duplicate, too old, or no open
+          // session to close. Retrying cannot change the answer, so drop it and
+          // report the count instead of pretending it synced.
+          rejected++;
+        } else if (resp.status === 401 || resp.status === 403) {
+          // A token problem, not a punch problem. Keep the whole queue and stop.
+          keep.push(item);
+          aborted = true;
         } else {
-          remaining.push(item);
+          keep.push(item); // 5xx — server trouble, try again later
         }
       } catch (e) {
-        remaining.push(item);
+        keep.push(item);   // still offline
       }
     }
 
-    // Save only failed items back, removing successfully synced ones
-    if (remaining.length > 0) {
-      var db = await openOfflineDB();
-      var tx = db.transaction('queue', 'readwrite');
-      var store = tx.objectStore('queue');
-      store.clear();
-      remaining.forEach(function(r) { store.add(r); });
-    } else {
-      await clearOfflineQueue();
+    await replaceQueue(keep);
+
+    const parts = [];
+    if (synced) parts.push(synced + ' punch' + (synced === 1 ? '' : 'es') + ' synced');
+    if (rejected) parts.push(rejected + ' could not be applied');
+    if (expired) parts.push(expired + ' expired');
+    if (parts.length) {
+      self.registration.showNotification('HRMS attendance', {
+        body: parts.join(' · '),
+        icon: './icons/icon-192.png',
+        badge: './icons/icon-192.png'
+      });
     }
 
-    // Notify user
-    self.registration.showNotification('HRMS', {
-      body: `${queue.length} offline action(s) synced successfully`,
-      icon: './icons/icon-192.png',
-      badge: './icons/icon-192.png'
-    });
+    const windows = await self.clients.matchAll({ type: 'window' });
+    windows.forEach(c => c.postMessage({
+      type: 'ATTENDANCE_SYNCED', synced: synced, rejected: rejected, expired: expired, pending: keep.length
+    }));
   } catch (e) {
     console.error('[SW] Sync error:', e);
   }
@@ -269,5 +391,10 @@ self.addEventListener('notificationclick', event => {
 self.addEventListener('message', event => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
+  }
+  // iOS Safari has no Background Sync, so there the page driving the replay is
+  // the primary mechanism, not a fallback.
+  if (event.data && event.data.type === 'REPLAY_QUEUE') {
+    event.waitUntil(syncOfflineQueue());
   }
 });
