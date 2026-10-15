@@ -66,18 +66,25 @@ function haversineDistance(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+// Up to this many metres of the phone's reported GPS accuracy is allowed on top
+// of a site's radius, so jitter at the office edge doesn't flag people outside.
+// Capped so an imprecise (or inflated) accuracy can't pass from far away.
+// Must match GEOFENCE_ACCURACY_CAP in app.js.
+const GEOFENCE_ACCURACY_CAP = 75;
+
 // Server-side geofence check — never trust client's isWithinGeofence
-async function checkGeofence(lat, lng) {
+async function checkGeofence(lat, lng, accuracy) {
   if (lat === null || lat === undefined || lng === null || lng === undefined) return { within: false, site: null };
   const parsedLat = parseFloat(lat);
   const parsedLng = parseFloat(lng);
   if (isNaN(parsedLat) || isNaN(parsedLng) || parsedLat < -90 || parsedLat > 90 || parsedLng < -180 || parsedLng > 180) {
     return { within: false, site: null };
   }
+  const slack = Math.min(Math.max(parseFloat(accuracy) || 0, 0), GEOFENCE_ACCURACY_CAP);
   const [sites] = await pool.query('SELECT name, lat, lng, radius FROM geofence_sites WHERE is_active = 1');
   for (const site of sites) {
     const dist = haversineDistance(parsedLat, parsedLng, parseFloat(site.lat), parseFloat(site.lng));
-    if (dist <= site.radius) return { within: true, site: site.name };
+    if (dist <= site.radius + slack) return { within: true, site: site.name };
   }
   return { within: false, site: null };
 }
@@ -106,7 +113,7 @@ router.post('/checkin', verifyToken, upload.single('selfie'), async (req, res) =
     }
 
     // Server-side geofence verification
-    const geo = await checkGeofence(lat, lng);
+    const geo = await checkGeofence(lat, lng, accuracy);
 
     // Selfie URL if uploaded
     const selfieUrl = req.file ? '/uploads/' + req.file.filename : null;
@@ -170,7 +177,7 @@ router.post('/checkin', verifyToken, upload.single('selfie'), async (req, res) =
 // POST /api/attendance/checkout — GPS check-out (closes latest active session)
 router.post('/checkout', verifyToken, upload.single('selfie'), async (req, res) => {
   try {
-    const { lat, lng, location, remark } = req.body;
+    const { lat, lng, location, remark, accuracy } = req.body;
 
     // A replayed check-out must close the session that was open on the day it
     // was made, not whichever day the queue happened to drain on.
@@ -190,7 +197,7 @@ router.post('/checkout', verifyToken, upload.single('selfie'), async (req, res) 
     }
 
     // Server-side geofence verification for checkout
-    const geo = await checkGeofence(lat, lng);
+    const geo = await checkGeofence(lat, lng, accuracy);
 
     // Selfie URL if uploaded
     const selfieUrl = req.file ? '/uploads/' + req.file.filename : null;
