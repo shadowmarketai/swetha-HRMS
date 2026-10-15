@@ -3524,7 +3524,7 @@ function generateEmployeeLocations() {
 
       if (lastLog.type === 'checkin') {
         // Checked in but not checked out — live/online
-        var geoCheck = (lat && lng) ? checkGeofence(lat, lng) : { inside: false };
+        var geoCheck = (lat && lng) ? checkGeofence(lat, lng, lastLog.accuracy) : { inside: false };
         status = geoCheck.inside ? 'on-site' : 'online';
         geofenceStatus = geoCheck.inside ? 'Inside: ' + geoCheck.location : 'Outside geofence';
       } else {
@@ -7555,23 +7555,44 @@ setTimeout(_startGpsWarm, 2000);
 
 // Fast location getter — returns cached warm position if < 30s old, otherwise
 // gets a quick network fix (no GPS hardware needed for 200m geofence).
+//
+// A fast fix is only trusted when it is precise. Indoors the network fix
+// (Wi-Fi / cell) is often hundreds of metres off, which put employees standing
+// in the office "outside geofence". If the quick fix is imprecise and not
+// already inside, ask for real GPS (fresh, no cache) for a few seconds and keep
+// the best reading; fall back to the best one we have if GPS never improves.
+var GPS_GOOD_ACCURACY = 50;   // metres — good enough to decide without waiting
+var GPS_WAIT_MS = 12000;      // how long to wait for a precise GPS fix
 function _getLocationFast() {
   return new Promise(function(resolve, reject) {
-    // Use warm cache if fresh enough
-    if (_gpsWarmPos && (Date.now() - _gpsWarmTs) < 30000) {
-      return resolve(_gpsWarmPos);
-    }
     if (!navigator.geolocation) return reject(new Error('Geolocation not supported'));
-    // Try fast network-based location first (usually < 3s)
-    navigator.geolocation.getCurrentPosition(resolve,
-      function(err1) {
-        // Fallback: allow slightly stale cache or try GPS
-        navigator.geolocation.getCurrentPosition(resolve, reject,
-          { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
-        );
-      },
-      { enableHighAccuracy: false, timeout: 5000, maximumAge: 15000 }
-    );
+    var best = null, done = false, watchId = null, timer = null;
+    function acc(p) { return (p && p.coords && p.coords.accuracy) || Infinity; }
+    function finish(p) {
+      if (done) return;
+      done = true;
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+      if (timer) clearTimeout(timer);
+      if (p) resolve(p); else reject(new Error('Could not get your location. Turn on GPS and try again.'));
+    }
+    function goodEnough(p) {
+      return acc(p) <= GPS_GOOD_ACCURACY || checkGeofence(p.coords.latitude, p.coords.longitude, acc(p)).inside;
+    }
+    function consider(p) {
+      if (!p || done) return;
+      if (!best || acc(p) < acc(best)) best = p;
+      if (goodEnough(best)) finish(best);
+    }
+    // Warm cache from the background watch, if fresh
+    if (_gpsWarmPos && (Date.now() - _gpsWarmTs) < 30000) consider(_gpsWarmPos);
+    if (done) return;
+    // Precise GPS, fresh reading; keep the best fix until good enough or timeout
+    watchId = navigator.geolocation.watchPosition(consider, function() {},
+      { enableHighAccuracy: true, timeout: GPS_WAIT_MS, maximumAge: 0 });
+    // Quick network fix in parallel — used at once if it's already decisive
+    navigator.geolocation.getCurrentPosition(consider, function() {},
+      { enableHighAccuracy: false, timeout: 5000, maximumAge: 15000 });
+    timer = setTimeout(function() { finish(best); }, GPS_WAIT_MS);
   });
 }
 
@@ -7615,7 +7636,7 @@ function gpsCheckIn() {
   });
 
   async function onSuccess(pos) {
-    var geoResult = checkGeofence(pos.coords.latitude, pos.coords.longitude);
+    var geoResult = checkGeofence(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
     var remark = '';
     if (!geoResult.inside) {
       remark = prompt('You are outside the geofenced area. Please provide a reason:') || '';
@@ -7699,7 +7720,7 @@ function gpsCheckOut() {
   });
 
   async function onSuccess(pos) {
-    var geoResult = checkGeofence(pos.coords.latitude, pos.coords.longitude);
+    var geoResult = checkGeofence(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
     var remark = '';
     if (!geoResult.inside) {
       remark = prompt('You are outside the geofenced area. Please provide a reason:') || '';
@@ -7713,6 +7734,7 @@ function gpsCheckOut() {
       fd.append('location', locationName);
       fd.append('remark', remark);
       fd.append('isWithinGeofence', geoResult.inside);
+      fd.append('accuracy', pos.coords.accuracy);
       if (window._attendanceSelfie) fd.append('selfie', window._attendanceSelfie);
       var result = await apiUpload('/attendance/checkout', fd);
       window._attendanceSelfie = null;
@@ -12516,11 +12538,18 @@ function haversineDistance(lat1, lng1, lat2, lng2) {
   const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
-function checkGeofence(lat, lng) {
+// A reading is a circle of uncertainty, not a point. Allow up to
+// GEOFENCE_ACCURACY_CAP metres of the reported accuracy on top of the radius
+// so a person at the edge of the office isn't flagged by GPS jitter. Capped,
+// so a vague cell-tower fix (or an inflated value) can't pass from far away.
+// Must match GEOFENCE_ACCURACY_CAP in server/routes/attendance.js.
+var GEOFENCE_ACCURACY_CAP = 75;
+function checkGeofence(lat, lng, accuracy) {
   const sites = (typeof siteLocations !== 'undefined' && Array.isArray(siteLocations)) ? siteLocations : SITE_LOCATIONS;
+  const slack = Math.min(Math.max(parseFloat(accuracy) || 0, 0), GEOFENCE_ACCURACY_CAP);
   for (const loc of sites) {
     const dist = haversineDistance(lat, lng, loc.lat, loc.lng);
-    if (dist <= loc.radius) return { inside: true, location: loc.name, distance: Math.round(dist) };
+    if (dist <= loc.radius + slack) return { inside: true, location: loc.name, distance: Math.round(dist) };
   }
   return { inside: false, location: null, distance: null };
 }
@@ -12528,20 +12557,20 @@ var _lastGeoPos = null;
 function getGeofenceStatusHTML() {
   // Use warm-cached position if available (from GPS pre-warm)
   if (_gpsWarmPos && (Date.now() - _gpsWarmTs) < 60000) {
-    _lastGeoPos = { lat: _gpsWarmPos.coords.latitude, lng: _gpsWarmPos.coords.longitude };
+    _lastGeoPos = { lat: _gpsWarmPos.coords.latitude, lng: _gpsWarmPos.coords.longitude, acc: _gpsWarmPos.coords.accuracy };
   }
   if (_lastGeoPos) {
-    var result = checkGeofence(_lastGeoPos.lat, _lastGeoPos.lng);
+    var result = checkGeofence(_lastGeoPos.lat, _lastGeoPos.lng, _lastGeoPos.acc);
     if (result.inside) return '<span class="geofence-status geofence-inside">\ud83d\udccd ' + escapeHTML(result.location) + ' (' + result.distance + 'm)</span>';
     return '<span class="geofence-status geofence-outside">\u26a0 Outside geofence</span>';
   }
   // Request GPS and update when available — use fast network fix
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(function(pos) {
-      _lastGeoPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      _lastGeoPos = { lat: pos.coords.latitude, lng: pos.coords.longitude, acc: pos.coords.accuracy };
       var el = document.getElementById('geofenceStatusContainer');
       if (el) {
-        var r = checkGeofence(_lastGeoPos.lat, _lastGeoPos.lng);
+        var r = checkGeofence(_lastGeoPos.lat, _lastGeoPos.lng, _lastGeoPos.acc);
         el.innerHTML = r.inside
           ? '<span class="geofence-status geofence-inside">\ud83d\udccd ' + escapeHTML(r.location) + ' (' + r.distance + 'm)</span>'
           : '<span class="geofence-status geofence-outside">\u26a0 Outside geofence</span>';
