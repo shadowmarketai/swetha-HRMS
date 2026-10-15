@@ -1762,7 +1762,18 @@ function showOverlay(id) {
   try { history.pushState({ overlay: id }, ''); } catch(e) { /* ignore */ }
   // Focus first focusable element
   var focusable = el.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
-  if (focusable.length) focusable[0].focus();
+  // preventScroll: the overlay is still mid-slide (translateX(100%)), so a plain
+  // focus() scrolled the overflow:hidden #app sideways to reach the off-screen
+  // back button — leaving the page shifted, with a parked overlay (PEB Dashboard,
+  // last in the DOM) covering the right of the screen and swallowing taps.
+  if (focusable.length) focusable[0].focus({ preventScroll: true });
+  _resetAppScroll();
+}
+// #app never scrolls sideways by design; undo any stray scroll (also frees
+// sessions already stuck from before the preventScroll fix)
+function _resetAppScroll() {
+  var app = document.getElementById('app');
+  if (app && app.scrollLeft) app.scrollLeft = 0;
 }
 // Force overlay to cover entire viewport via inline styles (beats all CSS)
 function _forceOverlayFullScreen(el) {
@@ -1799,7 +1810,8 @@ function hideOverlay(id, _fromPopstate) {
   }
   sessionStorage.removeItem('hrms_current_overlay');
   const prev = _overlayPreviousFocus.pop();
-  if (prev && prev.focus) prev.focus();
+  if (prev && prev.focus) prev.focus({ preventScroll: true });
+  _resetAppScroll();
   // If called from UI back button (not popstate), go back in history to consume the pushState entry
   if (!_fromPopstate) {
     _skipPopstate = true;
