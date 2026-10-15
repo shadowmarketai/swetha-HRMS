@@ -3417,8 +3417,8 @@ async function resetEmployeePassword(code) {
   if (!emp) return;
   if (!confirm('Reset password for ' + emp.name + ' to default (emp123)?')) return;
   try {
-    // Also creates the login if the employee never got one
-    await apiCall('POST', '/auth/reset-password', { empCode: code, newPassword: 'emp123' });
+    // Server resets to the default password; also creates the login if missing
+    await apiCall('POST', '/auth/reset-password', { empCode: code });
     showToast('Password reset for ' + emp.name);
   } catch (e) { showToast(e.message || 'Error resetting password'); }
 }

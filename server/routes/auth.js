@@ -170,9 +170,10 @@ router.post('/register', verifyToken, requireRole('MD', 'HR'), async (req, res) 
 // POST /api/auth/reset-password — MD/HR resets an employee's password
 router.post('/reset-password', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
   try {
-    const { newPassword } = req.body;
+    // No password given → reset to the default, same as bulk-create-missing
+    const newPassword = req.body.newPassword || 'emp123';
     const empCode = String(req.body.empCode || '').replace(/\s+/g, '').toUpperCase();
-    if (!empCode || !newPassword) return res.status(400).json({ error: 'Employee code and new password required' });
+    if (!empCode) return res.status(400).json({ error: 'Employee code required' });
     if (newPassword.length < 6) return res.status(400).json({ error: 'Password must be at least 6 characters' });
     const [emp] = await pool.query('SELECT code, role FROM employees WHERE code = ?', [empCode]);
     if (emp.length === 0) return res.status(404).json({ error: 'Employee not found' });
