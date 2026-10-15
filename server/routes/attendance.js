@@ -34,6 +34,28 @@ function parsePunchedAt(raw) {
   return { ms, date: istDateOf(ms) };
 }
 
+// Employee's date of joining as 'YYYY-MM-DD' ('' if unknown). mysql2 returns DATE
+// columns as local-midnight Date objects, so build it from local date parts.
+function dojYmdOf(emp) {
+  const d = emp && emp.doj;
+  if (!d) return '';
+  if (d instanceof Date) {
+    if (isNaN(d)) return '';
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+  return String(d).slice(0, 10);
+}
+
+// Working days (Mon–Sat, non-holiday) in days 1..lastDay that fall on/after joining
+function workingDaysFrom(yr, mo, lastDay, holidays, dojYmd) {
+  let n = 0;
+  for (let d = 1; d <= lastDay; d++) {
+    const ymd = `${yr}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    if (new Date(yr, mo - 1, d).getDay() !== 0 && !holidays[ymd] && !(dojYmd && ymd < dojYmd)) n++;
+  }
+  return n;
+}
+
 // Haversine distance in meters between two lat/lng pairs
 function haversineDistance(lat1, lng1, lat2, lng2) {
   const R = 6371000; // Earth radius in meters
@@ -327,18 +349,23 @@ router.put('/missed/:id/approve', verifyToken, requireRole('MD', 'HR'), async (r
     if (rows[0].status !== 'pending') return res.status(400).json({ error: 'Request already ' + rows[0].status });
 
     const request = rows[0];
+    // request_date comes back as a Date; CONCAT on it produced
+    // '2026-10-12 00:00:00.000 09:00:00', which MySQL rejects
+    const reqYmd = dojYmdOf({ doj: request.request_date });
+
+    // Auto-create attendance record for that date — before marking the request
+    // approved, so a failure can't leave it approved with nothing recorded.
+    // check_in is stored in UTC (see CONVERT_TZ above); 09:00 is IST.
+    await pool.query(
+      `INSERT INTO attendance_logs (emp_code, check_in, status, log_date, location_name, remark)
+       VALUES (?, CONVERT_TZ(CONCAT(?, ' 09:00:00'), '+05:30', '+00:00'), 'Present', ?, 'Missed Check-In (Approved)', ?)`,
+      [request.emp_code, reqYmd, reqYmd, 'Missed attendance approved by HR: ' + (request.reason || '')]
+    );
 
     // Mark request as approved
     await pool.query(
       "UPDATE missed_attendance_requests SET status = 'approved', reviewed_by = ?, reviewed_at = NOW(), review_note = ? WHERE id = ?",
       [req.user.empCode, note || null, id]
-    );
-
-    // Auto-create attendance record for that date
-    await pool.query(
-      `INSERT INTO attendance_logs (emp_code, check_in, status, log_date, location_name, remark)
-       VALUES (?, CONCAT(?, ' 09:00:00'), 'Present', ?, 'Missed Check-In (Approved)', ?)`,
-      [request.emp_code, request.request_date, request.request_date, 'Missed attendance approved by HR: ' + (request.reason || '')]
     );
 
     // Notify the employee
@@ -413,7 +440,7 @@ router.get('/export/consolidated', verifyToken, requireRole('MD', 'HR'), async (
         [month + '%', month + '%', month + '-01', month + '-' + String(daysInMonth).padStart(2,'0')]
       ),
       pool.query(`SELECT holiday_date, name FROM public_holidays WHERE holiday_date LIKE ?`, [month + '%']),
-      pool.query(`SELECT code, name, dept FROM employees WHERE is_active = 1 ORDER BY name`)
+      pool.query(`SELECT code, name, dept, doj FROM employees WHERE is_active = 1 ORDER BY name`)
     ]);
 
     // Build holiday lookup  { 'YYYY-MM-DD': name }
@@ -560,14 +587,19 @@ router.get('/export/consolidated', verifyToken, requireRole('MD', 'HR'), async (
       codeCell.alignment = ALIGN_CENTER; codeCell.border = BORDER_ALL;
 
       let totalMins = 0, fullDays = 0, halfDays = 0, leaveDays = 0, absentDays = 0;
+      // Days before a mid-month joiner's DOJ are blank, not Absent
+      const dojYmd = dojYmdOf(emp);
 
       for (let d = 1; d <= daysInMonth; d++) {
         const ymd = `${monthStr}-${String(d).padStart(2,'0')}`;
         const dow = new Date(yr, mo - 1, d).getDay();
         const isFuture = isCurrentMonth && d > lastDay;
         const colIdx = colForDay(d);
+        const beforeJoin = dojYmd && ymd < dojYmd && !(attMap[emp.code] && attMap[emp.code][d]);
 
-        if (dow === 0) {
+        if (beforeJoin) {
+          setCell(colIdx, '');
+        } else if (dow === 0) {
           setCell(colIdx, 'Sun', FILL_YELLOW);
         } else if (holidays[ymd]) {
           setCell(colIdx, 'Holiday', FILL_YELLOW);
@@ -606,7 +638,7 @@ router.get('/export/consolidated', verifyToken, requireRole('MD', 'HR'), async (
       const totalHours = +(totalMins / 60).toFixed(2);
       const avgHours   = fullDays > 0 ? +(totalHours / fullDays).toFixed(2) : 0;
 
-      setCell(summaryCol(0), totalWorkingDays);
+      setCell(summaryCol(0), dojYmd ? workingDaysFrom(yr, mo, lastDay, holidays, dojYmd) : totalWorkingDays);
       setCell(summaryCol(1), fullDays);
       setCell(summaryCol(2), halfDays || '');
       setCell(summaryCol(3), leaveDays || '');
@@ -684,7 +716,7 @@ router.get('/export/punch-detail', verifyToken, requireRole('MD', 'HR'), async (
         [month + '%', month + '%', month + '-01', month + '-' + String(daysInMonth).padStart(2,'0')]
       ),
       pool.query(`SELECT holiday_date, name FROM public_holidays WHERE holiday_date LIKE ?`, [month + '%']),
-      pool.query(`SELECT code, name FROM employees WHERE is_active = 1 ORDER BY CHAR_LENGTH(code), code`)
+      pool.query(`SELECT code, name, doj FROM employees WHERE is_active = 1 ORDER BY CHAR_LENGTH(code), code`)
     ]);
 
     const holidays = {};
@@ -878,6 +910,7 @@ router.get('/export/punch-detail', verifyToken, requireRole('MD', 'HR'), async (
       setCell(3, emp.code);
 
       let totalMins = 0, fullDays = 0, halfDays = 0, leaveDays = 0, absentDays = 0, missingOutDays = 0, eveningOnlyDays = 0;
+      const dojYmd = dojYmdOf(emp);
 
       for (let d = 1; d <= daysInMonth; d++) {
         const ymd = `${monthStr}-${String(d).padStart(2,'0')}`;
@@ -891,7 +924,8 @@ router.get('/export/punch-detail', verifyToken, requireRole('MD', 'HR'), async (
         const isSun = dow === 0;
         const isHol = !!holidays[ymd];
 
-        if (isFuture) {
+        if (isFuture || (dojYmd && ymd < dojYmd && !att)) {
+          // Not yet happened, or before this employee joined — blank, not Absent
           setCell(colIN, ''); setCell(colOUT, '');
         } else if ((isSun || isHol) && att && att.checkIn) {
           // Employee worked on Sunday/holiday — show actual punch times in orange
@@ -951,7 +985,7 @@ router.get('/export/punch-detail', verifyToken, requireRole('MD', 'HR'), async (
 
       const tH = Math.floor(totalMins / 60), tM = Math.round(totalMins % 60);
       const summaryBase = 3 + daysInMonth * 2 + 1;
-      setCell(summaryBase + 0, totalWorkingDays,                         FILL_SUMMARY);
+      setCell(summaryBase + 0, dojYmd ? workingDaysFrom(yr, mo, lastDay, holidays, dojYmd) : totalWorkingDays, FILL_SUMMARY);
       setCell(summaryBase + 1, fullDays,                                  FILL_SUMMARY);
       setCell(summaryBase + 2, halfDays      || '',                       FILL_SUMMARY);
       setCell(summaryBase + 3, leaveDays     || '',                       FILL_SUMMARY);

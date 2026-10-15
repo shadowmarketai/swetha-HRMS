@@ -258,7 +258,7 @@ CREATE TABLE IF NOT EXISTS attendance_logs (
   log_date DATE NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (emp_code) REFERENCES employees(code) ON DELETE CASCADE,
-  UNIQUE KEY unique_attendance (emp_code, log_date)
+  INDEX idx_att_emp_date (emp_code, log_date) -- several check-in sessions per day are allowed
 );
 
 -- Notifications

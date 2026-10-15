@@ -167,6 +167,20 @@ async function runMigrations(conn) {
         INDEX idx_doc_edit_emp (emp_code),
         INDEX idx_doc_edit_status (status)
       )`
+    },
+    // attendance_logs allows several check-in sessions per day, but older databases
+    // still carry UNIQUE(emp_code, log_date) from schema.sql, which refuses every
+    // second check-in of the day. Add a plain index first (the emp_code foreign key
+    // needs one), then drop the unique key.
+    {
+      name: 'add_attendance_emp_date_index',
+      sql: 'CREATE INDEX idx_att_emp_date ON attendance_logs (emp_code, log_date)',
+      ignore: [1061] // already exists
+    },
+    {
+      name: 'drop_unique_attendance',
+      sql: 'ALTER TABLE attendance_logs DROP INDEX unique_attendance',
+      ignore: [1091] // already dropped
     }
   ];
   let applied = 0;
@@ -178,6 +192,8 @@ async function runMigrations(conn) {
         break;
       } catch (err) {
         if (err.errno === 1146) break; // table doesn't exist yet
+        if (err.errno === 1060) break; // column already added on an earlier start
+        if (m.ignore && m.ignore.includes(err.errno)) break; // already in the desired state
         if (err.errno === 1213 && attempt < 3) {
           // Deadlock — wait and retry
           await new Promise(r => setTimeout(r, 1000 * attempt));
@@ -284,6 +300,22 @@ async function seedNewEmployees(conn) {
       console.log('[AUTO-FIX] Created login accounts for', missing.length, 'employees:', missing.map(m => m.code).join(', '));
     }
   } catch (e) { console.error('[AUTO-FIX] Error:', e.message); }
+  // Auto-fix: every employee needs a leave balance row (onboarded employees used to get none)
+  try {
+    const [r] = await conn.query(
+      'INSERT IGNORE INTO leave_balances (emp_code, casual, permission) SELECT e.code, 12, 2 FROM employees e LEFT JOIN leave_balances lb ON lb.emp_code = e.code WHERE lb.emp_code IS NULL'
+    );
+    if (r.affectedRows) console.log('[AUTO-FIX] Created leave balances for', r.affectedRows, 'employees');
+  } catch (e) { console.error('[AUTO-FIX] leave balances:', e.message); }
+  // Report employee codes not in canonical form (A-Z, 0-9, - and _ only). Lower case,
+  // spaces or invisible pasted characters let the password check pass (the collation
+  // is case-insensitive) but lock the employee out of the app. Checked in JS so
+  // zero-width/non-breaking characters are caught too.
+  try {
+    const [codes] = await conn.query('SELECT code, HEX(code) AS hex FROM employees');
+    const bad = codes.filter(c => !/^[A-Z0-9_-]+$/.test(c.code));
+    if (bad.length) console.warn('[CODE-CHECK] Non-canonical employee codes (run database/fix-employee-codes.js):', bad.map(b => JSON.stringify(b.code) + '=' + b.hex).join(', '));
+  } catch (e) { console.error('[CODE-CHECK]', e.message); }
   // Seed departments
   const depts = [...new Set(employees.map(e => e.dept))];
   for (const d of depts) {

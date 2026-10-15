@@ -52,8 +52,8 @@ test.describe('Login & Authentication', () => {
     await page.locator('#signInBtn').click();
     const err = page.locator('#loginError');
     await expect(err).toBeVisible({ timeout: 8000 });
-    const text = await err.textContent();
-    expect(text.length).toBeGreaterThan(0);
+    // The element is visible before the login response fills in the message
+    await expect(err).toHaveText(/\S/, { timeout: 8000 });
   });
 
   test('should login as MD (MD001)', async ({ page }) => {
@@ -289,8 +289,9 @@ test.describe('Admin Panel', () => {
   });
 
   test('can switch to employees tab', async ({ page }) => {
-    await page.locator('.admin-tab:has-text("All Employees")').click();
-    await expect(page.locator('#adminEmpList')).not.toHaveClass(/hidden/, { timeout: 3000 });
+    await page.locator('.admin-tab:has-text("Departments")').click();
+    await page.locator('.admin-tab:has-text("Employee Database")').click();
+    await expect(page.locator('#adminEmpDb')).not.toHaveClass(/hidden/, { timeout: 3000 });
   });
 
   test('can switch to geofence tab', async ({ page }) => {

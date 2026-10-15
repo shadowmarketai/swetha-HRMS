@@ -624,9 +624,12 @@ async function doLogin() {
     // Capture isSuperAdmin from login response immediately so loginAs can use it
     if (data.user && data.user.isSuperAdmin) _isSuperAdmin = true;
     var rememberMe = document.getElementById('rememberMe');
-    var session = { empCode: id, token: data.token, expiry: Date.now() + 24*60*60*1000, rememberMe: rememberMe ? rememberMe.checked : false };
+    // Use the code exactly as the server stores it — it is what the JWT carries and
+    // what every employee record is keyed on, whatever case was typed at login
+    var empCode = (data.user && data.user.empCode) || id;
+    var session = { empCode: empCode, token: data.token, expiry: Date.now() + 24*60*60*1000, rememberMe: rememberMe ? rememberMe.checked : false };
     safeStorage.set(STORAGE_KEYS.session, JSON.stringify(session));
-    await loginAs(id);
+    await loginAs(empCode);
     requestNotificationPermission();
   } catch (e) {
     err.textContent = 'Cannot reach server. Please try again later.';
@@ -652,7 +655,10 @@ async function loginAs(empCode) {
     loadLocalOnlyData();
 
     // Find employee in DB-loaded EMPLOYEES array
-    var empIdx = EMPLOYEES.findIndex(function(e) { return e.code === empCode; });
+    // Case/whitespace-insensitive, like the server's login lookup — an exact match
+    // locked out employees whose code was saved as e.g. "ss054"
+    var wantCode = String(empCode || '').replace(/\s+/g, '').toUpperCase();
+    var empIdx = EMPLOYEES.findIndex(function(e) { return String(e.code || '').replace(/\s+/g, '').toUpperCase() === wantCode; });
     if (empIdx < 0) {
       hideLoadingSpinner();
       showToast('Employee not found in database. Contact admin.');
@@ -2104,7 +2110,7 @@ function resetWizard() {
     if (el) el.value = el.tagName === 'SELECT' ? el.options[0].value : '';
   });
   // Auto-generate employee code (SS prefix)
-  const ssCodes = EMPLOYEES.filter(e=>e.code.startsWith('SS') && !e.code.startsWith('SSC')).map(e=>parseInt(e.code.replace('SS',''),10)||0);
+  const ssCodes = EMPLOYEES.map(e=>String(e.code||'').trim().toUpperCase()).filter(c=>/^SS\d+$/.test(c)).map(c=>parseInt(c.slice(2),10)||0);
   const maxSS = ssCodes.length > 0 ? Math.max.apply(null, ssCodes) : 0;
   document.getElementById('obCode').value = 'SS' + String(maxSS + 1).padStart(3,'0');
   // Populate dept dropdown with custom depts
@@ -2152,7 +2158,8 @@ function wizardNav(dir) {
 
 async function submitOnboarding() {
   var name = document.getElementById('obName').value.trim();
-  var code = document.getElementById('obCode').value.trim();
+  // Canonical form (no spaces, upper case) — login upper-cases what is typed
+  var code = document.getElementById('obCode').value.replace(/\s+/g, '').toUpperCase();
   var dept = document.getElementById('obDept').value;
   var designation = document.getElementById('obDesignation').value.trim();
   var salary = parseInt(document.getElementById('obSalary').value, 10) || 0;
@@ -2177,9 +2184,17 @@ async function submitOnboarding() {
   }
 
   var obPassword = (document.getElementById('obPassword') || {}).value || 'emp123';
+  if (!/^[A-Z0-9_-]+$/.test(code)) {
+    showToast('Employee code may only contain letters, digits, - and _');
+    return;
+  }
+  if (obPassword.length < 6) {
+    showToast('Login password must be at least 6 characters');
+    return;
+  }
   var obRole = (document.getElementById('obRole') || {}).value || 'Employee';
-  // Only MD can set HR role
-  if (obRole === 'HR' && currentUser.role !== 'MD') obRole = 'Employee';
+  // Only MD can grant HR-level access (Manager has the same backend access as HR)
+  if ((obRole === 'HR' || obRole === 'Manager') && currentUser.role !== 'MD') obRole = 'Employee';
 
   var newEmp = {
     code: code, name: name, dept: dept, designation: designation, salary: salary, bank: bank || '',
@@ -2188,18 +2203,21 @@ async function submitOnboarding() {
     aadhaar: aadhaar, pan: pan, ifscCode: ifscCode,
     emergencyContact: emergencyContact, emergencyPhone: emergencyPhone,
     reportingManager: reportingManager || null,
+    password: obPassword,
     status: 'Active'
   };
   var submitBtn = document.querySelector('#overlay-onboarding .btn-primary, #overlay-onboarding button[onclick*="submitOnboarding"]');
   if (submitBtn) { submitBtn.disabled = true; submitBtn.dataset.origText = submitBtn.textContent; submitBtn.textContent = 'Saving...'; }
   try {
-    await apiCall('POST', '/employees', newEmp);
-    // Register user account with specified password
-    var loginCreated = true;
-    try {
-      await apiCall('POST', '/auth/register', { empCode: code, password: obPassword, role: obRole });
-    } catch (regErr) {
-      loginCreated = false;
+    // The server creates the employee, their login and leave balance together
+    var created = await apiCall('POST', '/employees', newEmp);
+    var loginCreated = !!(created && created.loginCreated);
+    if (!loginCreated) {
+      // Older server without combined create — fall back to the separate call
+      try {
+        await apiCall('POST', '/auth/register', { empCode: code, password: obPassword, role: obRole });
+        loginCreated = true;
+      } catch (regErr) {}
     }
     // Upload photo if provided
     if (empPhotoFile) {
@@ -3084,7 +3102,8 @@ function renderEmployeeDetailCard(empCode) {
   html += empDetailField('Designation', emp.designation || '', empCode, 'designation');
   html += empDetailField('Salary', emp.salary || '', empCode, 'salary');
   if (isMD) {
-    var roleOpts = ['Employee','HR','Accounts','MD'].map(function(r) { return '<option' + (r === emp.role ? ' selected' : '') + '>' + r + '</option>'; }).join('');
+    // Must list every role the app can assign, or saving silently changes it
+    var roleOpts = ['Employee','Manager','Accounts','HR','MD'].map(function(r) { return '<option' + (r === emp.role ? ' selected' : '') + '>' + r + '</option>'; }).join('');
     html += '<div class="emp-detail-field"><label class="emp-detail-label">Role</label><select class="emp-detail-input" id="empField-' + empCode + '-role">' + roleOpts + '</select></div>';
   } else {
     html += empDetailField('Role', emp.role || '', empCode, 'role', true);
@@ -3178,6 +3197,8 @@ function empDetailField(label, value, empCode, fieldKey, readOnly) {
   var id = 'empField-' + empCode + '-' + fieldKey;
   if (fieldKey === 'dept' && !readOnly) {
     var opts = departments.map(function(d) { return '<option' + (d === value ? ' selected' : '') + '>' + escapeHTML(d) + '</option>'; }).join('');
+    // Keep a department that is not in the list, or saving would silently replace it
+    if (value && departments.indexOf(value) < 0) opts = '<option selected>' + escapeHTML(value) + '</option>' + opts;
     return '<div class="emp-detail-field">' +
       '<label class="emp-detail-label">' + escapeHTML(label) + '</label>' +
       '<select class="emp-detail-input" id="' + id + '">' + opts + '</select>' +
@@ -3396,7 +3417,8 @@ async function resetEmployeePassword(code) {
   if (!emp) return;
   if (!confirm('Reset password for ' + emp.name + ' to default (emp123)?')) return;
   try {
-    await apiCall('PUT', '/employees/' + code + '/reset-password', {});
+    // Also creates the login if the employee never got one
+    await apiCall('POST', '/auth/reset-password', { empCode: code, newPassword: 'emp123' });
     showToast('Password reset for ' + emp.name);
   } catch (e) { showToast(e.message || 'Error resetting password'); }
 }
@@ -5086,7 +5108,8 @@ function getRAGColor(score) {
 function submitSelfRating(empCode) {
   var inputs = document.querySelectorAll('#kpiSelfRatingForm input[type=range]');
   if (!inputs || inputs.length === 0) { showToast('No rating inputs found'); return; }
-  if (!KPI_DATA[empCode]) { showToast('KPI data not found'); return; }
+  // Employees added after the built-in list have no entry yet — start one
+  if (!KPI_DATA[empCode]) KPI_DATA[empCode] = { score: 55, targets: [], selfRating: null };
   var total = 0;
   var ratings = [];
   var categories = ['Punctuality','Quality Output','Teamwork','Task Completion','Initiative'];
@@ -5146,7 +5169,7 @@ function renderKpiOverlay() {
     rows;
   } else {
     var emp = currentUser;
-    var kpi = KPI_DATA[emp.code] || {score:55, targets:[], selfRating:null};
+    var kpi = KPI_DATA[emp.code] || (KPI_DATA[emp.code] = {score:55, targets:[], selfRating:null});
     var score = kpi.score;
     var rag = getRAGStatus(score);
     var ragColor = getRAGColor(score);
@@ -9587,15 +9610,19 @@ async function _buildConsolidatedData(selMonth, selYear) {
   const today = new Date(); today.setHours(0, 0, 0, 0);
 
   // Build per-employee rows
-  const activeEmps = EMPLOYEES.filter(e => e.status !== 'Inactive' && e.role === 'Employee' || e.role === 'HR' || e.role === 'MD').filter(e => e.code !== 'SADMIN');
+  // Every active employee, whatever their role (Manager/Accounts staff were left out)
+  const activeEmps = EMPLOYEES.filter(e => e.status !== 'Inactive' && e.code !== 'SADMIN');
   const rows = activeEmps.map(emp => {
     const days = [];
     let fullDays = 0, halfDays = 0, leaveDays = 0, absentDays = 0, workingDays = 0, totalMins = 0;
+    const dojYmd = String(emp.doj || '').slice(0, 10);
     for (let d = 1; d <= daysInMonth; d++) {
       const date = new Date(selYear, selMonth, d);
       const isSun = date.getDay() === 0;
       const ymd = selYear + '-' + String(selMonth+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
       const isHol = !!holidays[ymd];
+      // Before a mid-month joiner's DOJ: not a working day, not Absent
+      if (dojYmd && ymd < dojYmd && !attMap[emp.code]?.[d]) { days.push({ label:'', type:'future' }); continue; }
       if (isSun) { days.push({ label:'Sun', type:'sun' }); continue; }
       if (isHol) { days.push({ label:'Holiday', type:'holiday' }); workingDays++; continue; }
       workingDays++;
@@ -12932,12 +12959,14 @@ function renderHomeAnalytics() {
       html += '<thead><tr><th>Employee</th><th>Dept</th><th>Days Present</th><th>Attendance Rate</th></tr></thead><tbody>';
       data.topAbsentees.forEach(function(e) {
         var present = e.days_present || 0;
-        var pct = workDays > 0 ? Math.round(present / workDays * 100) : 0;
+        // Server counts each employee's working days from their joining date
+        var empWorkDays = e.working_days != null ? e.working_days : workDays;
+        var pct = empWorkDays > 0 ? Math.min(100, Math.round(present / empWorkDays * 100)) : 100;
         var barColor = pct >= 80 ? '#22c55e' : pct >= 50 ? '#f59e0b' : '#ef4444';
         var bgColor = pct >= 80 ? '#f0fdf4' : pct >= 50 ? '#fffbeb' : '#fef2f2';
         html += '<tr><td><strong>' + escapeHTML(e.name) + '</strong> <span style="color:#9ca3af">(' + escapeHTML(e.code) + ')</span></td>';
         html += '<td>' + escapeHTML(e.dept || '-') + '</td>';
-        html += '<td style="text-align:center"><span style="font-weight:700;color:' + barColor + '">' + present + '</span> / ' + workDays + '</td>';
+        html += '<td style="text-align:center"><span style="font-weight:700;color:' + barColor + '">' + present + '</span> / ' + empWorkDays + '</td>';
         html += '<td><div style="display:flex;align-items:center;gap:8px"><div style="flex:1;background:#f0f0f0;border-radius:6px;height:10px;min-width:80px;overflow:hidden"><div style="background:' + barColor + ';height:100%;border-radius:6px;width:' + pct + '%;transition:width .5s"></div></div><span style="font-size:.7rem;font-weight:600;color:' + barColor + ';min-width:35px;padding:2px 6px;background:' + bgColor + ';border-radius:4px;text-align:center">' + pct + '%</span></div></td></tr>';
       });
       html += '</tbody></table></div></div></div>';
@@ -16418,7 +16447,10 @@ async function loadAttendanceSummaryTable() {
   });
 
   // Build table rows for all active employees sorted by code ascending
-  var activeEmps = EMPLOYEES.filter(function(e) { return e.status !== 'Inactive'; });
+  // Skip employees who had not joined yet on the selected date (they are not absent)
+  var activeEmps = EMPLOYEES.filter(function(e) {
+    return e.status !== 'Inactive' && !(e.doj && String(e.doj).slice(0, 10) > selectedDate);
+  });
   activeEmps.sort(function(a, b) { return a.code.localeCompare(b.code); });
 
   var presentCount = 0, absentCount = 0, leaveCount = 0;
