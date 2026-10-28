@@ -3816,7 +3816,7 @@ function renderMapDotsClickable(emps) {
 // UNIFIED ADVANCE APPLICATION & APPROVAL (Site / Salary / Travel)
 // =====================================================
 // Travel reimbursement rates (Rs. per km)
-const TRAVEL_RATES = { 'Bike': 3.25, 'Car': 6.00 };
+const TRAVEL_RATES = { 'Bike': 3.50, 'Car': 6.00 };
 
 function _travelCalcHint(vehicle, km) {
   var rate = TRAVEL_RATES[vehicle];
