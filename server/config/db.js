@@ -121,7 +121,8 @@ async function runMigrations(conn) {
     },
     {
       name: 'update_expense_status_enum',
-      sql: "ALTER TABLE expense_reimbursements MODIFY COLUMN status ENUM('Pending','hr_accepted','Approved','Rejected') DEFAULT 'Pending'"
+      // Full status list: the old shorter one removed Paid/accounts_accepted on restart
+      sql: "ALTER TABLE expense_reimbursements MODIFY COLUMN status ENUM('Pending','accounts_accepted','hr_accepted','Approved','Paid','Rejected') DEFAULT 'Pending'"
     },
     {
       name: 'add_dob_to_employees',

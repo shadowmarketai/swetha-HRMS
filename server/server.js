@@ -266,9 +266,13 @@ app.get('*', (req, res) => {
   try {
     const pool = require('./config/db');
     // Add hr_accepted to leave_applications status ENUM
-    await pool.query("ALTER TABLE leave_applications MODIFY COLUMN status ENUM('pending','hr_accepted','approved','rejected') DEFAULT 'pending'").catch(() => {});
-    // Add HR_Accepted to advance_requests status ENUM
-    await pool.query("ALTER TABLE advance_requests MODIFY COLUMN status ENUM('Pending','HR_Accepted','Approved','Rejected') DEFAULT 'Pending'").catch(() => {});
+    // Must include 'cancelled' (used by leave cancellation) — leaving it out
+    // removed it on every restart and made cancelling a leave fail.
+    await pool.query("ALTER TABLE leave_applications MODIFY COLUMN status ENUM('pending','hr_accepted','approved','rejected','cancelled') DEFAULT 'pending'").catch(() => {});
+    // Add HR_Accepted to advance_requests status ENUM. Must list every status in
+    // use: an older shorter list here dropped Paid/Accounts_Accepted on each
+    // restart, depending on which startup step ran last.
+    await pool.query("ALTER TABLE advance_requests MODIFY COLUMN status ENUM('Pending','Accounts_Accepted','HR_Accepted','Approved','Paid','Rejected') DEFAULT 'Pending'").catch(() => {});
 
     // Phase 0: Employee extended columns (may not exist from initial schema)
     await pool.query("ALTER TABLE employees ADD COLUMN dob DATE").catch(() => {});
@@ -397,7 +401,8 @@ app.get('*', (req, res) => {
     await pool.query("ALTER TABLE expense_reimbursements ADD COLUMN travel_km INT DEFAULT NULL").catch(() => {});
     await pool.query("ALTER TABLE expense_reimbursements ADD COLUMN travel_days INT DEFAULT NULL").catch(() => {});
     await pool.query("ALTER TABLE expense_reimbursements ADD COLUMN expense_date DATE DEFAULT NULL").catch(() => {});
-    await pool.query("ALTER TABLE expense_reimbursements MODIFY COLUMN status ENUM('Pending','hr_accepted','Approved','Rejected') DEFAULT 'Pending'").catch(() => {});
+    // Full status list — see the advance_requests note above
+    await pool.query("ALTER TABLE expense_reimbursements MODIFY COLUMN status ENUM('Pending','accounts_accepted','hr_accepted','Approved','Paid','Rejected') DEFAULT 'Pending'").catch(() => {});
 
     // Phase F: SiteTrack tables
     await pool.query("ALTER TABLE projects ADD COLUMN contractor_name VARCHAR(255) DEFAULT 'Swetha Structures Pvt Ltd'").catch(() => {});
@@ -725,6 +730,91 @@ async function autoCheckoutStale() {
 // Run on startup (catch any stale from previous days) and then every 30 minutes
 setTimeout(autoCheckoutStale, 20000);
 setInterval(autoCheckoutStale, 30 * 60 * 1000);
+
+// =====================================================
+// BIKE RATE Rs.3.25 -> Rs.3.50/km WITH EFFECT FROM 1 OCT 2026 (one-time)
+// =====================================================
+// The app worked out claim amounts at Rs.3.25/km until 28 Oct. Bike claims for
+// travel from 1 Oct that are not yet paid are recalculated at Rs.3.50/km. Paid
+// claims are left exactly as paid; HR and MD get a notification listing each
+// employee's difference so Accounts can pay it as arrears. A claim is only
+// changed if its amount is what the old rate gave (km × 3.25, with or without
+// paise), so an amount someone typed in by hand is never overwritten. Runs
+// once; the record in one_time_jobs stops it running again.
+const BIKE_RATE_FROM_OCT_2026 = { from: '2026-10-01', oldRate: 3.25, newRate: 3.50 };
+async function applyBikeRateFromOct2026() {
+  const JOB = 'bike_rate_3_50_from_2026_10_01';
+  const pool = require('./config/db');
+  const { from, oldRate, newRate } = BIKE_RATE_FROM_OCT_2026;
+  try {
+    await pool.query(`CREATE TABLE IF NOT EXISTS one_time_jobs (
+      name VARCHAR(100) PRIMARY KEY, ran_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, result TEXT)`);
+    const [already] = await pool.query('SELECT name FROM one_time_jobs WHERE name = ?', [JOB]);
+    if (already.length) return;
+
+    const oldAmt = (t) => `(amount = ROUND(${t}.travel_km * ${oldRate}, 2) OR amount = FLOOR(${t}.travel_km * ${oldRate}))`;
+    const conn = await pool.getConnection();
+    let summary;
+    try {
+      await conn.beginTransaction();
+      // Claim the job inside the transaction, so two starting containers can't both run it
+      await conn.query('INSERT INTO one_time_jobs (name) VALUES (?)', [JOB]);
+
+      // Travel expense bills — dated by the actual travel date
+      const [exp] = await conn.query(
+        `SELECT id, emp_code, emp_name, travel_km, amount, status FROM expense_reimbursements e
+         WHERE LOWER(vehicle) = 'bike' AND expense_date >= ? AND travel_km > 0 AND status <> 'Rejected' AND ${oldAmt('e')}`,
+        [from]);
+      // Travel advances — no travel date on the form, so dated by application
+      const [adv] = await conn.query(
+        `SELECT a.id, a.emp_code, e.name AS emp_name, a.travel_km, a.amount, a.status FROM advance_requests a
+         LEFT JOIN employees e ON e.code = a.emp_code
+         WHERE a.type = 'travel' AND LOWER(a.vehicle) = 'bike' AND a.applied_date >= ? AND a.travel_km > 0
+           AND a.status <> 'Rejected' AND ${oldAmt('a')}`,
+        [from]);
+
+      let updated = 0;
+      const arrears = {}; // emp_code -> { name, amount, claims }
+      for (const [table, rows] of [['expense_reimbursements', exp], ['advance_requests', adv]]) {
+        for (const r of rows) {
+          const newAmount = Math.round(Number(r.travel_km) * newRate * 100) / 100;
+          if (r.status === 'Paid') {
+            const diff = Math.round((newAmount - Number(r.amount)) * 100) / 100;
+            if (diff <= 0) continue;
+            const a = arrears[r.emp_code] || (arrears[r.emp_code] = { name: r.emp_name || r.emp_code, amount: 0, claims: 0 });
+            a.amount = Math.round((a.amount + diff) * 100) / 100; a.claims++;
+          } else {
+            await conn.query(`UPDATE ${table} SET amount = ? WHERE id = ?`, [newAmount, r.id]);
+            updated++;
+          }
+        }
+      }
+
+      const lines = Object.keys(arrears).sort().map(c =>
+        `${arrears[c].name} (${c}): Rs.${arrears[c].amount.toFixed(2)} on ${arrears[c].claims} paid claim(s)`);
+      summary = `Bike rate Rs.${newRate.toFixed(2)}/km from ${from}: ${updated} unpaid claim(s) recalculated. ` +
+        (lines.length ? `Arrears due on paid claims — ${lines.join('; ')}.` : 'No paid claims need arrears.');
+      await conn.query('UPDATE one_time_jobs SET result = ? WHERE name = ?', [summary, JOB]);
+
+      // Tell HR and MD in the app
+      const [admins] = await conn.query("SELECT code FROM employees WHERE role IN ('MD','HR') AND is_active = 1");
+      for (const a of admins) {
+        await conn.query('INSERT INTO notifications (emp_code, title, message, type) VALUES (?, ?, ?, ?)',
+          [a.code, 'Bike travel rate updated from 1 Oct', summary, 'expense']);
+      }
+      await conn.commit();
+    } catch (e) {
+      await conn.rollback().catch(() => {});
+      throw e;
+    } finally {
+      conn.release();
+    }
+    console.log('[BIKE-RATE] ' + summary);
+  } catch (e) {
+    console.error('[BIKE-RATE] Error:', e.message);
+  }
+}
+setTimeout(applyBikeRateFromOct2026, 25000);
 
 // =====================================================
 // SOCKET.IO — Real-time updates

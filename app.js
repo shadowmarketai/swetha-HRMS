@@ -3815,14 +3815,32 @@ function renderMapDotsClickable(emps) {
 // =====================================================
 // UNIFIED ADVANCE APPLICATION & APPROVAL (Site / Salary / Travel)
 // =====================================================
-// Travel reimbursement rates (Rs. per km)
-const TRAVEL_RATES = { 'Bike': 3.50, 'Car': 6.00 };
+// Travel reimbursement rates (Rs. per km), by date of travel. The bike rate
+// went from Rs.3.25 to Rs.3.50 with effect from 1 Oct 2026, so a September
+// trip filed late still pays the old rate. Keep in step with
+// BIKE_RATE_FROM_OCT_2026 in server/server.js.
+const TRAVEL_RATE_HISTORY = {
+  'Bike': [{ from: '2026-10-01', rate: 3.50 }, { from: '0000-01-01', rate: 3.25 }],
+  'Car':  [{ from: '0000-01-01', rate: 6.00 }]
+};
+function getTravelRate(vehicle, travelDate) {
+  var steps = TRAVEL_RATE_HISTORY[vehicle];
+  if (!steps) return 0;
+  var d = String(travelDate || _istToday()).slice(0, 10);
+  for (var i = 0; i < steps.length; i++) if (d >= steps[i].from) return steps[i].rate;
+  return 0;
+}
+// Current rates, for anything that shows "the" rate without a travel date
+const TRAVEL_RATES = { 'Bike': getTravelRate('Bike'), 'Car': getTravelRate('Car') };
+// Amount in rupees with paise. The forms used parseInt, which dropped the
+// paise (35 km × 3.50 = 122.50 was claimed as 122).
+function _rupees(v) { var n = parseFloat(v); return isNaN(n) ? 0 : Math.round(n * 100) / 100; }
 
-function _travelCalcHint(vehicle, km) {
-  var rate = TRAVEL_RATES[vehicle];
+function _travelCalcHint(vehicle, km, travelDate) {
+  var rate = getTravelRate(vehicle, travelDate);
   if (!rate || !km || km <= 0) return null;
   var total = parseFloat((km * rate).toFixed(2));
-  return km + ' km × Rs.' + rate + '/km = <strong>Rs.' + total.toLocaleString('en-IN') + '</strong>';
+  return km + ' km × Rs.' + rate.toFixed(2) + '/km = <strong>Rs.' + total.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</strong>';
 }
 
 // Travel Advance overlay form (index.html)
@@ -3832,7 +3850,7 @@ function calcTravelAdvAmount() {
   var hint = document.getElementById('advTravelCalcHint');
   var msg = _travelCalcHint(vehicle, km);
   if (msg) {
-    var total = parseFloat((km * TRAVEL_RATES[vehicle]).toFixed(2));
+    var total = parseFloat((km * getTravelRate(vehicle)).toFixed(2));
     var amtEl = document.getElementById('advAmount');
     if (amtEl) amtEl.value = total;
     if (hint) { hint.innerHTML = msg; hint.style.display = ''; }
@@ -3848,7 +3866,7 @@ function calcInlineTravelAmount() {
   var hint = document.getElementById('inlineTravelCalcHint');
   var msg = _travelCalcHint(vehicle, km);
   if (msg) {
-    var total = parseFloat((km * TRAVEL_RATES[vehicle]).toFixed(2));
+    var total = parseFloat((km * getTravelRate(vehicle)).toFixed(2));
     var amtEl = document.getElementById('inlineExpAmount');
     if (amtEl) amtEl.value = total;
     if (hint) { hint.innerHTML = msg; hint.style.display = ''; }
@@ -3862,9 +3880,10 @@ function calcTravelExpAmount() {
   var vehicle = (document.getElementById('teBillVehicle') || {}).value || '';
   var km = parseFloat((document.getElementById('teBillKm') || {}).value) || 0;
   var hint = document.getElementById('teTravelCalcHint');
-  var msg = _travelCalcHint(vehicle, km);
+  var travelDate = (document.getElementById('teBillDate') || {}).value || '';
+  var msg = _travelCalcHint(vehicle, km, travelDate);
   if (msg) {
-    var total = parseFloat((km * TRAVEL_RATES[vehicle]).toFixed(2));
+    var total = parseFloat((km * getTravelRate(vehicle, travelDate)).toFixed(2));
     var amtEl = document.getElementById('teBillAmount');
     if (amtEl) amtEl.value = total;
     if (hint) { hint.innerHTML = msg; hint.style.display = ''; }
@@ -3958,7 +3977,7 @@ async function submitInlineExpense() {
   var amountEl = document.getElementById('inlineExpAmount');
   if (!typeEl || !typeEl.value) { showToast('Please select an expense type'); return; }
   var type = typeEl.value;
-  var amount = parseInt(amountEl.value, 10) || 0;
+  var amount = _rupees(amountEl.value);
   if (!amount) { showToast('Please enter the amount'); return; }
   var details = (document.getElementById('inlineExpDetails') || {}).value || '';
   var project = null, category = null, reason = null, emiAmount = null, emiMonths = null;
@@ -4078,7 +4097,7 @@ function handleBillUpload(input) {
 }
 
 async function submitAdvanceRequest() {
-  const amount = parseInt(document.getElementById('advAmount').value, 10) || 0;
+  const amount = _rupees(document.getElementById('advAmount').value);
   const details = document.getElementById('advDetails').value.trim();
   if (!amount) { showToast('Please enter the amount'); return; }
   // Salary limit validation for salary advance
@@ -4930,7 +4949,7 @@ function showTravelExpenseBillForm() {
   html += '<div class="form-row"><label>From *</label><input type="text" id="teBillFrom" placeholder="e.g. Coimbatore"></div>';
   html += '<div class="form-row"><label>To *</label><input type="text" id="teBillTo" placeholder="e.g. Chennai"></div></div>';
   html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
-  html += '<div class="form-row"><label>Travel Date * <span style="font-size:.65rem;color:var(--gray-400);font-weight:400">(actual date of travel)</span></label><input type="date" id="teBillDate" max="' + _istToday() + '"></div>';
+  html += '<div class="form-row"><label>Travel Date * <span style="font-size:.65rem;color:var(--gray-400);font-weight:400">(actual date of travel)</span></label><input type="date" id="teBillDate" max="' + _istToday() + '" onchange="calcTravelExpAmount()"></div>';
   html += '<div class="form-row"><label>Days</label><input type="number" id="teBillDays" placeholder="1" value="1"></div></div>';
   html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
   html += '<div class="form-row"><label>Mode of Travel *</label><select id="teBillVehicle" class="nf-select" onchange="calcTravelExpAmount()"><option value="">Select</option><option>Bike</option><option>Car</option><option>Auto</option><option>Bus</option><option>Train</option><option>Flight</option><option>Other</option></select></div>';
@@ -4955,7 +4974,7 @@ function previewTravelExpenseBill() {
   var from = (document.getElementById('teBillFrom') || {}).value || '';
   var to = (document.getElementById('teBillTo') || {}).value || '';
   var vehicle = (document.getElementById('teBillVehicle') || {}).value || '';
-  var amount = parseInt((document.getElementById('teBillAmount') || {}).value, 10) || 0;
+  var amount = _rupees((document.getElementById('teBillAmount') || {}).value);
   var km = (document.getElementById('teBillKm') || {}).value || '';
   var days = (document.getElementById('teBillDays') || {}).value || '1';
   var desc = (document.getElementById('teBillDesc') || {}).value || '';
@@ -5023,7 +5042,7 @@ async function submitTravelExpenseBill() {
   var from = stored.from || (document.getElementById('teBillFrom') || {}).value || '';
   var to = stored.to || (document.getElementById('teBillTo') || {}).value || '';
   var vehicle = stored.vehicle || (document.getElementById('teBillVehicle') || {}).value || '';
-  var amount = stored.amount || parseInt((document.getElementById('teBillAmount') || {}).value, 10) || 0;
+  var amount = stored.amount || _rupees((document.getElementById('teBillAmount') || {}).value);
   var km = stored.km ? parseInt(stored.km, 10) : (parseInt((document.getElementById('teBillKm') || {}).value, 10) || null);
   var days = stored.days ? parseInt(stored.days, 10) : (parseInt((document.getElementById('teBillDays') || {}).value, 10) || 1);
   var desc = stored.desc || (document.getElementById('teBillDesc') || {}).value || '';
