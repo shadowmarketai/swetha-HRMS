@@ -7565,17 +7565,45 @@ setTimeout(_startGpsWarm, 2000);
 // the best reading; fall back to the best one we have if GPS never improves.
 var GPS_GOOD_ACCURACY = 50;   // metres — good enough to decide without waiting
 var GPS_WAIT_MS = 12000;      // how long to wait for a precise GPS fix
-function _getLocationFast() {
+// If no reading at all has arrived by GPS_WAIT_MS, keep waiting up to this
+// long. A GPS cold start indoors (no Wi-Fi/cell location to help) often takes
+// 15–30s; giving up at 12s is what showed "Could not get your location" on
+// phones with GPS switched on.
+var GPS_MAX_WAIT_MS = 35000;
+// A recent last-known position is acceptable when no fresh one arrives; the
+// employee has not moved far in two minutes, and the server re-checks the
+// geofence on every punch.
+var GPS_LAST_KNOWN_MS = 120000;
+
+// What went wrong, in words an employee can act on. "Turn on GPS" was shown for
+// every failure, including the common one where GPS is on but Chrome (or this
+// site) is not allowed to use it.
+function _locationErrorMessage(code) {
+  if (code === 1) {
+    return 'Location permission is blocked for this app. Allow it: tap the lock icon next to the address (or Chrome ⋮ → Settings → Site settings → Location), set ' + location.hostname + ' to Allow, then reload. Also check Android Settings → Apps → Chrome → Permissions → Location is "Allow".';
+  }
+  if (code === 2) {
+    return 'Your phone could not work out its location. Check Location is ON (and "Google Location Accuracy" / "Improve accuracy" is on), then try again.';
+  }
+  return 'Could not get a GPS fix in time. Move near a window or outside for a few seconds and try again.';
+}
+
+function _getLocationFast(onWaiting) {
   return new Promise(function(resolve, reject) {
-    if (!navigator.geolocation) return reject(new Error('Geolocation not supported'));
-    var best = null, done = false, watchId = null, timer = null;
+    if (!navigator.geolocation) return reject(new Error('Location is not supported on this browser. Please open the app in Chrome or Safari.'));
+    var best = null, done = false, watchId = null, timer = null, hardTimer = null, extended = false;
+    var lastErr = 0, lastKnown = null;
     function acc(p) { return (p && p.coords && p.coords.accuracy) || Infinity; }
-    function finish(p) {
+    function finish(p, errCode) {
       if (done) return;
       done = true;
       if (watchId !== null) navigator.geolocation.clearWatch(watchId);
       if (timer) clearTimeout(timer);
-      if (p) resolve(p); else reject(new Error('Could not get your location. Turn on GPS and try again.'));
+      if (hardTimer) clearTimeout(hardTimer);
+      if (p) return resolve(p);
+      var err = new Error(_locationErrorMessage(errCode || lastErr || 3));
+      err.geoCode = errCode || lastErr || 3;
+      reject(err);
     }
     function goodEnough(p) {
       return acc(p) <= GPS_GOOD_ACCURACY || checkGeofence(p.coords.latitude, p.coords.longitude, acc(p)).inside;
@@ -7583,18 +7611,45 @@ function _getLocationFast() {
     function consider(p) {
       if (!p || done) return;
       if (!best || acc(p) < acc(best)) best = p;
-      if (goodEnough(best)) finish(best);
+      // Past the normal wait with nothing in hand, the first reading will do
+      if (extended || goodEnough(best)) finish(best);
+    }
+    function onErr(e) {
+      if (done || !e) return;
+      // Denied is final — waiting longer cannot help, so say so straight away
+      if (e.code === 1) return finish(null, 1);
+      lastErr = e.code;
+    }
+    // Ask the browser up front: a blocked permission otherwise looks like
+    // "no signal" for the whole wait.
+    if (navigator.permissions && navigator.permissions.query) {
+      navigator.permissions.query({ name: 'geolocation' }).then(function(st) {
+        if (st && st.state === 'denied') finish(null, 1);
+      }).catch(function() {});
     }
     // Warm cache from the background watch, if fresh
     if (_gpsWarmPos && (Date.now() - _gpsWarmTs) < 30000) consider(_gpsWarmPos);
     if (done) return;
-    // Precise GPS, fresh reading; keep the best fix until good enough or timeout
-    watchId = navigator.geolocation.watchPosition(consider, function() {},
-      { enableHighAccuracy: true, timeout: GPS_WAIT_MS, maximumAge: 0 });
+    // Precise GPS, fresh reading; keep the best fix until good enough or timeout.
+    // No per-reading timeout: a timeout error here used to stop nothing but was
+    // swallowed; the overall timers below decide when to give up.
+    watchId = navigator.geolocation.watchPosition(consider, onErr,
+      { enableHighAccuracy: true, maximumAge: 0 });
     // Quick network fix in parallel — used at once if it's already decisive
-    navigator.geolocation.getCurrentPosition(consider, function() {},
-      { enableHighAccuracy: false, timeout: 5000, maximumAge: 15000 });
-    timer = setTimeout(function() { finish(best); }, GPS_WAIT_MS);
+    navigator.geolocation.getCurrentPosition(consider, onErr,
+      { enableHighAccuracy: false, timeout: 8000, maximumAge: 15000 });
+    // Last known position (up to 2 min old) — only used if nothing fresher arrives
+    navigator.geolocation.getCurrentPosition(function(p) { lastKnown = p; }, function() {},
+      { enableHighAccuracy: false, timeout: 3000, maximumAge: GPS_LAST_KNOWN_MS });
+    timer = setTimeout(function() {
+      if (best) return finish(best);
+      var warm = (_gpsWarmPos && (Date.now() - _gpsWarmTs) < GPS_LAST_KNOWN_MS) ? _gpsWarmPos : null;
+      if (lastKnown || warm) return finish(lastKnown || warm);
+      // Nothing yet — GPS is probably still starting up. Keep waiting.
+      extended = true;
+      if (typeof onWaiting === 'function') { try { onWaiting(); } catch (e) {} }
+      hardTimer = setTimeout(function() { finish(best || lastKnown); }, GPS_MAX_WAIT_MS - GPS_WAIT_MS);
+    }, GPS_WAIT_MS);
   });
 }
 
@@ -7625,7 +7680,10 @@ function gpsCheckIn() {
 
   // Run selfie capture and GPS fetch IN PARALLEL for speed
   var selfiePromise = captureSelfiForAttendance().catch(function() { return null; });
-  var gpsPromise = _getLocationFast();
+  var gpsPromise = _getLocationFast(function() {
+    if (btn) btn.textContent = 'Waiting for GPS…';
+    showToast('Still getting your location — GPS can take up to 30 seconds indoors. Stay on this screen.', 'info');
+  });
 
   Promise.all([selfiePromise, gpsPromise]).then(function(results) {
     var selfieFile = results[0];
@@ -7633,7 +7691,7 @@ function gpsCheckIn() {
     window._attendanceSelfie = selfieFile;
     onSuccess(pos);
   }).catch(function(err) {
-    showToast('Location error: ' + (err.message || err));
+    showToast('Location error: ' + (err.message || err), 'error');
     if (btn) btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Check In';
   });
 
@@ -7723,13 +7781,15 @@ function gpsCheckOut() {
 
   // Run selfie + GPS in parallel for speed
   var selfiePromise = captureSelfiForAttendance().catch(function() { return null; });
-  var gpsPromise = _getLocationFast();
+  var gpsPromise = _getLocationFast(function() {
+    showToast('Still getting your location — GPS can take up to 30 seconds indoors. Stay on this screen.', 'info');
+  });
 
   Promise.all([selfiePromise, gpsPromise]).then(function(results) {
     window._attendanceSelfie = results[0];
     onSuccess(results[1]);
   }).catch(function(err) {
-    showToast('Location error: ' + (err.message || err));
+    showToast('Location error: ' + (err.message || err), 'error');
   });
 
   async function onSuccess(pos) {
