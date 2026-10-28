@@ -712,6 +712,8 @@ async function loginAs(empCode) {
     applyRole();
     renderNavigation();
     updateGreeting();
+    // Today's status straight from the server, plus anything still queued here
+    refreshCheckinStatusFromServer();
     buildCalendar();
     initLeaveTabs();
 
@@ -2025,7 +2027,7 @@ async function buildCalendar() {
     } catch (e) {
       // Fall back to pre-loaded global for current month
       if (isCurrentMonth && typeof attendanceLogs !== 'undefined') {
-        logs = attendanceLogs.filter(function(l) { return l.empCode === currentUser.code; }).map(function(l) {
+        logs = attendanceLogs.filter(function(l) { return _sameEmpCode(l.empCode, currentUser.code); }).map(function(l) {
           return { log_date: l.logDate, check_in: l.checkIn, check_out: l.checkOut, emp_code: l.empCode };
         });
       }
@@ -7676,8 +7678,16 @@ function gpsCheckIn() {
       // and HR's report showed nothing. Surface the real reason and stop — no
       // success toast, no phantom local record, no "Recorded" notification.
       window._attendanceSelfie = null;
-      showToast(_punchFailMessage(e, 'Check-in'), 'error');
       if (btn) btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Check In';
+      // "Already checked in" means the server has an open session this phone
+      // did not know about — usually a punch from another phone. Show it.
+      if (e && e.status === 400 && /already checked in/i.test(e.message || '')) {
+        showToast('You are already checked in (recorded earlier, maybe from another phone). Status updated.', 'warning');
+        refreshCheckinStatusFromServer();
+        return;
+      }
+      showToast(_punchFailMessage(e, 'Check-in'), 'error');
+      refreshCheckinStatusFromServer();
       return;
     }
     if (_queuedOffline) {
@@ -7700,8 +7710,11 @@ function gpsCheckIn() {
     }
     if (btn) btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Check In';
     updateCheckinCard(pos.coords);
-    updateCheckinStatus('checkin');
+    updateCheckinStatus(_queuedOffline ? 'pending-checkin' : 'checkin');
     renderAttendanceLogList();
+    if (typeof renderHomeQuickStats === 'function') renderHomeQuickStats();
+    // Confirm against the server (and pick up the queue state if it was queued)
+    refreshCheckinStatusFromServer();
   }
 }
 
@@ -7754,7 +7767,15 @@ function gpsCheckOut() {
       // the session open, so leaving the status as "Checked In" is the honest
       // state, and it keeps the next check-in from hitting "Already checked in".
       window._attendanceSelfie = null;
+      // "Not checked in" means the session this phone showed is already closed
+      // on the server (checked out from another phone) or never existed.
+      if (e && e.status === 400 && /not checked in/i.test(e.message || '')) {
+        showToast('There is no open check-in on the server for today (it may have been closed from another phone). Status updated.', 'warning');
+        refreshCheckinStatusFromServer();
+        return;
+      }
       showToast(_punchFailMessage(e, 'Check-out'), 'error');
+      refreshCheckinStatusFromServer();
       return;
     }
     if (_queuedOffline) {
@@ -7770,8 +7791,10 @@ function gpsCheckOut() {
         apiCall('POST', '/notifications', { title: 'Outside Geofence Check-Out', body: alertMsg, category: 'checkout', target_emp_code: hr.code }).catch(function(){});
       });
     }
-    updateCheckinStatus('checkout');
+    updateCheckinStatus(_queuedOffline ? 'pending-checkout' : 'checkout');
     renderAttendanceLogList();
+    if (typeof renderHomeQuickStats === 'function') renderHomeQuickStats();
+    refreshCheckinStatusFromServer();
   }
 }
 
@@ -7787,6 +7810,26 @@ function updateCheckinStatus(type) {
   var dot = document.querySelector('.checkin-status .dot');
   var checkinBtn = document.getElementById('gpsCheckinBtn');
   var checkoutBtn = document.getElementById('gpsCheckoutBtn');
+  var inIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>';
+  var outIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>';
+  if (type === 'none') {
+    // No session today. Check-out stays off: there is nothing to close.
+    if (statusText) statusText.textContent = 'Not Checked In';
+    if (dot) { dot.style.background = '#9CA3AF'; dot.style.animation = 'none'; }
+    if (checkinBtn) { checkinBtn.className = 'btn btn-golden'; checkinBtn.disabled = false; checkinBtn.innerHTML = inIcon + 'Check In'; }
+    if (checkoutBtn) { checkoutBtn.className = 'btn btn-white-outline'; checkoutBtn.disabled = true; checkoutBtn.innerHTML = outIcon + 'Check Out'; }
+    return;
+  }
+  if (type === 'pending-checkin' || type === 'pending-checkout') {
+    // Saved on this phone, not yet on the server. Say so — this is the state
+    // that used to read "Checked In" while HR and other phones saw nothing.
+    var isIn = type === 'pending-checkin';
+    if (statusText) statusText.textContent = (isIn ? 'Check-in' : 'Check-out') + ' saved offline — waiting to sync';
+    if (dot) { dot.style.background = '#F59E0B'; dot.style.animation = 'pulse 2s infinite'; }
+    if (checkinBtn) { checkinBtn.className = isIn ? 'btn btn-white-outline' : 'btn btn-golden'; checkinBtn.disabled = isIn; checkinBtn.innerHTML = inIcon + (isIn ? 'Syncing…' : 'Re-Check In'); }
+    if (checkoutBtn) { checkoutBtn.className = isIn ? 'btn btn-golden' : 'btn btn-white-outline'; checkoutBtn.disabled = !isIn; checkoutBtn.innerHTML = outIcon + (isIn ? 'Check Out' : 'Syncing…'); }
+    return;
+  }
   if (type === 'checkin') {
     if (statusText) statusText.textContent = 'Checked In';
     if (dot) { dot.style.background = 'var(--success)'; dot.style.animation = 'pulse 2s infinite'; }
@@ -7801,14 +7844,142 @@ function updateCheckinStatus(type) {
   }
 }
 
+// ── Check-in status: the server is the record ─────────────────────────────
+// The home card used to be set only by the phone that punched, from its own
+// memory. Another phone, or the same phone reopened later, kept whatever it
+// had loaded at login (often "Check In") and never asked the server again, so
+// one employee saw "Checked In" on one phone and "Check In" on the other. Now
+// every device reads today's sessions from /attendance/today on login, on
+// resume, when back online, after every punch and every few minutes, and a
+// punch still sitting in the offline queue shows as pending, not as done.
+
+// Employee codes compare like the server does (case-insensitive collation).
+// Older records can hold "ss054" while the login token carries "SS054"; an
+// exact match hid every attendance row from those employees.
+function _sameEmpCode(a, b) {
+  if (!a || !b) return false;
+  return String(a).replace(/\s+/g, '').toUpperCase() === String(b).replace(/\s+/g, '').toUpperCase();
+}
+// Attendance is filed by IST calendar date on the server (getTodayIST).
+function _istDateOf(value) {
+  var d = value ? new Date(value) : new Date();
+  return isNaN(d) ? '' : d.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+}
+function _istToday() { return _istDateOf(); }
+
+// Today's sessions for the signed-in employee, oldest first.
+function _myTodayLogs() {
+  if (!currentUser || typeof attendanceLogs === 'undefined') return [];
+  var today = _istToday();
+  return attendanceLogs.filter(function(l) {
+    return _sameEmpCode(l.empCode, currentUser.code) && _istDateOf(l.checkIn || l.timestamp) === today;
+  }).sort(function(a, b) {
+    return new Date(a.checkIn || a.timestamp) - new Date(b.checkIn || b.timestamp);
+  });
+}
+
 function restoreCheckinStatus() {
   if (!currentUser || typeof attendanceLogs === 'undefined') return;
-  var today = new Date().toISOString().split('T')[0];
-  var todayLogs = attendanceLogs.filter(function(l) { return l.empCode === currentUser.code && l.timestamp && l.timestamp.startsWith(today); });
-  if (todayLogs.length === 0) return;
+  var todayLogs = _myTodayLogs();
+  // No session today — show the plain "not checked in" state. Returning early
+  // here used to leave yesterday's or another user's status on the card.
+  if (todayLogs.length === 0) { updateCheckinStatus('none'); return; }
   var lastLog = todayLogs[todayLogs.length - 1];
-  updateCheckinStatus(lastLog.type);
+  updateCheckinStatus(lastLog.pendingSync ? 'pending-' + lastLog.type : lastLog.type);
 }
+
+// Punches the service worker has queued but not yet delivered, for this user.
+// Opens the worker's own IndexedDB store, read-only. The upgrade handler must
+// match sw.js: creating the database here without the store would break it.
+function _pendingPunches() {
+  return new Promise(function(resolve) {
+    if (!('indexedDB' in window) || !currentUser) return resolve([]);
+    var req;
+    try { req = indexedDB.open('hrms-offline', 1); } catch (e) { return resolve([]); }
+    req.onupgradeneeded = function() { req.result.createObjectStore('queue', { keyPath: 'id', autoIncrement: true }); };
+    req.onerror = function() { resolve([]); };
+    req.onsuccess = function() {
+      var db = req.result;
+      try {
+        var get = db.transaction('queue', 'readonly').objectStore('queue').getAll();
+        get.onsuccess = function() {
+          db.close();
+          var mine = (get.result || []).filter(function(item) {
+            if (!item || !item.fields || !/\/attendance\/check(in|out)/.test(item.url || '')) return false;
+            // Each item carries the bearer token it was punched with
+            try {
+              var tok = String(item.token || '').replace(/^Bearer /, '');
+              var payload = JSON.parse(atob(tok.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+              return _sameEmpCode(payload.empCode, currentUser.code);
+            } catch (e) { return true; }
+          });
+          resolve(mine);
+        };
+        get.onerror = function() { db.close(); resolve([]); };
+      } catch (e) { db.close(); resolve([]); }
+    };
+  });
+}
+
+var _attStatusSync = null;
+function refreshCheckinStatusFromServer() {
+  if (!currentUser || !JWT_TOKEN) return Promise.resolve(false);
+  if (_attStatusSync) return _attStatusSync;
+  var before = JSON.stringify(_myTodayLogs().map(function(l) { return [l.id, l.type, !!l.pendingSync]; }));
+  var serverCall = isOnline
+    ? apiCall('GET', '/attendance/today').catch(function() { return null; })
+    : Promise.resolve(null);
+  _attStatusSync = Promise.all([serverCall, _pendingPunches()]).then(function(res) {
+    var data = res[0], pending = res[1];
+    var today = _istToday();
+    var mine = function(l) { return _sameEmpCode(l.empCode, currentUser.code) && _istDateOf(l.checkIn || l.timestamp) === today; };
+    if (data && Array.isArray(data.sessions)) {
+      // Server answered: its sessions replace whatever this phone thought.
+      for (var i = attendanceLogs.length - 1; i >= 0; i--) {
+        if (mine(attendanceLogs[i])) attendanceLogs.splice(i, 1);
+      }
+      data.sessions.forEach(function(row) { attendanceLogs.push(mapAttendanceLog(row)); });
+    } else {
+      // No answer (offline, server down): keep confirmed rows, rebuild pending ones from the queue.
+      for (var j = attendanceLogs.length - 1; j >= 0; j--) {
+        if (attendanceLogs[j].pendingSync && mine(attendanceLogs[j])) attendanceLogs.splice(j, 1);
+      }
+    }
+    pending.forEach(function(item) {
+      var ts = new Date(item.punchedAtMs || Date.parse(item.queuedAt) || Date.now()).toISOString();
+      if (_istDateOf(ts) !== today) return;
+      attendanceLogs.push({
+        empCode: currentUser.code, type: /checkout/.test(item.url) ? 'checkout' : 'checkin',
+        pendingSync: true, timestamp: ts,
+        lat: parseFloat(item.fields.lat) || 0, lng: parseFloat(item.fields.lng) || 0,
+        accuracy: parseFloat(item.fields.accuracy) || 0,
+        location: item.fields.location || '', remark: item.fields.remark || ''
+      });
+    });
+    restoreCheckinStatus();
+    // Something is still waiting and we have signal — nudge the worker to send it.
+    if (pending.length && isOnline && typeof requestQueueReplay === 'function') requestQueueReplay();
+    var after = JSON.stringify(_myTodayLogs().map(function(l) { return [l.id, l.type, !!l.pendingSync]; }));
+    if (after !== before) {
+      if (typeof renderHomeQuickStats === 'function') renderHomeQuickStats();
+      if (typeof renderRecentActivity === 'function') renderRecentActivity();
+      if (typeof renderAttendanceLogList === 'function') renderAttendanceLogList();
+    }
+    return !!data;
+  }).finally(function() { _attStatusSync = null; });
+  return _attStatusSync;
+}
+
+// Re-read the status whenever the app comes back to the foreground, regains
+// signal, or every few minutes while open — another phone may have punched.
+document.addEventListener('visibilitychange', function() {
+  if (document.visibilityState === 'visible' && currentUser) refreshCheckinStatusFromServer();
+});
+window.addEventListener('pageshow', function(e) { if (e.persisted && currentUser) refreshCheckinStatusFromServer(); });
+window.addEventListener('online', function() { if (currentUser) setTimeout(refreshCheckinStatusFromServer, 1500); });
+setInterval(function() {
+  if (currentUser && document.visibilityState === 'visible') refreshCheckinStatusFromServer();
+}, 3 * 60 * 1000);
 
 // =====================================================
 // BROWSER APIS — CAMERA FOR DOCUMENT UPLOAD
@@ -8092,18 +8263,21 @@ async function _handleGoogleRedirect() {
 // =====================================================
 // PWA SERVICE WORKER REGISTRATION
 // =====================================================
+// Register and update only. This used to unregister every worker and wipe
+// every cache on each page load, racing its own register() call: the page kept
+// a controller but lost its registration, so serviceWorker.ready never
+// resolved and Background Sync was tied to a dead registration. Queued punches
+// then never replayed — the phone said "Checked In" and the server had nothing.
+// Updates still arrive: the browser re-checks sw.js on load (reg.update() too),
+// the new worker calls skipWaiting/clients.claim, and its activate step clears
+// caches from older versions.
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.getRegistrations().then(regs => {
-      regs.forEach(r => r.unregister());
-    });
-    caches.keys().then(keys => keys.forEach(k => caches.delete(k)));
     navigator.serviceWorker.register('./sw.js').then(reg => {
       reg.update();
-      // SW registered
-    }).catch(err => {
-      // SW registration failed
-    });
+      // A punch may be waiting from an earlier session — try it now.
+      if (typeof requestQueueReplay === 'function') requestQueueReplay();
+    }).catch(() => { /* registration failed — punches fall back to the online path */ });
   });
 }
 
@@ -8848,7 +9022,9 @@ async function loadFromBackend() {
     // 18. Attendance logs
     if (keyIdx.attendance !== undefined) {
       var attData = getData(keyIdx.attendance);
-      if (attData && Array.isArray(attData) && attData.length > 0) {
+      // Replace even when empty: a new month, or a different employee signing in
+      // on this phone, must not keep showing the previous list.
+      if (attData && Array.isArray(attData)) {
         attendanceLogs.length = 0;
         attData.map(mapAttendanceLog).forEach(function(a) { attendanceLogs.push(a); });
       }
@@ -10490,6 +10666,11 @@ function initWebSocket() {
     if (overlay && overlay.classList.contains('active')) renderNotifications();
   });
 
+  // ── Attendance: this employee punched (possibly on another phone) ──
+  _hrmsSocket.on('attendance:self', function() {
+    refreshCheckinStatusFromServer();
+  });
+
   // ── Attendance: someone checked in ──
   _hrmsSocket.on('attendance:checkin', function(data) {
     showToast(data.name + ' checked in at ' + data.location, 'info');
@@ -10985,7 +11166,8 @@ if ('serviceWorker' in navigator) {
       if (event.data.synced) showToast(event.data.synced + ' offline punch(es) synced.', 'success');
       if (event.data.rejected) showToast(event.data.rejected + ' offline punch(es) could not be applied. Please check your attendance.', 'error');
       if (event.data.expired) showToast(event.data.expired + ' offline punch(es) were too old to record. Please contact HR.', 'error');
-      if (typeof loadFromBackend === 'function') loadFromBackend().catch(function() {});
+      if (typeof loadFromBackend === 'function') loadFromBackend().catch(function() {}).then(function() { refreshCheckinStatusFromServer(); });
+      else refreshCheckinStatusFromServer();
     }
   });
 }
@@ -10993,16 +11175,20 @@ if ('serviceWorker' in navigator) {
 // Ask the service worker to drain the punch queue. Background Sync does this
 // on its own where it exists; on iOS Safari it does not exist at all, so this
 // message is the only thing that ever triggers a replay there.
+//
+// Always ask directly as well. Background Sync is not enough even on Android:
+// a punch lost mid-upload while the phone still counts as "online" never sees
+// an online event, and Chrome stops retrying a sync after a few failures —
+// that is how punches sat in the queue for good while the phone said
+// "Checked In". The worker runs one drain at a time, so asking twice is safe.
 function requestQueueReplay() {
   if (!('serviceWorker' in navigator)) return;
+  // The controlling worker can always take the message, even if the
+  // registration is mid-update and serviceWorker.ready has not settled.
+  if (navigator.serviceWorker.controller) navigator.serviceWorker.controller.postMessage({ type: 'REPLAY_QUEUE' });
   navigator.serviceWorker.ready.then(function(reg) {
-    if (reg.sync) {
-      reg.sync.register('sync-attendance').catch(function() {
-        if (reg.active) reg.active.postMessage({ type: 'REPLAY_QUEUE' });
-      });
-    } else if (reg.active) {
-      reg.active.postMessage({ type: 'REPLAY_QUEUE' });
-    }
+    if (!navigator.serviceWorker.controller && reg.active) reg.active.postMessage({ type: 'REPLAY_QUEUE' });
+    if (reg.sync) reg.sync.register('sync-attendance').catch(function() {});
   }).catch(function() {});
 }
 
@@ -12590,7 +12776,7 @@ function getAttendanceStatus(checkInTime) {
 function renderAttendanceLogOverlay() {
   const c = document.getElementById('attendanceLogContent');
   if (!c || !currentUser) return;
-  const logs = (typeof attendanceLogs !== 'undefined' ? attendanceLogs : []).filter(l => l.empCode === currentUser.code);
+  const logs = (typeof attendanceLogs !== 'undefined' ? attendanceLogs : []).filter(l => _sameEmpCode(l.empCode, currentUser.code));
   let html = '<div class="card" style="margin-bottom:12px"><div class="nf-section-title">Geofence Status</div>' + getGeofenceStatusHTML() + '</div>';
   html += '<div class="card"><div class="nf-section-title">Recent Attendance</div>';
   if (logs.length === 0) {
@@ -12641,13 +12827,13 @@ async function renderAttendanceLogList() {
   var monthStr = _attLogMonth.year + '-' + String(_attLogMonth.month + 1).padStart(2, '0');
   var myLogs;
   if (isCurrentMonth && typeof attendanceLogs !== 'undefined') {
-    myLogs = attendanceLogs.filter(function(l) { return l.empCode === currentUser.code; });
+    myLogs = attendanceLogs.filter(function(l) { return _sameEmpCode(l.empCode, currentUser.code); });
   } else {
     try {
       c.innerHTML = '<div style="padding:12px;text-align:center;color:var(--gray-400);font-size:.78rem">Loading...</div>';
       var rawLogs = await apiCall('GET', '/attendance?month=' + monthStr);
       myLogs = (Array.isArray(rawLogs) ? rawLogs : [])
-        .filter(function(l) { return (l.emp_code || l.empCode) === currentUser.code; })
+        .filter(function(l) { return _sameEmpCode(l.emp_code || l.empCode, currentUser.code); })
         .map(function(l) { return { empCode: l.emp_code || l.empCode, logDate: l.log_date || l.logDate, checkIn: l.check_in || l.checkIn, checkOut: l.check_out || l.checkOut, location: l.location_name || l.location }; });
     } catch(e) {
       c.innerHTML = '<div style="padding:12px;text-align:center;color:var(--danger);font-size:.78rem">Failed to load logs</div>';
@@ -12791,7 +12977,7 @@ function renderRecentActivity() {
       items.push({
         icon: '<div class="req-icon" style="background:#DBEAFE;color:#2563EB"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/></svg></div>',
         title: escapeHTML((l.leave_type || l.type || 'Leave') + (isMDorHR && l.emp_name ? ' — ' + l.emp_name : '')),
-        sub: escapeHTML((l.from_date || l.from || '') + ' to ' + (l.to_date || l.to || '')) + ' &middot; ' + (l.days || 1) + ' day(s)',
+        sub: escapeHTML(String(l.from_date || l.from || '').substring(0, 10) + ' to ' + String(l.to_date || l.to || '').substring(0, 10)) + ' &middot; ' + (l.days || 1) + ' day(s)',
         date: l.created_at || l.from_date || '',
         status: l.status || 'pending',
         sortDate: l.created_at || ''
@@ -12896,14 +13082,16 @@ function renderHomeQuickStats() {
   var pendingAdv = myAdvances.filter(function(r) { var s = (r.status || '').toLowerCase(); return s === 'pending' || s === 'hr_accepted'; }).length;
 
   // Attendance this month
-  var todayStr = new Date().toISOString().split('T')[0];
+  var todayStr = _istToday();
   var monthStr = todayStr.substring(0, 7);
-  // Count unique attendance days (not by type — records with checkout still count)
+  // Count unique attendance days (not by type — records with checkout still count).
+  // Days come from the IST date of the check-in, which is how the server files
+  // them; only confirmed punches count, not ones still waiting to sync.
   var myAttDays = {};
   (typeof attendanceLogs !== 'undefined' ? attendanceLogs : []).forEach(function(l) {
-    if (l.empCode === currentUser.code && l.logDate && String(l.logDate).substring(0, 7) === monthStr) {
-      myAttDays[String(l.logDate).substring(0, 10)] = true;
-    }
+    if (l.pendingSync || !_sameEmpCode(l.empCode, currentUser.code)) return;
+    var day = (l.checkIn || l.timestamp) ? _istDateOf(l.checkIn || l.timestamp) : String(l.logDate || '').substring(0, 10);
+    if (day && day.substring(0, 7) === monthStr) myAttDays[day] = true;
   });
   var myAttendance = Object.keys(myAttDays).length;
 

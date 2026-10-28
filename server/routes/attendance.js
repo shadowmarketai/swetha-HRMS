@@ -155,6 +155,8 @@ router.post('/checkin', verifyToken, upload.single('selfie'), async (req, res) =
         empCode: req.user.empCode, name: req.user.name, location: geo.site || location || 'Unknown',
         time: new Date().toISOString(), isWithinGeofence: geo.within
       });
+      // The employee's other phones/tabs re-read their status straight away
+      io.to('user:' + req.user.empCode).emit('attendance:self', { type: 'checkin' });
     }
     res.json({
       message: 'Checked in successfully',
@@ -220,6 +222,7 @@ router.post('/checkout', verifyToken, upload.single('selfie'), async (req, res) 
         empCode: req.user.empCode, name: req.user.name, location: location || 'Unknown',
         time: new Date().toISOString()
       });
+      io.to('user:' + req.user.empCode).emit('attendance:self', { type: 'checkout' });
     }
     res.json({ message: 'Checked out successfully', time: new Date().toISOString(), row: rows[0] || null });
   } catch (err) {
@@ -236,11 +239,11 @@ router.get('/today', verifyToken, async (req, res) => {
       'SELECT * FROM attendance_logs WHERE emp_code = ? AND log_date = ? ORDER BY check_in ASC',
       [req.user.empCode, today]
     );
-    if (rows.length === 0) return res.json({ checkedIn: false, sessions: [] });
+    if (rows.length === 0) return res.json({ date: today, checkedIn: false, sessions: [] });
     // Latest session determines current status
     const latest = rows[rows.length - 1];
     const isActive = latest.check_in && !latest.check_out;
-    res.json({ checkedIn: isActive, sessions: rows, latest: latest, totalSessions: rows.length });
+    res.json({ date: today, checkedIn: isActive, sessions: rows, latest: latest, totalSessions: rows.length });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
@@ -262,11 +265,12 @@ router.get('/', verifyToken, async (req, res) => {
       } else {
         query = `SELECT a.*, e.name, e.dept FROM attendance_logs a
                  JOIN employees e ON a.emp_code = e.code
-                 WHERE a.log_date LIKE ? ORDER BY a.log_date DESC, e.name`;
+                 WHERE a.log_date LIKE ? ORDER BY a.log_date DESC, e.name, a.check_in ASC`;
         params = [month + '%'];
       }
     } else {
-      query = 'SELECT * FROM attendance_logs WHERE emp_code = ? AND log_date LIKE ? ORDER BY log_date DESC';
+      // Sessions within a day in time order — the last one is the current status
+      query = 'SELECT * FROM attendance_logs WHERE emp_code = ? AND log_date LIKE ? ORDER BY log_date DESC, check_in ASC';
       params = [req.user.empCode, month + '%'];
     }
 

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hrms-v209';
+const CACHE_NAME = 'hrms-v210';
 const PRECACHE_URLS = [
   './',
   './index.html',
@@ -85,6 +85,14 @@ self.addEventListener('fetch', event => {
           }
         })
       );
+      return;
+    }
+
+    // Today's check-in status must never come from cache: a stale copy looks
+    // like a real answer and shows a different status than the server holds.
+    // Fail instead, so the page keeps what it knows and says it is offline.
+    if (url.pathname === '/api/attendance/today') {
+      event.respondWith(fetch(event.request).catch(() => new Response(JSON.stringify({ error: 'Offline' }), { status: 503, headers: { 'Content-Type': 'application/json' } })));
       return;
     }
 
@@ -269,7 +277,17 @@ self.addEventListener('sync', event => {
 // closed. Mirrors MAX_PUNCH_AGE_MS in server/routes/attendance.js.
 const MAX_QUEUE_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
-async function syncOfflineQueue() {
+// One drain at a time. The page now asks for a replay whenever it comes back
+// to the foreground, and Background Sync may fire at the same moment; two
+// overlapping drains would post the same punch twice.
+let _syncRunning = null;
+function syncOfflineQueue() {
+  if (_syncRunning) return _syncRunning;
+  _syncRunning = _drainOfflineQueue().finally(() => { _syncRunning = null; });
+  return _syncRunning;
+}
+
+async function _drainOfflineQueue() {
   try {
     const queue = await getOfflineQueue();
     if (queue.length === 0) return;
