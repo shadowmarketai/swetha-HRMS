@@ -20,11 +20,41 @@ function istDateOf(ms) {
 // Kept in step with MAX_QUEUE_AGE_MS in sw.js — change both together.
 const MAX_PUNCH_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
+// Serialise punches per employee. The check for an open session and the
+// insert are separate queries, so two requests arriving together (a double
+// tap, or a queued punch replaying while the employee taps again) both saw
+// "no open session" and opened two. A named MySQL lock makes the second wait.
+async function lockEmployee(empCode) {
+  const name = 'hrms-att:' + String(empCode || '').toUpperCase();
+  const conn = await pool.getConnection();
+  try {
+    const [rows] = await conn.query('SELECT GET_LOCK(?, 15) AS got', [name]);
+    if (!rows[0] || Number(rows[0].got) !== 1) { conn.release(); return null; }
+  } catch (e) { conn.release(); throw e; }
+  return async () => {
+    try { await conn.query('SELECT RELEASE_LOCK(?)', [name]); } catch (e) { /* lock ends with the session anyway */ }
+    conn.release();
+  };
+}
+
+// Open sessions from the previous IST day stay closable this long, so someone
+// who checks in late evening can still check out after midnight.
+const OVERNIGHT_MS = 18 * 60 * 60 * 1000;
+
 // Validate the optional punched_at_ms sent by the offline queue.
 // Absent  -> null, and the caller falls back to NOW() (existing behaviour).
 // Present -> must be a sane instant; anything else is refused outright rather
 // than silently recorded at the wrong time.
-function parsePunchedAt(raw) {
+function parsePunchedAt(raw, rawAge) {
+  // Prefer the punch's age (measured on the phone's own clock, so a phone set
+  // minutes or hours wrong still lands on the right time) over its timestamp.
+  if (rawAge !== undefined && rawAge !== null && rawAge !== '') {
+    const age = Number(rawAge);
+    if (!Number.isFinite(age) || age < 0) return { bad: 'Invalid punch timestamp.' };
+    if (age > MAX_PUNCH_AGE_MS) return { bad: 'Punch is too old to record.' };
+    const ms = Date.now() - age;
+    return { ms, date: istDateOf(ms) };
+  }
   if (raw === undefined || raw === null || raw === '') return null;
   const ms = Number(raw);
   const now = Date.now();
@@ -44,6 +74,18 @@ function dojYmdOf(emp) {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }
   return String(d).slice(0, 10);
+}
+
+// Any DATE value as 'YYYY-MM-DD'. mysql2 returns DATE columns as local-midnight
+// Date objects here, so String(date).slice(0, 10) gave "Tue Oct 27" — holidays
+// and approved leave then never matched in the exports and showed as Absent.
+function toYmd(v) {
+  if (!v) return '';
+  if (v instanceof Date) {
+    if (isNaN(v)) return '';
+    return `${v.getFullYear()}-${String(v.getMonth() + 1).padStart(2, '0')}-${String(v.getDate()).padStart(2, '0')}`;
+  }
+  return String(v).slice(0, 10);
 }
 
 // Working days (Mon–Sat, non-holiday) in days 1..lastDay that fall on/after joining
@@ -91,16 +133,20 @@ async function checkGeofence(lat, lng, accuracy) {
 
 // POST /api/attendance/checkin — GPS check-in (supports multiple sessions per day)
 router.post('/checkin', verifyToken, upload.single('selfie'), async (req, res) => {
+  let release = null;
   try {
     const { lat, lng, location, remark, accuracy } = req.body;
 
     // An offline punch replayed by the service worker carries the instant it was
     // actually made. FROM_UNIXTIME() resolves it in the same frame as NOW(), so
     // this stays correct whatever timezone the container runs in.
-    const punch = parsePunchedAt(req.body.punched_at_ms);
+    const punch = parsePunchedAt(req.body.punched_at_ms, req.body.punch_age_ms);
     if (punch && punch.bad) return res.status(409).json({ error: punch.bad });
     const logDate = punch ? punch.date : getTodayIST();
     const checkInExpr = punch ? 'FROM_UNIXTIME(? / 1000)' : 'NOW()';
+
+    release = await lockEmployee(req.user.empCode);
+    if (!release) return res.status(503).json({ error: 'Your previous punch is still being saved. Please try again in a few seconds.' });
 
     // Check if there's an active session (checked in but not checked out)
     const [active] = await pool.query(
@@ -173,25 +219,36 @@ router.post('/checkin', verifyToken, upload.single('selfie'), async (req, res) =
     }
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    if (release) await release();
   }
 });
 
 // POST /api/attendance/checkout — GPS check-out (closes latest active session)
 router.post('/checkout', verifyToken, upload.single('selfie'), async (req, res) => {
+  let release = null;
   try {
     const { lat, lng, location, remark, accuracy } = req.body;
 
     // A replayed check-out must close the session that was open on the day it
     // was made, not whichever day the queue happened to drain on.
-    const punch = parsePunchedAt(req.body.punched_at_ms);
+    const punch = parsePunchedAt(req.body.punched_at_ms, req.body.punch_age_ms);
     if (punch && punch.bad) return res.status(409).json({ error: punch.bad });
     const logDate = punch ? punch.date : getTodayIST();
     const checkOutExpr = punch ? 'FROM_UNIXTIME(? / 1000)' : 'NOW()';
 
-    // Find latest active session (checked in but not checked out)
+    release = await lockEmployee(req.user.empCode);
+    if (!release) return res.status(503).json({ error: 'Your previous punch is still being saved. Please try again in a few seconds.' });
+
+    // Find latest active session (checked in but not checked out): today's, or
+    // one from the previous IST day if it is recent — a 23:30 check-in must be
+    // closable at 00:30.
+    const punchMs = punch ? punch.ms : Date.now();
+    const prevDate = istDateOf(punchMs - 24 * 60 * 60 * 1000);
     const [active] = await pool.query(
-      'SELECT id FROM attendance_logs WHERE emp_code = ? AND log_date = ? AND check_in IS NOT NULL AND check_out IS NULL ORDER BY check_in DESC LIMIT 1',
-      [req.user.empCode, logDate]
+      `SELECT id FROM attendance_logs WHERE emp_code = ? AND check_in IS NOT NULL AND check_out IS NULL
+       AND (log_date = ? OR (log_date = ? AND check_in >= ?)) ORDER BY check_in DESC LIMIT 1`,
+      [req.user.empCode, logDate, prevDate, new Date(punchMs - OVERNIGHT_MS)]
     );
 
     if (active.length === 0) {
@@ -228,6 +285,8 @@ router.post('/checkout', verifyToken, upload.single('selfie'), async (req, res) 
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Internal server error' });
+  } finally {
+    if (release) await release();
   }
 });
 
@@ -235,10 +294,17 @@ router.post('/checkout', verifyToken, upload.single('selfie'), async (req, res) 
 router.get('/today', verifyToken, async (req, res) => {
   try {
     const today = getTodayIST();
-    const [rows] = await pool.query(
+    const [todayRows] = await pool.query(
       'SELECT * FROM attendance_logs WHERE emp_code = ? AND log_date = ? ORDER BY check_in ASC',
       [req.user.empCode, today]
     );
+    // A session opened late yesterday and still open is today's status too
+    const [overnight] = await pool.query(
+      `SELECT * FROM attendance_logs WHERE emp_code = ? AND log_date = ? AND check_in IS NOT NULL
+       AND check_out IS NULL AND check_in >= ? ORDER BY check_in DESC LIMIT 1`,
+      [req.user.empCode, istDateOf(Date.now() - 24 * 60 * 60 * 1000), new Date(Date.now() - OVERNIGHT_MS)]
+    );
+    const rows = overnight.concat(todayRows);
     if (rows.length === 0) return res.json({ date: today, checkedIn: false, sessions: [] });
     // Latest session determines current status
     const latest = rows[rows.length - 1];
@@ -253,7 +319,7 @@ router.get('/today', verifyToken, async (req, res) => {
 // GET /api/attendance — get attendance logs
 router.get('/', verifyToken, async (req, res) => {
   try {
-    const month = req.query.month || new Date().toISOString().slice(0, 7);
+    const month = req.query.month || getTodayIST().slice(0, 7);
     let query, params;
 
     if (['MD', 'HR'].includes(req.user.role)) {
@@ -292,12 +358,16 @@ router.post('/missed', verifyToken, upload.single('proof'), async (req, res) => 
     const { date, reason } = req.body;
     if (!date || !reason) return res.status(400).json({ error: 'Date and reason are required' });
 
-    // Check if already has attendance for that date
+    // Refuse only if the day already has a morning punch. An evening-only day
+    // (the case the check-in screen itself warns will count as Absent) must be
+    // fixable here; refusing every day with any row made that impossible.
+    // A forgotten check-out needs no request: it is closed automatically.
     const [existing] = await pool.query(
-      'SELECT id FROM attendance_logs WHERE emp_code = ? AND log_date = ?',
+      `SELECT id FROM attendance_logs WHERE emp_code = ? AND log_date = ? AND check_in IS NOT NULL
+       AND HOUR(CONVERT_TZ(check_in, '+00:00', '+05:30')) < 14`,
       [req.user.empCode, date]
     );
-    if (existing.length > 0) return res.status(400).json({ error: 'You already have attendance recorded for this date' });
+    if (existing.length > 0) return res.status(400).json({ error: 'You already have a morning check-in recorded for this date' });
 
     // Check if already has a pending request for that date
     const [pendingReq] = await pool.query(
@@ -367,10 +437,19 @@ router.put('/missed/:id/approve', verifyToken, requireRole('MD', 'HR'), async (r
     // Auto-create attendance record for that date — before marking the request
     // approved, so a failure can't leave it approved with nothing recorded.
     // check_in is stored in UTC (see CONVERT_TZ above); 09:00 is IST.
+    // If the employee punched later that day (evening-only), the approved
+    // morning session runs until their first real check-in, so the day reads
+    // as one continuous stretch instead of overlapping sessions.
+    const [laterRows] = await pool.query(
+      `SELECT MIN(check_in) AS first_in FROM attendance_logs WHERE emp_code = ? AND log_date = ? AND check_in IS NOT NULL
+       AND check_in > CONVERT_TZ(CONCAT(?, ' 09:00:00'), '+05:30', '+00:00')`,
+      [request.emp_code, reqYmd, reqYmd]
+    );
+    const firstIn = laterRows[0] && laterRows[0].first_in;
     await pool.query(
-      `INSERT INTO attendance_logs (emp_code, check_in, status, log_date, location_name, remark)
-       VALUES (?, CONVERT_TZ(CONCAT(?, ' 09:00:00'), '+05:30', '+00:00'), 'Present', ?, 'Missed Check-In (Approved)', ?)`,
-      [request.emp_code, reqYmd, reqYmd, 'Missed attendance approved by HR: ' + (request.reason || '')]
+      `INSERT INTO attendance_logs (emp_code, check_in, check_out, status, log_date, location_name, remark)
+       VALUES (?, CONVERT_TZ(CONCAT(?, ' 09:00:00'), '+05:30', '+00:00'), ?, 'Present', ?, 'Missed Check-In (Approved)', ?)`,
+      [request.emp_code, reqYmd, firstIn || null, reqYmd, 'Missed attendance approved by HR: ' + (request.reason || '')]
     );
 
     // Mark request as approved
@@ -430,7 +509,7 @@ router.put('/missed/:id/reject', verifyToken, requireRole('MD', 'HR'), async (re
 router.get('/export/consolidated', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
   try {
     const ExcelJS = require('exceljs');
-    const month = (req.query.month || new Date().toISOString().slice(0, 7)).slice(0, 7); // YYYY-MM
+    const month = (req.query.month || getTodayIST().slice(0, 7)).slice(0, 7); // YYYY-MM
     const [yr, mo] = month.split('-').map(Number);
     const daysInMonth = new Date(yr, mo, 0).getDate();
     const today = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
@@ -446,7 +525,7 @@ router.get('/export/consolidated', verifyToken, requireRole('MD', 'HR'), async (
       ),
       pool.query(
         `SELECT emp_code, from_date, to_date, days, paid_days, lop_days, is_half_day, half_day_session, leave_type, status
-         FROM leave_applications WHERE status IN ('approved', 'HR Accepted')
+         FROM leave_applications WHERE status IN ('approved', 'hr_accepted', 'HR Accepted')
          AND ((from_date LIKE ? OR to_date LIKE ?) OR (from_date < ? AND to_date > ?))`,
         [month + '%', month + '%', month + '-01', month + '-' + String(daysInMonth).padStart(2,'0')]
       ),
@@ -456,12 +535,12 @@ router.get('/export/consolidated', verifyToken, requireRole('MD', 'HR'), async (
 
     // Build holiday lookup  { 'YYYY-MM-DD': name }
     const holidays = {};
-    (holidayRows[0] || []).forEach(h => { holidays[String(h.holiday_date).slice(0,10)] = h.name || 'Holiday'; });
+    (holidayRows[0] || []).forEach(h => { holidays[toYmd(h.holiday_date)] = h.name || 'Holiday'; });
 
     // Build attendance: empCode -> dayNum -> totalMinutes
     const attMap = {};
     (attRows[0] || []).forEach(row => {
-      const dateStr = String(row.log_date).slice(0, 10);
+      const dateStr = toYmd(row.log_date);
       const d = parseInt(dateStr.slice(8), 10);
       if (!attMap[row.emp_code]) attMap[row.emp_code] = {};
       if (!attMap[row.emp_code][d]) attMap[row.emp_code][d] = { mins: 0 };
@@ -485,8 +564,8 @@ router.get('/export/consolidated', verifyToken, requireRole('MD', 'HR'), async (
     (leaveRows[0] || []).forEach(la => {
       const code = la.emp_code;
       if (!leaveMap[code]) leaveMap[code] = {};
-      const from = new Date(String(la.from_date).slice(0,10) + 'T00:00:00');
-      const to   = new Date(String(la.to_date).slice(0,10) + 'T00:00:00');
+      const from = new Date(toYmd(la.from_date) + 'T00:00:00');
+      const to   = new Date(toYmd(la.to_date) + 'T00:00:00');
       let paidRemain = parseFloat(la.paid_days) > 0 ? parseFloat(la.paid_days) : parseFloat(la.days);
       for (let ld = new Date(from); ld <= to; ld.setDate(ld.getDate() + 1)) {
         if (ld.getDay() === 0) continue;
@@ -700,7 +779,7 @@ router.get('/export/consolidated', verifyToken, requireRole('MD', 'HR'), async (
 router.get('/export/punch-detail', verifyToken, requireRole('MD', 'HR'), async (req, res) => {
   try {
     const ExcelJS = require('exceljs');
-    const month = (req.query.month || new Date().toISOString().slice(0, 7)).slice(0, 7);
+    const month = (req.query.month || getTodayIST().slice(0, 7)).slice(0, 7);
     const [yr, mo] = month.split('-').map(Number);
     const daysInMonth = new Date(yr, mo, 0).getDate();
     const today = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
@@ -722,7 +801,7 @@ router.get('/export/punch-detail', verifyToken, requireRole('MD', 'HR'), async (
       ),
       pool.query(
         `SELECT emp_code, from_date, to_date, days, paid_days, lop_days, is_half_day, leave_type, status
-         FROM leave_applications WHERE status IN ('approved', 'HR Accepted')
+         FROM leave_applications WHERE status IN ('approved', 'hr_accepted', 'HR Accepted')
          AND ((from_date LIKE ? OR to_date LIKE ?) OR (from_date < ? AND to_date > ?))`,
         [month + '%', month + '%', month + '-01', month + '-' + String(daysInMonth).padStart(2,'0')]
       ),
@@ -731,13 +810,13 @@ router.get('/export/punch-detail', verifyToken, requireRole('MD', 'HR'), async (
     ]);
 
     const holidays = {};
-    (holidayRows[0] || []).forEach(h => { holidays[String(h.holiday_date).slice(0,10)] = h.name || 'Holiday'; });
+    (holidayRows[0] || []).forEach(h => { holidays[toYmd(h.holiday_date)] = h.name || 'Holiday'; });
 
     // attMap: empCode -> dayNum -> { checkIn, checkOut, mins, missingOut, eveningOnly }
     const EVENING_CUTOFF_HOUR = 14; // 2:00 PM IST — check_in at/after this = evening-only
     const attMap = {};
     (attRows[0] || []).forEach(row => {
-      const dateStr = String(row.log_date).slice(0, 10);
+      const dateStr = toYmd(row.log_date);
       const d = parseInt(dateStr.slice(8), 10);
       if (!attMap[row.emp_code]) attMap[row.emp_code] = {};
       if (!attMap[row.emp_code][d]) attMap[row.emp_code][d] = { checkIn: null, checkOut: null, mins: 0, missingOut: false, eveningOnly: false };
@@ -787,8 +866,8 @@ router.get('/export/punch-detail', verifyToken, requireRole('MD', 'HR'), async (
     (leaveRows[0] || []).forEach(la => {
       const code = la.emp_code;
       if (!leaveMap[code]) leaveMap[code] = {};
-      const from = new Date(String(la.from_date).slice(0,10) + 'T00:00:00');
-      const to   = new Date(String(la.to_date).slice(0,10) + 'T00:00:00');
+      const from = new Date(toYmd(la.from_date) + 'T00:00:00');
+      const to   = new Date(toYmd(la.to_date) + 'T00:00:00');
       let paidRemain = parseFloat(la.paid_days) > 0 ? parseFloat(la.paid_days) : parseFloat(la.days);
       for (let ld = new Date(from); ld <= to; ld.setDate(ld.getDate() + 1)) {
         if (ld.getDay() === 0) continue;

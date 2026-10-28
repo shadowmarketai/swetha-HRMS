@@ -2212,7 +2212,7 @@ async function submitOnboarding() {
 
   var newEmp = {
     code: code, name: name, dept: dept, designation: designation, salary: salary, bank: bank || '',
-    accNo: accNo || '', role: obRole, phone: phone || '', doj: doj || new Date().toISOString().split('T')[0],
+    accNo: accNo || '', role: obRole, phone: phone || '', doj: doj || _istToday(),
     email: email, dob: dob || null, gender: gender, address: address,
     aadhaar: aadhaar, pan: pan, ifscCode: ifscCode,
     emergencyContact: emergencyContact, emergencyPhone: emergencyPhone,
@@ -3501,12 +3501,12 @@ let locRefreshInterval = null;
 let locActiveFilter = 'All';
 
 function generateEmployeeLocations() {
-  var today = new Date().toISOString().split('T')[0];
+  var today = _istToday();
   var logs = (typeof attendanceLogs !== 'undefined' ? attendanceLogs : []);
   employeeLocations = EMPLOYEES.map(function(emp) {
     // Get today's logs for this employee, sorted by time
     var empLogs = logs.filter(function(l) {
-      return l.empCode === emp.code && l.timestamp && l.timestamp.startsWith(today);
+      return _sameEmpCode(l.empCode, emp.code) && l.timestamp && _istDateOf(l.timestamp) === today;
     }).sort(function(a, b) { return a.timestamp < b.timestamp ? -1 : 1; });
 
     var lastLog = empLogs.length > 0 ? empLogs[empLogs.length - 1] : null;
@@ -4006,9 +4006,9 @@ async function submitInlineExpense() {
       amount: amount, reason: reason, details: details, project: project, category: category,
       travelFrom: travelFrom, travelTo: travelTo, vehicle: vehicle, travelKm: travelKm,
       emiAmount: emiAmount, emiMonths: emiMonths, urgency: 'normal',
-      status: inlineStatus, appliedDate: new Date().toISOString().split('T')[0],
+      status: inlineStatus, appliedDate: _istToday(),
       reviewedBy: inlineStatus === 'hr_accepted' ? currentUser.name + ' (HR - Self)' : null,
-      reviewDate: inlineStatus === 'hr_accepted' ? new Date().toISOString().split('T')[0] : null,
+      reviewDate: inlineStatus === 'hr_accepted' ? _istToday() : null,
       rejectReason: null
     });
     _submitSuccess(inlineBtn);
@@ -4141,9 +4141,9 @@ async function submitAdvanceRequest() {
       emiAmount, emiMonths,
       urgency: advSelectedUrgency,
       status: initStatus,
-      appliedDate: new Date().toISOString().split('T')[0],
+      appliedDate: _istToday(),
       reviewedBy: initStatus === 'hr_accepted' ? currentUser.name + ' (HR - Self)' : null,
-      reviewDate: initStatus === 'hr_accepted' ? new Date().toISOString().split('T')[0] : null,
+      reviewDate: initStatus === 'hr_accepted' ? _istToday() : null,
       rejectReason: null
     });
 
@@ -4497,7 +4497,7 @@ async function accountsAcceptAdvance(id) {
     await apiCall('PATCH', '/advances/' + id + '/accounts-accept');
     req.status = 'accounts_accepted';
     req.reviewedBy = currentUser.name + ' (Accounts)';
-    req.reviewDate = new Date().toISOString().split('T')[0];
+    req.reviewDate = _istToday();
     showToast('Accepted \u20B9' + req.amount.toLocaleString('en-IN') + ' — forwarded to MD');
     renderAdvanceRequests(advReqActiveTab);
     renderAllPendingBanners();
@@ -4518,7 +4518,7 @@ async function approveAdvance(id) {
     await apiCall('PATCH', '/advances/' + id + '/approve');
     req.status = 'approved';
     req.reviewedBy = currentUser.name + ' (' + currentUser.role + ')';
-    req.reviewDate = new Date().toISOString().split('T')[0];
+    req.reviewDate = _istToday();
     showToast('Approved \u20B9' + req.amount.toLocaleString('en-IN') + ' for ' + req.empName + ' — sent back to Accounts to disburse');
     renderAdvanceRequests(advReqActiveTab);
     renderAllPendingBanners();
@@ -4550,7 +4550,7 @@ async function rejectAdvance(id) {
     await apiCall('PATCH', '/advances/' + id + '/reject', { reason: reason || 'No reason specified' });
     req.status = 'rejected';
     req.reviewedBy = currentUser.name + ' (' + currentUser.role + ')';
-    req.reviewDate = new Date().toISOString().split('T')[0];
+    req.reviewDate = _istToday();
     req.rejectReason = reason || 'No reason specified';
     showToast('Rejected advance for ' + req.empName);
     renderAdvanceRequests(advReqActiveTab);
@@ -4623,7 +4623,7 @@ async function downloadAdvExport(kind, uiFilter) {
     var dlUrl = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = dlUrl;
-    a.download = kind + '_' + new Date().toISOString().slice(0, 10) + '.xlsx';
+    a.download = kind + '_' + _istToday() + '.xlsx';
     document.body.appendChild(a); a.click();
     setTimeout(function() { URL.revokeObjectURL(dlUrl); a.remove(); }, 0);
   } catch (e) { showToast('Download error: ' + (e.message || e)); }
@@ -4734,7 +4734,7 @@ function showSiteExpenseBillForm() {
   html += '<option>Other</option></select></div>';
   html += '<div class="form-row"><label>Category *</label><select id="seBillCategory" class="nf-select"><option value="">Select</option><option>Material</option><option>Labour</option><option>Equipment</option><option>Transport</option><option>Fuel</option><option>Food</option><option>Other</option></select></div>';
   html += '<div class="form-row"><label>Amount (Rs.) *</label><input type="number" id="seBillAmount" placeholder="e.g. 5000"></div>';
-  html += '<div class="form-row"><label>Date of Expense *</label><input type="date" id="seBillDate" max="' + new Date().toISOString().split('T')[0] + '"></div>';
+  html += '<div class="form-row"><label>Date of Expense *</label><input type="date" id="seBillDate" max="' + _istToday() + '"></div>';
   html += '<div class="form-row"><label>Description</label><textarea id="seBillDesc" rows="2" placeholder="Brief explanation..." style="width:100%;padding:8px;border:1.5px solid var(--gray-200);border-radius:var(--radius-xs);font-family:var(--font-body);font-size:.82rem"></textarea></div>';
   html += '<div class="section-title" style="font-size:.72rem;margin-bottom:6px">Attach Bill Photo *</div>';
   html += '<div style="display:flex;gap:8px;flex-wrap:wrap">';
@@ -4819,7 +4819,7 @@ async function submitSiteExpenseBill() {
   var project = stored.project || (document.getElementById('seBillProject') || {}).value || '';
   var category = stored.category || (document.getElementById('seBillCategory') || {}).value || '';
   var amount = stored.amount || parseInt((document.getElementById('seBillAmount') || {}).value, 10) || 0;
-  var expDate = stored.expDate || (document.getElementById('seBillDate') || {}).value || new Date().toISOString().split('T')[0];
+  var expDate = stored.expDate || (document.getElementById('seBillDate') || {}).value || _istToday();
   var desc = stored.desc || (document.getElementById('seBillDesc') || {}).value || '';
   var billFile = stored.billFile || null;
   if (!billFile) { var billInput = document.getElementById('seBillInput'); if (billInput && billInput.files && billInput.files[0]) billFile = billInput.files[0]; }
@@ -4930,7 +4930,7 @@ function showTravelExpenseBillForm() {
   html += '<div class="form-row"><label>From *</label><input type="text" id="teBillFrom" placeholder="e.g. Coimbatore"></div>';
   html += '<div class="form-row"><label>To *</label><input type="text" id="teBillTo" placeholder="e.g. Chennai"></div></div>';
   html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
-  html += '<div class="form-row"><label>Travel Date * <span style="font-size:.65rem;color:var(--gray-400);font-weight:400">(actual date of travel)</span></label><input type="date" id="teBillDate" max="' + new Date().toISOString().split('T')[0] + '"></div>';
+  html += '<div class="form-row"><label>Travel Date * <span style="font-size:.65rem;color:var(--gray-400);font-weight:400">(actual date of travel)</span></label><input type="date" id="teBillDate" max="' + _istToday() + '"></div>';
   html += '<div class="form-row"><label>Days</label><input type="number" id="teBillDays" placeholder="1" value="1"></div></div>';
   html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
   html += '<div class="form-row"><label>Mode of Travel *</label><select id="teBillVehicle" class="nf-select" onchange="calcTravelExpAmount()"><option value="">Select</option><option>Bike</option><option>Car</option><option>Auto</option><option>Bus</option><option>Train</option><option>Flight</option><option>Other</option></select></div>';
@@ -5027,7 +5027,7 @@ async function submitTravelExpenseBill() {
   var km = stored.km ? parseInt(stored.km, 10) : (parseInt((document.getElementById('teBillKm') || {}).value, 10) || null);
   var days = stored.days ? parseInt(stored.days, 10) : (parseInt((document.getElementById('teBillDays') || {}).value, 10) || 1);
   var desc = stored.desc || (document.getElementById('teBillDesc') || {}).value || '';
-  var travelDate = stored.travelDate || (document.getElementById('teBillDate') || {}).value || new Date().toISOString().split('T')[0];
+  var travelDate = stored.travelDate || (document.getElementById('teBillDate') || {}).value || _istToday();
   var billFile = stored.billFile || null;
   if (!billFile) { var billInput = document.getElementById('teBillInput'); if (billInput && billInput.files && billInput.files[0]) billFile = billInput.files[0]; }
   if (!from || !to) { showToast('Please enter From and To locations'); return; }
@@ -5416,7 +5416,7 @@ async function saveJobPosting(editId) {
       showToast('Opening updated');
     } else {
       var res = await apiCall('POST', '/recruitment/jobs', {title:title,dept:dept,openings:openings,jd:jd});
-      JOB_POSTINGS.push({id: res && res.id ? res.id : jobNextId, title:title, dept:dept, openings:openings, posted:new Date().toISOString().split('T')[0], status:'open', jd:jd});
+      JOB_POSTINGS.push({id: res && res.id ? res.id : jobNextId, title:title, dept:dept, openings:openings, posted:_istToday(), status:'open', jd:jd});
       jobNextId++;
       showToast('Opening created');
     }
@@ -5639,7 +5639,7 @@ function handleResumeUpload(files) {
       skills: [],
       exp: 'N/A',
       resumeText: 'Uploaded file: ' + file.name + ' (' + Math.round(file.size / 1024) + ' KB)',
-      uploadDate: new Date().toISOString().split('T')[0],
+      uploadDate: _istToday(),
       source: 'upload'
     });
     resumeNextId++;
@@ -5839,7 +5839,7 @@ function generateDocument() {
   var emp = EMPLOYEES.find(function(e) { return e.code === empCode; });
   var tpl = DOCUMENT_TEMPLATES.find(function(t) { return t.id === tplId; });
   if (!emp || !tpl) return;
-  var today = new Date().toISOString().split('T')[0];
+  var today = _istToday();
   EMPLOYEE_DOCUMENTS.push({empCode: empCode, type: tplId, label: tpl.label, date: today, status: 'Generated'});
   showToast(tpl.label + ' generated for ' + emp.name);
   renderDocumentsOverlay();
@@ -6379,7 +6379,7 @@ function exportAllData() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'hrms-backup-' + new Date().toISOString().split('T')[0] + '.json';
+  a.download = 'hrms-backup-' + _istToday() + '.json';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -7477,41 +7477,65 @@ let attendanceLogs = [];
 // Selfie capture for attendance — opens front camera, returns File
 function captureSelfiForAttendance() {
   return new Promise(function(resolve, reject) {
+    // Never stack two camera screens: a second one (from a quick double tap)
+    // reused the same element ids, so its buttons were dead and the screen
+    // stayed black until reload.
+    if (typeof window._cancelSelfie === 'function') window._cancelSelfie();
+    var stale = document.getElementById('selfieOverlay');
+    if (stale) stale.remove();
+
     // Create fullscreen overlay with camera
     var overlay = document.createElement('div');
     overlay.id = 'selfieOverlay';
     overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center';
     overlay.innerHTML = '<div style="color:#fff;font-size:.85rem;font-weight:600;margin-bottom:10px;text-align:center">Take a selfie for attendance</div>' +
-      '<video id="selfieVideo" autoplay playsinline style="width:100%;max-width:400px;max-height:60vh;border-radius:12px;object-fit:cover;transform:scaleX(-1)"></video>' +
-      '<canvas id="selfieCanvas" style="display:none"></canvas>' +
+      '<video autoplay playsinline muted style="width:100%;max-width:400px;max-height:60vh;border-radius:12px;object-fit:cover;transform:scaleX(-1)"></video>' +
+      '<canvas style="display:none"></canvas>' +
       '<div style="display:flex;gap:16px;margin-top:16px">' +
-      '<button id="selfieCaptureBtn" style="width:64px;height:64px;border-radius:50%;border:4px solid #fff;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center"><div style="width:48px;height:48px;border-radius:50%;background:#fff"></div></button>' +
+      '<button data-role="capture" aria-label="Take selfie" style="width:64px;height:64px;border-radius:50%;border:4px solid #fff;background:transparent;cursor:pointer;display:flex;align-items:center;justify-content:center"><div style="width:48px;height:48px;border-radius:50%;background:#fff"></div></button>' +
       '</div>' +
-      '<button id="selfieCancelBtn" style="margin-top:12px;background:none;border:1px solid rgba(255,255,255,0.4);color:#fff;padding:8px 24px;border-radius:8px;font-size:.78rem;cursor:pointer">Cancel</button>';
+      '<button data-role="cancel" style="margin-top:12px;background:none;border:1px solid rgba(255,255,255,0.4);color:#fff;padding:8px 24px;border-radius:8px;font-size:.78rem;cursor:pointer">Cancel</button>';
     document.body.appendChild(overlay);
 
-    var video = document.getElementById('selfieVideo');
-    var canvas = document.getElementById('selfieCanvas');
-    var stream = null;
+    // References to this overlay's own elements — not lookups by id
+    var video = overlay.querySelector('video');
+    var canvas = overlay.querySelector('canvas');
+    var captureBtn = overlay.querySelector('[data-role="capture"]');
+    var cancelBtn = overlay.querySelector('[data-role="cancel"]');
+    captureBtn.id = 'selfieCaptureBtn';
+    cancelBtn.id = 'selfieCancelBtn';
+    var stream = null, settled = false;
+
+    function cleanup() {
+      if (stream) stream.getTracks().forEach(function(t) { t.stop(); });
+      if (overlay.parentNode) overlay.remove();
+      if (window._cancelSelfie === cancelFromOutside) window._cancelSelfie = null;
+    }
+    function done(fn, v) { if (settled) return; settled = true; cleanup(); fn(v); }
+    // Lets the punch flow close the camera when the location step fails, so
+    // its error message is not hidden behind this black screen.
+    function cancelFromOutside() { done(reject, new Error('Selfie cancelled')); }
+    window._cancelSelfie = cancelFromOutside;
 
     navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } }, audio: false })
       .then(function(s) {
+        if (settled) { s.getTracks().forEach(function(t) { t.stop(); }); return; }
         stream = s;
         video.srcObject = stream;
       })
       .catch(function(err) {
-        cleanup();
         showToast('Camera access denied. Please allow camera permission.');
-        reject(err);
+        done(reject, err);
       });
 
-    function cleanup() {
-      if (stream) stream.getTracks().forEach(function(t) { t.stop(); });
-      var el = document.getElementById('selfieOverlay');
-      if (el) el.remove();
-    }
-
-    document.getElementById('selfieCaptureBtn').addEventListener('click', function() {
+    captureBtn.addEventListener('click', function() {
+      // Tapped before the camera picture appeared: there is nothing to capture
+      // yet (it used to send an empty, corrupt photo). Wait for the picture.
+      if (!video.videoWidth || !video.videoHeight) {
+        showToast('Camera is starting — tap again in a moment.', 'info');
+        return;
+      }
+      captureBtn.disabled = true;
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       var ctx = canvas.getContext('2d');
@@ -7520,15 +7544,13 @@ function captureSelfiForAttendance() {
       ctx.scale(-1, 1);
       ctx.drawImage(video, 0, 0);
       canvas.toBlob(function(blob) {
-        cleanup();
-        var file = new File([blob], 'selfie_' + Date.now() + '.jpg', { type: 'image/jpeg' });
-        resolve(file);
+        if (!blob) return done(resolve, null);
+        done(resolve, new File([blob], 'selfie_' + Date.now() + '.jpg', { type: 'image/jpeg' }));
       }, 'image/jpeg', 0.8);
     });
 
-    document.getElementById('selfieCancelBtn').addEventListener('click', function() {
-      cleanup();
-      reject(new Error('Selfie cancelled'));
+    cancelBtn.addEventListener('click', function() {
+      done(reject, new Error('Selfie cancelled'));
     });
   });
 }
@@ -7673,10 +7695,36 @@ function _punchFailMessage(e, action) {
   return 'Could not confirm your ' + action.toLowerCase() + '. Refresh and check your status before punching again.';
 }
 
+// One punch at a time. Without this a double tap, or a second tap while GPS
+// was still searching (up to 35s, with no sign anything was happening on the
+// Check Out button), sent two punches — two open sessions for one day.
+var _punchInFlight = false;
+function _beginPunch(which) {
+  if (_punchInFlight) { showToast('Please wait — your ' + which + ' is still in progress.', 'info'); return false; }
+  _punchInFlight = true;
+  var inBtn = document.getElementById('gpsCheckinBtn');
+  var outBtn = document.getElementById('gpsCheckoutBtn');
+  if (inBtn) inBtn.disabled = true;
+  if (outBtn) outBtn.disabled = true;
+  var mine = which === 'check-in' ? inBtn : outBtn;
+  if (mine) mine.textContent = 'Getting ready...';
+  return true;
+}
+function _endPunch() {
+  _punchInFlight = false;
+  // Buttons back to whatever today's sessions say (also re-enables them)
+  restoreCheckinStatus();
+}
+function _onPunchLocationError(err) {
+  // Close the camera first, or this message plays underneath its black screen
+  if (typeof window._cancelSelfie === 'function') window._cancelSelfie();
+  showToast('Location error: ' + (err && err.message || err), 'error');
+}
+
 function gpsCheckIn() {
   if (!navigator.geolocation) { showToast('Geolocation not supported'); return; }
+  if (!_beginPunch('check-in')) return;
   var btn = document.getElementById('gpsCheckinBtn');
-  if (btn) btn.textContent = 'Getting ready...';
 
   // Run selfie capture and GPS fetch IN PARALLEL for speed
   var selfiePromise = captureSelfiForAttendance().catch(function() { return null; });
@@ -7689,11 +7737,9 @@ function gpsCheckIn() {
     var selfieFile = results[0];
     var pos = results[1];
     window._attendanceSelfie = selfieFile;
-    onSuccess(pos);
-  }).catch(function(err) {
-    showToast('Location error: ' + (err.message || err), 'error');
-    if (btn) btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Check In';
-  });
+    if (btn) btn.textContent = 'Saving...';
+    return onSuccess(pos);
+  }).catch(_onPunchLocationError).finally(_endPunch);
 
   async function onSuccess(pos) {
     var geoResult = checkGeofence(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
@@ -7778,19 +7824,21 @@ function gpsCheckIn() {
 
 function gpsCheckOut() {
   if (!navigator.geolocation) { showToast('Geolocation not supported'); return; }
+  if (!_beginPunch('check-out')) return;
+  var outBtn = document.getElementById('gpsCheckoutBtn');
 
   // Run selfie + GPS in parallel for speed
   var selfiePromise = captureSelfiForAttendance().catch(function() { return null; });
   var gpsPromise = _getLocationFast(function() {
+    if (outBtn) outBtn.textContent = 'Waiting for GPS…';
     showToast('Still getting your location — GPS can take up to 30 seconds indoors. Stay on this screen.', 'info');
   });
 
   Promise.all([selfiePromise, gpsPromise]).then(function(results) {
     window._attendanceSelfie = results[0];
-    onSuccess(results[1]);
-  }).catch(function(err) {
-    showToast('Location error: ' + (err.message || err), 'error');
-  });
+    if (outBtn) outBtn.textContent = 'Saving...';
+    return onSuccess(results[1]);
+  }).catch(_onPunchLocationError).finally(_endPunch);
 
   async function onSuccess(pos) {
     var geoResult = checkGeofence(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
@@ -7927,12 +7975,20 @@ function _istDateOf(value) {
 }
 function _istToday() { return _istDateOf(); }
 
+// A session opened late yesterday and still open counts as today's status
+// until it is closed (the server lets it be checked out for 18 hours).
+var OVERNIGHT_MS = 18 * 60 * 60 * 1000;
+function _isOvernightOpen(l) {
+  if (!l || l.pendingSync || l.type !== 'checkin' || l.checkOut) return false;
+  var t = new Date(l.checkIn || l.timestamp).getTime();
+  return !isNaN(t) && Date.now() - t < OVERNIGHT_MS && _istDateOf(t) !== _istToday();
+}
 // Today's sessions for the signed-in employee, oldest first.
 function _myTodayLogs() {
   if (!currentUser || typeof attendanceLogs === 'undefined') return [];
   var today = _istToday();
   return attendanceLogs.filter(function(l) {
-    return _sameEmpCode(l.empCode, currentUser.code) && _istDateOf(l.checkIn || l.timestamp) === today;
+    return _sameEmpCode(l.empCode, currentUser.code) && (_istDateOf(l.checkIn || l.timestamp) === today || _isOvernightOpen(l));
   }).sort(function(a, b) {
     return new Date(a.checkIn || a.timestamp) - new Date(b.checkIn || b.timestamp);
   });
@@ -7940,6 +7996,9 @@ function _myTodayLogs() {
 
 function restoreCheckinStatus() {
   if (!currentUser || typeof attendanceLogs === 'undefined') return;
+  // Mid-punch the buttons are deliberately disabled; the once-a-minute clock
+  // refresh used to re-enable them halfway through.
+  if (typeof _punchInFlight !== 'undefined' && _punchInFlight) return;
   var todayLogs = _myTodayLogs();
   // No session today — show the plain "not checked in" state. Returning early
   // here used to leave yesterday's or another user's status on the card.
@@ -7964,7 +8023,11 @@ function _pendingPunches() {
         var get = db.transaction('queue', 'readonly').objectStore('queue').getAll();
         get.onsuccess = function() {
           db.close();
-          var mine = (get.result || []).filter(function(item) {
+          var all = (get.result || []).filter(function(item) {
+            return item && item.fields && /\/attendance\/check(in|out)/.test(item.url || '');
+          });
+          _pendingPunchesTotal = all.length;
+          var mine = all.filter(function(item) {
             if (!item || !item.fields || !/\/attendance\/check(in|out)/.test(item.url || '')) return false;
             // Each item carries the bearer token it was punched with
             try {
@@ -7981,6 +8044,9 @@ function _pendingPunches() {
   });
 }
 
+// Queued punches on this phone for anyone (a shared site phone can hold
+// another employee's punch); any of them is a reason to ask for a replay.
+var _pendingPunchesTotal = 0;
 var _attStatusSync = null;
 function refreshCheckinStatusFromServer() {
   if (!currentUser || !JWT_TOKEN) return Promise.resolve(false);
@@ -7992,11 +8058,13 @@ function refreshCheckinStatusFromServer() {
   _attStatusSync = Promise.all([serverCall, _pendingPunches()]).then(function(res) {
     var data = res[0], pending = res[1];
     var today = _istToday();
-    var mine = function(l) { return _sameEmpCode(l.empCode, currentUser.code) && _istDateOf(l.checkIn || l.timestamp) === today; };
+    var mine = function(l) { return _sameEmpCode(l.empCode, currentUser.code) && (_istDateOf(l.checkIn || l.timestamp) === today || _isOvernightOpen(l)); };
     if (data && Array.isArray(data.sessions)) {
       // Server answered: its sessions replace whatever this phone thought.
+      var serverIds = {};
+      data.sessions.forEach(function(row) { if (row && row.id != null) serverIds[row.id] = true; });
       for (var i = attendanceLogs.length - 1; i >= 0; i--) {
-        if (mine(attendanceLogs[i])) attendanceLogs.splice(i, 1);
+        if (mine(attendanceLogs[i]) || serverIds[attendanceLogs[i].id]) attendanceLogs.splice(i, 1);
       }
       data.sessions.forEach(function(row) { attendanceLogs.push(mapAttendanceLog(row)); });
     } else {
@@ -8018,7 +8086,7 @@ function refreshCheckinStatusFromServer() {
     });
     restoreCheckinStatus();
     // Something is still waiting and we have signal — nudge the worker to send it.
-    if (pending.length && isOnline && typeof requestQueueReplay === 'function') requestQueueReplay();
+    if ((pending.length || _pendingPunchesTotal) && isOnline && typeof requestQueueReplay === 'function') requestQueueReplay();
     var after = JSON.stringify(_myTodayLogs().map(function(l) { return [l.id, l.type, !!l.pendingSync]; }));
     if (after !== before) {
       if (typeof renderHomeQuickStats === 'function') renderHomeQuickStats();
@@ -8854,7 +8922,7 @@ async function loadFromBackend() {
     var base = API_BASE;
 
     // Build request list — 23 parallel fetches
-    var curMonth = new Date().toISOString().slice(0, 7);
+    var curMonth = _istToday().slice(0, 7);
     var requests = [
       { key: 'employees', url: base + '/employees?limit=200' },
       { key: 'leaves', url: base + '/leaves?limit=500' },
@@ -11361,7 +11429,7 @@ function uploadSitePhoto(projectId) {
         var proj = projects.find(function(p) { return p.id === projectId; });
         var projName = proj ? proj.name : 'Project #' + projectId;
         apiCall('POST', '/sitetrack/projects/' + projectId + '/daily-logs', {
-          logDate: new Date().toISOString().split('T')[0],
+          logDate: _istToday(),
           workDescription: 'Site progress photo',
           weather: '',
           workersCount: 0,
@@ -11644,7 +11712,7 @@ function openLeaveForm() {
       (monthlyPaid > 0 ? '1 paid leave available this month' : 'Paid leave used this month — additional leave will be LOP (salary deducted)') + '</span>';
   }
   document.querySelectorAll('#leaveTypePills .lt-pill').forEach((p,i) => p.classList.toggle('active', i===0));
-  var today = new Date().toISOString().split('T')[0];
+  var today = _istToday();
   var fromDate = document.getElementById('leaveFromDate');
   var toDate = document.getElementById('leaveToDate');
   fromDate.value = '';
@@ -11709,7 +11777,7 @@ function selectLeaveType(type, el) {
         '<br><span style="font-size:.7rem;color:' + (permLeft > 0 ? 'var(--success)' : 'var(--danger)') + '">' +
         (permLeft > 0 ? permLeft + ' permission' + (permLeft !== 1 ? 's' : '') + ' available — no salary deduction' : 'All 4 permissions used this month — additional will be LOP') + '</span>';
       // Auto-set same-day dates and show time pickers for permission
-      var today = new Date().toISOString().split('T')[0];
+      var today = _istToday();
       var fromEl = document.getElementById('leaveFromDate');
       var toEl = document.getElementById('leaveToDate');
       if (fromEl) fromEl.value = today;
@@ -11754,7 +11822,7 @@ async function submitLeave() {
   const reason = document.getElementById('leaveReason').value.trim();
   if (!from || !to) { showToast('Please select dates'); return; }
   if (new Date(to) < new Date(from)) { showToast('End date must be after start date'); return; }
-  var today = new Date().toISOString().split('T')[0];
+  var today = _istToday();
   if (from < today) { showToast('Cannot apply leave for past dates'); return; }
   if (!reason) { showToast('Please enter a reason'); return; }
 
@@ -12095,7 +12163,7 @@ function isShiftEligible(emp) {
 async function assignShift(empCode, shiftCode) {
   try {
     await apiCall('PUT', '/shifts/' + empCode, { shift_code: shiftCode });
-    shiftAssignments[empCode] = { shiftCode: shiftCode, assignedBy: currentUser.code, assignedDate: new Date().toISOString().split('T')[0] };
+    shiftAssignments[empCode] = { shiftCode: shiftCode, assignedBy: currentUser.code, assignedDate: _istToday() };
     renderShiftsOverlay();
     showToast('Shift assigned successfully');
   } catch (e) { showToast(e.message || 'Error assigning shift'); }
@@ -12263,7 +12331,7 @@ async function submitExpenseReimbursement() {
     var exp = {
       id: (res && res.id) || expReimbNextId++, empCode: currentUser.code, empName: currentUser.name, dept: currentUser.dept,
       category: cat, amount: amount, description: desc, date: date, status: 'Pending',
-      submittedOn: new Date().toISOString().split('T')[0], billUrl: res.billUrl || ''
+      submittedOn: _istToday(), billUrl: res.billUrl || ''
     };
     expenseReimbursements.push(exp);
     addNotification('Expense claim submitted: Rs.' + amount.toLocaleString('en-IN'), 'expense');
@@ -12284,7 +12352,7 @@ async function accountsAcceptExpense(id) {
     await apiCall('PUT', '/expenses/' + id + '/approve', {});
     exp.status = 'accounts_accepted';
     exp.approvedBy = currentUser.name + ' (Accounts)';
-    exp.approvedOn = new Date().toISOString().split('T')[0];
+    exp.approvedOn = _istToday();
     showToast('Accepted Rs.' + exp.amount.toLocaleString('en-IN') + ' — forwarded to MD');
     renderAdvanceRequests(advReqActiveTab);
   } catch (e) { showToast(e.message || 'Error accepting expense'); }
@@ -12304,7 +12372,7 @@ async function approveExpense(id) {
     await apiCall('PUT', '/expenses/' + id + '/approve', {});
     exp.status = 'Approved';
     exp.approvedBy = currentUser.name + ' (' + currentUser.role + ')';
-    exp.approvedOn = new Date().toISOString().split('T')[0];
+    exp.approvedOn = _istToday();
     renderExpenseOverlay(); renderAdvanceRequests(advReqActiveTab);
     showToast('Expense approved — sent back to Accounts to disburse');
   } catch (e) { showToast(e.message || 'Error approving expense'); }
@@ -12319,7 +12387,7 @@ async function markExpensePaid(id) {
     await apiCall('PUT', '/expenses/' + id + '/mark-paid', {});
     exp.status = 'Paid';
     exp.paidBy = currentUser.code;
-    exp.paidDate = new Date().toISOString().split('T')[0];
+    exp.paidDate = _istToday();
     renderExpenseOverlay(); renderAdvanceRequests(advReqActiveTab);
     showToast('Marked as paid — Rs.' + exp.amount.toLocaleString('en-IN'));
   } catch (e) { showToast(e.message || 'Error marking as paid'); }
@@ -12396,7 +12464,7 @@ function openExpenseApplyForm() {
   html += '</select></div>';
   html += '<div class="ss-form-group"><label>Advance Amount Received (Rs.)</label><input type="number" id="expAdvanceAmt" value="' + advTotal + '" readonly style="background:var(--gray-50);cursor:not-allowed"></div>';
   html += '<div class="ss-form-group"><label>Total Amount Spent (Rs.) *</label><input type="number" id="expAmount" placeholder="e.g. 5000"></div>';
-  html += '<div class="ss-form-group"><label>Date *</label><input type="date" id="expDate" value="' + new Date().toISOString().split('T')[0] + '"></div>';
+  html += '<div class="ss-form-group"><label>Date *</label><input type="date" id="expDate" value="' + _istToday() + '"></div>';
   html += '<div class="ss-form-group"><label>Description</label><textarea id="expDesc" rows="2" placeholder="Brief description..." style="width:100%;padding:8px;border:1.5px solid var(--gray-200);border-radius:var(--radius-xs);font-family:var(--font-body);font-size:.82rem"></textarea></div>';
   // Line items
   html += '<div class="ss-form-group"><label style="font-weight:600;margin-bottom:6px">Expense Line Items</label>';
@@ -12760,7 +12828,7 @@ function uploadMandatoryDoc(docKey, docLabel) {
     if (!input.files || !input.files[0]) return;
     var file = input.files[0];
     var selfData = ensureSelfData(currentUser.code);
-    selfData.documents[docKey] = { name: file.name, date: new Date().toISOString().split('T')[0] };
+    selfData.documents[docKey] = { name: file.name, date: _istToday() };
     // Try backend upload
     var formData = new FormData();
     formData.append('file', file);
@@ -12925,7 +12993,7 @@ async function renderAttendanceLogList() {
     var coTime = hasRealCheckout ? new Date(coLog.checkOut).toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'}) : '--:--';
     var loc = (theLog && theLog.location) ? theLog.location : 'Unknown';
     var duration = '';
-    var isToday = (dt === new Date().toISOString().split('T')[0]);
+    var isToday = (dt === _istToday());
     if (theLog && theLog.checkIn) {
       if (hasRealCheckout) {
         var diff = (new Date(coLog.checkOut) - new Date(theLog.checkIn)) / 60000;
@@ -13566,7 +13634,7 @@ async function submitTaxDeclaration() {
   try {
     const taxCalc = calculateTaxLiability(currentUser.code);
     await apiCall('POST', '/tax', { fy: '2025-26', section_80c: sec80C, section_80d: sec80D, hra_exemption: hra, home_loan_interest: homeLoan, annual_income: taxCalc ? taxCalc.annualGross : 0, total_deductions: taxCalc ? taxCalc.totalDeductions : 0, taxable_income: taxCalc ? taxCalc.taxableIncome : 0, tax_liability: taxCalc ? taxCalc.totalTax : 0, monthly_tds: taxCalc ? taxCalc.monthlyTds : 0 });
-    taxDeclarations[currentUser.code] = { sec80C, sec80D, hra, homeLoan, submittedOn: new Date().toISOString().split('T')[0] };
+    taxDeclarations[currentUser.code] = { sec80C, sec80D, hra, homeLoan, submittedOn: _istToday() };
     showToast('Tax declaration submitted');
     switchTaxTab('summary');
   } catch (e) { showToast(e.message || 'Error submitting tax declaration'); }
@@ -13654,7 +13722,7 @@ async function markFiled(id) {
     var f = complianceFilings.find(function(c) { return c.id === id; });
     if (!f) return;
     await apiCall('PUT', '/compliance/filings/' + id + '/mark-filed', {});
-    f.status = 'Filed'; f.filedOn = new Date().toISOString().split('T')[0];
+    f.status = 'Filed'; f.filedOn = _istToday();
     renderComplianceOverlay(); showToast('Marked as filed');
   } catch (e) { showToast(e.message || 'Error marking as filed'); }
 }
@@ -13674,7 +13742,7 @@ async function addContractWorker() {
   if (!name) return;
   const contractor = prompt('Contractor name:');
   try {
-    var workerData = { name, contractor: contractor || 'Self', startDate: new Date().toISOString().split('T')[0], status: 'Active', dept: 'Execution' };
+    var workerData = { name, contractor: contractor || 'Self', startDate: _istToday(), status: 'Active', dept: 'Execution' };
     var res = await apiCall('POST', '/compliance/workers', workerData);
     workerData.id = res && res.id ? res.id : contractWorkerNextId++;
     contractWorkers.push(workerData);
@@ -13796,7 +13864,7 @@ function openAssetForm() {
   ASSET_TYPES.forEach(t => html += `<option>${t}</option>`);
   html += '</select></div>';
   html += '<div class="ss-form-group"><label>Serial Number</label><input type="text" id="assetSerial" placeholder="S/N"></div>';
-  html += '<div class="ss-form-group"><label>Purchase Date</label><input type="date" id="assetDate" value="' + new Date().toISOString().split('T')[0] + '"></div>';
+  html += '<div class="ss-form-group"><label>Purchase Date</label><input type="date" id="assetDate" value="' + _istToday() + '"></div>';
   html += '<div class="ss-form-group"><label>Purchase Cost (Rs.)</label><input type="number" id="assetCost" placeholder="e.g. 45000"></div>';
   html += '<div class="ss-form-group"><label>Condition</label><select class="nf-select" id="assetCondition"><option>New</option><option>Good</option><option>Fair</option></select></div>';
   html += '<div style="display:flex;gap:8px"><button class="nf-btn nf-btn-primary" onclick="saveAsset()">Save Asset</button><button class="nf-btn nf-btn-outline" onclick="renderAssetsOverlay()">Cancel</button></div></div>';
@@ -13825,7 +13893,7 @@ async function assignAsset(id, empCode) {
   try {
     await apiCall('PUT', '/assets/' + id + '/assign', { emp_code: empCode });
     var asset = assetInventory.find(function(a) { return a.id === id; });
-    if (asset) { asset.assignedTo = empCode; asset.assignedDate = new Date().toISOString().split('T')[0]; }
+    if (asset) { asset.assignedTo = empCode; asset.assignedDate = _istToday(); }
     renderAssetsOverlay(); showToast('Asset assigned');
   } catch (e) { showToast(e.message || 'Error assigning asset'); }
 }
@@ -13898,7 +13966,7 @@ async function submitResignation() {
     var res = await apiCall('POST', '/exit', { reason: reason, remarks: remarks, preferred_lwd: lwd });
     exitRequests.push({
       id: (res && res.id) || exitNextId++, empCode: currentUser.code, reason: reason, lwd: lwd,
-      remarks: remarks, noticePeriod: noticePeriod, appliedOn: new Date().toISOString().split('T')[0],
+      remarks: remarks, noticePeriod: noticePeriod, appliedOn: _istToday(),
       status: 'Pending', clearance: {}
     });
     addNotification(currentUser.name + ' has submitted resignation', 'exit');
@@ -13910,7 +13978,7 @@ async function approveExit(id) {
   try {
     await apiCall('PUT', '/exit/' + id + '/approve', {});
     var req = exitRequests.find(function(e) { return e.id === id; });
-    if (req) { req.status = 'Approved'; req.approvedBy = currentUser.code; req.approvedOn = new Date().toISOString().split('T')[0]; }
+    if (req) { req.status = 'Approved'; req.approvedBy = currentUser.code; req.approvedOn = _istToday(); }
     renderExitOverlay(); showToast('Exit approved');
   } catch (e) { showToast(e.message || 'Error approving exit'); }
 }
@@ -14010,7 +14078,7 @@ async function generateFnFPDF(exitId) {
   doc.text('NET PAYABLE: Rs.' + fnf.netPayable.toLocaleString('en-IN'), 105, y, {align:'center'}); y += 15;
   doc.setFontSize(8); doc.setFont('Helvetica','normal');
   doc.text('This is a computer-generated document.', 105, y, {align:'center'});
-  savePdfSafe(doc, `FnF_${fnf.emp.code}_${new Date().toISOString().split('T')[0]}.pdf`);
+  savePdfSafe(doc, `FnF_${fnf.emp.code}_${_istToday()}.pdf`);
   showToast('F&F PDF downloaded');
 }
 async function completeExit(id) {
@@ -14019,7 +14087,7 @@ async function completeExit(id) {
     await apiCall('PUT', '/exit/' + id + '/complete', { fnf_amount: 0 });
     var req = exitRequests.find(function(e) { return e.id === id; });
     if (req) {
-      req.status = 'Completed'; req.completedOn = new Date().toISOString().split('T')[0];
+      req.status = 'Completed'; req.completedOn = _istToday();
       var exitEmp = EMPLOYEES.find(function(e) { return e.code === req.empCode; });
       if (exitEmp) exitEmp.status = 'Inactive';
     }
@@ -14052,7 +14120,7 @@ async function createAnnouncement() {
     var res = await apiCall('POST', '/announcements', { title: title, content: body, category: category, priority: priority });
     announcements.push({
       id: (res && res.id) || announcementNextId++, title: title, body: body, category: category, priority: priority,
-      author: currentUser.code, date: new Date().toISOString().split('T')[0]
+      author: currentUser.code, date: _istToday()
     });
     addNotification('New announcement: ' + title, 'announcement');
     showToast('Announcement published');
@@ -15712,7 +15780,7 @@ function openDailyLogForm(projectId) {
   area.innerHTML = '<div class="card" style="padding:12px;border-left:4px solid var(--primary);margin-bottom:8px">' +
     '<div class="nf-section-title" style="margin-bottom:8px">Add Daily Log</div>' +
     '<div style="display:flex;gap:8px">' +
-    '<div class="form-group" style="flex:1"><label class="form-label">Date</label><input class="form-control" type="date" id="dlDate" value="' + new Date().toISOString().split('T')[0] + '"></div>' +
+    '<div class="form-group" style="flex:1"><label class="form-label">Date</label><input class="form-control" type="date" id="dlDate" value="' + _istToday() + '"></div>' +
     '<div class="form-group" style="flex:1"><label class="form-label">Weather</label><select class="form-control" id="dlWeather"><option value="">--</option>' + weatherOpts + '</select></div>' +
     '<div class="form-group" style="flex:1"><label class="form-label">Workers</label><input class="form-control" type="number" id="dlWorkers" min="0"></div>' +
     '</div>' +
@@ -16125,7 +16193,7 @@ function downloadSettlementCSV() {
     var status   = balance > 0 ? 'To Return' : balance < 0 ? 'To Reimburse' : 'Settled';
     rows.push(['"' + e.name + '"', code, e.advApproved, e.advPaid, e.expApproved, e.expPaid, Math.abs(balance), status].join(','));
   });
-  downloadCSV(rows.join('\n'), 'Settlement_Tracker_' + new Date().toISOString().slice(0, 10) + '.csv');
+  downloadCSV(rows.join('\n'), 'Settlement_Tracker_' + _istToday() + '.csv');
 }
 
 // =====================================================
@@ -16391,7 +16459,7 @@ async function downloadConsolidatedPDF() {
   y+=6; doc.setDrawColor(...primary); doc.line(lm,y,rm,y);
   y+=5; doc.setFont('helvetica','normal'); doc.setFontSize(6); doc.setTextColor(...mid);
   doc.text('Generated: '+new Date().toLocaleDateString('en-IN')+' | Swetha HRMS', rm, y, {align:'right'});
-  savePdfSafe(doc, 'consolidated_payments_'+new Date().toISOString().slice(0,10)+'.pdf');
+  savePdfSafe(doc, 'consolidated_payments_'+_istToday()+'.pdf');
   showToast('PDF downloaded');
 }
 
@@ -16501,7 +16569,7 @@ async function downloadEmpSettlementPDF(empCode, empName) {
     doc.setFont('helvetica','normal'); doc.setFontSize(6); doc.setTextColor(...mid);
     doc.text('Generated by Swetha HRMS  |  ' + today, pw/2, 290, {align:'center'});
 
-    doc.save('Settlement_' + empCode + '_' + empName.replace(/\s+/g,'_') + '_' + new Date().toISOString().slice(0,10) + '.pdf');
+    doc.save('Settlement_' + empCode + '_' + empName.replace(/\s+/g,'_') + '_' + _istToday() + '.pdf');
   } catch(e) { showToast('PDF generation failed: ' + (e.message || e)); }
 }
 
@@ -16678,7 +16746,7 @@ function renderEmployeeAttendanceView() {
   html += '<div style="margin-top:16px">';
   html += '<div class="section-title">Daily Attendance Summary</div>';
   html += '<div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">';
-  html += '<input type="date" id="attSummaryDate" value="' + new Date().toISOString().split('T')[0] + '" onchange="loadAttendanceSummaryTable()" style="padding:6px 10px;border:1px solid var(--gray-200);border-radius:var(--radius);font-size:.78rem">';
+  html += '<input type="date" id="attSummaryDate" value="' + _istToday() + '" onchange="loadAttendanceSummaryTable()" style="padding:6px 10px;border:1px solid var(--gray-200);border-radius:var(--radius);font-size:.78rem">';
   html += '</div>';
   html += '<div id="attSummaryTableArea" class="card fade-in"></div>';
   html += '</div>';
@@ -16697,10 +16765,10 @@ async function loadAttendanceSummaryTable() {
   var area = document.getElementById('attSummaryTableArea');
   if (!area) return;
   var dateInput = document.getElementById('attSummaryDate');
-  var selectedDate = dateInput ? dateInput.value : new Date().toISOString().split('T')[0];
+  var selectedDate = dateInput ? dateInput.value : _istToday();
   var monthStr = selectedDate.substring(0, 7);
   var dateLabel = new Date(selectedDate + 'T00:00:00').toLocaleDateString('en-IN', {day:'2-digit', month:'short', year:'numeric', weekday:'long'});
-  var today = new Date().toISOString().split('T')[0];
+  var today = _istToday();
   var isPastDate = selectedDate < today;
 
   area.innerHTML = '<div style="text-align:center;padding:16px;color:var(--gray-400);font-size:.78rem">Loading...</div>';
@@ -17200,7 +17268,7 @@ function showMissedPunchInLeaves() {
   var area = document.getElementById('missedPunchLeavesArea');
   if (!area) return;
   if (area.innerHTML.trim()) { area.innerHTML = ''; return; }
-  var today = new Date().toISOString().split('T')[0];
+  var today = _istToday();
   var html = '<div class="card fade-in" style="padding:14px;margin:8px 0;border-left:4px solid var(--warning,#f59e0b)">';
   html += '<h4 style="font-size:.85rem;font-weight:600;margin:0 0 10px 0">Report Missed Punch</h4>';
   html += '<div class="form-row"><label>Date *</label><input type="date" id="missedPunchDate" max="' + today + '" style="width:100%"></div>';
@@ -17237,7 +17305,7 @@ function showMissedAttendanceForm() {
   var area = document.getElementById('missedAttFormArea');
   if (!area) return;
   if (area.innerHTML.trim()) { area.innerHTML = ''; return; } // toggle
-  var today = new Date().toISOString().split('T')[0];
+  var today = _istToday();
   var html = '<div class="card fade-in" style="padding:14px;margin-bottom:12px;border-left:4px solid var(--warning,#f59e0b)">';
   html += '<h4 style="font-size:.85rem;font-weight:600;margin:0 0 10px 0">Missed Attendance Request</h4>';
   html += '<div class="form-row"><label>Date *</label><input type="date" id="missedAttDate" max="' + today + '" style="width:100%"></div>';
@@ -17296,7 +17364,7 @@ function renderPublicHolidaysPanel() {
   var area = document.getElementById('publicHolidaysArea');
   if (!area) return;
   if (!currentUser || (currentUser.role !== 'MD' && currentUser.role !== 'HR' && currentUser.role !== 'Manager')) { area.innerHTML = ''; return; }
-  var todayIso = new Date().toISOString().split('T')[0];
+  var todayIso = _istToday();
   var html = '<div class="section-title" style="margin-top:4px">Public Holidays</div>';
   html += '<div class="card fade-in" style="padding:12px">';
   html += '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px">';
@@ -17899,7 +17967,7 @@ async function submitForm12B() {
   dec.prevTo = (document.getElementById('f12bTo') || {}).value || '';
   dec.prevGross = parseInt((document.getElementById('f12bGross') || {}).value, 10) || 0;
   dec.prevTds = parseInt((document.getElementById('f12bTds') || {}).value, 10) || 0;
-  dec.form12bSubmitted = new Date().toISOString().split('T')[0];
+  dec.form12bSubmitted = _istToday();
   taxDeclarations[empCode] = dec;
   try {
     await apiCall('POST', '/tax/form12b', {

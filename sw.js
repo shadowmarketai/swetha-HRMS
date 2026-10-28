@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hrms-v211';
+const CACHE_NAME = 'hrms-v212';
 const PRECACHE_URLS = [
   './',
   './index.html',
@@ -66,25 +66,49 @@ self.addEventListener('fetch', event => {
       const offlineResponse = msg => new Response(JSON.stringify({ error: msg }), {
         status: 503, headers: { 'Content-Type': 'application/json' }
       });
-      // Non-GET API calls — try network, queue on failure
-      event.respondWith(
-        fetch(event.request.clone()).catch(async () => {
-          if (!isPunch) return offlineResponse('You are offline. Please try again when connected.');
-          const form = await captured;
-          if (!form) return offlineResponse('Could not save your punch offline. Please try again.');
-          try {
-            await queuePunch(form, punchAuth, url.pathname, punchMethod);
-            return new Response(JSON.stringify({
-              message: 'Saved offline — will sync when online',
-              offline: true,
-              time: new Date().toISOString()
-            }), { headers: { 'Content-Type': 'application/json' } });
-          } catch (e) {
-            // Could not even queue it — say so rather than claim it was saved.
-            return offlineResponse('Could not save your punch offline. Please try again.');
-          }
-        })
-      );
+      const queueIt = async () => {
+        const form = await captured;
+        if (!form) return offlineResponse('Could not save your punch offline. Please try again.');
+        try {
+          await queuePunch(form, punchAuth, url.pathname, punchMethod);
+          return new Response(JSON.stringify({
+            message: 'Saved offline — will sync when online',
+            offline: true,
+            time: new Date().toISOString()
+          }), { headers: { 'Content-Type': 'application/json' } });
+        } catch (e) {
+          // Could not even queue it — say so rather than claim it was saved.
+          return offlineResponse('Could not save your punch offline. Please try again.');
+        }
+      };
+      if (!isPunch) {
+        event.respondWith(fetch(event.request.clone()).catch(() => offlineResponse('You are offline. Please try again when connected.')));
+        return;
+      }
+      event.respondWith((async () => {
+        // A punch must not overtake one still waiting in the queue: a check-out
+        // sent before its queued check-in is refused ("Not checked in") and the
+        // check-in then stays open all night. Queue behind it and drain now.
+        const waiting = await getOfflineQueue().catch(() => []);
+        if (waiting.length) {
+          const resp = await queueIt();
+          syncOfflineQueue();
+          return resp;
+        }
+        // On a stalled upload (one bar of signal) fetch can hang for minutes,
+        // and a punch still "in flight" when the app is closed is simply lost.
+        // Give up after PUNCH_TIMEOUT_MS and queue it instead.
+        const ctrl = new AbortController();
+        const timer = setTimeout(() => ctrl.abort(), PUNCH_TIMEOUT_MS);
+        try {
+          const resp = await fetch(event.request.clone(), { signal: ctrl.signal });
+          clearTimeout(timer);
+          return resp;
+        } catch (e) {
+          clearTimeout(timer);
+          return queueIt();
+        }
+      })());
       return;
     }
 
@@ -273,6 +297,18 @@ self.addEventListener('sync', event => {
   }
 });
 
+// How long a punch upload may take before it is queued instead.
+const PUNCH_TIMEOUT_MS = 25000;
+
+// The employee code inside a bearer token ('' if unreadable).
+function tokenEmpCode(token) {
+  try {
+    const raw = String(token || '').replace(/^Bearer /, '');
+    const b64 = raw.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    return String(JSON.parse(atob(b64)).empCode || '').replace(/\s+/g, '').toUpperCase();
+  } catch (e) { return ''; }
+}
+
 // Refuse to post a punch this stale; the month it belongs to may already be
 // closed. Mirrors MAX_PUNCH_AGE_MS in server/routes/attendance.js.
 const MAX_QUEUE_AGE_MS = 7 * 24 * 60 * 60 * 1000;
@@ -296,6 +332,9 @@ async function _drainOfflineQueue() {
     const keep = [];
     let synced = 0, rejected = 0, expired = 0;
     let aborted = false;
+    // Employees with a punch held back this round. Their later punches wait
+    // too, so a check-out never goes in ahead of the check-in it closes.
+    const held = new Set();
 
     // A live page's token beats the one stored with the item, which may have
     // expired while the punch waited. Either works; neither is required to
@@ -304,14 +343,19 @@ async function _drainOfflineQueue() {
 
     for (let i = 0; i < queue.length; i++) {
       const item = queue[i];
-      if (aborted) { keep.push(item); continue; }
+      if (aborted || held.has(tokenEmpCode(item.token))) { keep.push(item); continue; }
 
       const punchedAtMs = item.punchedAtMs || Date.parse(item.queuedAt || '') || null;
       if (punchedAtMs && now - punchedAtMs > MAX_QUEUE_AGE_MS) { expired++; continue; }
       // Written by a previous version that never captured a usable body.
       if (!item.fields) { expired++; continue; }
 
-      const rawToken = freshToken || item.token;
+      // Each punch goes in as the employee who made it. On a shared site phone
+      // the page's current login may be someone else; using it filed one
+      // person's punch under another. The live token is used only when it is
+      // the same employee (it may be newer than the stored one).
+      const itemEmp = tokenEmpCode(item.token);
+      const rawToken = (freshToken && itemEmp && tokenEmpCode(freshToken) === itemEmp) ? freshToken : item.token;
       if (!rawToken) { keep.push(item); continue; }
       const authHeader = rawToken.indexOf('Bearer ') === 0 ? rawToken : 'Bearer ' + rawToken;
 
@@ -319,19 +363,30 @@ async function _drainOfflineQueue() {
       // set Content-Type — fetch derives it with the right boundary.
       const fd = new FormData();
       Object.keys(item.fields).forEach(k => fd.append(k, item.fields[k]));
-      if (punchedAtMs) fd.append('punched_at_ms', String(punchedAtMs));
+      if (punchedAtMs) {
+        fd.append('punched_at_ms', String(punchedAtMs));
+        // How long ago it was punched, by this phone's own clock. The server
+        // uses this rather than the timestamp, so a phone whose clock is set
+        // wrong still records the right time instead of being refused.
+        fd.append('punch_age_ms', String(Math.max(0, Date.now() - punchedAtMs)));
+      }
       // Only attach the photo if it survived storage intact. A Blob that came
       // back null or malformed must not fail the punch — send it without.
       if (item.selfie && item.selfie.blob instanceof Blob) {
         fd.append('selfie', item.selfie.blob, item.selfie.name || 'selfie.jpg');
       }
 
+      // Same limit as a live punch: a replay stuck on one bar of signal would
+      // otherwise hold the drain lock and block every later sync.
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), PUNCH_TIMEOUT_MS);
       try {
         const resp = await fetch(item.url, {
           method: item.method || 'POST',
           headers: { 'Authorization': authHeader },
-          body: fd
-        });
+          body: fd,
+          signal: ctrl.signal
+        }).finally(() => clearTimeout(timer));
         if (resp.ok) {
           synced++;
         } else if (resp.status === 400 || resp.status === 409 || resp.status === 422) {
@@ -340,14 +395,15 @@ async function _drainOfflineQueue() {
           // report the count instead of pretending it synced.
           rejected++;
         } else if (resp.status === 401 || resp.status === 403) {
-          // A token problem, not a punch problem. Keep the whole queue and stop.
-          keep.push(item);
-          aborted = true;
+          // That employee's token has expired. Keep their punch for when they
+          // next sign in; other employees' punches can still go.
+          keep.push(item); held.add(itemEmp);
         } else {
-          keep.push(item); // 5xx — server trouble, try again later
+          keep.push(item); held.add(itemEmp); // 5xx — server trouble, try again later
         }
       } catch (e) {
-        keep.push(item);   // still offline
+        keep.push(item);   // still offline — nothing else will get through either
+        aborted = true;
       }
     }
 

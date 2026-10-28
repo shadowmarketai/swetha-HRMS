@@ -50,15 +50,31 @@ app.use(cors({
 }));
 
 
-// Rate limiting on login (50 attempts per 15 min per IP — generous for office networks sharing one IP)
+// Rate limiting on login. Password guessing is limited per account (10 tries
+// per 15 min for one employee code from one IP). The IP-wide cap is sized for
+// the whole office signing in on the shared Wi-Fi each morning — at 50 per IP
+// the 51st employee at 9:00 was locked out for 15 minutes.
+const loginAccountLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: IS_TEST ? 10000 : 10,
+  message: { error: 'Too many login attempts for this employee code. Please try again after 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true, // only failed attempts count against the account
+  keyGenerator: (req) => {
+    const code = String((req.body && req.body.empCode) || '').replace(/\s+/g, '').toUpperCase().slice(0, 30);
+    return 'login:' + code + ':' + rateLimit.ipKeyGenerator(req.ip);
+  }
+});
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: IS_TEST ? 10000 : 50,
+  max: IS_TEST ? 10000 : 400,
   message: { error: 'Too many login attempts. Please try again after 15 minutes.' },
   standardHeaders: true,
   legacyHeaders: false
 });
-app.use('/api/auth/login', loginLimiter);
+// Parse the body here so the per-account limiter can read the employee code
+app.use('/api/auth/login', express.json({ limit: '10kb' }), loginLimiter, loginAccountLimiter);
 
 // Rate limiting on password change (3 attempts per 15 min)
 const passwordChangeLimiter = rateLimit({
@@ -91,8 +107,28 @@ const biometricLimiter = rateLimit({
 app.use('/api/auth/biometric-challenge', biometricLimiter);
 app.use('/api/auth/biometric-login', biometricLimiter);
 
+// The general limits count per signed-in employee, not per IP. The whole
+// office shares one Wi-Fi IP, so at 9:00 a few dozen people opening the app
+// (about 23 requests each) and punching used up one shared allowance and got
+// "Too many requests" — sometimes on the geofence-site list, which then made
+// everyone look "outside geofence". Unsigned or invalid requests still count
+// per IP. The token is verified, so a forged one cannot dodge the limit.
+const jwtForLimits = require('jsonwebtoken');
+const { ipKeyGenerator } = rateLimit;
+function limitKey(req) {
+  const h = req.headers.authorization || '';
+  if (h.startsWith('Bearer ') && process.env.JWT_SECRET) {
+    try {
+      const d = jwtForLimits.verify(h.slice(7), process.env.JWT_SECRET);
+      if (d && d.empCode) return 'emp:' + String(d.empCode).toUpperCase();
+    } catch (e) { /* fall through to IP */ }
+  }
+  return 'ip:' + (ipKeyGenerator ? ipKeyGenerator(req.ip) : req.ip);
+}
+
 // General read rate limiter (100 req/min on GET)
 const readLimiter = rateLimit({
+  keyGenerator: limitKey,
   windowMs: 60 * 1000,
   max: IS_TEST ? 10000 : 100,
   message: { error: 'Too many requests. Please slow down.' },
@@ -104,12 +140,15 @@ app.use('/api/', readLimiter);
 
 // General mutation rate limiter (30 req/min on POST/PUT/PATCH/DELETE)
 const mutationLimiter = rateLimit({
+  keyGenerator: limitKey,
   windowMs: 60 * 1000,
   max: IS_TEST ? 10000 : 30,
   message: { error: 'Too many requests. Please slow down.' },
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req) => req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS'
+  // Login has its own limiters above; counting it here too meant 30 sign-ins
+  // a minute from the office IP and everyone after got "Too many requests".
+  skip: (req) => req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS' || req.path === '/auth/login'
 });
 app.use('/api/', mutationLimiter);
 
