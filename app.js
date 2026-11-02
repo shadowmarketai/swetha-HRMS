@@ -8453,6 +8453,33 @@ async function _handleGoogleRedirect() {
 // Updates still arrive: the browser re-checks sw.js on load (reg.update() too),
 // the new worker calls skipWaiting/clients.claim, and its activate step clears
 // caches from older versions.
+//
+// Picking up new versions: a phone may keep the app open in the background for
+// days. Each time it comes back to the foreground, ask the browser to check for
+// a new version; when one takes over, reload at the next return to the app —
+// never in the middle of a punch or with the camera open.
+var _appUpdateReady = false;
+function _reloadIfUpdated() {
+  if (!_appUpdateReady || document.visibilityState !== 'visible') return;
+  if ((typeof _punchInFlight !== 'undefined' && _punchInFlight) || document.getElementById('selfieOverlay')) return;
+  _appUpdateReady = false;
+  location.reload();
+}
+if ('serviceWorker' in navigator) {
+  var _hadSwController = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange', function() {
+    if (!_hadSwController) { _hadSwController = true; return; } // first install, nothing to refresh
+    _appUpdateReady = true;
+  });
+  navigator.serviceWorker.addEventListener('message', function(e) {
+    if (e.data && e.data.type === 'APP_UPDATED') _appUpdateReady = true;
+  });
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState !== 'visible') return;
+    _reloadIfUpdated();
+    navigator.serviceWorker.getRegistration().then(function(r) { if (r) r.update().catch(function() {}); }).catch(function() {});
+  });
+}
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js').then(reg => {

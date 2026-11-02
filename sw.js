@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hrms-v214';
+const CACHE_NAME = 'hrms-v215';
 const PRECACHE_URLS = [
   './',
   './index.html',
@@ -33,6 +33,17 @@ self.addEventListener('activate', event => {
     caches.keys().then(keys =>
       Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))
     ).then(() => self.clients.claim())
+      // Bring open copies of the app onto this version. Phones keep the app
+      // open in the background for days, so a fix only reached people who
+      // happened to restart it. Apps in the background reload now (nobody is
+      // looking at them); visible ones are told and reload the next time the
+      // employee comes back to the app.
+      .then(() => self.clients.matchAll({ type: 'window' }))
+      .then(list => Promise.all(list.map(c => {
+        if (c.visibilityState === 'hidden' && typeof c.navigate === 'function') return c.navigate(c.url).catch(() => {});
+        try { c.postMessage({ type: 'APP_UPDATED' }); } catch (e) { /* ignore */ }
+        return null;
+      })))
       // Drain on activate too. An iOS PWA closed while offline has no page to
       // send REPLAY_QUEUE and no Background Sync, so without this its punches
       // would sit until someone happened to reopen the app while online.
