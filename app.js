@@ -7468,14 +7468,30 @@ function requestNotificationPermission() {
   }
 }
 
+// Show a phone notification. Never throws: it runs after punches and approvals
+// have already been saved. Android Chrome forbids `new Notification()` once
+// permission is granted ("Illegal constructor") — that exception aborted the
+// rest of every punch on Android, showed "Location error" for a punch that had
+// in fact been saved, and skipped the outside-geofence alert to MD/HR. On
+// Android the service worker has to show it.
+var _recentPhoneNotifs = {};
 function sendNotification(title, body, tag) {
-  if (!('Notification' in window) || Notification.permission !== 'granted') return;
-  new Notification(title, {
-    body: body,
-    icon: 'icons/icon-192.svg',
-    tag: tag || 'hrms-notif',
-    vibrate: [200, 100, 200]
-  });
+  try {
+    if (!('Notification' in window) || Notification.permission !== 'granted') return;
+    // The same message arrives from the action itself and again from the
+    // server (poll or live update) a moment later; show it once.
+    var key = title + '|' + body, now = Date.now();
+    if (_recentPhoneNotifs[key] && now - _recentPhoneNotifs[key] < 60000) return;
+    _recentPhoneNotifs[key] = now;
+    var opts = { body: body, icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', tag: tag || 'hrms-notif', vibrate: [200, 100, 200] };
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.ready
+        .then(function(reg) { return reg.showNotification(title, opts); })
+        .catch(function() { /* notification is optional */ });
+      return;
+    }
+    try { new Notification(title, opts); } catch (e) { /* not allowed here (Android without a worker) */ }
+  } catch (e) { /* notification is optional */ }
 }
 
 // Patch approve/reject to trigger notifications
@@ -7507,7 +7523,7 @@ function captureSelfiForAttendance() {
     var overlay = document.createElement('div');
     overlay.id = 'selfieOverlay';
     overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center';
-    overlay.innerHTML = '<div style="color:#fff;font-size:.85rem;font-weight:600;margin-bottom:10px;text-align:center">Take a selfie for attendance</div>' +
+    overlay.innerHTML = '<div data-role="title" style="color:#fff;font-size:.85rem;font-weight:600;margin-bottom:10px;text-align:center;padding:0 16px">Take a selfie for attendance</div>' +
       '<video autoplay playsinline muted style="width:100%;max-width:400px;max-height:60vh;border-radius:12px;object-fit:cover;transform:scaleX(-1)"></video>' +
       '<canvas style="display:none"></canvas>' +
       '<div style="display:flex;gap:16px;margin-top:16px">' +
@@ -7521,6 +7537,7 @@ function captureSelfiForAttendance() {
     var canvas = overlay.querySelector('canvas');
     var captureBtn = overlay.querySelector('[data-role="capture"]');
     var cancelBtn = overlay.querySelector('[data-role="cancel"]');
+    var titleEl = overlay.querySelector('[data-role="title"]');
     captureBtn.id = 'selfieCaptureBtn';
     cancelBtn.id = 'selfieCancelBtn';
     var stream = null, settled = false;
@@ -7551,7 +7568,9 @@ function captureSelfiForAttendance() {
       // Tapped before the camera picture appeared: there is nothing to capture
       // yet (it used to send an empty, corrupt photo). Wait for the picture.
       if (!video.videoWidth || !video.videoHeight) {
-        showToast('Camera is starting — tap again in a moment.', 'info');
+        // Shown on the camera screen itself — a toast would sit underneath it
+        titleEl.textContent = 'Camera is starting — tap again in a moment.';
+        titleEl.style.color = '#FCD34D';
         return;
       }
       captureBtn.disabled = true;
@@ -7737,7 +7756,16 @@ function _endPunch() {
 function _onPunchLocationError(err) {
   // Close the camera first, or this message plays underneath its black screen
   if (typeof window._cancelSelfie === 'function') window._cancelSelfie();
-  showToast('Location error: ' + (err && err.message || err), 'error');
+  // Only failures from the location step are location errors. Anything else
+  // happened after GPS — the punch may well be saved — so check the server and
+  // say so rather than calling it a location problem.
+  if (err && (err.geoCode || /location/i.test(err.message || ''))) {
+    showToast('Location error: ' + (err.message || err), 'error');
+    return;
+  }
+  console.warn('[punch] unexpected error:', err);
+  showToast('Something went wrong on this phone. Your status above has been re-checked with the server — if it shows Checked In, your punch is saved.', 'warning');
+  refreshCheckinStatusFromServer();
 }
 
 function gpsCheckIn() {
@@ -7813,6 +7841,10 @@ function gpsCheckIn() {
       refreshCheckinStatusFromServer();
       return;
     }
+    // The punch is saved from here on. Nothing below may make it look failed:
+    // a crash in a notification used to show "Location error" after a
+    // successful check-in.
+    try {
     if (_queuedOffline) {
       showToast('Saved offline \u2014 your check-in will sync when you are back online.', 'warning');
     } else if (_checkinWarning === 'morningAbsent') {
@@ -7831,8 +7863,9 @@ function gpsCheckIn() {
         apiCall('POST', '/notifications', { title: 'Outside Geofence Check-In', body: alertMsg, category: 'checkin', target_emp_code: hr.code }).catch(function(){});
       });
     }
+    } catch (sideErr) { console.warn('[checkin] after-save step failed:', sideErr); }
     if (btn) btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>Check In';
-    updateCheckinCard(pos.coords);
+    try { updateCheckinCard(pos.coords); } catch (e) {}
     updateCheckinStatus(_queuedOffline ? 'pending-checkin' : 'checkin');
     renderAttendanceLogList();
     if (typeof renderHomeQuickStats === 'function') renderHomeQuickStats();
@@ -7905,6 +7938,7 @@ function gpsCheckOut() {
       refreshCheckinStatusFromServer();
       return;
     }
+    try {
     if (_queuedOffline) {
       showToast('Saved offline \u2014 your check-out will sync when you are back online.', 'warning');
     } else {
@@ -7918,6 +7952,7 @@ function gpsCheckOut() {
         apiCall('POST', '/notifications', { title: 'Outside Geofence Check-Out', body: alertMsg, category: 'checkout', target_emp_code: hr.code }).catch(function(){});
       });
     }
+    } catch (sideErr) { console.warn('[checkout] after-save step failed:', sideErr); }
     updateCheckinStatus(_queuedOffline ? 'pending-checkout' : 'checkout');
     renderAttendanceLogList();
     if (typeof renderHomeQuickStats === 'function') renderHomeQuickStats();
