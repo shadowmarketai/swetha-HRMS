@@ -248,7 +248,7 @@ async function seedNewEmployees(conn) {
     {code:'SS032',name:'Dharmaraj',dept:'Design',designation:'Designing',salary:0,role:'Employee',phone:'',doj:null,email:'thedharmarajm@gmail.com'},
     {code:'SS033',name:'Sakthi Murugan',dept:'Execution',designation:'Execution',salary:0,role:'Employee',phone:'',doj:null,email:'sakthi252636@gmail.com'},
     {code:'SS034',name:'Praveen Kumar J',dept:'Marketing',designation:'Marketing',salary:0,role:'Employee',phone:'',doj:null,email:'forpraveenvideos@gmail.com'},
-    {code:'SS035',name:'Dinesh',dept:'Design',designation:'Designing',salary:0,role:'Employee',phone:'',doj:null,email:'Dineshvj5315@gmail.com'},
+    {code:'SS035',name:'Dinesh',dept:'Design',designation:'Designing',salary:0,role:'HR',phone:'',doj:null,email:'Dineshvj5315@gmail.com'},
     {code:'SS036',name:'Lingeswaran Subramanian',dept:'Production',designation:'Production',salary:0,role:'Employee',phone:'',doj:null,email:'linges1993@gmail.com'},
     {code:'SS037',name:'Udhayasankar',dept:'Production',designation:'Production',salary:0,role:'Employee',phone:'',doj:null,email:'udhayask14@gmail.com'},
     {code:'SS038',name:'Manikam',dept:'Execution',designation:'Execution',salary:0,role:'Employee',phone:'',doj:null,email:'mkguys2010@gmail.com'},
