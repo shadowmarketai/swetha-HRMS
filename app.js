@@ -121,7 +121,7 @@ const EMPLOYEES = [
   {code:'SS032',name:'Dharmaraj',dept:'Design',designation:'Designing',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'thedharmarajm@gmail.com'},
   {code:'SS033',name:'Sakthi Murugan',dept:'Execution',designation:'Execution',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'sakthi252636@gmail.com'},
   {code:'SS034',name:'Praveen Kumar J',dept:'Marketing',designation:'Marketing',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'forpraveenvideos@gmail.com'},
-  {code:'SS035',name:'Dinesh',dept:'Design',designation:'Designing',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'Dineshvj5315@gmail.com'},
+  {code:'SS035',name:'Dinesh',dept:'Design',designation:'Designing',salary:0,bank:'',accNo:'',role:'HR',phone:'',doj:'',email:'Dineshvj5315@gmail.com'},
   {code:'SS036',name:'Lingeswaran Subramanian',dept:'Production',designation:'Production',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'linges1993@gmail.com'},
   {code:'SS037',name:'Udhayasankar',dept:'Production',designation:'Production',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'udhayask14@gmail.com'},
   {code:'SS038',name:'Manikam',dept:'Execution',designation:'Execution',salary:0,bank:'',accNo:'',role:'Employee',phone:'',doj:'',email:'mkguys2010@gmail.com'},
