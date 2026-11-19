@@ -215,6 +215,7 @@ app.use('/api/settings', require('./routes/settings'));
 app.use('/api/attendance', require('./routes/attendance'));
 app.use('/api/leaves', require('./routes/leaves'));
 app.use('/api/notifications', require('./routes/notifications'));
+app.use('/api/push', require('./routes/push'));
 app.use('/api/salary', require('./routes/salary'));
 app.use('/api/shifts', require('./routes/shifts'));
 app.use('/api/expenses', require('./routes/expenses'));
@@ -710,6 +711,19 @@ async function cleanupOldSelfies() {
     if (deleted > 0) console.log('[SELFIE-CLEANUP] Deleted selfies from ' + deleted + ' attendance records (older than 7 days)');
   } catch (e) { console.error('[SELFIE-CLEANUP] Error:', e.message); }
 }
+
+// =====================================================
+// WEB PUSH — phone notifications when the app is closed
+// =====================================================
+// Started after the schema/migrations above have had time to run; retried
+// once for a first boot that is still creating tables.
+(function startWebPush() {
+  const push = require('./utils/push');
+  setTimeout(async () => {
+    await push.start();
+    if (!push.isReady()) setTimeout(() => push.start(), 60000);
+  }, 15000);
+})();
 
 // Run cleanup on startup and then every hour
 setTimeout(cleanupOldSelfies, 10000);

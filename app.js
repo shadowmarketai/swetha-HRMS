@@ -730,9 +730,15 @@ async function loginAs(empCode) {
     }
     history.replaceState({ tab: savedTab || 'home' }, '');
 
-    // Request browser notification permission
+    // Request browser notification permission, then register this phone for
+    // push so notifications arrive even when the app is closed
     if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission();
+      try {
+        var _permReq = Notification.requestPermission(function() { ensurePushSubscription(); });
+        if (_permReq && _permReq.then) _permReq.then(function() { ensurePushSubscription(); }).catch(function() {});
+      } catch (e) { /* permission prompt not available here */ }
+    } else {
+      ensurePushSubscription();
     }
     // Start WebSocket + notification polling + chatbot
     initWebSocket();
@@ -1212,6 +1218,7 @@ function requestProfileChange() {
 }
 
 function doLogout() {
+  removePushSubscription(); // before the token is cleared
   currentUser = null;
   JWT_TOKEN = null;
   safeStorage.remove('hrms_jwt');
@@ -7469,8 +7476,63 @@ function requestNotificationPermission() {
   if (Notification.permission === 'default') {
     Notification.requestPermission().then(perm => {
       safeStorage.set(STORAGE_KEYS.notifPref, perm);
+      ensurePushSubscription();
     });
+  } else {
+    ensurePushSubscription();
   }
+}
+
+// ── Web push: notifications when the app is closed ──
+// Registers this phone/browser with the server. Safe to call repeatedly; does
+// nothing unless notifications are allowed. Never throws — push is optional.
+function _pushKeyToBytes(base64) {
+  var pad = '='.repeat((4 - base64.length % 4) % 4);
+  var raw = atob((base64 + pad).replace(/-/g, '+').replace(/_/g, '/'));
+  var out = new Uint8Array(raw.length);
+  for (var i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+  return out;
+}
+var _pushSubscribing = false;
+async function ensurePushSubscription() {
+  try {
+    if (_pushSubscribing || !JWT_TOKEN || !isOnline) return;
+    if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return;
+    if (Notification.permission !== 'granted') return;
+    _pushSubscribing = true;
+    var cfg = await apiCall('GET', '/push/public-key');
+    if (!cfg || !cfg.enabled || !cfg.publicKey) return;
+    var reg = await navigator.serviceWorker.ready;
+    var sub = await reg.pushManager.getSubscription();
+    // A subscription made with an older server key can never receive anything
+    if (sub && sub.options && sub.options.applicationServerKey) {
+      var cur = btoa(String.fromCharCode.apply(null, new Uint8Array(sub.options.applicationServerKey)))
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      if (cur !== cfg.publicKey) { await sub.unsubscribe(); sub = null; }
+    }
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: _pushKeyToBytes(cfg.publicKey) });
+    await apiCall('POST', '/push/subscribe', { subscription: sub.toJSON() });
+  } catch (e) {
+    /* push is optional — the app works without it */
+  } finally {
+    _pushSubscribing = false;
+  }
+}
+// On logout: stop pushing this employee's notifications to this phone.
+// Called while the token is still valid.
+function removePushSubscription() {
+  try {
+    if (!JWT_TOKEN || !('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    var token = JWT_TOKEN;
+    navigator.serviceWorker.ready.then(function(reg) { return reg.pushManager.getSubscription(); }).then(function(sub) {
+      if (!sub) return;
+      return fetch(API_BASE + '/push/unsubscribe', {
+        method: 'POST', keepalive: true,
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ endpoint: sub.endpoint })
+      });
+    }).catch(function() {});
+  } catch (e) { /* optional */ }
 }
 
 // Show a phone notification. Never throws: it runs after punches and approvals
