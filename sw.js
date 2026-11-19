@@ -1,4 +1,4 @@
-const CACHE_NAME = 'hrms-v215';
+const CACHE_NAME = 'hrms-v216';
 const PRECACHE_URLS = [
   './',
   './index.html',
@@ -443,15 +443,25 @@ async function _drainOfflineQueue() {
 
 // ── Push Notification ──
 self.addEventListener('push', event => {
-  const data = event.data ? event.data.json() : { title: 'HRMS', body: 'New notification' };
+  let data = { title: 'HRMS', body: 'New notification' };
+  try { if (event.data) data = event.data.json(); } catch (e) { /* not JSON — keep the default text */ }
   event.waitUntil(
-    self.registration.showNotification(data.title, {
-      body: data.body,
-      icon: './icons/icon-192.png',
-      badge: './icons/icon-192.png',
-      vibrate: [200, 100, 200],
-      data: data.url || './',
-      actions: data.actions || []
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => {
+      // The app is open on screen: it shows this notification itself (toast +
+      // notification list), so a second phone notification would be a duplicate.
+      if (windowClients.some(c => c.visibilityState === 'visible')) return;
+      return self.registration.showNotification(data.title || 'HRMS', {
+        body: data.body || '',
+        icon: './icons/icon-192.png',
+        badge: './icons/icon-192.png',
+        vibrate: [200, 100, 200],
+        // Same tag the app uses, so a copy shown by a backgrounded tab
+        // replaces this one instead of stacking.
+        tag: 'hrms-notif',
+        renotify: true,
+        data: data.url || './',
+        actions: data.actions || []
+      });
     })
   );
 });

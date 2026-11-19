@@ -271,8 +271,32 @@ CREATE TABLE IF NOT EXISTS notifications (
   message TEXT,
   type VARCHAR(50),
   is_read TINYINT(1) DEFAULT 0,
+  pushed_at DATETIME NULL, -- when the web push dispatcher handled this row
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (emp_code) REFERENCES employees(code) ON DELETE CASCADE,
+  INDEX idx_notif_push (pushed_at, created_at)
+);
+
+-- Web push: one row per subscribed phone/browser
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  emp_code VARCHAR(20) NOT NULL,
+  endpoint_hash CHAR(64) NOT NULL,
+  endpoint TEXT NOT NULL,
+  p256dh VARCHAR(255) NOT NULL,
+  auth VARCHAR(255) NOT NULL,
+  user_agent VARCHAR(255),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  last_ok_at DATETIME NULL,
+  UNIQUE KEY uniq_push_endpoint (endpoint_hash),
+  INDEX idx_push_emp (emp_code),
   FOREIGN KEY (emp_code) REFERENCES employees(code) ON DELETE CASCADE
+);
+
+-- Web push: server keys, generated on first start unless set in the environment
+CREATE TABLE IF NOT EXISTS push_config (
+  name VARCHAR(50) PRIMARY KEY,
+  value TEXT NOT NULL
 );
 
 -- User Settings

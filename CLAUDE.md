@@ -73,6 +73,7 @@ Playwright starts the server itself on port 3333 with `PLAYWRIGHT=1`, which rela
 
 - **Field use is mobile and offline-heavy.** Attendance check-in depends on geolocation plus geofence (`checkGeofence` runs on both the client and `routes/geofence.js` / `attendance.js`, and the two must agree). It also depends on the service worker's offline queue. Never let a punch fail silently: surface errors to the user.
 - **Service worker cache:** `CACHE_NAME` in `sw.js` (currently `hrms-v2xx`). Bump it when changing `sw.js` or the precache list, so clients pick up the new worker.
+- **Web push:** every row inserted into `notifications` is pushed to the employee's subscribed phones by the dispatcher in `server/utils/push.js` (it polls for rows with `pushed_at IS NULL`). To notify someone, insert a `notifications` row; don't call the push module from routes. VAPID keys come from `VAPID_PUBLIC_KEY`/`VAPID_PRIVATE_KEY` if set, otherwise they are generated once and kept in the `push_config` table. Don't delete or change them: every subscribed phone would stop receiving.
 - The CSP in `server.js` (helmet) whitelists specific CDNs. A new external script, font or API domain must be added there, or it will be blocked.
 - `app.js` is huge, so search it with grep or Grep rather than reading it whole. Many features have both a client and a server half. Change both.
 - Uploads go to `server/uploads`, which is a Docker volume. Don't commit it.
