@@ -524,6 +524,16 @@ app.get('*', (req, res) => {
       INDEX idx_missed_att_status (status)
     )`).catch(() => {});
 
+    // Missing punch-out handling: a session closed by the server (not by the
+    // employee) is flagged so it can be told apart from a real punch-out, and
+    // a punch-out reminder is sent once per session.
+    await pool.query("ALTER TABLE attendance_logs ADD COLUMN auto_closed TINYINT(1) NOT NULL DEFAULT 0").catch(() => {});
+    await pool.query("ALTER TABLE attendance_logs ADD COLUMN checkout_reminded_at DATETIME NULL").catch(() => {});
+    // Missed-punch requests now say which punch was missed and, for a missed
+    // punch-out, the time the employee says they left.
+    await pool.query("ALTER TABLE missed_attendance_requests ADD COLUMN missed_type VARCHAR(10) NOT NULL DEFAULT 'in'").catch(() => {});
+    await pool.query("ALTER TABLE missed_attendance_requests ADD COLUMN out_time VARCHAR(5) NULL").catch(() => {});
+
     // Phase G2: Selfie columns for attendance
     await pool.query("ALTER TABLE attendance_logs ADD COLUMN selfie_checkin_url VARCHAR(500)").catch(() => {});
     await pool.query("ALTER TABLE attendance_logs ADD COLUMN selfie_checkout_url VARCHAR(500)").catch(() => {});
@@ -706,30 +716,122 @@ setTimeout(cleanupOldSelfies, 10000);
 setInterval(cleanupOldSelfies, 60 * 60 * 1000);
 
 // =====================================================
-// AUTO-CHECKOUT — At 9 PM, auto-checkout anyone who forgot
+// MISSING PUNCH-OUT — close sessions the employee never punched out of
 // =====================================================
+// A day with a missing punch-out counts as a half day (4h) at most, until HR
+// approves a missed punch-out request with the real leaving time. It used to be
+// credited a full 8h, so someone who left early without punching out was paid
+// a full day.
+const MISSING_OUT_CREDIT_MIN = 240;
 async function autoCheckoutStale() {
   try {
     const pool = require('./config/db');
-    // Close any attendance log where check_in exists, check_out is NULL,
-    // and check_in was more than 18 hours ago.
-    // Sets check_out = check_in + 8 hours (credited work time), not 9 PM,
-    // so past "Active" entries get properly closed with a reasonable duration.
-    const [result] = await pool.query(
-      `UPDATE attendance_logs
-       SET check_out = DATE_ADD(check_in, INTERVAL 8 HOUR),
-           check_out_lat = check_in_lat, check_out_lng = check_in_lng
+    // Sessions still open 18h after check-in (the window in which a late
+    // punch-out is still accepted — OVERNIGHT_MS in routes/attendance.js).
+    const [stale] = await pool.query(
+      `SELECT id FROM attendance_logs
        WHERE check_in IS NOT NULL AND check_out IS NULL
-         AND check_in < DATE_SUB(NOW(), INTERVAL 18 HOUR)`
+         AND check_in < DATE_SUB(NOW(), INTERVAL 18 HOUR)
+       ORDER BY check_in ASC`
     );
-    if (result.affectedRows > 0) {
-      console.log('[AUTO-CHECKOUT] Closed ' + result.affectedRows + ' stale checkout(s) (check_in > 18h ago, set check_out = check_in + 8h)');
+    let closed = 0;
+    for (const row of stale) {
+      // Time already worked that day in properly closed sessions counts first,
+      // so 4h worked + an open afternoon session does not add up to a full day.
+      const [w] = await pool.query(
+        `SELECT COALESCE(SUM(TIMESTAMPDIFF(MINUTE, o.check_in, o.check_out)), 0) AS worked
+         FROM attendance_logs s JOIN attendance_logs o
+           ON o.emp_code = s.emp_code AND o.log_date = s.log_date AND o.id <> s.id
+         WHERE s.id = ? AND o.check_in IS NOT NULL AND o.check_out IS NOT NULL`,
+        [row.id]
+      );
+      const worked = Number(w[0] && w[0].worked) || 0;
+      const credit = Math.max(0, Math.min(MISSING_OUT_CREDIT_MIN, MISSING_OUT_CREDIT_MIN - worked));
+      const [result] = await pool.query(
+        `UPDATE attendance_logs
+         SET check_out = DATE_ADD(check_in, INTERVAL ? MINUTE), auto_closed = 1
+         WHERE id = ? AND check_out IS NULL`,
+        [credit, row.id]
+      );
+      closed += result.affectedRows;
+    }
+    if (closed > 0) {
+      console.log('[AUTO-CHECKOUT] Closed ' + closed + ' session(s) with no punch-out (credited up to 4h, flagged auto_closed)');
     }
   } catch (e) { console.error('[AUTO-CHECKOUT] Error:', e.message); }
 }
 // Run on startup (catch any stale from previous days) and then every 30 minutes
 setTimeout(autoCheckoutStale, 20000);
 setInterval(autoCheckoutStale, 30 * 60 * 1000);
+
+// =====================================================
+// PUNCH-OUT REMINDER — nudge people still checked in after their shift ends
+// =====================================================
+const CHECKOUT_REMINDER_GRACE_MIN = 15;
+// Minutes since IST midnight for 'HH:MM'; null if unreadable.
+function hhmmToMin(v) {
+  const m = /^(\d{1,2}):(\d{2})/.exec(String(v || ''));
+  if (!m) return null;
+  const h = Number(m[1]), mi = Number(m[2]);
+  if (h > 23 || mi > 59) return null;
+  return h * 60 + mi;
+}
+// The instant (ms) a session's shift ends, given when the session started.
+// A shift that ends at or before its start time (22:00–06:00) ends next day.
+function shiftEndMs(checkInMs, startHHMM, endHHMM) {
+  const IST = 330 * 60000;
+  const endMin = hhmmToMin(endHHMM);
+  if (endMin === null) return null;
+  const startMin = hhmmToMin(startHHMM);
+  const istMidnight = Math.floor((checkInMs + IST) / 86400000) * 86400000 - IST;
+  let end = istMidnight + endMin * 60000;
+  const overnight = startMin !== null && endMin <= startMin;
+  // Checked in after an overnight shift's end time: it ends tomorrow morning.
+  // (An early-morning check-in on an overnight shift belongs to the shift
+  // that is just finishing, so its end stays on the same day.)
+  if (overnight && checkInMs >= end) end += 86400000;
+  // An extra session started after the day shift is over has no shift end to
+  // go by; remind after four hours instead of straight away.
+  else if (!overnight && checkInMs >= end) end = checkInMs + 4 * 3600000;
+  return end;
+}
+async function remindMissingCheckout() {
+  try {
+    const pool = require('./config/db');
+    const [open] = await pool.query(
+      `SELECT a.id, a.emp_code, UNIX_TIMESTAMP(a.check_in) * 1000 AS in_ms,
+              COALESCE(st.start_time, '09:00') AS start_time, COALESCE(st.end_time, '18:00') AS end_time
+       FROM attendance_logs a
+       JOIN employees e ON e.code = a.emp_code AND e.is_active = 1
+       LEFT JOIN shift_assignments sa ON sa.emp_code = a.emp_code
+       LEFT JOIN shift_types st ON st.code = COALESCE(sa.shift_code, 'GEN')
+       WHERE a.check_in IS NOT NULL AND a.check_out IS NULL AND a.checkout_reminded_at IS NULL
+         AND a.check_in > DATE_SUB(NOW(), INTERVAL 18 HOUR)`
+    );
+    const now = Date.now();
+    let sent = 0;
+    for (const row of open) {
+      const end = shiftEndMs(Number(row.in_ms), row.start_time, row.end_time);
+      if (end === null || now < end + CHECKOUT_REMINDER_GRACE_MIN * 60000) continue;
+      // Claim the reminder first so two overlapping runs cannot both send it.
+      const [claim] = await pool.query(
+        'UPDATE attendance_logs SET checkout_reminded_at = NOW() WHERE id = ? AND check_out IS NULL AND checkout_reminded_at IS NULL',
+        [row.id]
+      );
+      if (claim.affectedRows === 0) continue;
+      const title = 'Punch out reminder';
+      const message = 'You are still checked in. Please punch out before you leave — a day with no punch-out is counted as a half day.';
+      await pool.query('INSERT INTO notifications (emp_code, title, message, type) VALUES (?, ?, ?, ?)',
+        [row.emp_code, title, message, 'attendance']);
+      const io = app.get('io');
+      if (io) io.to('user:' + row.emp_code).emit('attendance:checkout-reminder', { title, message });
+      sent++;
+    }
+    if (sent > 0) console.log('[CHECKOUT-REMINDER] Reminded ' + sent + ' employee(s) still checked in after shift end');
+  } catch (e) { console.error('[CHECKOUT-REMINDER] Error:', e.message); }
+}
+setTimeout(remindMissingCheckout, 30000);
+setInterval(remindMissingCheckout, 10 * 60 * 1000);
 
 // =====================================================
 // BIKE RATE Rs.3.25 -> Rs.3.50/km WITH EFFECT FROM 1 OCT 2026 (one-time)

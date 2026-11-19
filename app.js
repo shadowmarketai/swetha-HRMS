@@ -1922,7 +1922,8 @@ function _computeCalendarStatuses(logs, empCode, year, month, maxDay) {
     if (!dayData[dayNum]) dayData[dayNum] = [];
     dayData[dayNum].push({
       checkIn: row.check_in || row.checkIn || null,
-      checkOut: row.check_out || row.checkOut || null
+      checkOut: row.check_out || row.checkOut || null,
+      autoClosed: _isAutoClosed(row)
     });
   });
 
@@ -1973,16 +1974,19 @@ function _computeCalendarStatuses(logs, empCode, year, month, maxDay) {
         if (s.checkIn) {
           var start = new Date(s.checkIn).getTime();
           var end;
-          if (s.checkOut && (new Date(s.checkOut).getTime() - start) >= 5 * 60000) {
+          if (s.autoClosed && s.checkOut) {
+            // No punch-out: closed by the server with half-day credit
+            end = new Date(s.checkOut).getTime();
+          } else if (s.checkOut && (new Date(s.checkOut).getTime() - start) >= 5 * 60000) {
             end = new Date(s.checkOut).getTime();
           } else if (isCurrentMonth && dd === now.getDate()) {
             // Still active today — count up to current time
             end = Date.now();
           } else {
-            // Past day with no checkout → treat as auto-checkout at 9 PM,
-            // but cap the credited hours at 8 (480 min) max.
-            var autoOut = new Date(year, month, dd, 21, 0, 0).getTime();
-            end = Math.min(autoOut, start + 480 * 60000);
+            // Past day with no punch-out, not yet closed by the server:
+            // half-day credit only (it used to be a full 8h).
+            s.autoClosed = true;
+            end = start + MISSING_OUT_CREDIT_MIN * 60000;
           }
           if (end > start) totalMin += (end - start) / 60000;
         }
@@ -2028,7 +2032,7 @@ async function buildCalendar() {
       // Fall back to pre-loaded global for current month
       if (isCurrentMonth && typeof attendanceLogs !== 'undefined') {
         logs = attendanceLogs.filter(function(l) { return _sameEmpCode(l.empCode, currentUser.code); }).map(function(l) {
-          return { log_date: l.logDate, check_in: l.checkIn, check_out: l.checkOut, emp_code: l.empCode };
+          return { log_date: l.logDate, check_in: l.checkIn, check_out: l.checkOut, emp_code: l.empCode, auto_closed: l.autoClosed ? 1 : 0 };
         });
       }
     }
@@ -2065,7 +2069,7 @@ async function buildCalendar() {
       var firstSession = dayData[d][0];
       var ciStr = firstSession.checkIn ? new Date(firstSession.checkIn).toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit', hour12:false}) : '';
       var lastSession = dayData[d][dayData[d].length - 1];
-      var coStr = lastSession.checkOut ? new Date(lastSession.checkOut).toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit', hour12:false}) : '';
+      var coStr = (lastSession.checkOut && !lastSession.autoClosed) ? new Date(lastSession.checkOut).toLocaleTimeString('en-IN', {hour:'2-digit', minute:'2-digit', hour12:false}) : '';
       if (ciStr || coStr) {
         timesHtml = '<div class="cal-times">' + (ciStr || '--') + '<br>' + (coStr || '--') + '</div>';
       }
@@ -6728,7 +6732,7 @@ async function _fetchAttMonthData(selYear, selMonth) {
     var dayNum = parseInt(String(row.log_date).substring(0, 10).split('-')[2], 10);
     if (!empDayData[row.emp_code]) empDayData[row.emp_code] = {};
     if (!empDayData[row.emp_code][dayNum]) empDayData[row.emp_code][dayNum] = { minutes: 0, sessions: [] };
-    var session = { checkIn: row.check_in || null, checkOut: row.check_out || null };
+    var session = { checkIn: row.check_in || null, checkOut: row.check_out || null, autoClosed: _isAutoClosed(row) };
     empDayData[row.emp_code][dayNum].sessions.push(session);
     if (row.check_in) {
       var start = new Date(row.check_in).getTime();
@@ -6736,11 +6740,12 @@ async function _fetchAttMonthData(selYear, selMonth) {
       var isToday = isCurrentMonth && dayNum === today.getDate();
       if (row.check_out) {
         end = new Date(row.check_out).getTime();
+        if (_isAutoClosed(row)) empDayData[row.emp_code][dayNum].missedCheckout = true;
       } else if (isToday) {
         end = Date.now();
       } else {
-        var autoOut = new Date(new Date(row.check_in).toDateString() + ' 21:00:00').getTime();
-        end = Math.min(autoOut, start + 480 * 60000);
+        // No punch-out on a past day: half-day credit only
+        end = start + MISSING_OUT_CREDIT_MIN * 60000;
         empDayData[row.emp_code][dayNum].missedCheckout = true;
       }
       if (end > start) empDayData[row.emp_code][dayNum].minutes += (end - start) / 60000;
@@ -6797,7 +6802,7 @@ async function _exportPunchInOutCSV() {
       var emp = empMap[row.emp_code] || {};
       var dateStr = String(row.log_date).substring(0, 10);
       var punchIn = _fmtTime(row.check_in);
-      var punchOut = _fmtTime(row.check_out);
+      var punchOut = _isAutoClosed(row) ? 'No punch-out' : _fmtTime(row.check_out);
       var mins = 0;
       if (row.check_in && row.check_out) {
         mins = (new Date(row.check_out) - new Date(row.check_in)) / 60000;
@@ -6984,7 +6989,7 @@ async function exportIndividualStaffPDF() {
           var en;
           if (row.check_out) en = new Date(row.check_out).getTime();
           else if (isCurrentMonth && d === today.getDate()) en = Date.now();
-          else { var ao = new Date(new Date(row.check_in).toDateString() + ' 21:00:00').getTime(); en = Math.min(ao, s + 480*60000); }
+          else { en = s + MISSING_OUT_CREDIT_MIN * 60000; } // past day, no punch-out: half-day credit
           if (en > s) dayMin += (en - s) / 60000;
         });
         dayMin = Math.min(dayMin, 480);
@@ -7046,7 +7051,7 @@ async function exportIndividualStaffPDF() {
       } else if (dayLogs[d] && dayLogs[d].length > 0) {
         var sess = dayLogs[d][0];
         var pIn = _fmtTime(sess.check_in);
-        var pOut = sess.check_out ? _fmtTime(sess.check_out) : (isCurrentMonth && d === today.getDate() ? 'Active' : '—*');
+        var pOut = (sess.check_out && !_isAutoClosed(sess)) ? _fmtTime(sess.check_out) : (isCurrentMonth && d === today.getDate() && !sess.check_out ? 'Active' : '—*');
         var sessMin = 0;
         dayLogs[d].forEach(function(row) {
           if (!row.check_in) return;
@@ -7054,12 +7059,12 @@ async function exportIndividualStaffPDF() {
           var en;
           if (row.check_out) en = new Date(row.check_out).getTime();
           else if (isCurrentMonth && d === today.getDate()) en = Date.now();
-          else { var ao = new Date(new Date(row.check_in).toDateString() + ' 21:00:00').getTime(); en = Math.min(ao, s + 480*60000); }
+          else { en = s + MISSING_OUT_CREDIT_MIN * 60000; } // past day, no punch-out: half-day credit
           if (en > s) sessMin += (en - s) / 60000;
         });
         sessMin = Math.min(sessMin, 480);
         var statusTxt = sessMin >= 480 ? 'Present' : 'Half Day';
-        var missNote = !dayLogs[d][0].check_out && !(isCurrentMonth && d === today.getDate()) ? 'Missed checkout*' : '';
+        var missNote = dayLogs[d].some(function(r) { return _isAutoClosed(r) || (!r.check_out && !(isCurrentMonth && d === today.getDate())); }) ? 'Missed checkout*' : '';
         doc.text(dayName2, colX[0]+1, y+3.8);
         doc.text(dateLabel, colX[1]+1, y+3.8);
         doc.text(pIn, colX[2]+1, y+3.8);
@@ -8832,6 +8837,7 @@ function mapAttendanceLog(row) {
     timestamp: ts ? new Date(ts).toISOString() : new Date().toISOString(),
     checkIn: row.check_in ? new Date(row.check_in).toISOString() : null,
     checkOut: row.check_out ? new Date(row.check_out).toISOString() : null,
+    autoClosed: _isAutoClosed(row),
     location: row.location_name || row.location || '',
     remark: row.remark || '',
     status: row.status || 'Present',
@@ -9969,7 +9975,11 @@ async function _buildConsolidatedData(selMonth, selYear) {
     const day = d.getDate();
     if (!attMap[code]) attMap[code] = {};
     let hrs = 0, mn = 0;
-    if (l.check_in && l.check_out && (new Date(l.check_out) - new Date(l.check_in)) >= 5 * 60000) {
+    if (l.check_in && l.check_out && _isAutoClosed(l)) {
+      // No punch-out: the server closed it with half-day credit — use that as is
+      const credit = Math.max(0, (new Date(l.check_out) - new Date(l.check_in)) / 60000);
+      hrs = Math.floor(credit / 60); mn = Math.round(credit % 60);
+    } else if (l.check_in && l.check_out && (new Date(l.check_out) - new Date(l.check_in)) >= 5 * 60000) {
       // Valid session — at least 5 minutes between check-in and check-out
       const diff = (new Date(l.check_out) - new Date(l.check_in)) / 60000;
       hrs = Math.floor(diff / 60); mn = Math.round(diff % 60);
@@ -9988,14 +9998,14 @@ async function _buildConsolidatedData(selMonth, selYear) {
     }
     const _existing = attMap[code][day];
     if (!_existing) {
-      attMap[code][day] = { hrs, mn, checkIn: l.check_in || null, checkOut: l.check_out || null };
+      attMap[code][day] = { hrs, mn, checkIn: l.check_in || null, checkOut: _isAutoClosed(l) ? null : (l.check_out || null) };
     } else {
       // Multiple sessions same day: accumulate minutes, keep earliest IN and latest OUT
       const _totalMn = (_existing.hrs * 60 + _existing.mn) + (hrs * 60 + mn);
       _existing.hrs = Math.floor(_totalMn / 60);
       _existing.mn = Math.round(_totalMn % 60);
       if (l.check_in && (!_existing.checkIn || new Date(l.check_in) < new Date(_existing.checkIn))) _existing.checkIn = l.check_in;
-      if (l.check_out && (!_existing.checkOut || new Date(l.check_out) > new Date(_existing.checkOut))) _existing.checkOut = l.check_out;
+      if (l.check_out && !_isAutoClosed(l) && (!_existing.checkOut || new Date(l.check_out) > new Date(_existing.checkOut))) _existing.checkOut = l.check_out;
     }
   });
 
@@ -10208,11 +10218,12 @@ async function _downloadPunchDetailXLSX_legacy() {
         var start = new Date(row.check_in).getTime(), end;
         if (row.check_out) {
           end = new Date(row.check_out).getTime();
-          if (!entry.checkOut || new Date(row.check_out) > new Date(entry.checkOut)) entry.checkOut = row.check_out;
+          // A server-closed session has no real OUT time to show
+          if (!_isAutoClosed(row) && (!entry.checkOut || new Date(row.check_out) > new Date(entry.checkOut))) entry.checkOut = row.check_out;
         } else if (isCurrentMonth && dayNum === today.getDate()) {
           end = Date.now();
         } else {
-          end = start + 480 * 60000;
+          end = start + MISSING_OUT_CREDIT_MIN * 60000; // past day, no punch-out: half-day credit
         }
         if (end > start) entry.mins += (end - start) / 60000;
       }
@@ -11126,6 +11137,15 @@ function initWebSocket() {
     if (typeof renderAdvanceRequests === 'function') renderAdvanceRequests(advReqActiveTab);
     renderAllPendingBanners();
     renderRecentActivity();
+  });
+
+  // ── Punch-out reminder (still checked in after shift end) ──
+  _hrmsSocket.on('attendance:checkout-reminder', function(data) {
+    var title = (data && data.title) || 'Punch out reminder';
+    var msg = (data && data.message) || 'You are still checked in. Please punch out before you leave.';
+    showToast(msg, 'info');
+    sendNotification(title, msg, 'hrms-checkout-reminder');
+    refreshNotifications();
   });
 
   // ── Missed Attendance ──
@@ -12939,6 +12959,11 @@ function haversineDistance(lat1, lng1, lat2, lng2) {
 // so a vague cell-tower fix (or an inflated value) can't pass from far away.
 // Must match GEOFENCE_ACCURACY_CAP in server/routes/attendance.js.
 var GEOFENCE_ACCURACY_CAP = 75;
+// A day with no punch-out is credited this many minutes (a half day) until HR
+// approves a missed punch-out request. Must match MISSING_OUT_CREDIT_MIN on the
+// server (server.js and routes/attendance.js).
+var MISSING_OUT_CREDIT_MIN = 240;
+function _isAutoClosed(row) { return !!(row && Number(row.auto_closed || row.autoClosed)); }
 function checkGeofence(lat, lng, accuracy) {
   const sites = (typeof siteLocations !== 'undefined' && Array.isArray(siteLocations)) ? siteLocations : SITE_LOCATIONS;
   const slack = Math.min(Math.max(parseFloat(accuracy) || 0, 0), GEOFENCE_ACCURACY_CAP);
@@ -13043,7 +13068,7 @@ async function renderAttendanceLogList() {
       var rawLogs = await apiCall('GET', '/attendance?month=' + monthStr);
       myLogs = (Array.isArray(rawLogs) ? rawLogs : [])
         .filter(function(l) { return _sameEmpCode(l.emp_code || l.empCode, currentUser.code); })
-        .map(function(l) { return { empCode: l.emp_code || l.empCode, logDate: l.log_date || l.logDate, checkIn: l.check_in || l.checkIn, checkOut: l.check_out || l.checkOut, location: l.location_name || l.location }; });
+        .map(function(l) { return { empCode: l.emp_code || l.empCode, logDate: l.log_date || l.logDate, checkIn: l.check_in || l.checkIn, checkOut: l.check_out || l.checkOut, autoClosed: _isAutoClosed(l), location: l.location_name || l.location }; });
     } catch(e) {
       c.innerHTML = '<div style="padding:12px;text-align:center;color:var(--danger);font-size:.78rem">Failed to load logs</div>';
       return;
@@ -13057,10 +13082,12 @@ async function renderAttendanceLogList() {
   var byDate = {};
   myLogs.forEach(function(log) {
     var d = log.logDate ? String(log.logDate).substring(0, 10) : (log.timestamp ? log.timestamp.split('T')[0] : 'unknown');
-    if (!byDate[d]) byDate[d] = { checkin: null, checkout: null, log: null };
+    if (!byDate[d]) byDate[d] = { checkin: null, checkout: null, log: null, sessions: [] };
+    byDate[d].sessions.push(log);
     // Each attendance record has both checkIn and checkOut fields
     if (log.checkIn && !byDate[d].checkin) byDate[d].checkin = log;
-    if (log.checkOut) byDate[d].checkout = log;
+    // A session the server closed has no real punch-out time to show
+    if (log.checkOut && !log.autoClosed) byDate[d].checkout = log;
     if (!byDate[d].log) byDate[d].log = log;
   });
   var dates = Object.keys(byDate).sort().reverse().slice(0, 30);
@@ -13069,26 +13096,36 @@ async function renderAttendanceLogList() {
     var pair = byDate[dt];
     var theLog = pair.checkin || pair.checkout || pair.log;
     var ciTime = theLog && theLog.checkIn ? new Date(theLog.checkIn).toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'}) : '--:--';
-    var coLog = pair.checkout || theLog;
-    var hasRealCheckout = !!(coLog && coLog.checkOut);
-    var coTime = hasRealCheckout ? new Date(coLog.checkOut).toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'}) : '--:--';
+    var hasRealCheckout = !!pair.checkout;
+    var coTime = hasRealCheckout ? new Date(pair.checkout.checkOut).toLocaleTimeString('en-IN', {hour:'2-digit',minute:'2-digit'}) : '--:--';
     var loc = (theLog && theLog.location) ? theLog.location : 'Unknown';
     var duration = '';
     var isToday = (dt === _istToday());
-    if (theLog && theLog.checkIn) {
-      if (hasRealCheckout) {
-        var diff = (new Date(coLog.checkOut) - new Date(theLog.checkIn)) / 60000;
-        // Cap displayed duration at 8h to match calendar logic
-        if (diff > 480) diff = 480;
-        if (diff > 0) { var hrs = Math.floor(diff / 60), mins = Math.round(diff % 60); duration = hrs + 'h ' + mins + 'm'; }
-      } else if (!isToday) {
-        // Past day with no checkout — show 8h (auto-closed by server cron)
-        duration = '8h 0m';
-        coTime = 'auto-closed';
+    // Time worked = the day's sessions added up. A session with no punch-out
+    // counts as a half day at most (the server stores that credit once it
+    // closes the session; before that the same credit is worked out here).
+    var diff = 0, noPunchOut = false, stillActive = false;
+    pair.sessions.forEach(function(sx) {
+      if (!sx.checkIn) return;
+      var st = new Date(sx.checkIn).getTime();
+      if (sx.checkOut) {
+        if (sx.autoClosed) noPunchOut = true;
+        diff += Math.max(0, (new Date(sx.checkOut).getTime() - st) / 60000);
+      } else if (isToday) {
+        stillActive = true;
+      } else {
+        noPunchOut = true;
+        diff += MISSING_OUT_CREDIT_MIN;
       }
-    }
+    });
+    // Cap displayed duration at 8h to match calendar logic
+    if (diff > 480) diff = 480;
+    if (!stillActive && (diff > 0 || noPunchOut)) { var hrs = Math.floor(diff / 60), mins = Math.round(diff % 60); duration = hrs + 'h ' + mins + 'm'; }
+    if (noPunchOut && !stillActive) coTime = 'No punch-out';
     var statusHtml = '';
-    if (theLog && theLog.checkIn) {
+    if (noPunchOut && !stillActive && diff < 480) {
+      statusHtml = '<span style="font-size:.65rem;color:var(--warning-dark,#92400e);font-weight:600">Half day &middot; no punch-out</span>';
+    } else if (theLog && theLog.checkIn) {
       statusHtml = '<span style="font-size:.65rem;color:var(--success);font-weight:600">Present</span>';
     }
     var dateLabel = new Date(dt + 'T00:00:00').toLocaleDateString('en-IN', {day:'2-digit',month:'short',year:'numeric',weekday:'short'});
@@ -17353,7 +17390,8 @@ function showMissedPunchInLeaves() {
   var html = '<div class="card fade-in" style="padding:14px;margin:8px 0;border-left:4px solid var(--warning,#f59e0b)">';
   html += '<h4 style="font-size:.85rem;font-weight:600;margin:0 0 10px 0">Report Missed Punch</h4>';
   html += '<div class="form-row"><label>Date *</label><input type="date" id="missedPunchDate" max="' + today + '" style="width:100%"></div>';
-  html += '<div class="form-row"><label>Missed</label><select id="missedPunchType" style="width:100%;padding:8px;border:1.5px solid var(--gray-200);border-radius:var(--radius-xs);font-size:.82rem"><option value="in">Check-In (forgot to punch in)</option><option value="out">Check-Out (forgot to punch out)</option><option value="both">Both In & Out</option></select></div>';
+  html += '<div class="form-row"><label>Missed</label><select id="missedPunchType" onchange="_toggleMissedOutTime(\'missedPunchType\',\'missedPunchOutRow\')" style="width:100%;padding:8px;border:1.5px solid var(--gray-200);border-radius:var(--radius-xs);font-size:.82rem"><option value="in">Check-In (forgot to punch in)</option><option value="out">Check-Out (forgot to punch out)</option><option value="both">Both In & Out</option></select></div>';
+  html += '<div class="form-row" id="missedPunchOutRow" style="display:none"><label>Time you left (punch-out) *</label><input type="time" id="missedPunchOutTime" style="width:100%"></div>';
   html += '<div class="form-row"><label>Reason *</label><textarea id="missedPunchReason" rows="2" placeholder="Reason for missing punch..." style="width:100%;padding:8px;border:1.5px solid var(--gray-200);border-radius:var(--radius-xs);font-size:.82rem"></textarea></div>';
   html += '<div style="display:flex;gap:8px"><button class="nf-btn nf-btn-primary" onclick="submitMissedPunchFromLeaves()">Submit</button>';
   html += '<button class="nf-btn nf-btn-outline" onclick="document.getElementById(\'missedPunchLeavesArea\').innerHTML=\'\'">Cancel</button></div>';
@@ -17365,14 +17403,18 @@ async function submitMissedPunchFromLeaves() {
   var date = (document.getElementById('missedPunchDate') || {}).value;
   var type = (document.getElementById('missedPunchType') || {}).value;
   var reason = (document.getElementById('missedPunchReason') || {}).value.trim();
+  var outTime = (document.getElementById('missedPunchOutTime') || {}).value || '';
   if (!date) { showToast('Please select the date'); return; }
+  if (type !== 'in' && !outTime) { showToast('Please enter the time you left'); return; }
   if (!reason) { showToast('Please enter a reason'); return; }
   var btn = document.querySelector('#missedPunchLeavesArea .nf-btn-primary');
   if (btn) { btn.disabled = true; btn.textContent = 'Submitting...'; }
   try {
     var fd = new FormData();
     fd.append('date', date);
-    fd.append('reason', '(' + type + ' punch missed) ' + reason);
+    fd.append('reason', reason);
+    fd.append('type', type);
+    if (type !== 'in' && outTime) fd.append('out_time', outTime);
     await apiUpload('/attendance/missed', fd);
     showToast('Missed punch report submitted. HR will review.');
     document.getElementById('missedPunchLeavesArea').innerHTML = '';
@@ -17380,6 +17422,12 @@ async function submitMissedPunchFromLeaves() {
     showToast(e.message || 'Error submitting request');
     if (btn) { btn.disabled = false; btn.textContent = 'Submit'; }
   }
+}
+
+// Show the "time you left" field only when a punch-out was missed
+function _toggleMissedOutTime(selectId, rowId) {
+  var sel = document.getElementById(selectId), row = document.getElementById(rowId);
+  if (sel && row) row.style.display = (sel.value === 'out' || sel.value === 'both') ? '' : 'none';
 }
 
 function showMissedAttendanceForm() {
@@ -17390,7 +17438,9 @@ function showMissedAttendanceForm() {
   var html = '<div class="card fade-in" style="padding:14px;margin-bottom:12px;border-left:4px solid var(--warning,#f59e0b)">';
   html += '<h4 style="font-size:.85rem;font-weight:600;margin:0 0 10px 0">Missed Attendance Request</h4>';
   html += '<div class="form-row"><label>Date *</label><input type="date" id="missedAttDate" max="' + today + '" style="width:100%"></div>';
-  html += '<div class="form-row"><label>Reason *</label><textarea id="missedAttReason" rows="2" placeholder="Why did you miss check-in? (e.g., phone was dead, forgot, etc.)" style="width:100%;padding:8px;border:1.5px solid var(--gray-200);border-radius:var(--radius-xs);font-size:.82rem"></textarea></div>';
+  html += '<div class="form-row"><label>Missed</label><select id="missedAttType" onchange="_toggleMissedOutTime(\'missedAttType\',\'missedAttOutRow\')" style="width:100%;padding:8px;border:1.5px solid var(--gray-200);border-radius:var(--radius-xs);font-size:.82rem"><option value="in">Check-In (forgot to punch in)</option><option value="out">Check-Out (forgot to punch out)</option><option value="both">Both In & Out</option></select></div>';
+  html += '<div class="form-row" id="missedAttOutRow" style="display:none"><label>Time you left (punch-out) *</label><input type="time" id="missedAttOutTime" style="width:100%"></div>';
+  html += '<div class="form-row"><label>Reason *</label><textarea id="missedAttReason" rows="2" placeholder="Why did you miss the punch? (e.g., phone was dead, forgot, etc.)" style="width:100%;padding:8px;border:1.5px solid var(--gray-200);border-radius:var(--radius-xs);font-size:.82rem"></textarea></div>';
   html += '<div class="form-row"><label>Attach Proof (optional)</label>';
   html += '<div class="camera-zone" onclick="document.getElementById(\'missedAttProof\').click()" style="padding:10px;margin-top:4px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
   html += '<p style="font-size:.72rem;margin-top:4px">Tap to upload proof (screenshot, photo, etc.)</p>';
@@ -17406,7 +17456,10 @@ async function submitMissedAttendance() {
   var date = (document.getElementById('missedAttDate') || {}).value;
   var reason = (document.getElementById('missedAttReason') || {}).value.trim();
   var proofInput = document.getElementById('missedAttProof');
+  var type = (document.getElementById('missedAttType') || {}).value || 'in';
+  var outTime = (document.getElementById('missedAttOutTime') || {}).value || '';
   if (!date) { showToast('Please select the date you missed'); return; }
+  if (type !== 'in' && !outTime) { showToast('Please enter the time you left'); return; }
   if (!reason) { showToast('Please provide a reason'); return; }
 
   var btn = document.querySelector('#missedAttFormArea .nf-btn-primary');
@@ -17416,6 +17469,8 @@ async function submitMissedAttendance() {
     var fd = new FormData();
     fd.append('date', date);
     fd.append('reason', reason);
+    fd.append('type', type);
+    if (type !== 'in' && outTime) fd.append('out_time', outTime);
     if (proofInput && proofInput.files && proofInput.files[0]) fd.append('proof', proofInput.files[0]);
     await apiUpload('/attendance/missed', fd);
     showToast('Missed attendance request submitted. HR will review.');
@@ -17533,12 +17588,12 @@ async function loadMissedAttRequests() {
       var html = '<div class="section-title" style="font-size:.78rem">My Missed Attendance Requests</div>';
       html += '<div class="card fade-in" style="padding:10px">';
       myReqs.forEach(function(r) {
-        var dateLabel = new Date(r.request_date + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+        var dateLabel = _missedReqDate(r.request_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
         var badgeCls = r.status === 'approved' ? 'badge-approved' : r.status === 'rejected' ? 'badge-rejected' : 'badge-pending';
         var statusLabel = r.status.charAt(0).toUpperCase() + r.status.slice(1);
         html += '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--gray-100)">';
         html += '<div style="flex:1"><div style="font-weight:600;font-size:.78rem">' + escapeHTML(dateLabel) + '</div>';
-        html += '<div style="font-size:.68rem;color:var(--gray-500)">' + escapeHTML(r.reason) + '</div>';
+        html += '<div style="font-size:.68rem;color:var(--gray-500)">' + escapeHTML(_missedTypeLabel(r)) + ' &middot; ' + escapeHTML(r.reason) + '</div>';
         if (r.review_note) html += '<div style="font-size:.65rem;color:var(--gray-400);margin-top:2px">HR: ' + escapeHTML(r.review_note) + '</div>';
         html += '</div>';
         html += '<span class="badge-status ' + badgeCls + '">' + escapeHTML(statusLabel) + '</span></div>';
@@ -17558,12 +17613,13 @@ function renderMissedAttForHR() {
   var html = '<div style="margin-top:16px"><div class="section-title">Missed Attendance Requests <span style="background:var(--danger);color:#fff;font-size:.65rem;padding:1px 7px;border-radius:10px;margin-left:6px">' + pending.length + '</span></div>';
   html += '<div class="card fade-in" style="padding:10px">';
   pending.forEach(function(r) {
-    var dateLabel = new Date(r.request_date + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    var dateLabel = _missedReqDate(r.request_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
     var empName = r.name || r.emp_code;
     html += '<div style="padding:10px 0;border-bottom:1px solid var(--gray-100)">';
     html += '<div style="display:flex;align-items:center;gap:10px">';
     html += '<div style="flex:1"><div style="font-weight:600;font-size:.82rem">' + escapeHTML(empName) + ' <span style="font-weight:400;color:var(--gray-500);font-size:.72rem">(' + escapeHTML(r.emp_code) + ')</span></div>';
     html += '<div style="font-size:.72rem;color:var(--gray-500)">Date: <strong>' + escapeHTML(dateLabel) + '</strong>' + (r.dept ? ' &middot; ' + escapeHTML(r.dept) : '') + '</div>';
+    html += '<div style="font-size:.72rem;color:var(--gray-600);margin-top:2px">Missed: <strong>' + escapeHTML(_missedTypeLabel(r)) + '</strong></div>';
     html += '<div style="font-size:.72rem;color:var(--gray-600);margin-top:2px">Reason: ' + escapeHTML(r.reason) + '</div>';
     if (r.proof_url) {
       var proofUrl = r.proof_url + (r.proof_url.indexOf('?') === -1 ? '?' : '&') + 'token=' + encodeURIComponent(JWT_TOKEN);
@@ -17580,10 +17636,37 @@ function renderMissedAttForHR() {
   return html;
 }
 
+// The request date arrives as a full ISO timestamp from the API; appending
+// 'T00:00:00' to that gave "Invalid Date" in both request lists.
+function _missedReqDate(v) {
+  var str = String(v || '');
+  return str.indexOf('T') > 0 ? new Date(str) : new Date(str + 'T00:00:00');
+}
+
+// "Punch-out (left at 17:30)" etc. for a missed-punch request
+function _missedTypeLabel(r) {
+  var t = r.missed_type || 'in';
+  var left = r.out_time ? ' (left at ' + r.out_time + ')' : '';
+  if (t === 'out') return 'Punch-out' + left;
+  if (t === 'both') return 'Punch-in & punch-out' + left;
+  return 'Punch-in';
+}
+
 async function approveMissedAtt(id) {
+  var req = (window._missedAttRequests || []).find(function(r) { return r.id === id; }) || {};
+  var body = {};
+  if (req.missed_type === 'out' || req.missed_type === 'both') {
+    // HR confirms (or corrects) the leaving time the day will be calculated on
+    var t = prompt('Punch-out time to record (24-hour HH:MM):', req.out_time || '');
+    if (t === null) return; // cancelled
+    t = t.trim();
+    if (!/^([01]?\d|2[0-3]):[0-5]\d$/.test(t)) { showToast('Enter the time as HH:MM, e.g. 17:30'); return; }
+    body.out_time = t;
+  }
   var note = prompt('Add a note (optional):') || '';
+  body.note = note;
   try {
-    await apiCall('PUT', '/attendance/missed/' + id + '/approve', { note: note });
+    await apiCall('PUT', '/attendance/missed/' + id + '/approve', body);
     showToast('Missed attendance approved — attendance marked');
     // Refresh data
     var data = await apiCall('GET', '/attendance/missed');
