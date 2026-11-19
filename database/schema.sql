@@ -256,6 +256,8 @@ CREATE TABLE IF NOT EXISTS attendance_logs (
   check_out_lng DECIMAL(10,7),
   status ENUM('Present','Absent','Half Day','Leave') DEFAULT 'Present',
   log_date DATE NOT NULL,
+  auto_closed TINYINT(1) NOT NULL DEFAULT 0, -- 1 = no punch-out, closed by the server with half-day credit
+  checkout_reminded_at DATETIME NULL, -- punch-out reminder already sent for this session
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (emp_code) REFERENCES employees(code) ON DELETE CASCADE,
   INDEX idx_att_emp_date (emp_code, log_date) -- several check-in sessions per day are allowed

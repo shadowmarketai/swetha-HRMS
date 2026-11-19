@@ -41,6 +41,37 @@ async function lockEmployee(empCode) {
 // who checks in late evening can still check out after midnight.
 const OVERNIGHT_MS = 18 * 60 * 60 * 1000;
 
+// A day with a missing punch-out is credited this much (a half day) until HR
+// approves a missed punch-out request. Must match MISSING_OUT_CREDIT_MIN in
+// server.js and app.js.
+const MISSING_OUT_CREDIT_MIN = 240;
+
+// 'HH:MM' (24h) -> 'HH:MM' zero-padded, or '' if it is not a valid time.
+function cleanHHMM(v) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(String(v || '').trim());
+  if (!m) return '';
+  const h = Number(m[1]), mi = Number(m[2]);
+  if (h > 23 || mi > 59) return '';
+  return String(h).padStart(2, '0') + ':' + String(mi).padStart(2, '0');
+}
+
+// Write a notification row. Rows are what the notification list shows (and
+// what gets pushed to phones); the socket events alone reach only open apps.
+// Never fails the request it belongs to.
+async function notifyRow(empCodes, title, message) {
+  try {
+    const values = [...new Set(empCodes)].filter(Boolean).map(code => [code, title, message, 'attendance']);
+    if (values.length) await pool.query('INSERT INTO notifications (emp_code, title, message, type) VALUES ?', [values]);
+  } catch (e) { console.error('Notify error:', e.message); }
+}
+const MISSED_TYPE_TEXT = { in: 'punch-in', out: 'punch-out', both: 'punch-in and punch-out' };
+
+// Which punch a missed-punch request is about.
+function cleanMissedType(v) {
+  const t = String(v || '').toLowerCase();
+  return (t === 'out' || t === 'both') ? t : 'in';
+}
+
 // Validate the optional punched_at_ms sent by the offline queue.
 // Absent  -> null, and the caller falls back to NOW() (existing behaviour).
 // Present -> must be a sane instant; anything else is refused outright rather
@@ -357,17 +388,48 @@ router.post('/missed', verifyToken, upload.single('proof'), async (req, res) => 
   try {
     const { date, reason } = req.body;
     if (!date || !reason) return res.status(400).json({ error: 'Date and reason are required' });
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date)) || date > getTodayIST()) {
+      return res.status(400).json({ error: 'Please choose a valid date (today or earlier)' });
+    }
+    const missedType = cleanMissedType(req.body.type);
+    const outTime = cleanHHMM(req.body.out_time);
+    if (missedType !== 'in' && !outTime) {
+      return res.status(400).json({ error: 'Please enter the time you left (punch-out time)' });
+    }
 
-    // Refuse only if the day already has a morning punch. An evening-only day
-    // (the case the check-in screen itself warns will count as Absent) must be
-    // fixable here; refusing every day with any row made that impossible.
-    // A forgotten check-out needs no request: it is closed automatically.
-    const [existing] = await pool.query(
-      `SELECT id FROM attendance_logs WHERE emp_code = ? AND log_date = ? AND check_in IS NOT NULL
-       AND HOUR(CONVERT_TZ(check_in, '+00:00', '+05:30')) < 14`,
-      [req.user.empCode, date]
-    );
-    if (existing.length > 0) return res.status(400).json({ error: 'You already have a morning check-in recorded for this date' });
+    if (outTime && date === getTodayIST()) {
+      const nowHHMM = new Date().toLocaleTimeString('en-GB', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', hour12: false });
+      if (outTime > nowHHMM) return res.status(400).json({ error: 'Punch-out time cannot be in the future' });
+    }
+
+    if (missedType === 'out') {
+      // Forgot to punch out: there must be a session on that day that the
+      // employee never closed — still open, or closed by the server.
+      const [sessions] = await pool.query(
+        `SELECT id, (check_in < CONVERT_TZ(CONCAT(?, ' ', ?, ':00'), '+05:30', @@session.time_zone)) AS after_in
+         FROM attendance_logs WHERE emp_code = ? AND log_date = ? AND check_in IS NOT NULL
+         AND (check_out IS NULL OR auto_closed = 1) ORDER BY check_in DESC LIMIT 1`,
+        [date, outTime, req.user.empCode, date]
+      );
+      if (sessions.length === 0) {
+        return res.status(400).json({ error: 'No check-in without a punch-out was found for this date' });
+      }
+      if (!Number(sessions[0].after_in)) {
+        return res.status(400).json({ error: 'Punch-out time must be after your check-in time' });
+      }
+    } else {
+      // Refuse only if the day already has a morning punch. An evening-only day
+      // (the case the check-in screen itself warns will count as Absent) must be
+      // fixable here; refusing every day with any row made that impossible.
+      const [existing] = await pool.query(
+        `SELECT id FROM attendance_logs WHERE emp_code = ? AND log_date = ? AND check_in IS NOT NULL
+         AND HOUR(CONVERT_TZ(check_in, '+00:00', '+05:30')) < 14`,
+        [req.user.empCode, date]
+      );
+      if (existing.length > 0) {
+        return res.status(400).json({ error: 'You already have a morning check-in for this date. If you forgot to punch out, choose "Check-Out (forgot to punch out)".' });
+      }
+    }
 
     // Check if already has a pending request for that date
     const [pendingReq] = await pool.query(
@@ -379,17 +441,21 @@ router.post('/missed', verifyToken, upload.single('proof'), async (req, res) => 
     const proofUrl = req.file ? '/uploads/' + req.file.filename : null;
 
     const [result] = await pool.query(
-      'INSERT INTO missed_attendance_requests (emp_code, request_date, reason, proof_url) VALUES (?, ?, ?, ?)',
-      [req.user.empCode, date, reason, proofUrl]
+      'INSERT INTO missed_attendance_requests (emp_code, request_date, reason, proof_url, missed_type, out_time) VALUES (?, ?, ?, ?, ?, ?)',
+      [req.user.empCode, date, reason, proofUrl, missedType, outTime || null]
     );
 
     // Notify HR
     const io = req.app.get('io');
     if (io) {
       io.to('role:HR').emit('missed-attendance:new', {
-        empCode: req.user.empCode, name: req.user.name, date, reason
+        empCode: req.user.empCode, name: req.user.name, date, reason, type: missedType
       });
     }
+
+    const [admins] = await pool.query("SELECT code FROM employees WHERE role IN ('MD','HR') AND is_active = 1");
+    await notifyRow(admins.map(a => a.code).filter(c => c !== req.user.empCode), 'Missed punch request',
+      (req.user.name || req.user.empCode) + ' reported a missed ' + MISSED_TYPE_TEXT[missedType] + ' for ' + date + '.');
 
     res.json({ message: 'Missed attendance request submitted', id: result.insertId });
   } catch (err) {
@@ -434,23 +500,72 @@ router.put('/missed/:id/approve', verifyToken, requireRole('MD', 'HR'), async (r
     // '2026-10-12 00:00:00.000 09:00:00', which MySQL rejects
     const reqYmd = dojYmdOf({ doj: request.request_date });
 
-    // Auto-create attendance record for that date — before marking the request
-    // approved, so a failure can't leave it approved with nothing recorded.
-    // check_in is stored in UTC (see CONVERT_TZ above); 09:00 is IST.
-    // If the employee punched later that day (evening-only), the approved
-    // morning session runs until their first real check-in, so the day reads
-    // as one continuous stretch instead of overlapping sessions.
-    const [laterRows] = await pool.query(
-      `SELECT MIN(check_in) AS first_in FROM attendance_logs WHERE emp_code = ? AND log_date = ? AND check_in IS NOT NULL
-       AND check_in > CONVERT_TZ(CONCAT(?, ' 09:00:00'), '+05:30', '+00:00')`,
-      [request.emp_code, reqYmd, reqYmd]
-    );
-    const firstIn = laterRows[0] && laterRows[0].first_in;
-    await pool.query(
-      `INSERT INTO attendance_logs (emp_code, check_in, check_out, status, log_date, location_name, remark)
-       VALUES (?, CONVERT_TZ(CONCAT(?, ' 09:00:00'), '+05:30', '+00:00'), ?, 'Present', ?, 'Missed Check-In (Approved)', ?)`,
-      [request.emp_code, reqYmd, firstIn || null, reqYmd, 'Missed attendance approved by HR: ' + (request.reason || '')]
-    );
+    const missedType = cleanMissedType(request.missed_type);
+    // HR may correct the leaving time; otherwise the employee's own is used.
+    const rawOut = req.body.out_time;
+    if (rawOut !== undefined && rawOut !== null && String(rawOut).trim() !== '' && !cleanHHMM(rawOut)) {
+      return res.status(400).json({ error: 'Punch-out time must be in HH:MM (24-hour) format' });
+    }
+    const outTime = cleanHHMM(rawOut) || cleanHHMM(request.out_time);
+
+    if (missedType === 'out') {
+      // Forgot to punch out: put the real leaving time on the session that was
+      // left open (or that the server closed with half-day credit). This is
+      // done before marking the request approved, so a failure can't leave it
+      // approved with nothing recorded.
+      if (!outTime) return res.status(400).json({ error: 'Punch-out time is required to approve this request' });
+      const [sessions] = await pool.query(
+        `SELECT id, (check_in < CONVERT_TZ(CONCAT(?, ' ', ?, ':00'), '+05:30', @@session.time_zone)) AS after_in
+         FROM attendance_logs WHERE emp_code = ? AND log_date = ? AND check_in IS NOT NULL
+         AND (check_out IS NULL OR auto_closed = 1) ORDER BY check_in DESC LIMIT 1`,
+        [reqYmd, outTime, request.emp_code, reqYmd]
+      );
+      if (sessions.length === 0) {
+        return res.status(400).json({ error: 'No check-in without a punch-out exists for that date any more. Reject this request instead.' });
+      }
+      if (!Number(sessions[0].after_in)) {
+        return res.status(400).json({ error: 'Punch-out time must be after the check-in time' });
+      }
+      await pool.query(
+        `UPDATE attendance_logs
+         SET check_out = CONVERT_TZ(CONCAT(?, ' ', ?, ':00'), '+05:30', @@session.time_zone), auto_closed = 0,
+             remark = TRIM(CONCAT(COALESCE(remark, ''), ' [Punch-out ', ?, ' approved by HR: ', ?, ']'))
+         WHERE id = ?`,
+        [reqYmd, outTime, outTime, String(request.reason || '').slice(0, 200), sessions[0].id]
+      );
+    } else {
+      // Auto-create attendance record for that date — before marking the request
+      // approved, so a failure can't leave it approved with nothing recorded.
+      // check_in is stored in UTC (see CONVERT_TZ above); 09:00 is IST.
+      // If the employee punched later that day (evening-only), the approved
+      // morning session runs until their first real check-in, so the day reads
+      // as one continuous stretch instead of overlapping sessions.
+      const [laterRows] = await pool.query(
+        `SELECT MIN(check_in) AS first_in FROM attendance_logs WHERE emp_code = ? AND log_date = ? AND check_in IS NOT NULL
+         AND check_in > CONVERT_TZ(CONCAT(?, ' 09:00:00'), '+05:30', '+00:00')`,
+        [request.emp_code, reqYmd, reqYmd]
+      );
+      const firstIn = laterRows[0] && laterRows[0].first_in;
+      if (firstIn) {
+        await pool.query(
+          `INSERT INTO attendance_logs (emp_code, check_in, check_out, status, log_date, location_name, remark)
+           VALUES (?, CONVERT_TZ(CONCAT(?, ' 09:00:00'), '+05:30', '+00:00'), ?, 'Present', ?, 'Missed Check-In (Approved)', ?)`,
+          [request.emp_code, reqYmd, firstIn, reqYmd, 'Missed attendance approved by HR: ' + (request.reason || '')]
+        );
+      } else {
+        // No punch at all that day. HR is approving the day, so it is closed
+        // here rather than left open: at the stated leaving time if one was
+        // given (it must be after 09:00), otherwise as a full 8h day — an open
+        // session would now be closed by the server as a half day.
+        const useOut = outTime && outTime > '09:00' ? outTime : '17:00';
+        await pool.query(
+          `INSERT INTO attendance_logs (emp_code, check_in, check_out, status, log_date, location_name, remark)
+           VALUES (?, CONVERT_TZ(CONCAT(?, ' 09:00:00'), '+05:30', '+00:00'),
+                   CONVERT_TZ(CONCAT(?, ' ', ?, ':00'), '+05:30', '+00:00'), 'Present', ?, 'Missed Check-In (Approved)', ?)`,
+          [request.emp_code, reqYmd, reqYmd, useOut, reqYmd, 'Missed attendance approved by HR: ' + (request.reason || '')]
+        );
+      }
+    }
 
     // Mark request as approved
     await pool.query(
@@ -463,6 +578,10 @@ router.put('/missed/:id/approve', verifyToken, requireRole('MD', 'HR'), async (r
     if (io) {
       io.to('user:' + request.emp_code).emit('missed-attendance:approved', { date: request.request_date });
     }
+
+    await notifyRow([request.emp_code], 'Missed punch request approved',
+      'Your missed ' + MISSED_TYPE_TEXT[missedType] + ' request for ' + reqYmd + ' was approved' +
+      (missedType === 'out' ? ' (punch-out recorded as ' + outTime + ').' : '.'));
 
     res.json({ message: 'Request approved and attendance marked' });
   } catch (err) {
@@ -491,6 +610,9 @@ router.put('/missed/:id/reject', verifyToken, requireRole('MD', 'HR'), async (re
     if (io) {
       io.to('user:' + rows[0].emp_code).emit('missed-attendance:rejected', { date: rows[0].request_date });
     }
+
+    await notifyRow([rows[0].emp_code], 'Missed punch request rejected',
+      'Your missed punch request for ' + dojYmdOf({ doj: rows[0].request_date }) + ' was rejected.' + (note ? ' Note: ' + String(note).slice(0, 200) : ''));
 
     res.json({ message: 'Request rejected' });
   } catch (err) {
@@ -552,8 +674,8 @@ router.get('/export/consolidated', verifyToken, requireRole('MD', 'HR'), async (
         } else if (isCurrentMonth && d === today.getDate()) {
           end = Date.now();
         } else {
-          const autoOut = new Date(new Date(row.check_in).toDateString() + ' 21:00:00').getTime();
-          end = Math.min(autoOut, start + 480 * 60000);
+          // Past day, no punch-out, not yet closed by the server: half-day credit
+          end = start + MISSING_OUT_CREDIT_MIN * 60000;
         }
         if (end > start) attMap[row.emp_code][d].mins += (end - start) / 60000;
       }
@@ -795,7 +917,7 @@ router.get('/export/punch-detail', verifyToken, requireRole('MD', 'HR'), async (
 
     const [attRows, leaveRows, holidayRows, empRows] = await Promise.all([
       pool.query(
-        `SELECT a.emp_code, a.log_date, a.check_in, a.check_out
+        `SELECT a.emp_code, a.log_date, a.check_in, a.check_out, a.auto_closed
          FROM attendance_logs a WHERE a.log_date LIKE ? ORDER BY a.emp_code, a.log_date`,
         [month + '%']
       ),
@@ -825,7 +947,12 @@ router.get('/export/punch-detail', verifyToken, requireRole('MD', 'HR'), async (
         if (!entry.checkIn || new Date(row.check_in) < new Date(entry.checkIn)) entry.checkIn = row.check_in;
         const start = new Date(row.check_in).getTime();
         let end;
-        if (row.check_out && (new Date(row.check_out).getTime() - start) >= 5 * 60000) {
+        if (row.auto_closed && row.check_out) {
+          // No punch-out: the server closed this session with half-day credit.
+          // Count the credited time but show no OUT time — it is not a real punch.
+          entry.missingOut = true;
+          end = new Date(row.check_out).getTime();
+        } else if (row.check_out && (new Date(row.check_out).getTime() - start) >= 5 * 60000) {
           // Valid checkout — gap is at least 5 minutes
           end = new Date(row.check_out).getTime();
           if (!entry.checkOut || new Date(row.check_out) > new Date(entry.checkOut)) entry.checkOut = row.check_out;
@@ -836,7 +963,7 @@ router.get('/export/punch-detail', verifyToken, requireRole('MD', 'HR'), async (
         } else {
           // Rule A: missing checkout on past day — credit only 4h (half day), not 8h
           entry.missingOut = true;
-          end = start + 4 * 60 * 60000;
+          end = start + MISSING_OUT_CREDIT_MIN * 60000;
         }
         if (end && end > start) entry.mins += (end - start) / 60000;
       }
