@@ -55,6 +55,17 @@ function cleanHHMM(v) {
   return String(h).padStart(2, '0') + ':' + String(mi).padStart(2, '0');
 }
 
+// Write a notification row. Rows are what the notification list shows (and
+// what gets pushed to phones); the socket events alone reach only open apps.
+// Never fails the request it belongs to.
+async function notifyRow(empCodes, title, message) {
+  try {
+    const values = [...new Set(empCodes)].filter(Boolean).map(code => [code, title, message, 'attendance']);
+    if (values.length) await pool.query('INSERT INTO notifications (emp_code, title, message, type) VALUES ?', [values]);
+  } catch (e) { console.error('Notify error:', e.message); }
+}
+const MISSED_TYPE_TEXT = { in: 'punch-in', out: 'punch-out', both: 'punch-in and punch-out' };
+
 // Which punch a missed-punch request is about.
 function cleanMissedType(v) {
   const t = String(v || '').toLowerCase();
@@ -442,6 +453,10 @@ router.post('/missed', verifyToken, upload.single('proof'), async (req, res) => 
       });
     }
 
+    const [admins] = await pool.query("SELECT code FROM employees WHERE role IN ('MD','HR') AND is_active = 1");
+    await notifyRow(admins.map(a => a.code).filter(c => c !== req.user.empCode), 'Missed punch request',
+      (req.user.name || req.user.empCode) + ' reported a missed ' + MISSED_TYPE_TEXT[missedType] + ' for ' + date + '.');
+
     res.json({ message: 'Missed attendance request submitted', id: result.insertId });
   } catch (err) {
     console.error(err);
@@ -564,6 +579,10 @@ router.put('/missed/:id/approve', verifyToken, requireRole('MD', 'HR'), async (r
       io.to('user:' + request.emp_code).emit('missed-attendance:approved', { date: request.request_date });
     }
 
+    await notifyRow([request.emp_code], 'Missed punch request approved',
+      'Your missed ' + MISSED_TYPE_TEXT[missedType] + ' request for ' + reqYmd + ' was approved' +
+      (missedType === 'out' ? ' (punch-out recorded as ' + outTime + ').' : '.'));
+
     res.json({ message: 'Request approved and attendance marked' });
   } catch (err) {
     console.error(err);
@@ -591,6 +610,9 @@ router.put('/missed/:id/reject', verifyToken, requireRole('MD', 'HR'), async (re
     if (io) {
       io.to('user:' + rows[0].emp_code).emit('missed-attendance:rejected', { date: rows[0].request_date });
     }
+
+    await notifyRow([rows[0].emp_code], 'Missed punch request rejected',
+      'Your missed punch request for ' + dojYmdOf({ doj: rows[0].request_date }) + ' was rejected.' + (note ? ' Note: ' + String(note).slice(0, 200) : ''));
 
     res.json({ message: 'Request rejected' });
   } catch (err) {
